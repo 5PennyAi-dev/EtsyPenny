@@ -1,24 +1,27 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import ProductStudio from './pages/ProductStudio';
+import LoginPage from './pages/LoginPage';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <div className="p-8">
-              <h1 className="text-3xl font-bold text-primary">Dashboard</h1>
-              <p className="mt-4 text-slate-500">Welcome to EtsyPenny.</p>
-            </div>
-          </ProtectedRoute>
-        } />
-        <Route path="/" element={
-          <div className="flex items-center justify-center min-h-screen bg-slate-50">
-            <h1 className="text-4xl font-bold text-indigo-600">EtsyPenny</h1>
-          </div>
-        } />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route 
+            path="/studio" 
+            element={
+              <ProtectedRoute>
+                <ProductStudio />
+              </ProtectedRoute>
+            } 
+          />
+          {/* Default redirect to studio (which will redirect to login if needed) */}
+          <Route path="/" element={<Navigate to="/studio" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
