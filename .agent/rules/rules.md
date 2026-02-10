@@ -28,6 +28,7 @@ trigger: always_on
 
 10. **Persistent Context Management**: At the end of every work session, you MUST update the `docs/context.md` file. This file serves as the "Living Memory" of the project and will be the first file read at the start of any new session. 
     - **Content Requirements**: It must include a concise project summary, the finalized tech stack, core UI/Style specifications, and a "Latest Developments" section.
+    - **Preserve History**: **NEVER OVERWRITE** the "Latest Developments" history. Always **APPEND** new items to the list or maintain a reverse-chronological order. You must keep a complete history of the project's evolution.
     - **Session Handover**: Summarize exactly what was achieved in the current session and clearly state the next immediate steps. 
     - **Consistency**: Ensure that any architectural or design decisions made during the session are reflected in this document to prevent future regressions.
 
