@@ -30,6 +30,6 @@
 - [Live] **End-to-End Analysis Flow**: Successful image upload, database insertion, and N8N webhook trigger confirmed.
 
 ## 5. Next Steps (Action Items)
-- Polish the UI for the Login/Signup pages (currently functional but basic).
+- **IMMEDIATE FOCUS**: Receive SEO analysis JSON from N8N workflow and display results in `ResultsDisplay.jsx`.
+- Polish the UI for the Login/Signup pages.
 - Implement the comprehensive Landing Page.
-- Monitor N8N webhook execution and handle the response in the UI (currently fire-and-forget).

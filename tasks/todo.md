@@ -35,4 +35,10 @@
     - [x] Fix Database Schema (Added `status` and `title` columns).
     - [x] Verify End-to-End Analysis Workflow.
 
-- [ ] Phase 4: Production Polish
+- [ ] Phase 4: N8N Integration & Polish
+    - [ ] **Handle N8N Webhook Response**:
+        - [ ] Create API Endpoint or Edge Function to receive N8N callback (or poll for logic).
+        - [ ] Update `ProductStudio` to listen for completion.
+        - [ ] Populate `ResultsDisplay` with real data from DB.
+    - [ ] Polish Login/Signup UI.
+    - [ ] Build Landing Page.
