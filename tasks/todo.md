@@ -38,7 +38,16 @@
 - [ ] Phase 4: N8N Integration & Polish
     - [ ] **Handle N8N Webhook Response**:
         - [ ] Create API Endpoint or Edge Function to receive N8N callback (or poll for logic).
-        - [ ] Update `ProductStudio` to listen for completion.
-        - [ ] Populate `ResultsDisplay` with real data from DB.
+        - [x] **Update Database Schema**:
+            - [x] Add `volume_history` (int array), `is_top_tag`, `is_trending`, `is_evergreen`, `is_promising` (bools) to `listing_seo_stats`.
+        - [x] Update `ProductStudio` to listen for completion.
+        - [x] Populate `ResultsDisplay` with real data from DB including new metrics.
+    - [x] Refine `ResultsDisplay` UI (Sparklines, Status Icons, 2-Column Layout).
+    - [x] Refactor `ResultsDisplay` to Main + Sidebar layout.
+    - [x] Implement `ProductStudio` state logic (SEO vs Drafting phases).
+    - [x] Update `ResultsDisplay` sidebar states (Ready, Drafting, Editor).
+    - [x] Update `OptimizationForm` to include Tone and Sub-niche.
+    - [x] Implement `handleGenerateDraft` with real N8N webhook call.
+    - [x] Fix CORS issues and standardize N8N payload schema.
     - [ ] Polish Login/Signup UI.
     - [ ] Build Landing Page.

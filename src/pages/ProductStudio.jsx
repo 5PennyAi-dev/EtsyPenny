@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { Zap, Sparkles } from 'lucide-react';
 import ImageUpload from '../components/studio/ImageUpload';
@@ -8,46 +8,33 @@ import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
-const MOCK_RESULTS = {
-  title: "Vintage Cat T-Shirt - Retro Bookworm Kitten Graphic Tee, Cozy Book Lover Gift, Indie Aesthetic Apparel, Novelty Animal Shirt",
-  description: `Embrace your love for cats and literature with our vintage-inspired graphic tee! Perfect for cozy days reading or casual outings.
-
-Features:
-- Soft, high-quality cotton blend
-- Unique retro design
-- Available in multiple sizes
-- Machine washable
-
-This shirt makes a perfect gift for librarians, book club members, and cat moms alike. Pair it with your favorite jeans and a cardigan for the ultimate cozy aesthetic.`,
-  tags: [
-    "Vintage Cat Shirt", "Retro Graphic Tee", "Book Lover Gift", "Kitten T-Shirt", 
-    "Indie Aesthetic", "Novelty Animal Tee", "Cozy Apparel", "Cat Mom Gift", 
-    "Bookworm Shirt", "Bookish Shirt", "Quirky Style", "Animal Graphic", "Etsy Finds"
-  ],
-  analytics: [
-    { keyword: "Vintage Cat Shirt", volume: 12500, competition: "Medium", score: 85 },
-    { keyword: "Retro Graphic Tee", volume: 45000, competition: "High", score: 72 },
-    { keyword: "Book Lover Gift", volume: 28000, competition: "Medium", score: 88 },
-    { keyword: "Kitten T-Shirt", volume: 8200, competition: "Low", score: 94 },
-    { keyword: "Indie Aesthetic", volume: 18500, competition: "Low", score: 92 },
-    { keyword: "Cozy Apparel", volume: 32000, competition: "High", score: 68 },
-    { keyword: "Novelty Animal Tee", volume: 5600, competition: "Low", score: 97 },
-  ]
-};
-
 const ProductStudio = () => {
   const { user, profile } = useAuth();
   const [showResults, setShowResults] = useState(false);
   const [isLoading, setIsLoading] = useState(false); // false | 'uploading' | 'saving' | 'triggering' | true
   const [selectedImage, setSelectedImage] = useState(null);
+  const [listingId, setListingId] = useState(null);
+  const [results, setResults] = useState(null);
+  const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+  const [analysisContext, setAnalysisContext] = useState(null);
+
+  // No changes to imports
+
+  // ... (keep useEffect for realtime as a backup or removal? Let's keep it but focusing on the direct response)
+  // Actually, if we handle it here, we might double-fetch if realtime also triggers. 
+  // But since the Status won't change to 'completed' until WE do it here, the realtime won't fire early.
+  // And once we update it, the realtime might fire. 
+  // Let's rely on the direct response for speed and reliability if N8N returns data.
 
   const handleAnalyze = async (formData) => {
+    // Save context for drafting phase
+    setAnalysisContext(formData);
+    
     if (!selectedImage) {
         alert("Please select an image first.");
         return;
     }
     
-    // Auth context ensures user is present via ProtectedRoute, but good safety check
     if (!user) {
         alert("You must be logged in to analyze products.");
         return;
@@ -55,16 +42,14 @@ const ProductStudio = () => {
 
     try {
         setIsLoading('uploading');
+        setListingId(null);
+        setResults(null);
+        setShowResults(false);
         
         // 1. Upload Image
         console.log("Starting upload process...");
-        console.log("User ID:", user.id);
-        console.log("Selected Image:", selectedImage.name, selectedImage.size, selectedImage.type);
-
-        // Sanitize filename
         const sanitizedFileName = selectedImage.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const filename = `${user.id}/${Date.now()}_${sanitizedFileName}`;
-        console.log("Generated Filename:", filename);
 
         const { data: uploadData, error: uploadError } = await supabase.storage
             .from('mockups_bucket')
@@ -73,15 +58,9 @@ const ProductStudio = () => {
                 upsert: false
             });
 
-        if (uploadError) {
-            console.error("Upload Error Details:", uploadError);
-            throw uploadError;
-        }
-
-        console.log("Upload Success:", uploadData);
+        if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage.from('mockups_bucket').getPublicUrl(filename);
-        console.log("Public URL:", publicUrl);
         
         setIsLoading('saving');
 
@@ -95,27 +74,27 @@ const ProductStudio = () => {
         const { data: listingData, error: dbError } = await supabase
             .from('listings')
             .insert({
-                user_id: user.id, // Use authenticated user ID
+                user_id: user.id,
                 product_type_id: formData.product_type_id,
                 tone_id: formData.tone_id,
                 theme_id: formData.theme_id,
                 niche_id: formData.niche_id,
                 sub_niche_id: formData.sub_niche_id,
                 user_description: formData.context,
-                custom_listing: JSON.stringify(customData), // Store custom text inputs
-                image_url: publicUrl, // Now supported by DB schema
+                custom_listing: JSON.stringify(customData),
+                image_url: publicUrl,
                 title: "Pending Analysis...",
-                status: 'processing' // Good practice
+                status: 'processing'
             })
             .select()
             .single();
 
         if (dbError) throw dbError;
 
+        setListingId(listingData.id);
         setIsLoading('triggering');
 
         // 3. Trigger Webhook (N8N)
-        // Construct Payload according to User Schema
         const webhookPayload = {
             action: "generate_seo",
             listing_id: listingData.id,
@@ -123,15 +102,15 @@ const ProductStudio = () => {
             payload: {
                 image_url: publicUrl,
                 categorization: {
-                    theme: formData.theme_name, // Text for AI
-                    niche: formData.niche_name, // Text for AI
-                    sub_niche: formData.sub_niche_name, // Text for AI
+                    theme: formData.theme_name,
+                    niche: formData.niche_name,
+                    sub_niche: formData.sub_niche_name,
                     custom_listing: formData.custom_theme || formData.custom_niche ? JSON.stringify(customData) : null
                 },
                 product_details: {
-                    product_type: formData.product_type_name, // Text
-                    tone: formData.tone_name, // Text
-                    client_description: formData.context // Text
+                    product_type: formData.product_type_name,
+                    tone: formData.tone_name,
+                    client_description: formData.context
                 }
             },
             metadata: {
@@ -140,22 +119,176 @@ const ProductStudio = () => {
             }
         };
 
-        // NOTE: In production, use an Edge Function to hide the n8n URL
-        await axios.post(
+        // Note: We expect the N8N workflow to return the analysis data in the response
+        const response = await axios.post(
             'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2', 
             webhookPayload
         );
 
-        // Success!
+        console.log("N8N Response:", response.data);
+        const responseData = response.data;
+        
+        let seoAnalysis = [];
+        let generatedTitle = "SEO Analysis Completed";
+        let generatedDescription = "Please review the competition analysis below.";
+
+        // Handle different response structures
+        if (Array.isArray(responseData)) {
+            // Case: Response is just the array of stats
+            seoAnalysis = responseData;
+        } else if (responseData && responseData.seo_analysis) {
+            // Case: Response is an object with metadata
+            seoAnalysis = responseData.seo_analysis;
+            generatedTitle = responseData.title || generatedTitle;
+            generatedDescription = responseData.description || generatedDescription;
+        } else {
+             throw new Error("Invalid response structure from analysis service");
+        }
+
+        // 4. Save Results to Database
+        setIsLoading('saving');
+
+        // Update Listing with Title/Desc
+        const { error: updateError } = await supabase
+            .from('listings')
+            .update({
+                generated_title: generatedTitle,
+                generated_description: generatedDescription,
+                status: 'completed',
+                title: generatedTitle // Update main title as well?
+            })
+            .eq('id', listingData.id);
+
+        if (updateError) throw updateError;
+
+        // Insert SEO Stats
+        // transform seoAnalysis (array) to db format
+        const statsToInsert = seoAnalysis.map(item => ({
+            listing_id: listingData.id,
+            tag: item.keyword,
+            search_volume: item.avg_volume || 0,
+            competition: String(item.competition), 
+            opportunity_score: item.opportunity_score,
+            volume_history: item.volumes_history || [],
+            is_trending: item.status?.trending || false,
+            is_evergreen: item.status?.evergreen || false,
+            is_promising: item.status?.promising || false
+        }));
+
+        const { error: statsInsertError } = await supabase
+            .from('listing_seo_stats')
+            .insert(statsToInsert);
+
+        if (statsInsertError) throw statsInsertError;
+
+        // 5. Update UI
+        const formattedResults = {
+            title: generatedTitle === "SEO Analysis Completed" ? null : generatedTitle, // Use null to trigger "Ready to Craft" state
+            description: generatedDescription === "Please review the competition analysis below." ? null : generatedDescription,
+            imageUrl: publicUrl,
+            tags: statsToInsert.map(s => s.tag),
+            analytics: statsToInsert.map(s => ({
+                keyword: s.tag,
+                volume: s.search_volume,
+                competition: s.competition,
+                score: s.opportunity_score,
+                volume_history: s.volume_history,
+                is_trending: s.is_trending,
+                is_evergreen: s.is_evergreen,
+                is_promising: s.is_promising
+            }))
+        };
+
+        setResults(formattedResults);
         setIsLoading(false);
-        // alert("Analysis Started! Results will appear shortly.");
-        setShowResults(true); // Show mock results for now
+        setShowResults(true);
 
     } catch (err) {
         console.error("Error:", err);
         alert("An error occurred: " + err.message);
         setIsLoading(false);
     }
+  };
+
+  const handleGenerateDraft = async () => {
+      if (isGeneratingDraft || !results || !analysisContext) return;
+      setIsGeneratingDraft(true);
+
+      try {
+        const payload = {
+            action: 'drafting_seo',
+            keywords: results.analytics.map(k => ({
+                keyword: k.keyword,
+                avg_volume: k.volume,
+                competition: typeof k.competition === 'string' && !isNaN(parseFloat(k.competition)) ? parseFloat(k.competition) : k.competition, 
+                opportunity_score: k.score,
+                volumes_history: k.volume_history,
+                status: {
+                   trending: k.is_trending,
+                   evergreen: k.is_evergreen,
+                   promising: k.is_promising
+                }
+            })),
+            mockups: [results.imageUrl], 
+            listing_id: listingId,
+            payload: {
+                image_url: results.imageUrl, // Added to match generate_seo schema
+                categorization: {
+                    theme: analysisContext.theme_name || "General",
+                    niche: analysisContext.niche_name || "General",
+                    sub_niche: analysisContext.sub_niche_name || "General"
+                },
+                product_details: {
+                    product_type: analysisContext.product_type_name || "Product",
+                    tone: analysisContext.tone_name || "Engaging",
+                    client_description: analysisContext.context || ""
+                }
+            }
+        };
+
+        const response = await axios.post(
+            'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2',
+            payload
+        );
+
+        let title, description;
+        
+        if (Array.isArray(response.data) && response.data.length > 0) {
+            title = response.data[0].title;
+            description = response.data[0].description;
+        } else {
+            title = response.data.title;
+            description = response.data.description;
+        }
+        
+        if (!title) throw new Error("Incomplete draft received from AI");
+
+        // Update UI
+        setResults(prev => ({
+            ...prev,
+            title: title,
+            description: description
+        }));
+
+        // Update Database
+        if (listingId) {
+             const { error: updateError } = await supabase
+                .from('listings')
+                .update({ 
+                    generated_title: title,
+                    generated_description: description
+                })
+                .eq('id', listingId);
+             
+             if (updateError) console.error("Failed to save draft:", updateError);
+        }
+
+      } catch (err) {
+          console.error("Draft generation failed:", err);
+          alert("Failed to generate draft. Please try again.");
+      } finally {
+          setIsGeneratingDraft(false);
+      }
   };
 
   return (
@@ -212,13 +345,22 @@ const ProductStudio = () => {
            {isLoading && (
              <div className="flex flex-col items-center justify-center py-12 animate-in fade-in">
                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-               <p className="text-indigo-600 font-medium animate-pulse">Analyzing image and generating SEO...</p>
+               <p className="text-indigo-600 font-medium animate-pulse">
+                   {isLoading === 'uploading' && 'Uploading image...'}
+                   {isLoading === 'saving' && 'Saving Data...'}
+                   {isLoading === 'triggering' && 'Running AI Analysis...'}
+                   {isLoading === true && 'Analyzing image and generating SEO...'}
+               </p>
              </div>
            )}
 
            {/* Results Section */}
-           {showResults && !isLoading && (
-             <ResultsDisplay results={MOCK_RESULTS} />
+           {showResults && results && !isLoading && (
+             <ResultsDisplay 
+               results={results} 
+               isGeneratingDraft={isGeneratingDraft}
+               onGenerateDraft={handleGenerateDraft}
+             />
            )}
 
         </div>

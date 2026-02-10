@@ -28,8 +28,13 @@
 - [Fix] **Database Schema**: Added missing `status` and `title` columns to `listings` table.
 - [Live] `ProductStudio` is now fully integrated with real user data (Credits/ID).
 - [Live] **End-to-End Analysis Flow**: Successful image upload, database insertion, and N8N webhook trigger confirmed.
+- [Live] **Real-time SEO Results**: `ProductStudio.jsx` now listens to database changes and displays live analysis results.
+- [UI] **Main + Sidebar Layout**: Refactored `ResultsDisplay.jsx` into a 66/33 (8/4 col) grid. Main column for visual context & full data table; Sticky sidebar for "Magic Draft" listing generation.
+- [Logic] **State Management**: Implemented `handleGenerateDraft` in `ProductStudio` to manage the transition from "Analysis Ready" to "Drafting" to "Editor" states. Added `analysisContext` to persist form data (Tone, Sub-niche).
+- [Live] **N8N Drafting Integration**: "Magic Draft" workflow implemented. Consolidated Analysis and Drafting to one webhook endpoint to fix CORS. Standardized payload schema (nested `payload`) and handled array response format.
+- [UI] **UX Refinements**: Auto-expanding description textarea using `useLayoutEffect`, compacted table design, and full tag visibility.
 
 ## 5. Next Steps (Action Items)
-- **IMMEDIATE FOCUS**: Receive SEO analysis JSON from N8N workflow and display results in `ResultsDisplay.jsx`.
-- Polish the UI for the Login/Signup pages.
+- Polish the Login/Signup UI.
 - Implement the comprehensive Landing Page.
+- Build the Stripe Payment Integration (Credits & Subscriptions).
