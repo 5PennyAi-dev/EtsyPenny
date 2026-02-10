@@ -35,7 +35,7 @@
     - [x] Fix Database Schema (Added `status` and `title` columns).
     - [x] Verify End-to-End Analysis Workflow.
 
-- [ ] Phase 4: N8N Integration & Polish
+- [/] Phase 4: N8N Integration & Polish
     - [ ] **Handle N8N Webhook Response**:
         - [ ] Create API Endpoint or Edge Function to receive N8N callback (or poll for logic).
         - [x] **Update Database Schema**:
@@ -49,5 +49,7 @@
     - [x] Update `OptimizationForm` to include Tone and Sub-niche.
     - [x] Implement `handleGenerateDraft` with real N8N webhook call.
     - [x] Fix CORS issues and standardize N8N payload schema.
+    - [x] Implement "Export to PDF" feature (Studio & History).
+        - [x] Polish PDF Report (Layout, Icons, Legend).
     - [ ] Polish Login/Signup UI.
     - [ ] Build Landing Page.

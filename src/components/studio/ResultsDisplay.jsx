@@ -1,5 +1,7 @@
-import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud } from 'lucide-react';
-import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown } from 'lucide-react';
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import ListingPDFDocument from '../pdf/ListingPDFDocument';
 
 const Sparkline = ({ data }) => {
   if (!data || data.length === 0) return <div className="text-slate-300 text-xs">-</div>;
@@ -88,6 +90,106 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
   if (!results) return null;
 
   const hasDraft = !!results.title && results.title !== "SEO Analysis Completed";
+  
+  // Tag Selection State
+  const [selectedTags, setSelectedTags] = useState([]);
+
+  // Initialize selectedTags when results load
+  useEffect(() => {
+    if (results?.analytics) {
+        setSelectedTags(results.analytics.map(r => r.keyword));
+    }
+  }, [results]);
+
+  const toggleTag = (keyword) => {
+    setSelectedTags(prev => 
+        prev.includes(keyword) 
+            ? prev.filter(k => k !== keyword)
+            : [...prev, keyword]
+    );
+  };
+
+  const handleMagicDraft = () => {
+    if (selectedTags.length === 0) {
+        alert("Please select at least one tag to craft your listing.");
+        return;
+    }
+    onGenerateDraft(selectedTags);
+  };
+
+  // Sorting Logic
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' }); // Default sorted by volume DESC if we set key: 'volume' initially, but let's keep it null
+  
+  const sortedAnalytics = useMemo(() => {
+    if (!results?.analytics) return [];
+    
+    let sortableItems = [...results.analytics];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        let aValue, bValue;
+        
+        switch (sortConfig.key) {
+            case 'volume':
+                aValue = a.volume;
+                bValue = b.volume;
+                break;
+            case 'trend':
+                const aFirst = a.volume_history?.[0] || 1;
+                const aLast = a.volume_history?.[a.volume_history.length - 1] || 0;
+                aValue = ((aLast - aFirst) / aFirst) * 100;
+                
+                const bFirst = b.volume_history?.[0] || 1;
+                const bLast = b.volume_history?.[b.volume_history.length - 1] || 0;
+                bValue = ((bLast - bFirst) / bFirst) * 100;
+                break;
+            case 'competition':
+                // Helper to score competition: Low=1, Medium=2, High=3 (Actually Low is better usually, but request says Low < Medium < High for sorting value)
+                // Let's interpret the request: "Low < Medium < High".
+                // If ASC: Low -> Medium -> High. This means Low has lower value.
+                const getCompScore = (val) => {
+                    const numVal = parseFloat(val);
+                    if (!isNaN(numVal)) return numVal; // If number 0-1, use it directly (0.1 < 0.5 < 0.9)
+                    if (val === 'Low') return 0.2;
+                    if (val === 'Medium') return 0.5;
+                    if (val === 'High') return 0.8;
+                    return 0.5; // Default medium
+                };
+                aValue = getCompScore(a.competition);
+                bValue = getCompScore(b.competition);
+                break;
+            case 'score':
+                aValue = a.score;
+                bValue = b.score;
+                break;
+            default:
+                return 0;
+        }
+
+        if (aValue < bValue) {
+            return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+            return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [results?.analytics, sortConfig]);
+
+  const requestSort = (key) => {
+    let direction = 'desc'; // Default to descending for numbers usually
+    if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const SortIcon = ({ columnKey }) => {
+      if (sortConfig.key !== columnKey) return <ArrowUpDown size={14} className="text-slate-300 ml-1 inline-block opacity-0 group-hover:opacity-50 transition-opacity" />;
+      if (sortConfig.direction === 'asc') return <ArrowUp size={14} className="text-indigo-600 ml-1 inline-block" />;
+      return <ArrowDown size={14} className="text-indigo-600 ml-1 inline-block" />;
+  };
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
@@ -98,50 +200,15 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
         {/* --- MAIN CONTENT (Left - 8 Cols ~66%) --- */}
         <div className="lg:col-span-8 space-y-8">
             
-            {/* 1. Design & Product Card */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-6 items-start">
-                {/* Thumbnail */}
-                 <div className="w-full sm:w-48 aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50 relative shrink-0 group">
-                    {results.imageUrl ? (
-                         <>
-                            <img 
-                                src={results.imageUrl} 
-                                alt="Analyzed Product" 
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                         </>
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-300">
-                            <UploadCloud size={32} />
-                        </div>
-                    )}
-                </div>
-                
-                {/* Details */}
-                <div className="flex-grow space-y-4">
-                     <div>
-                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Analysis Context</h3>
-                        <h2 className="text-xl font-bold text-slate-900 leading-snug">
-                            {results.title || "New Product Analysis"}
-                        </h2>
-                     </div>
-                     <div className="flex flex-wrap gap-2">
-                        {results.tags.map((tag, i) => (
-                        <span key={i} className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-md border border-indigo-100/50 hover:bg-indigo-100 transition-colors cursor-default">
-                            #{tag}
-                        </span>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* 2. Full Width Performance Table */}
+            {/* 1. Full Width Performance Table */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                         <TrendingUp size={16} className="text-indigo-600" />
                         Keyword Performance
+                        <span className="text-xs font-normal text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full ml-2">
+                            {selectedTags.length} / {results.analytics.length} selected
+                        </span>
                     </h3>
                     <div className="flex gap-4 text-xs text-slate-500 hidden sm:flex">
                          <span className="flex items-center gap-1"><Flame size={12} className="text-orange-500"/> Trending</span>
@@ -153,20 +220,66 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                             <tr>
-                                <th className="px-3 py-2 font-semibold w-1/4">Keyword</th>
-                                <th className="px-2 py-2 text-center font-semibold">Avg. Vol</th>
-                                <th className="px-2 py-2 text-center font-semibold">Trend</th>
-                                <th className="px-2 py-2 text-center font-semibold">Competition</th>
-                                <th className="px-2 py-2 text-center font-semibold">Score</th>
+                                <th className="px-4 py-2 w-10 text-center">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selectedTags.length === results.analytics.length && results.analytics.length > 0}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setSelectedTags(results.analytics.map(r => r.keyword));
+                                            } else {
+                                                setSelectedTags([]);
+                                            }
+                                        }}
+                                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                    />
+                                </th>
+                                <th className="px-3 py-2 font-semibold w-1/4">Tag / Keyword</th>
+                                <th 
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors"
+                                    onClick={() => requestSort('volume')}
+                                >
+                                    Avg. Vol <SortIcon columnKey="volume" />
+                                </th>
+                                <th 
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors"
+                                    onClick={() => requestSort('trend')}
+                                >
+                                    Trend <SortIcon columnKey="trend" />
+                                </th>
+                                <th 
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors"
+                                    onClick={() => requestSort('competition')}
+                                >
+                                    Competition <SortIcon columnKey="competition" />
+                                </th>
+                                <th 
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors"
+                                    onClick={() => requestSort('score')}
+                                >
+                                    Score <SortIcon columnKey="score" />
+                                </th>
                                 <th className="px-2 py-2 text-center font-semibold">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {results.analytics.map((row, i) => (
-                                <tr key={i} className="hover:bg-slate-50 transition-colors group">
-                                    <td className="px-6 py-3 font-medium text-slate-700 relative">
-                                        {row.keyword}
-                                        {row.is_promising && <div className="absolute left-2 top-1/2 -translate-y-1/2 w-1 h-8 bg-amber-400/20 rounded-r opacity-0 group-hover:opacity-100 transition-opacity" />}
+                            {sortedAnalytics.map((row, i) => (
+                                <tr key={i} className={`hover:bg-slate-50 transition-colors group ${!selectedTags.includes(row.keyword) ? 'opacity-50 grayscale-[0.5]' : ''}`}>
+                                    <td className="px-4 py-3 text-center">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedTags.includes(row.keyword)}
+                                            onChange={() => toggleTag(row.keyword)}
+                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                    </td>
+                                    <td className="px-3 py-3 font-medium relative">
+                                        <div className="flex items-center gap-2">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                                {row.keyword}
+                                            </span>
+                                            {row.is_promising && <Star size={12} className="text-amber-400 fill-amber-400" />}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-3 text-center text-slate-600 font-mono text-xs">
                                         {row.volume.toLocaleString()}
@@ -194,7 +307,6 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
                                         <div className="flex items-center justify-center gap-2">
                                             {row.is_trending && <Flame size={16} className="text-orange-500 fill-orange-500/20" />}
                                             {row.is_evergreen && <Leaf size={16} className="text-emerald-500 fill-emerald-500/20" />}
-                                            {row.is_promising && <Star size={16} className="text-amber-400 fill-amber-400/20" />}
                                             {(!row.is_trending && !row.is_evergreen && !row.is_promising) && <span className="text-slate-300">-</span>}
                                         </div>
                                     </td>
@@ -230,8 +342,12 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
                                  Ready to turn them into a high-converting listing?
                              </p>
                              <button 
-                                onClick={onGenerateDraft}
-                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                                onClick={handleMagicDraft}
+                                disabled={selectedTags.length === 0}
+                                className={`w-full py-3 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2
+                                    ${selectedTags.length === 0 
+                                        ? 'bg-slate-300 cursor-not-allowed shadow-none' 
+                                        : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5'}`}
                              >
                                 <Sparkles size={18} /> Magic Draft ✨
                              </button>
@@ -284,6 +400,48 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
                                 <button className="w-full py-2.5 bg-slate-900 hover:bg-black text-white text-sm font-medium rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2">
                                     <UploadCloud size={16} /> Sync to Etsy
                                 </button>
+                                
+                                <PDFDownloadLink
+                                    key={`pdf-${displayedTitle}-${selectedTags.length}-version4`}
+                                    document={
+                                        <ListingPDFDocument 
+                                            listing={{
+                                                title: displayedTitle,
+                                                description: displayedDescription,
+                                                imageUrl: results.imageUrl,
+                                                productName: displayedTitle.split(' ').slice(0, 5).join(' ') + '...', // Simple truncated name
+                                                tags: results.analytics
+                                                    .filter(k => selectedTags.includes(k.keyword))
+                                                    .map(k => {
+                                                        // Calculate Trend %
+                                                        let trend = 0;
+                                                        if (k.volume_history && k.volume_history.length > 0) {
+                                                            const first = k.volume_history[0] || 1; // Avoid divide by zero
+                                                            const last = k.volume_history[k.volume_history.length - 1] || 0;
+                                                            trend = Math.round(((last - first) / first) * 100);
+                                                        }
+
+                                                        return { 
+                                                            keyword: k.keyword, 
+                                                            score: k.score,
+                                                            volume: k.volume,
+                                                            competition: k.competition,
+                                                            trend: trend,
+                                                            is_trending: k.is_trending,
+                                                            is_evergreen: k.is_evergreen,
+                                                            is_promising: k.is_promising
+                                                        };
+                                                    })
+                                            }}
+                                        />
+                                    }
+                                    fileName={`${displayedTitle.substring(0, 20).replace(/\s+/g, '_')}_SEO_v4.pdf`}
+                                    className="w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium rounded-lg border border-indigo-200 transition-all flex items-center justify-center gap-2"
+                                >
+                                    {({ blob, url, loading, error }) => (
+                                        loading ? 'Generating PDF...' : <><FileDown size={16} /> Export to PDF</>
+                                    )}
+                                </PDFDownloadLink>
                                 <div className="grid grid-cols-2 gap-2">
                                      <CopyButton text={displayedTitle} label="Copy Title" />
                                      <CopyButton text={displayedDescription} label="Copy Desc" />

@@ -41,7 +41,7 @@ const Select = ({ label, value, onChange, options, disabled, id, loading }) => (
   </div>
 );
 
-const OptimizationForm = ({ onAnalyze, isLoading }) => {
+const OptimizationForm = ({ onAnalyze, isLoading, onCancel }) => {
   // Data State
   const [themes, setThemes] = useState([]);
   const [nichesList, setNichesList] = useState([]);
@@ -55,6 +55,7 @@ const OptimizationForm = ({ onAnalyze, isLoading }) => {
   const [subNiche, setSubNiche] = useState("");
   const [productType, setProductType] = useState("");
   const [tone, setTone] = useState("");
+  const [tagLimit, setTagLimit] = useState("13");
 
   // Custom Input State
   const [customTheme, setCustomTheme] = useState("");
@@ -169,6 +170,9 @@ const OptimizationForm = ({ onAnalyze, isLoading }) => {
       tone_id: tone || null,
       tone_name: selectedTone,
       
+      ton_name: selectedTone,
+      tag_count: parseInt(tagLimit),
+      
       context: contextRef.current.value
     });
   };
@@ -261,7 +265,7 @@ const OptimizationForm = ({ onAnalyze, isLoading }) => {
                 />
             </div>
 
-            {/* Type & Tone (Right Col) */}
+            {/* Type & Tone & Tag Limit (Right Col) */}
             <div className="space-y-4">
                <div className="space-y-1">
                   <label htmlFor="type" className="text-sm font-medium text-slate-700">Product Type</label>
@@ -296,27 +300,59 @@ const OptimizationForm = ({ onAnalyze, isLoading }) => {
                     <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                   </div>
                 </div>
+
+                {/* Tag Limit */}
+                 <div className="space-y-1">
+                   <label htmlFor="tagLimit" className="text-sm font-medium text-slate-700">Max Tags</label>
+                   <div className="relative">
+                     <select
+                       id="tagLimit"
+                       value={tagLimit}
+                       onChange={(e) => setTagLimit(e.target.value)}
+                       className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-700 appearance-none"
+                     >
+                        <option value="13">13 Tags (Default)</option>
+                        <option value="15">15 Tags</option>
+                        <option value="20">20 Tags</option>
+                        <option value="25">25 Tags</option>
+                     </select>
+                     <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                   </div>
+                 </div>
             </div>
           </div>
       </div>
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className={`w-full py-4 rounded-xl font-bold shadow-lg transition-all transform flex items-center justify-center gap-2
-          ${isLoading 
-            ? 'bg-indigo-400 cursor-not-allowed shadow-none translate-y-0' 
-            : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5'
-          }`}
-      >
-        <Sparkles size={20} className={isLoading ? 'animate-spin' : ''} />
-        {isLoading === 'uploading' && 'UPLOADING IMAGES...'}
-        {isLoading === 'saving' && 'SAVING DATA...'}
-        {isLoading === 'triggering' && 'STARTING AI...'}
-        {isLoading === true && 'ANALYZING...'} 
-        {!isLoading && 'ANALYZE AND GENERATE SEO (1 Credit)'}
-        {!isLoading && <span className="text-indigo-200">🚀</span>}
-      </button>
+      <div className="flex gap-4">
+          {onCancel && (
+             <button
+                type="button"
+                onClick={onCancel}
+                disabled={isLoading}
+                className="px-8 py-4 rounded-xl font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors border border-slate-200 hover:border-slate-300"
+             >
+                Cancel
+             </button>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className={`flex-1 py-4 rounded-xl font-bold shadow-lg transition-all transform flex items-center justify-center gap-2
+            ${isLoading 
+                ? 'bg-indigo-400 cursor-not-allowed shadow-none translate-y-0' 
+                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5'
+            }`}
+          >
+            <Sparkles size={20} className={isLoading ? 'animate-spin' : ''} />
+            {isLoading === 'uploading' && 'UPLOADING...'}
+            {isLoading === 'saving' && 'SAVING...'}
+            {isLoading === 'triggering' && 'STARTING...'}
+            {isLoading === true && 'ANALYZING...'} 
+            {!isLoading && 'ANALYZE (1 Credit)'}
+            {!isLoading && <span className="text-indigo-200">🚀</span>}
+          </button>
+      </div>
 
     </form>
   );
