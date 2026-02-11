@@ -4,11 +4,15 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ProductStudio from './pages/ProductStudio';
 import LoginPage from './pages/LoginPage';
 import HistoryPage from './pages/HistoryPage';
+import BrandProfilePage from './pages/BrandProfilePage';
+
+import { Toaster } from 'sonner';
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <Toaster position="top-center" richColors />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route 
@@ -24,6 +28,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <HistoryPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/shop" 
+            element={
+              <ProtectedRoute>
+                <BrandProfilePage />
               </ProtectedRoute>
             } 
           />

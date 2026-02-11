@@ -41,7 +41,7 @@ const Select = ({ label, value, onChange, options, disabled, id, loading }) => (
   </div>
 );
 
-const OptimizationForm = ({ onAnalyze, isLoading, onCancel }) => {
+const OptimizationForm = ({ onAnalyze, isLoading, onCancel, initialValues }) => {
   // Data State
   const [themes, setThemes] = useState([]);
   const [nichesList, setNichesList] = useState([]);
@@ -85,7 +85,7 @@ const OptimizationForm = ({ onAnalyze, isLoading, onCancel }) => {
     fetchData();
   }, []);
 
-  // Fetch Niches when Theme changes
+  // Fetch Niches when Theme changes (Logic only, no resets)
   useEffect(() => {
     if (theme && theme !== 'custom') {
       const fetchNiches = async () => {
@@ -96,15 +96,9 @@ const OptimizationForm = ({ onAnalyze, isLoading, onCancel }) => {
     } else {
       setNichesList([]);
     }
-    // Reset selections
-    if (theme !== 'custom') {
-      setNiche("");
-      setSubNiche("");
-      setCustomTheme("");
-    }
   }, [theme]);
 
-  // Fetch Sub-niches when Niche changes
+  // Fetch Sub-niches when Niche changes (Logic only, no resets)
   useEffect(() => {
     if (niche && niche !== 'custom') {
       const fetchSubNiches = async () => {
@@ -115,19 +109,59 @@ const OptimizationForm = ({ onAnalyze, isLoading, onCancel }) => {
     } else {
       setSubNichesList([]);
     }
-    // Reset selections
-     if (niche !== 'custom') {
-      setSubNiche("");
-      setCustomNiche("");
-    }
   }, [niche]);
 
-  // Reset custom subniche
+  // Initialize from initialValues
   useEffect(() => {
-    if (subNiche !== 'custom') {
-      setCustomSubNiche("");
-    }
-  }, [subNiche]);
+      if (initialValues) {
+          setTheme(initialValues.theme_id || (initialValues.custom_theme ? 'custom' : ""));
+          setCustomTheme(initialValues.custom_theme || "");
+          
+          setNiche(initialValues.niche_id || (initialValues.custom_niche ? 'custom' : ""));
+          setCustomNiche(initialValues.custom_niche || "");
+
+          setSubNiche(initialValues.sub_niche_id || (initialValues.custom_sub_niche ? 'custom' : ""));
+          setCustomSubNiche(initialValues.custom_sub_niche || "");
+
+          setProductType(initialValues.product_type_id || "");
+          setTone(initialValues.tone_id || "");
+          setTagLimit(initialValues.tag_count ? String(initialValues.tag_count) : "13");
+          
+          if (contextRef.current) {
+              contextRef.current.value = initialValues.context || "";
+          }
+      }
+  }, [initialValues]);
+
+  // Handlers with Reset Logic
+  const handleThemeChange = (newTheme) => {
+      setTheme(newTheme);
+      // Reset children
+      if (newTheme !== 'custom') {
+          setNiche("");
+          setSubNiche("");
+          setCustomTheme("");
+          setCustomNiche("");
+          setCustomSubNiche("");
+      }
+  };
+
+  const handleNicheChange = (newNiche) => {
+      setNiche(newNiche);
+      // Reset children
+      if (newNiche !== 'custom') {
+          setSubNiche("");
+          setCustomNiche("");
+          setCustomSubNiche("");
+      }
+  };
+
+  const handleSubNicheChange = (newSubNiche) => {
+      setSubNiche(newSubNiche);
+      if (newSubNiche !== 'custom') {
+          setCustomSubNiche("");
+      }
+  };
 
 
   const handleSubmit = (e) => {
@@ -194,7 +228,7 @@ const OptimizationForm = ({ onAnalyze, isLoading, onCancel }) => {
               id="theme" 
               label="Theme" 
               value={theme} 
-              onChange={setTheme} 
+              onChange={handleThemeChange} 
               options={themes} 
               disabled={false} 
             />
@@ -212,7 +246,7 @@ const OptimizationForm = ({ onAnalyze, isLoading, onCancel }) => {
               id="niche" 
               label="Niche" 
               value={niche} 
-              onChange={setNiche} 
+              onChange={handleNicheChange} 
               options={nichesList} 
               disabled={!theme || (theme === 'custom' && !customTheme)}
             />
@@ -230,7 +264,7 @@ const OptimizationForm = ({ onAnalyze, isLoading, onCancel }) => {
               id="subniche" 
               label="Sub-niche" 
               value={subNiche} 
-              onChange={setSubNiche} 
+              onChange={handleSubNicheChange} 
               options={subNichesList} 
               disabled={!niche || (niche === 'custom' && !customNiche)}
             />

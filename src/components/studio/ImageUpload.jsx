@@ -1,9 +1,16 @@
 import { Upload } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-const ImageUpload = ({ onFileSelect }) => {
+const ImageUpload = ({ onFileSelect, initialImage }) => {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [preview, setPreview] = useState(null);
+  const [preview, setPreview] = useState(initialImage || null);
+
+  // Update preview if initialImage changes
+  useEffect(() => {
+    if (initialImage) {
+        setPreview(initialImage);
+    }
+  }, [initialImage]);
 
   const handleFile = (file) => {
     if (file && (file.type === 'image/jpeg' || file.type === 'image/png')) {

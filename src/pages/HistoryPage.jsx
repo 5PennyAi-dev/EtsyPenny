@@ -297,9 +297,9 @@ const HistoryPage = () => {
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button 
                                                             onClick={() => handleViewResults(item.id)}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors shadow-sm hover:shadow"
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors shadow-sm hover:shadow whitespace-nowrap"
                                                         >
-                                                            Voir Résultats <Eye size={12} />
+                                                            SHOW SEO <Eye size={12} />
                                                         </button>
                                                         <div className="relative group/menu">
                                                             <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">

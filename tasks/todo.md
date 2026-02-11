@@ -53,3 +53,46 @@
         - [x] Polish PDF Report (Layout, Icons, Legend).
     - [ ] Polish Login/Signup UI.
     - [ ] Build Landing Page.
+- [x] Phase 5: Brand Profile
+    - [x] Update Database Schema
+    - [x] Create BrandProfilePage
+    - [x] Update App Routing
+    - [x] Integrate with ProductStudio
+
+- [x] Feature: Shop Analysis Webhook
+    - [x] Add Env Variables (VITE_N8N_WEBHOOK_URL_PROD, VITE_N8N_WEBHOOK_URL_TEST)
+    - [x] Integrate N8N Response Data
+
+- [x] Fix: SEO Webhook Call
+    - [x] Replace hardcoded URLs in `ProductStudio.jsx`
+    - [x] Add error logging
+
+- [x] Feature: Relaunch Capabilities
+    - [x] Implement `handleRelaunchSEO` in `ProductStudio.jsx`
+    - [x] Add "Regenerate Draft" logic in `ProductStudio.jsx`
+    - [x] Add "Relaunch" buttons in `ResultsDisplay.jsx`
+    - [x] UI: Make Relaunch buttons more obvious (Labels + Styling)
+    - [x] Bugfix: Relaunch button inactivity (missing prop)
+    - [x] Bugfix: Image validation, Modal UI, and Draft logic fixes
+    
+- [x] Feature: Form Data Persistence
+    - [x] Refactor `OptimizationForm.jsx` (initialValues + reset logic)
+    - [x] Integrate with `ProductStudio.jsx`
+
+- [x] UI Refinements (Text Fields)
+    - [x] Auto-expand text inputs (bio, audience, signature)
+
+- [x] UI Refinements (Brand Tone)
+    - [x] Change `brand_tone` to text input
+
+- [x] Feature: Verify Shop Context in Payloads
+    - [x] Confirm `generate_seo` payload includes `shop_context`
+    - [x] Confirm `drafting_seo` payload includes `shop_context`
+
+- [x] UI Refinements (Brand Profile)
+    - [x] Disable Save Button when clean
+    - [x] Update Save Button Color (Indigo)
+    - [x] Replace Alert with Toast
+
+- [x] Hotfixes
+    - [x] Fix Missing Dependency (sonner)

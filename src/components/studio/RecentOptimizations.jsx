@@ -108,7 +108,7 @@ const RecentOptimizations = ({ onViewResults }) => {
                                             onClick={() => onViewResults(listing.id)}
                                             className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors"
                                         >
-                                            VOIR LE SEO ↗
+                                            SHOW SEO ↗
                                         </button>
                                     </td>
                                 </tr>

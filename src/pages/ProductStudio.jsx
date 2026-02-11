@@ -10,6 +10,7 @@ import RecentOptimizations from '../components/studio/RecentOptimizations';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 
 const ProductStudio = () => {
   const { user, profile } = useAuth();
@@ -25,6 +26,10 @@ const ProductStudio = () => {
   // UI State for Form Collapse
   const [isFormCollapsed, setIsFormCollapsed] = useState(false);
   const [formKey, setFormKey] = useState(0); // For resetting the form
+  
+  // Confirmation Modal State
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingRelaunchData, setPendingRelaunchData] = useState(null);
 
   // No changes to imports
 
@@ -37,8 +42,13 @@ const ProductStudio = () => {
   const handleAnalyze = async (formData) => {
     // Save context for drafting phase
     setAnalysisContext(formData);
-    
-    if (!selectedImage) {
+    // Fallback: Use existing result image if valid and no new image selected
+    if (!selectedImage && !formData.existingImageUrl && results?.imageUrl) {
+        console.log("Restoring existing image URL from results");
+        formData.existingImageUrl = results.imageUrl;
+    }
+
+    if (!selectedImage && !formData.existingImageUrl) {
         alert("Please select an image first.");
         return;
     }
@@ -55,21 +65,30 @@ const ProductStudio = () => {
         setShowResults(false);
         setIsFormCollapsed(false);
         
-        // 1. Upload Image
-        console.log("Starting upload process...");
-        const sanitizedFileName = selectedImage.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const filename = `${user.id}/${Date.now()}_${sanitizedFileName}`;
+        
+        let publicUrl = formData.existingImageUrl;
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('mockups_bucket')
-            .upload(filename, selectedImage, {
-                cacheControl: '3600',
-                upsert: false
-            });
+        if (formData.existingImageUrl) {
+            console.log("Using existing image:", formData.existingImageUrl);
+             // Skip upload, use existing URL
+        } else {
+            // 1. Upload Image
+            console.log("Starting upload process...");
+            const sanitizedFileName = selectedImage.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const filename = `${user.id}/${Date.now()}_${sanitizedFileName}`;
 
-        if (uploadError) throw uploadError;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('mockups_bucket')
+                .upload(filename, selectedImage, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
 
-        const { data: { publicUrl } } = supabase.storage.from('mockups_bucket').getPublicUrl(filename);
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl: newUrl } } = supabase.storage.from('mockups_bucket').getPublicUrl(filename);
+            publicUrl = newUrl;
+        }
         
         setIsLoading('saving');
 
@@ -121,6 +140,14 @@ const ProductStudio = () => {
                     tone: formData.tone_name,
                     client_description: formData.context,
                     tag_count: formData.tag_count
+                },
+                shop_context: {
+                    shop_name: profile?.shop_name,
+                    shop_bio: profile?.shop_bio,
+                    target_audience: profile?.target_audience,
+                    brand_tone: profile?.brand_tone,
+                    brand_keywords: profile?.brand_keywords,
+                    signature_text: profile?.signature_text
                 }
             },
             metadata: {
@@ -130,8 +157,11 @@ const ProductStudio = () => {
         };
 
         // Note: We expect the N8N workflow to return the analysis data in the response
+        const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
+        console.log("Calling Webhook:", webhookUrl);
+
         const response = await axios.post(
-            'https://n8n.srv840060.hstgr.cloud/webhook/9d856f4f-d5ae-4fce-b2da-72f584288dc2', 
+            webhookUrl, 
             webhookPayload
         );
 
@@ -215,14 +245,47 @@ const ProductStudio = () => {
         setIsFormCollapsed(true); // Auto-collapse on success
 
     } catch (err) {
-        console.error("Error:", err);
-        alert("An error occurred: " + err.message);
+        console.error("Error in handleAnalyze:", err);
+        if (err.response) {
+            console.error("Webhook Error Response:", err.response.data);
+            alert(`Analysis failed: Server returned ${err.response.status}. Check console for details.`);
+        } else if (err.request) {
+            console.error("Webhook No Response:", err.request);
+            alert("Analysis failed: No response from analysis server. Check your connection.");
+        } else {
+             alert("An error occurred: " + err.message);
+        }
         setIsLoading(false);
     }
   };
 
+  const handleRelaunchSEO = () => {
+      if (!analysisContext || !results?.imageUrl) return;
+      
+      const relaunchData = {
+          ...analysisContext,
+          existingImageUrl: results.imageUrl
+      };
+      
+      setPendingRelaunchData(relaunchData);
+      setShowConfirmModal(true);
+  };
+
+  const executeRelaunch = () => {
+      if (pendingRelaunchData) {
+          handleAnalyze(pendingRelaunchData);
+          setPendingRelaunchData(null);
+      }
+  };
+
+
+
   const handleGenerateDraft = async (selectedTags = []) => {
-      if (isGeneratingDraft || !results || !analysisContext) return;
+      console.log("Draft Gen: Context Check", { isGeneratingDraft, hasResults: !!results, hasContext: !!analysisContext });
+      if (isGeneratingDraft || !results || !analysisContext) {
+          console.error("Draft Generation Aborted: Missing prerequisites.");
+          return;
+      }
       setIsGeneratingDraft(true);
 
       const statsToUse = selectedTags.length > 0 
@@ -257,12 +320,23 @@ const ProductStudio = () => {
                     product_type: analysisContext.product_type_name || "Product",
                     tone: analysisContext.tone_name || "Engaging",
                     client_description: analysisContext.context || ""
+                },
+                shop_context: {
+                    shop_name: profile?.shop_name,
+                    shop_bio: profile?.shop_bio,
+                    target_audience: profile?.target_audience,
+                    brand_tone: profile?.brand_tone,
+                    brand_keywords: profile?.brand_keywords,
+                    signature_text: profile?.signature_text
                 }
             }
         };
 
+        const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
+        console.log("Calling Draft Webhook:", webhookUrl);
+
         const response = await axios.post(
-            'https://n8n.srv840060.hstgr.cloud/webhook/9d856f4f-d5ae-4fce-b2da-72f584288dc2',
+            webhookUrl,
             payload
         );
 
@@ -300,7 +374,12 @@ const ProductStudio = () => {
 
       } catch (err) {
           console.error("Draft generation failed:", err);
-          alert("Failed to generate draft. Please try again.");
+          if (err.response) {
+               console.error("Webhook Error Response:", err.response.data);
+               alert(`Draft generation failed: Server returned ${err.response.status}`);
+          } else {
+               alert("Failed to generate draft. Please try again.");
+          }
       } finally {
           setIsGeneratingDraft(false);
       }
@@ -351,7 +430,17 @@ const ProductStudio = () => {
             sub_niche_name: "Loaded from history", 
             product_type_name: listing.product_types?.name || "Unknown",
             tone_name: listing.tones?.name || "Unknown",
-            context: listing.user_description
+            context: listing.user_description,
+            // ID mappings for relaunch
+            product_type_id: listing.product_type_id,
+            tone_id: listing.tone_id,
+            theme_id: listing.theme_id,
+            niche_id: listing.niche_id,
+            sub_niche_id: listing.sub_niche_id,
+            custom_theme: listing.custom_listing ? JSON.parse(listing.custom_listing).theme : null,
+            custom_niche: listing.custom_listing ? JSON.parse(listing.custom_listing).niche : null,
+            custom_sub_niche: listing.custom_listing ? JSON.parse(listing.custom_listing).sub_niche : null,
+            tag_count: 15 // Default or stored?
         });
 
         // Set Results
@@ -541,9 +630,19 @@ const ProductStudio = () => {
                     
                     <div className="p-8">
                         <div className="mb-8">
-                            <ImageUpload key={`img-${formKey}`} onFileSelect={setSelectedImage} />
+                            <ImageUpload 
+                                key={`img-${formKey}`} 
+                                onFileSelect={setSelectedImage} 
+                                initialImage={results?.imageUrl}
+                            />
                         </div>
-   <OptimizationForm key={`form-${formKey}`} onAnalyze={handleAnalyze} isLoading={isLoading} onCancel={results ? handleCancel : null} />
+   <OptimizationForm 
+       key={`form-${formKey}`} 
+       onAnalyze={handleAnalyze} 
+       isLoading={isLoading} 
+       onCancel={results ? handleCancel : null} 
+       initialValues={analysisContext}
+   />
                     </div>
               </motion.div>
            </motion.div>
@@ -567,6 +666,7 @@ const ProductStudio = () => {
                results={results} 
                isGeneratingDraft={isGeneratingDraft}
                onGenerateDraft={handleGenerateDraft}
+                onRelaunchSEO={handleRelaunchSEO}
              />
            )}
 
@@ -575,6 +675,15 @@ const ProductStudio = () => {
         </div>
 
       </div>
+      <ConfirmationModal 
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={executeRelaunch}
+        title="Relaunch Analysis?"
+        message="This action will consume 1 credit to re-analyze the current image with the updated settings. Do you want to continue?"
+        confirmText="Yes, Relaunch"
+      />
+
     </Layout>
   );
 };

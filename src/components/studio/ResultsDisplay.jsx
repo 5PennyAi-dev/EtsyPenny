@@ -40,31 +40,49 @@ const Sparkline = ({ data }) => {
   );
 };
 
-const CopyButton = ({ text, label = "Copy" }) => {
+const CopyButton = ({ text, label = "Copy", className = "", tooltipSide = "top" }) => {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = (e) => {
+    e.stopPropagation();
+    if (!text) return;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const positionClasses = tooltipSide === "top" 
+    ? "bottom-full mb-2" 
+    : "top-full mt-2";
+    
+  const arrowClasses = tooltipSide === "top"
+    ? "top-full border-t-slate-800 border-b-transparent border-l-transparent border-r-transparent"
+    : "bottom-full border-b-slate-800 border-t-transparent border-l-transparent border-r-transparent";
+
   return (
-    <button
-      onClick={handleCopy}
-      className={`group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200
-        ${copied 
-          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
-          : 'bg-white text-slate-500 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 shadow-sm'
-        }`}
-    >
-      {copied ? <Check size={14} /> : <Copy size={14} className="group-hover:scale-110 transition-transform" />}
-      {copied ? 'Copied' : label}
-    </button>
+    <div className={`relative group/copy inline-flex ${className}`}>
+      <button
+        onClick={handleCopy}
+        className={`flex items-center justify-center p-1 rounded-md transition-all duration-200
+          ${copied 
+            ? 'text-emerald-500 bg-emerald-50' 
+            : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'
+          }`}
+        type="button"
+      >
+        {copied ? <Check size={14} /> : <Copy size={14} />}
+      </button>
+      
+      {/* Tooltip */}
+      <div className={`absolute left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] font-medium text-white bg-slate-800 rounded shadow-lg opacity-0 group-hover/copy:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 ${positionClasses}`}>
+        {copied ? 'Copied!' : label}
+        <div className={`absolute left-1/2 -translate-x-1/2 border-4 ${arrowClasses}`}></div>
+      </div>
+    </div>
   );
 };
 
-const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
+const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO }) => {
   const [displayedTitle, setDisplayedTitle] = useState("");
   const [displayedDescription, setDisplayedDescription] = useState("");
   const descriptionRef = useRef(null);
@@ -206,9 +224,19 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                         <TrendingUp size={16} className="text-indigo-600" />
                         Keyword Performance
-                        <span className="text-xs font-normal text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full ml-2">
+                        <CopyButton text={selectedTags.join(', ')} label="Copy Keywords" tooltipSide="bottom" />
+                        <span className="text-xs font-normal text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full ml-1">
                             {selectedTags.length} / {results.analytics.length} selected
                         </span>
+                        
+                         <button 
+                            onClick={onRelaunchSEO}
+                            className="ml-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-100 shadow-sm"
+                            title="Relaunch Analysis (Costs 1 Credit)"
+                         >
+                            <RefreshCw size={12} />
+                            Refresh Data
+                         </button>
                     </h3>
                     <div className="flex gap-4 text-xs text-slate-500 hidden sm:flex">
                          <span className="flex items-center gap-1"><Flame size={12} className="text-orange-500"/> Trending</span>
@@ -327,7 +355,18 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
                             <Pencil size={16} className="text-indigo-600" />
                             Listing Preview
                         </h3>
-                        {hasDraft && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase rounded-full animate-in fade-in zoom-in">Draft Ready</span>}
+                        {hasDraft && (
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={() => onGenerateDraft(selectedTags)}
+                                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-100"
+                                    title="Regenerate Draft"
+                                >
+                                    <RefreshCw size={12} />
+                                    Regenerate
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {!hasDraft && !isGeneratingDraft ? (
@@ -371,10 +410,13 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
                         <div className="flex-1 flex flex-col space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* Title Input */}
                             <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-slate-500 uppercase flex justify-between">
-                                    Title 
-                                    <span className={`${displayedTitle.length > 140 ? 'text-rose-500' : 'text-slate-400'}`}>{displayedTitle.length}/140</span>
-                                </label>
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                        Title 
+                                        <CopyButton text={displayedTitle} label="Copy Title" />
+                                    </label>
+                                    <span className={`text-xs font-bold ${displayedTitle.length > 140 ? 'text-rose-500' : 'text-slate-400'}`}>{displayedTitle.length}/140</span>
+                                </div>
                                 <textarea 
                                     value={displayedTitle}
                                     onChange={(e) => setDisplayedTitle(e.target.value)}
@@ -386,7 +428,10 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
 
                             {/* Description Input */}
                             <div className="space-y-1.5 flex-grow flex flex-col">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Description</label>
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Description</label>
+                                    <CopyButton text={displayedDescription} label="Copy Description" />
+                                </div>
                                 <textarea 
                                     ref={descriptionRef}
                                     value={displayedDescription}
@@ -395,12 +440,6 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
                                 />
                             </div>
 
-                            {/* Actions */}
-                            <div className="pt-2 flex flex-col gap-2 mt-auto">
-                                <button className="w-full py-2.5 bg-slate-900 hover:bg-black text-white text-sm font-medium rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2">
-                                    <UploadCloud size={16} /> Sync to Etsy
-                                </button>
-                                
                                 <PDFDownloadLink
                                     key={`pdf-${displayedTitle}-${selectedTags.length}-version4`}
                                     document={
@@ -442,11 +481,6 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft }) => {
                                         loading ? 'Generating PDF...' : <><FileDown size={16} /> Export to PDF</>
                                     )}
                                 </PDFDownloadLink>
-                                <div className="grid grid-cols-2 gap-2">
-                                     <CopyButton text={displayedTitle} label="Copy Title" />
-                                     <CopyButton text={displayedDescription} label="Copy Desc" />
-                                </div>
-                            </div>
                         </div>
                     )}
                 </div>
