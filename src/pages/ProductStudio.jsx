@@ -292,11 +292,12 @@ const ProductStudio = () => {
         const customData = {
             theme: formData.custom_theme,
             niche: formData.custom_niche,
-            sub_niche: formData.custom_sub_niche
+            sub_niche: formData.custom_sub_niche,
+            product_type: formData.product_type_id ? null : formData.product_type_name
         };
 
         const commonFields = {
-            product_type_id: formData.product_type_id,
+            product_type_id: formData.product_type_id || null,
             tone_id: formData.tone_id,
             theme_id: formData.theme_id,
             niche_id: formData.niche_id,
@@ -667,11 +668,13 @@ const ProductStudio = () => {
         if (statsError) throw statsError;
 
         // Reconstruct Analysis Context (Handle missing relations gracefully)
+        const parsedCustom = listing.custom_listing ? JSON.parse(listing.custom_listing) : {};
+
         setAnalysisContext({
             theme_name: listing.themes?.name || "",
             niche_name: listing.niches?.name || "",
             sub_niche_name: listing.sub_niches?.name || "", 
-            product_type_name: listing.product_types?.name || "",
+            product_type_name: listing.product_types?.name || parsedCustom.product_type || "",
             tone_name: listing.tones?.name || "",
             context: listing.user_description,
             // ID mappings for relaunch
@@ -680,10 +683,10 @@ const ProductStudio = () => {
             theme_id: listing.theme_id,
             niche_id: listing.niche_id,
             sub_niche_id: listing.sub_niche_id,
-            custom_theme: listing.custom_listing ? JSON.parse(listing.custom_listing).theme : null,
-            custom_niche: listing.custom_listing ? JSON.parse(listing.custom_listing).niche : null,
-            custom_sub_niche: listing.custom_listing ? JSON.parse(listing.custom_listing).sub_niche : null,
-            tag_count: 15 // Default or stored?
+            custom_theme: parsedCustom.theme || null,
+            custom_niche: parsedCustom.niche || null,
+            custom_sub_niche: parsedCustom.sub_niche || null,
+            tag_count: 15
         });
 
         // Set Results

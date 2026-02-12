@@ -1,8 +1,20 @@
 
 import { useState, useRef, useEffect } from 'react';
-import { Sparkles, ArrowRight, ChevronDown } from 'lucide-react';
+import { Sparkles, ArrowRight, ChevronDown, ChevronRight, Settings, Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
+import ProductTypeCombobox from './ProductTypeCombobox';
+
+const TONE_OPTIONS = [
+  { value: 'auto', label: '✨ Auto-detect from image' },
+  { value: 'professional', label: 'Professional' },
+  { value: 'funny', label: 'Funny' },
+  { value: 'sarcastic', label: 'Sarcastic' },
+  { value: 'minimalist', label: 'Minimalist' },
+  { value: 'emotional', label: 'Emotional' },
+];
+
+const MAX_TAGS_LIMIT = 13;
 
 const CustomInput = ({ isVisible, value, onChange, placeholder }) => (
   <div className={`grid transition-all duration-300 ease-in-out ${isVisible ? 'grid-rows-[1fr] opacity-100 mt-2' : 'grid-rows-[0fr] opacity-0'}`}>
@@ -47,16 +59,21 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
   const [themes, setThemes] = useState([]);
   const [nichesList, setNichesList] = useState([]);
   const [subNichesList, setSubNichesList] = useState([]);
-  const [productTypes, setProductTypes] = useState([]);
-  const [tones, setTones] = useState([]);
+  const [groupedProductTypes, setGroupedProductTypes] = useState([]);
 
   // Selection State (IDs or 'custom')
   const [theme, setTheme] = useState("");
   const [niche, setNiche] = useState("");
   const [subNiche, setSubNiche] = useState("");
-  const [productType, setProductType] = useState("");
-  const [tone, setTone] = useState("");
-  const [tagLimit, setTagLimit] = useState("13");
+  const [tone, setTone] = useState('auto');
+  const [tagLimit, setTagLimit] = useState(MAX_TAGS_LIMIT);
+
+  // Advanced section toggle
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+
+  // Product Type State — name-based with optional ID
+  const [productTypeName, setProductTypeName] = useState("");
+  const [productTypeId, setProductTypeId] = useState(null);
 
   // Custom Input State
   const [customTheme, setCustomTheme] = useState("");
@@ -65,32 +82,46 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
 
   const contextRef = useRef(null);
 
-  // Initial Fetch (Themes, Product Types, Tones)
+  // Initial Fetch (Themes, Product Categories+Types, Tones)
   useEffect(() => {
     const fetchData = async () => {
       const { data: themesData } = await supabase.from('themes').select('id, name').order('name');
       if (themesData) setThemes(themesData);
 
-      const { data: typesData } = await supabase.from('product_types').select('id, name').order('name');
-      if (typesData) {
-        setProductTypes(typesData);
-        if (typesData.length > 0 && !productType) {
-          // Default to T-Shirt if available, otherwise first item
-          const tshirt = typesData.find(t => t.name.toLowerCase().includes('t-shirt'));
-          setProductType(tshirt ? tshirt.id : typesData[0].id);
+      // Fetch product types grouped by category
+      const { data: categoriesData } = await supabase
+        .from('product_categories')
+        .select('id, name, product_types(id, name)')
+        .order('name');
+      
+      if (categoriesData) {
+        const grouped = categoriesData
+          .map((cat) => ({
+            category: cat.name,
+            types: (cat.product_types || []).sort((a, b) => a.name.localeCompare(b.name))
+          }))
+          .filter((g) => g.types.length > 0);
+        
+        setGroupedProductTypes(grouped);
+
+        // Default to T-Shirt if available and no value set yet
+        if (!productTypeName) {
+          for (const group of grouped) {
+            const tshirt = group.types.find((t) => t.name.toLowerCase().includes('t-shirt'));
+            if (tshirt) {
+              setProductTypeName(tshirt.name);
+              setProductTypeId(tshirt.id);
+              break;
+            }
+          }
         }
       }
 
-      const { data: tonesData } = await supabase.from('tones').select('id, name').order('name');
-      if (tonesData) {
-        setTones(tonesData);
-        if (tonesData.length > 0 && !tone) setTone(tonesData[0].id); // Default if not set
-      } 
     };
     fetchData();
   }, []);
 
-  // Fetch Niches when Theme changes (Logic only, no resets)
+  // Fetch Niches when Theme changes
   useEffect(() => {
     if (theme && theme !== 'custom') {
       const fetchNiches = async () => {
@@ -103,7 +134,7 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
     }
   }, [theme]);
 
-  // Fetch Sub-niches when Niche changes (Logic only, no resets)
+  // Fetch Sub-niches when Niche changes
   useEffect(() => {
     if (niche && niche !== 'custom') {
       const fetchSubNiches = async () => {
@@ -128,9 +159,19 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
           setSubNiche(initialValues.sub_niche_id || (initialValues.custom_sub_niche ? 'custom' : ""));
           setCustomSubNiche(initialValues.custom_sub_niche || "");
 
-          setProductType(initialValues.product_type_id || "");
-          setTone(initialValues.tone_id || "");
-          setTagLimit(initialValues.tag_count ? String(initialValues.tag_count) : "13");
+          // Product Type: hydrate from ID (find name) or from name directly
+          if (initialValues.product_type_id) {
+            setProductTypeId(initialValues.product_type_id);
+            // Name will be resolved once groupedProductTypes loads
+            setProductTypeName(initialValues.product_type_name || "");
+          } else if (initialValues.product_type_name) {
+            // Custom type — no ID
+            setProductTypeId(null);
+            setProductTypeName(initialValues.product_type_name);
+          }
+
+          setTone(initialValues.tone_name ? initialValues.tone_name.toLowerCase() : 'auto');
+          setTagLimit(initialValues.tag_count ? Math.min(initialValues.tag_count, MAX_TAGS_LIMIT) : MAX_TAGS_LIMIT);
           
           if (contextRef.current) {
               contextRef.current.value = initialValues.context || "";
@@ -138,10 +179,22 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
       }
   }, [initialValues]);
 
+  // Resolve product type name from ID once grouped data loads
+  useEffect(() => {
+    if (productTypeId && groupedProductTypes.length > 0 && !productTypeName) {
+      for (const group of groupedProductTypes) {
+        const found = group.types.find((t) => t.id === productTypeId);
+        if (found) {
+          setProductTypeName(found.name);
+          break;
+        }
+      }
+    }
+  }, [productTypeId, groupedProductTypes]);
+
   // Handlers with Reset Logic
   const handleThemeChange = (newTheme) => {
       setTheme(newTheme);
-      // Reset children
       if (newTheme !== 'custom') {
           setNiche("");
           setSubNiche("");
@@ -153,7 +206,6 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
 
   const handleNicheChange = (newNiche) => {
       setNiche(newNiche);
-      // Reset children
       if (newNiche !== 'custom') {
           setSubNiche("");
           setCustomNiche("");
@@ -168,17 +220,21 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
       }
   };
 
+  const handleProductTypeChange = (id, name) => {
+      setProductTypeId(id);
+      setProductTypeName(name);
+  };
+
 
   const getFormData = () => {
-    // Validate mandatory fields
-    if (!productType) {
+    if (!productTypeName) {
         toast.error("Please select a Product Type.");
         return null;
     }
 
-    // Find Names for Payload
-    const selectedProductType = productTypes.find(t => t.id === productType)?.name || "Unknown";
-    const selectedTone = tones.find(t => t.id === tone)?.name || "Default";
+    // Resolve tone label
+    const toneOption = TONE_OPTIONS.find(t => t.value === tone);
+    const resolvedToneName = tone === 'auto' ? 'Auto-detect' : (toneOption?.label || 'Auto-detect');
     
     // Find Categorization Names (if not custom)
     const selectedTheme = theme !== 'custom' ? themes.find(t => t.id === theme)?.name : customTheme;
@@ -201,14 +257,14 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
       custom_niche: niche === 'custom' ? customNiche : null,
       custom_sub_niche: subNiche === 'custom' ? customSubNiche : null,
       
-      // Product Details (IDs + Names)
-      product_type_id: productType || null,
-      product_type_name: selectedProductType,
-      tone_id: tone || null,
-      tone_name: selectedTone,
+      // Product Details
+      product_type_id: productTypeId,
+      product_type_name: productTypeName,
+      tone_id: null,
+      tone_name: resolvedToneName,
       
-      ton_name: selectedTone,
-      tag_count: parseInt(tagLimit),
+      ton_name: resolvedToneName,
+      tag_count: Math.min(tagLimit, MAX_TAGS_LIMIT),
       
       context: contextRef.current.value
     };
@@ -227,8 +283,18 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       
+      {/* PRODUCT TYPE — Prominent position above categorization */}
+      <div>
+        <ProductTypeCombobox
+          groupedOptions={groupedProductTypes}
+          value={productTypeName}
+          onChange={handleProductTypeChange}
+          disabled={false}
+        />
+      </div>
+
       {/* CATEGORIZATION SECTION */}
       <div className="space-y-4">
         <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2">
@@ -295,79 +361,92 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
       </div>
 
       {/* DETAILS SECTION */}
-      <div className="space-y-4">
+      <div className="space-y-3">
           <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2">
-            Product Details
+            Details
           </h3>
+          <div className="space-y-1">
+              <label htmlFor="context" className="text-sm font-medium text-slate-700">Instructions / Details</label>
+              <textarea
+                ref={contextRef}
+                id="context"
+                rows="3"
+                placeholder="ex: Witty and modern tone, for cat lovers..."
+                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 resize-none"
+              />
+          </div>
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            
-            {/* Context (Left 2 cols) */}
-            <div className="md:col-span-2 space-y-1">
-                <label htmlFor="context" className="text-sm font-medium text-slate-700">Instructions / Details</label>
-                <textarea
-                  ref={contextRef}
-                  id="context"
-                  rows="3"
-                  placeholder="ex: Witty and modern tone, for cat lovers..."
-                  className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 resize-none"
-                />
-            </div>
+      {/* ADVANCED SEO SETTINGS — Collapsible */}
+      <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+          <button
+            type="button"
+            onClick={() => setIsAdvancedOpen(prev => !prev)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Settings size={14} className="text-slate-400" />
+              Advanced SEO Settings
+            </span>
+            <ChevronRight
+              size={16}
+              className={`text-slate-400 transition-transform duration-200 ${isAdvancedOpen ? 'rotate-90' : ''}`}
+            />
+          </button>
 
-            {/* Type & Tone & Tag Limit (Right Col) */}
-            <div className="space-y-4">
-               <div className="space-y-1">
-                  <label htmlFor="type" className="text-sm font-medium text-slate-700">Product Type</label>
-                  <div className="relative">
-                    <select
-                      id="type"
-                      value={productType}
-                      onChange={(e) => setProductType(e.target.value)}
-                      className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-700 appearance-none"
-                    >
-                       {productTypes.map((t) => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
-                       ))}
-                    </select>
-                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                  </div>
-                </div>
+          <div
+            className={`grid transition-all duration-300 ease-in-out ${isAdvancedOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+          >
+            <div className="overflow-hidden">
+              <div className="px-4 pb-4 pt-1 space-y-4 border-t border-slate-200">
 
+                {/* Tone Override */}
                 <div className="space-y-1">
-                  <label htmlFor="tone" className="text-sm font-medium text-slate-700">Tone</label>
+                  <label htmlFor="tone" className="text-sm font-medium text-slate-700">Tone Override</label>
+                  <p className="text-xs text-slate-400">Leave on auto to let AI detect the best tone from your image.</p>
                   <div className="relative">
                     <select
                       id="tone"
                       value={tone}
                       onChange={(e) => setTone(e.target.value)}
-                      className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-700 appearance-none"
+                      className={`w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all appearance-none text-sm
+                        ${tone === 'auto' ? 'text-slate-400 italic' : 'text-slate-700'}`}
                     >
-                       {tones.map((t) => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
-                       ))}
+                      {TONE_OPTIONS.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
                     </select>
-                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   </div>
                 </div>
 
-                {/* Tag Limit */}
-                 <div className="space-y-1">
-                   <label htmlFor="tagLimit" className="text-sm font-medium text-slate-700">Max Tags</label>
-                   <div className="relative">
-                     <select
-                       id="tagLimit"
-                       value={tagLimit}
-                       onChange={(e) => setTagLimit(e.target.value)}
-                       className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-700 appearance-none"
-                     >
-                        <option value="13">13 Tags (Default)</option>
-                        <option value="15">15 Tags</option>
-                        <option value="20">20 Tags</option>
-                        <option value="25">25 Tags</option>
-                     </select>
-                     <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                   </div>
-                 </div>
+                {/* Max Tags — Locked */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="tagLimit" className="text-sm font-medium text-slate-700">Max Tags</label>
+                    <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium">
+                      <Lock size={10} />
+                      Standard Plan: {MAX_TAGS_LIMIT} tags
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      id="tagLimit"
+                      min="5"
+                      max={MAX_TAGS_LIMIT}
+                      value={tagLimit}
+                      onChange={(e) => setTagLimit(parseInt(e.target.value))}
+                      className="flex-1 h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-indigo-600"
+                    />
+                    <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg min-w-[44px] text-center">
+                      {tagLimit}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">Upgrade to unlock up to 25 tags per listing.</p>
+                </div>
+
+              </div>
             </div>
           </div>
       </div>
