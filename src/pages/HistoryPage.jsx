@@ -32,20 +32,8 @@ const HistoryPage = () => {
     const fetchListings = async () => {
         try {
             const { data, error } = await supabase
-                .from('listings')
-                .select(`
-                    id,
-                    created_at,
-                    title,
-                    generated_title,
-                    image_url,
-                    status,
-                    user_description,
-                    niches ( name ),
-                    product_types ( name ),
-                    tones ( name ),
-                    custom_listing
-                `)
+                .from('view_listing_scores')
+                .select('*')
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
@@ -68,7 +56,7 @@ const HistoryPage = () => {
                 .eq('id', id);
 
              if (error) throw error;
-             setListings(listings.filter(l => l.id !== id));
+             setListings(listings.filter(l => (l.listing_id || l.id) !== id));
         } catch (err) {
             console.error("Error deleting listing:", err);
             alert("Failed to delete listing.");
@@ -77,28 +65,25 @@ const HistoryPage = () => {
 
     const handleExportPDF = async (item) => {
         try {
-            setExportingId(item.id);
+            const listingId = item.listing_id || item.id;
+            setExportingId(listingId);
             
             // 1. Fetch SEO Stats (not in initial list query)
             const { data: stats, error: statsError } = await supabase
                 .from('listing_seo_stats')
                 .select('*')
-                .eq('listing_id', item.id);
+                .eq('listing_id', listingId);
 
             if (statsError) throw statsError;
 
             // 2. Prepare Data for PDF
             const customData = item.custom_listing ? JSON.parse(item.custom_listing) : {};
             const listingData = {
-                title: item.generated_title || item.title || "Untitled",
-                description: item.user_description || "", // or generated_description if available? 
-                // Wait, user_description is the INPUT context. generated_description is the result.
-                // In fetchListings, we select user_description. We MISS generated_description.
-                // We need to fetch it or update fetchListings. 
-                // Let's fetch the full listing details again to be safe and simple.
+                title: item.display_title || item.title || "Untitled", // Use display_title from view
+                description: item.user_description || "", 
                 
                 imageUrl: item.image_url,
-                productName: (item.generated_title || item.title || "Untitled").split(' ').slice(0, 5).join(' ') + '...',
+                productName: (item.display_title || item.title || "Untitled").split(' ').slice(0, 5).join(' ') + '...',
                 tags: stats.map(s => {
                     // Calculate Trend %
                     let trend = 0;
@@ -121,21 +106,16 @@ const HistoryPage = () => {
                 })
             };
 
-            // Fetch full details if description/generated_description is missing from list view
-            // The list view query selects: id, created_at, title, generated_title, image_url, status, user_description...
-            // It does NOT select generated_description.
-            // So we MUST fetch the specific listing.
-            
+            // Fetch full details if description is missing
             const { data: fullListing, error: listingError } = await supabase
                 .from('listings')
-                .select('generated_description')
-                .eq('id', item.id)
+                .select('generated_description, user_description')
+                .eq('id', listingId)
                 .single();
                 
             if (listingError) throw listingError;
             
-            listingData.description = fullListing.generated_description || item.user_description;
-
+            listingData.description = fullListing.generated_description || fullListing.user_description || "";
 
             // 3. Generate Blob
             const blob = await pdf(<ListingPDFDocument listing={listingData} />).toBlob();
@@ -144,7 +124,7 @@ const HistoryPage = () => {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `${(item.generated_title || "listing").substring(0, 20).replace(/\s+/g, '_')}_SEO.pdf`;
+            link.download = `${(item.display_title || "listing").substring(0, 20).replace(/\s+/g, '_')}_SEO.pdf`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -172,17 +152,23 @@ const HistoryPage = () => {
 
     // Filter Logic
     const filteredListings = listings.filter(item => {
-        const customData = item.custom_listing ? JSON.parse(item.custom_listing) : {};
-        const nicheName = item.niches?.name || customData.niche || "";
-        const typeName = item.product_types?.name || "";
-        const title = item.generated_title || item.title || "";
+        // Adapt to View Fields
+        const nicheName = item.niche_full || item.niche_name || "General";
+        const typeName = item.product_type_name || "Product";
+        const title = item.display_title || item.title || "";
 
         const matchesSearch = 
             title.toLowerCase().includes(searchTerm.toLowerCase()) ||
             nicheName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             typeName.toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
+        // Map View Status to Filter Status
+        // View returns: 'Listing completed', 'SEO analysis completed', 'New', etc.
+        const normalizedStatus = ['Listing completed', 'SEO analysis completed'].includes(item.status) 
+            ? 'completed' 
+            : 'processing';
+            
+        const matchesStatus = statusFilter === 'all' || normalizedStatus === statusFilter;
 
         return matchesSearch && matchesStatus;
     });
@@ -235,68 +221,92 @@ const HistoryPage = () => {
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
                     <div className="overflow-x-auto flex-grow">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
-                                <tr>
-                                    <th className="px-6 py-3 font-semibold w-20">Visuel</th>
-                                    <th className="px-4 py-3 font-semibold">Produit</th>
-                                    <th className="px-4 py-3 font-semibold">Contexte</th>
-                                    <th className="px-4 py-3 font-semibold w-40">Statut/Date</th>
-                                    <th className="px-4 py-3 font-semibold text-right w-40">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan="5" className="px-6 py-12 text-center text-slate-400">Loading history...</td>
-                                    </tr>
-                                ) : paginatedListings.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="5" className="px-6 py-12 text-center text-slate-400">No optimizations found.</td>
-                                    </tr>
-                                ) : (
-                                    paginatedListings.map((item) => {
-                                        const customData = item.custom_listing ? JSON.parse(item.custom_listing) : {};
-                                        const nicheName = item.niches?.name || customData.niche || "General";
-                                        const typeName = item.product_types?.name || "Product";
-                                        const toneName = item.tones?.name || "Standard";
-                                        const displayTitle = item.generated_title || item.title || "Untitled Product";
+                                    <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-6 py-3 font-semibold w-20"></th> {/* Visuel (Empty Label) */}
+                                            <th className="px-4 py-3 font-semibold">Title</th>
+                                            <th className="px-4 py-3 font-semibold">Niche</th>
+                                            <th className="px-4 py-3 font-semibold w-24 text-center">Score</th>
+                                            <th className="px-4 py-3 font-semibold w-32 text-center">Status</th>
+                                            <th className="px-4 py-3 font-semibold w-32 text-right">Date</th>
+                                            <th className="px-4 py-3 font-semibold text-right w-40">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {isLoading ? (
+                                            <tr>
+                                                <td colSpan="7" className="px-6 py-12 text-center text-slate-400">Loading history...</td>
+                                            </tr>
+                                        ) : paginatedListings.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="7" className="px-6 py-12 text-center text-slate-400">No optimizations found.</td>
+                                            </tr>
+                                        ) : (
+                                            paginatedListings.map((item) => {
+                                                const listingId = item.listing_id || item.id;
+                                                // Niche Breadcrumbs: Theme > Niche > Sub-niche
+                                                const theme = item.theme_name || "General";
+                                                const niche = item.niche_name || "Niche";
+                                                const subNiche = item.sub_niche_name || ""; 
+                                                
+                                                let nicheDisplay = item.niche_full;
+                                                if (!nicheDisplay || nicheDisplay === "General") {
+                                                     nicheDisplay = `${theme} > ${niche}${subNiche ? ` > ${subNiche}` : ''}`;
+                                                }
 
-                                        return (
-                                            <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-                                                <td className="px-6 py-4">
-                                                    <div className="w-12 h-12 rounded-lg border border-slate-200 bg-slate-100 overflow-hidden relative group-hover:shadow-md transition-all">
-                                                        {item.image_url ? (
-                                                            <img src={item.image_url} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <div className="flex items-center justify-center h-full text-xs text-slate-300">No Img</div>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-4">
-                                                    <div className="font-bold text-slate-900 mb-0.5 line-clamp-1">{displayTitle}</div>
-                                                    <div className="text-xs text-slate-500 font-mono">Type : {typeName}</div>
-                                                </td>
-                                                <td className="px-4 py-4">
-                                                    <div className="text-xs text-slate-700 font-medium">Niche : {nicheName}</div>
-                                                    <div className="text-xs text-slate-500">Ton : {toneName}</div>
-                                                </td>
-                                                <td className="px-4 py-4">
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-slate-900 font-medium">
-                                                            {format(new Date(item.created_at), 'dd MMM', { locale: fr })}
-                                                        </span>
-                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide w-fit border
-                                                            ${item.status === 'completed' 
-                                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                                                                : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>
-                                                            {item.status === 'completed' ? 'Généré' : 'En cours'}
-                                                        </span>
-                                                    </div>
-                                                </td>
+                                                // Use listing_score as per user instruction. Handle null/0 as N/A.
+                                                const rawScore = item.listing_score || item.performance_score;
+                                                const score = rawScore ? Math.round(rawScore) : null;
+                                                
+                                                const displayTitle = item.display_title || item.title || "Untitled Product";
+                                                
+                                                // Status Logic
+                                                const status = item.status || "New";
+                                                const statusColor = 
+                                                    status === 'Listing completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                    status === 'SEO analysis completed' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
+                                                    status === 'New' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                                    'bg-slate-50 text-slate-600 border-slate-100';
+
+                                                return (
+                                                    <tr key={listingId} className="hover:bg-slate-50 transition-colors group">
+                                                        <td className="px-6 py-4">
+                                                            <div className="w-12 h-12 rounded-lg border border-slate-200 bg-slate-100 overflow-hidden relative group-hover:shadow-md transition-all">
+                                                                {item.image_url ? (
+                                                                    <img src={item.image_url} alt="" className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <div className="flex items-center justify-center h-full text-xs text-slate-300">No Img</div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <div className="font-bold text-slate-900 mb-0.5 line-clamp-1">{displayTitle}</div>
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <div className="text-sm text-slate-700 font-medium truncate max-w-[200px]" title={nicheDisplay}>
+                                                                {nicheDisplay}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center">
+                                                            <div className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold 
+                                                                ${score >= 80 ? 'bg-emerald-100 text-emerald-700' :
+                                                                  score >= 50 ? 'bg-amber-100 text-amber-700' :
+                                                                  'bg-slate-100 text-slate-500'}`}>
+                                                                {score !== null ? score : 'N/A'}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center">
+                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusColor}`}>
+                                                                {status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-right whitespace-nowrap text-sm text-slate-500">
+                                                            {format(new Date(item.created_at), 'dd MMM yyyy', { locale: fr })}
+                                                        </td>
                                                 <td className="px-4 py-4 text-right">
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button 
-                                                            onClick={() => handleViewResults(item.id)}
+                                                            onClick={() => handleViewResults(listingId)}
                                                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors shadow-sm hover:shadow whitespace-nowrap"
                                                         >
                                                             SHOW SEO <Eye size={12} />
@@ -309,14 +319,14 @@ const HistoryPage = () => {
                                                             <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-slate-100 rounded-lg shadow-xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-10 p-1">
                                                                 <button 
                                                                     onClick={() => handleExportPDF(item)}
-                                                                    disabled={exportingId === item.id}
+                                                                    disabled={exportingId === listingId}
                                                                     className="w-full text-left px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded flex items-center gap-2 mb-1"
                                                                 >
-                                                                    {exportingId === item.id ? <Loader2 size={12} className="animate-spin text-indigo-600" /> : <FileDown size={12} />}
+                                                                    {exportingId === listingId ? <Loader2 size={12} className="animate-spin text-indigo-600" /> : <FileDown size={12} />}
                                                                     Export PDF
                                                                 </button>
                                                                 <button 
-                                                                    onClick={() => handleDelete(item.id)}
+                                                                    onClick={() => handleDelete(listingId)}
                                                                     className="w-full text-left px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded flex items-center gap-2"
                                                                 >
                                                                     <Trash2 size={12} />

@@ -96,3 +96,16 @@
 
 - [x] Hotfixes
     - [x] Fix Missing Dependency (sonner)
+
+- [x] Phase 6: Save Listing Feature & Schema Cleanup
+    - [x] Database: Migrate to `status_id` (UUID) and drop legacy `status` column.
+    - [x] Database: Update Views (`view_listing_scores`, `view_listing_dashboard`, `view_dashboard_summary`) to use `listing_statuses`.
+    - [x] Feature: "Save Draft" in Product Studio (Save without running SEO).
+    - [x] UI: Update Dashboard Listing Badges to reflect new status names.
+    - [x] Code: Refactor `ProductStudio` and `Dashboard` to use status UUIDs.
+
+## Review for Phase 6
+- **Schema Refactor**: The `listings.status` text column has been successfully dropped. All views now join with `listing_statuses` to retrieve the status name. This ensures data consistency with the UUID foreign key.
+- **Save Draft**: Users can now save a draft with an image and basic details without consuming credits or running the full analysis. Status is set to 'New'.
+- **Dashboard**: Badges now correctly display 'New', 'SEO analysis completed', and 'Listing completed'.
+

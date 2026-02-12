@@ -1,4 +1,4 @@
-import { LayoutGrid, LineChart, ShoppingBag, Settings, User, LogOut } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, LineChart, ShoppingBag, Settings, User, LogOut } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -7,6 +7,7 @@ const Sidebar = () => {
   const { user, profile, signOut } = useAuth();
   
   const navItems = [
+    { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { name: 'Product Studio', icon: LayoutGrid, path: '/studio' },
     { name: 'SEO History', icon: LineChart, path: '/history' },
     { name: 'My Shop', icon: ShoppingBag, path: '/shop' },

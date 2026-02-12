@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Sparkles, ArrowRight, ChevronDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { toast } from 'sonner';
 
 const CustomInput = ({ isVisible, value, onChange, placeholder }) => (
   <div className={`grid transition-all duration-300 ease-in-out ${isVisible ? 'grid-rows-[1fr] opacity-100 mt-2' : 'grid-rows-[0fr] opacity-0'}`}>
@@ -41,7 +42,7 @@ const Select = ({ label, value, onChange, options, disabled, id, loading }) => (
   </div>
 );
 
-const OptimizationForm = ({ onAnalyze, isLoading, onCancel, initialValues }) => {
+const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, onCancel, initialValues }) => {
   // Data State
   const [themes, setThemes] = useState([]);
   const [nichesList, setNichesList] = useState([]);
@@ -73,7 +74,11 @@ const OptimizationForm = ({ onAnalyze, isLoading, onCancel, initialValues }) => 
       const { data: typesData } = await supabase.from('product_types').select('id, name').order('name');
       if (typesData) {
         setProductTypes(typesData);
-        if (typesData.length > 0 && !productType) setProductType(typesData[0].id); // Default if not set
+        if (typesData.length > 0 && !productType) {
+          // Default to T-Shirt if available, otherwise first item
+          const tshirt = typesData.find(t => t.name.toLowerCase().includes('t-shirt'));
+          setProductType(tshirt ? tshirt.id : typesData[0].id);
+        }
       }
 
       const { data: tonesData } = await supabase.from('tones').select('id, name').order('name');
@@ -164,13 +169,11 @@ const OptimizationForm = ({ onAnalyze, isLoading, onCancel, initialValues }) => 
   };
 
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
+  const getFormData = () => {
     // Validate mandatory fields
     if (!productType) {
-        alert("Please select a Product Type.");
-        return;
+        toast.error("Please select a Product Type.");
+        return null;
     }
 
     // Find Names for Payload
@@ -182,7 +185,7 @@ const OptimizationForm = ({ onAnalyze, isLoading, onCancel, initialValues }) => 
     const selectedNiche = niche !== 'custom' ? nichesList.find(t => t.id === niche)?.name : customNiche;
     const selectedSubNiche = subNiche !== 'custom' ? subNichesList.find(t => t.id === subNiche)?.name : customSubNiche;
 
-    onAnalyze({
+    return {
       // Categorization (IDs)
       theme_id: (theme === 'custom' || theme === "") ? null : theme,
       niche_id: (niche === 'custom' || niche === "") ? null : niche,
@@ -208,11 +211,23 @@ const OptimizationForm = ({ onAnalyze, isLoading, onCancel, initialValues }) => 
       tag_count: parseInt(tagLimit),
       
       context: contextRef.current.value
-    });
+    };
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const data = getFormData();
+    if (data) onAnalyze(data);
+  };
+
+  const handleSaveClick = (e) => {
+    e.preventDefault();
+    const data = getFormData();
+    if (data && onSaveDraft) onSaveDraft(data);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
+    <form onSubmit={handleSubmit} className="space-y-4">
       
       {/* CATEGORIZATION SECTION */}
       <div className="space-y-4">
@@ -365,7 +380,22 @@ const OptimizationForm = ({ onAnalyze, isLoading, onCancel, initialValues }) => 
                 disabled={isLoading}
                 className="px-8 py-4 rounded-xl font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors border border-slate-200 hover:border-slate-300"
              >
-                Cancel
+                Close settings
+             </button>
+          )}
+
+          {onSaveDraft && (
+             <button
+                type="button"
+                onClick={handleSaveClick}
+                disabled={isLoading || !isImageSelected}
+                className={`px-6 py-4 rounded-xl font-bold transition-all border shadow-sm
+                    ${!isImageSelected || isLoading
+                        ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
+                        : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300'
+                    }`}
+             >
+                Save listing
              </button>
           )}
 

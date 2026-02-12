@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Zap, Sparkles, Edit3, RefreshCw, ChevronRight, ChevronUp } from 'lucide-react';
+import { Zap, Sparkles, Edit3, RefreshCw, ChevronRight, ChevronUp, Wand2, Palette, Type, LayoutTemplate, Target, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ImageUpload from '../components/studio/ImageUpload';
 import OptimizationForm from '../components/studio/OptimizationForm';
@@ -11,6 +11,13 @@ import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
+import { toast } from 'sonner';
+
+const STATUS_IDS = {
+  NEW: 'ac083a90-43fa-4ff5-a62d-5cd6bb5edbcc',
+  SEO_DONE: '35660e24-94bb-4586-aa5a-a5027546b4a1',
+  COMPLETE: '28a11ca0-bcfc-42e0-971d-efc320f78424'
+};
 
 const ProductStudio = () => {
   const { user, profile } = useAuth();
@@ -22,7 +29,19 @@ const ProductStudio = () => {
   const [results, setResults] = useState(null);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [analysisContext, setAnalysisContext] = useState(null);
+  const [listingName, setListingName] = useState("");
   
+  // Visual Analysis State
+  const [isAnalyzingDesign, setIsAnalyzingDesign] = useState(false);
+  const [visualAnalysis, setVisualAnalysis] = useState({
+      aesthetic: "",
+      typography: "",
+      graphics: "",
+      colors: "",
+      target_audience: "",
+      overall_vibe: ""
+  });
+
   // UI State for Form Collapse
   const [isFormCollapsed, setIsFormCollapsed] = useState(false);
   const [formKey, setFormKey] = useState(0); // For resetting the form
@@ -36,8 +55,185 @@ const ProductStudio = () => {
   // ... (keep useEffect for realtime as a backup or removal? Let's keep it but focusing on the direct response)
   // Actually, if we handle it here, we might double-fetch if realtime also triggers. 
   // But since the Status won't change to 'completed' until WE do it here, the realtime won't fire early.
-  // And once we update it, the realtime might fire. 
   // Let's rely on the direct response for speed and reliability if N8N returns data.
+  // Auto-resize visual analysis textareas when values change programmatically
+  useEffect(() => {
+      document.querySelectorAll('[data-visual-field]').forEach(el => {
+          el.style.height = 'auto';
+          el.style.height = el.scrollHeight + 'px';
+      });
+  }, [visualAnalysis]);
+
+  // Visual Analysis Handler
+  const handleAnalyzeDesign = async () => {
+      // 1. Check if image selected
+      if (!selectedImage && !results?.imageUrl) {
+          toast.error("Please select an image first.");
+          return;
+      }
+
+      setIsAnalyzingDesign(true);
+
+      try {
+          // Upload if fresh image
+          let publicUrl = results?.imageUrl; 
+          if (!publicUrl && selectedImage) {
+               // Reuse upload logic or separate it? 
+               // For now, let's assume we need to upload if it's a file
+               const sanitizedFileName = selectedImage.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+               const filename = `${user.id}/${Date.now()}_temp_${sanitizedFileName}`; // temp prefix? 
+               
+               const { error: uploadError } = await supabase.storage
+                    .from('mockups_bucket')
+                    .upload(filename, selectedImage, { upsert: false });
+               if (uploadError) throw uploadError;
+               
+               const { data: { publicUrl: newUrl } } = supabase.storage.from('mockups_bucket').getPublicUrl(filename);
+               publicUrl = newUrl;
+          }
+
+          // Trigger n8n webhook
+          const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
+          
+          const payload = {
+              action: "analyseImage", // As requested
+              user_id: user.id,
+              payload: {
+                  image_url: publicUrl
+              }
+          };
+
+          const response = await axios.post(webhookUrl, payload);
+          console.log("Visual Analysis Response:", response.data);
+          
+          // Handle n8n array structure: [{ output: { visual_analysis: { ... } } }]
+          // Or direct object if changed later
+          const responseData = Array.isArray(response.data) ? response.data[0] : response.data;
+          const data = responseData?.output?.visual_analysis || responseData?.visual_analysis || responseData;
+
+          if (data) {
+              setVisualAnalysis({
+                  aesthetic: data.aesthetic_style || "",
+                  typography: data.typography_details || "",
+                  graphics: data.graphic_elements || "",
+                  colors: data.color_palette || "",
+                  target_audience: data.target_audience || "",
+                  overall_vibe: data.overall_vibe || ""
+              });
+              toast.success("Visual analysis complete! ✨");
+          }
+
+      } catch (error) {
+          console.error("Visual Analysis Error:", error);
+          toast.error("Failed to analyze design.");
+      } finally {
+          setIsAnalyzingDesign(false);
+      }
+  };
+
+  const handleSaveDraft = async (formData) => {
+      // Logic similar to handleAnalyze but stops after DB insert
+      // Fallback: Use existing result image if valid and no new image selected
+      if (!selectedImage && !formData.existingImageUrl && results?.imageUrl) {
+          formData.existingImageUrl = results.imageUrl;
+      }
+  
+      if (!selectedImage && !formData.existingImageUrl) {
+          toast.error("Please select an image first.");
+          return;
+      }
+      
+      if (!user) {
+          toast.error("You must be logged in to save drafts.");
+          return;
+      }
+  
+      try {
+          setIsLoading('saving');
+          // Removing setListingId(null) to allow updates
+          
+          let publicUrl = formData.existingImageUrl;
+  
+          if (!formData.existingImageUrl) {
+              // 1. Upload Image (Duplicate logic slightly for safety/isolation)
+              const sanitizedFileName = selectedImage.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+              const filename = `${user.id}/${Date.now()}_${sanitizedFileName}`;
+  
+              const { error: uploadError } = await supabase.storage
+                  .from('mockups_bucket')
+                  .upload(filename, selectedImage, {
+                      cacheControl: '3600',
+                      upsert: false
+                  });
+  
+              if (uploadError) throw uploadError;
+  
+              const { data: { publicUrl: newUrl } } = supabase.storage.from('mockups_bucket').getPublicUrl(filename);
+              publicUrl = newUrl;
+          }
+          
+          // 2. Database Operation
+          const customData = {
+              theme: formData.custom_theme,
+              niche: formData.custom_niche,
+              sub_niche: formData.custom_sub_niche
+          };
+
+          const commonFields = {
+                product_type_id: formData.product_type_id,
+                tone_id: formData.tone_id,
+                theme_id: formData.theme_id,
+                niche_id: formData.niche_id,
+                sub_niche_id: formData.sub_niche_id,
+                user_description: formData.context,
+                custom_listing: JSON.stringify(customData),
+                image_url: publicUrl,
+                title: listingName || "Draft Listing",
+                // Visual Fields
+                visual_aesthetic: visualAnalysis.aesthetic,
+                visual_typography: visualAnalysis.typography,
+                visual_graphics: visualAnalysis.graphics,
+                visual_colors: visualAnalysis.colors,
+                visual_target_audience: visualAnalysis.target_audience,
+                visual_overall_vibe: visualAnalysis.overall_vibe
+          };
+
+          if (listingId) {
+            // UPDATE existing listing
+            const { error: dbError } = await supabase
+              .from('listings')
+              .update(commonFields)
+              .eq('id', listingId);
+
+            if (dbError) throw dbError;
+            toast.success("Listing updated");
+
+          } else {
+            // INSERT new listing
+            const { data: listingData, error: dbError } = await supabase
+              .from('listings')
+              .insert({
+                  ...commonFields,
+                  user_id: user.id,
+                  status_id: STATUS_IDS.NEW
+              })
+              .select()
+              .single();
+  
+            if (dbError) throw dbError;
+            setListingId(listingData.id);
+            toast.success("Listing saved");
+          }
+
+          setIsLoading(false);
+  
+      } catch (err) {
+          console.error("Error saving draft:", err);
+          toast.error("Failed to save draft: " + err.message);
+          setIsLoading(false);
+      }
+  };
+
 
   const handleAnalyze = async (formData) => {
     // Save context for drafting phase
@@ -49,18 +245,18 @@ const ProductStudio = () => {
     }
 
     if (!selectedImage && !formData.existingImageUrl) {
-        alert("Please select an image first.");
+        toast.error("Please select an image first.");
         return;
     }
     
     if (!user) {
-        alert("You must be logged in to analyze products.");
+        toast.error("You must be logged in to analyze products.");
         return;
     }
 
     try {
         setIsLoading('uploading');
-        setListingId(null);
+        let activeListingId = listingId;
         setResults(null);
         setShowResults(false);
         setIsFormCollapsed(false);
@@ -92,47 +288,77 @@ const ProductStudio = () => {
         
         setIsLoading('saving');
 
-        // 2. Database Insert
+        // 2. Database Operation
         const customData = {
             theme: formData.custom_theme,
             niche: formData.custom_niche,
             sub_niche: formData.custom_sub_niche
         };
 
-        const { data: listingData, error: dbError } = await supabase
-            .from('listings')
-            .insert({
-                user_id: user.id,
-                product_type_id: formData.product_type_id,
-                tone_id: formData.tone_id,
-                theme_id: formData.theme_id,
-                niche_id: formData.niche_id,
-                sub_niche_id: formData.sub_niche_id,
-                user_description: formData.context,
-                custom_listing: JSON.stringify(customData),
-                image_url: publicUrl,
-                title: "Pending Analysis...",
-                status: 'processing'
-            })
-            .select()
-            .single();
+        const commonFields = {
+            product_type_id: formData.product_type_id,
+            tone_id: formData.tone_id,
+            theme_id: formData.theme_id,
+            niche_id: formData.niche_id,
+            sub_niche_id: formData.sub_niche_id,
+            user_description: formData.context,
+            custom_listing: JSON.stringify(customData),
+            image_url: publicUrl,
+            title: listingName || "Pending Analysis...",
+             // Visual Fields
+            visual_aesthetic: visualAnalysis.aesthetic,
+            visual_typography: visualAnalysis.typography,
+            visual_graphics: visualAnalysis.graphics,
+            visual_colors: visualAnalysis.colors,
+            visual_target_audience: visualAnalysis.target_audience,
+            visual_overall_vibe: visualAnalysis.overall_vibe
+        };
 
-        if (dbError) throw dbError;
+        if (activeListingId) {
+             // UPDATE
+             const { error: dbError } = await supabase
+                .from('listings')
+                .update(commonFields)
+                .eq('id', activeListingId);
+             
+             if (dbError) throw dbError;
+        } else {
+             // INSERT
+             const { data: listingData, error: dbError } = await supabase
+                .from('listings')
+                .insert({
+                    ...commonFields,
+                    user_id: user.id,
+                    status_id: STATUS_IDS.NEW
+                })
+                .select()
+                .single();
+    
+             if (dbError) throw dbError;
+             activeListingId = listingData.id;
+             setListingId(activeListingId);
+        }
 
-        setListingId(listingData.id);
         setIsLoading('triggering');
 
         // 3. Trigger Webhook (N8N)
         const webhookPayload = {
             action: "generate_seo",
-            listing_id: listingData.id,
+            listing_id: activeListingId,
             user_id: user.id,
             payload: {
                 image_url: publicUrl,
+                // Visual analysis fields
+                visual_aesthetic: visualAnalysis.aesthetic,
+                visual_typography: visualAnalysis.typography,
+                visual_graphics: visualAnalysis.graphics,
+                visual_colors: visualAnalysis.colors,
+                visual_target_audience: visualAnalysis.target_audience,
+                visual_overall_vibe: visualAnalysis.overall_vibe,
                 categorization: {
-                    theme: formData.theme_name,
-                    niche: formData.niche_name,
-                    sub_niche: formData.sub_niche_name,
+                    theme: formData.theme_name || null,
+                    niche: formData.niche_name || null,
+                    sub_niche: formData.sub_niche_name || null,
                     custom_listing: formData.custom_theme || formData.custom_niche ? JSON.stringify(customData) : null
                 },
                 product_details: {
@@ -194,17 +420,17 @@ const ProductStudio = () => {
             .update({
                 generated_title: generatedTitle,
                 generated_description: generatedDescription,
-                status: 'completed',
-                title: generatedTitle // Update main title as well?
+                status_id: STATUS_IDS.SEO_DONE,
+                title: listingName || generatedTitle
             })
-            .eq('id', listingData.id);
+            .eq('id', activeListingId);
 
         if (updateError) throw updateError;
 
         // Insert SEO Stats
         // transform seoAnalysis (array) to db format
         const statsToInsert = seoAnalysis.map(item => ({
-            listing_id: listingData.id,
+            listing_id: activeListingId,
             tag: item.keyword,
             search_volume: item.avg_volume || 0,
             competition: String(item.competition), 
@@ -248,12 +474,12 @@ const ProductStudio = () => {
         console.error("Error in handleAnalyze:", err);
         if (err.response) {
             console.error("Webhook Error Response:", err.response.data);
-            alert(`Analysis failed: Server returned ${err.response.status}. Check console for details.`);
+            toast.error(`Analysis failed: Server returned ${err.response.status}. Check console for details.`);
         } else if (err.request) {
             console.error("Webhook No Response:", err.request);
-            alert("Analysis failed: No response from analysis server. Check your connection.");
+            toast.error("Analysis failed: No response from analysis server. Check your connection.");
         } else {
-             alert("An error occurred: " + err.message);
+             toast.error("An error occurred: " + err.message);
         }
         setIsLoading(false);
     }
@@ -310,11 +536,18 @@ const ProductStudio = () => {
             mockups: [results.imageUrl], 
             listing_id: listingId,
             payload: {
-                image_url: results.imageUrl, // Added to match generate_seo schema
+                image_url: results.imageUrl,
+                // Visual analysis fields
+                visual_aesthetic: visualAnalysis.aesthetic,
+                visual_typography: visualAnalysis.typography,
+                visual_graphics: visualAnalysis.graphics,
+                visual_colors: visualAnalysis.colors,
+                visual_target_audience: visualAnalysis.target_audience,
+                visual_overall_vibe: visualAnalysis.overall_vibe,
                 categorization: {
-                    theme: analysisContext.theme_name || "General",
-                    niche: analysisContext.niche_name || "General",
-                    sub_niche: analysisContext.sub_niche_name || "General"
+                    theme: analysisContext.theme_name || null,
+                    niche: analysisContext.niche_name || null,
+                    sub_niche: analysisContext.sub_niche_name || null
                 },
                 product_details: {
                     product_type: analysisContext.product_type_name || "Product",
@@ -365,20 +598,27 @@ const ProductStudio = () => {
                 .from('listings')
                 .update({ 
                     generated_title: title,
-                    generated_description: description
+                    generated_description: description,
+                    status_id: STATUS_IDS.COMPLETE
                 })
                 .eq('id', listingId);
              
-             if (updateError) console.error("Failed to save draft:", updateError);
+             if (updateError) {
+                 console.error("Failed to save draft status:", updateError);
+                 toast.error("Draft generated but failed to update status.");
+             } else {
+                 console.log("Listing status updated to COMPLETE");
+                 toast.success("Magic Draft generated and listing completed!");
+             }
         }
 
       } catch (err) {
           console.error("Draft generation failed:", err);
           if (err.response) {
                console.error("Webhook Error Response:", err.response.data);
-               alert(`Draft generation failed: Server returned ${err.response.status}`);
+               toast.error(`Draft generation failed: Server returned ${err.response.status}`);
           } else {
-               alert("Failed to generate draft. Please try again.");
+               toast.error("Failed to generate draft. Please try again.");
           }
       } finally {
           setIsGeneratingDraft(false);
@@ -400,6 +640,7 @@ const ProductStudio = () => {
     setListingId(null);
     setSelectedImage(null);
     setAnalysisContext(null);
+    setListingName("");
     setFormKey(prev => prev + 1); // Reset form state
   };
 
@@ -409,11 +650,13 @@ const ProductStudio = () => {
         // Fetch Listing Details
         const { data: listing, error: listingError } = await supabase
             .from('listings')
-            .select(`*, niches(name), themes(name), product_types(name), tones(name)`)
+            .select(`*, niches(name), themes(name), sub_niches(name), product_types(name), tones(name)`)
             .eq('id', listingId)
             .single();
 
         if (listingError) throw listingError;
+
+        setListingName(listing.title || "");
 
         // Fetch SEO Stats
         const { data: stats, error: statsError } = await supabase
@@ -425,11 +668,11 @@ const ProductStudio = () => {
 
         // Reconstruct Analysis Context (Handle missing relations gracefully)
         setAnalysisContext({
-            theme_name: listing.themes?.name || "Unknown",
-            niche_name: listing.niches?.name || "Unknown",
-            sub_niche_name: "Loaded from history", 
-            product_type_name: listing.product_types?.name || "Unknown",
-            tone_name: listing.tones?.name || "Unknown",
+            theme_name: listing.themes?.name || "",
+            niche_name: listing.niches?.name || "",
+            sub_niche_name: listing.sub_niches?.name || "", 
+            product_type_name: listing.product_types?.name || "",
+            tone_name: listing.tones?.name || "",
             context: listing.user_description,
             // ID mappings for relaunch
             product_type_id: listing.product_type_id,
@@ -461,7 +704,18 @@ const ProductStudio = () => {
         });
 
         setListingId(listingId);
-        setShowResults(true);
+      
+      // Hydrate Visual Analysis fields
+      setVisualAnalysis({
+          aesthetic: listing.visual_aesthetic || "",
+          typography: listing.visual_typography || "",
+          graphics: listing.visual_graphics || "",
+          colors: listing.visual_colors || "",
+          target_audience: listing.visual_target_audience || "",
+          overall_vibe: listing.visual_overall_vibe || ""
+      });
+
+      setShowResults(true);
         setIsFormCollapsed(true);
         setIsLoading(false);
 
@@ -470,7 +724,7 @@ const ProductStudio = () => {
 
     } catch (err) {
         console.error("Error loading listing:", err);
-        alert("Failed to load listing.");
+        toast.error("Failed to load listing.");
         setIsLoading(false);
     }
   };
@@ -629,16 +883,161 @@ const ProductStudio = () => {
                     </div>
                     
                     <div className="p-8">
-                        <div className="mb-8">
-                            <ImageUpload 
-                                key={`img-${formKey}`} 
-                                onFileSelect={setSelectedImage} 
-                                initialImage={results?.imageUrl}
-                            />
+                        <div className="mb-6">
+                           <label htmlFor="listingName" className="block text-sm font-medium text-slate-700 mb-1">Listing name</label>
+                           <input
+                              type="text"
+                              id="listingName"
+                              value={listingName}
+                              onChange={(e) => setListingName(e.target.value)}
+                              placeholder="e.g. Vintage Floral T-Shirt"
+                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 text-slate-900"
+                           />
+                        </div>
+
+                        {/* NEW 2-Column Grid Layout */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                            
+                            {/* Left Column: Image Area */}
+                            <div className="md:col-span-1 flex flex-col gap-4">
+                                <div className={`relative rounded-xl overflow-hidden transition-all ${isAnalyzingDesign ? 'ring-4 ring-indigo-500/20' : ''}`}>
+                                    <ImageUpload 
+                                        key={`img-${formKey}`} 
+                                        onFileSelect={setSelectedImage} 
+                                        initialImage={results?.imageUrl}
+                                        compact={true} 
+                                    />
+                                    {isAnalyzingDesign && (
+                                        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-10">
+                                             <div className="flex flex-col items-center">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
+                                                <span className="text-xs font-bold text-indigo-700 animate-pulse">Analyzing...</span>
+                                             </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={handleAnalyzeDesign}
+                                    disabled={!selectedImage && !results?.imageUrl || isAnalyzingDesign}
+                                    className="w-full py-2.5 px-4 rounded-xl border-2 border-indigo-600 text-indigo-600 font-bold text-sm hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
+                                >
+                                    <Sparkles size={16} className="group-hover:animate-pulse" />
+                                    Analyze Design
+                                </button>
+                            </div>
+
+                            {/* Right Column: Visual Analysis Fields */}
+                            <div className="md:col-span-2 bg-slate-50/50 rounded-2xl p-6 border border-slate-100">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Wand2 size={16} className="text-indigo-500" />
+                                    <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Visual Analysis</h3>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="group">
+                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                            <Palette size={12} />
+                                            Aesthetic Style
+                                        </label>
+                                        <textarea 
+                                            data-visual-field
+                                            rows={1}
+                                            value={visualAnalysis.aesthetic}
+                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, aesthetic: e.target.value})}
+                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                            placeholder="e.g. Minimalist, Boho..."
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                        />
+                                    </div>
+                                    
+                                    <div className="group">
+                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                            <Type size={12} />
+                                            Typography
+                                        </label>
+                                        <textarea 
+                                            data-visual-field
+                                            rows={1}
+                                            value={visualAnalysis.typography}
+                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, typography: e.target.value})}
+                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                            placeholder="e.g. Bold Serif..."
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                        />
+                                    </div>
+
+                                    <div className="group">
+                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                            <LayoutTemplate size={12} />
+                                            Graphic Elements
+                                        </label>
+                                        <textarea 
+                                            data-visual-field
+                                            rows={1}
+                                            value={visualAnalysis.graphics}
+                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, graphics: e.target.value})}
+                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                            placeholder="e.g. Geometric shapes..."
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                        />
+                                    </div>
+
+                                    <div className="group">
+                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                            <Palette size={12} />
+                                            Color Palette
+                                        </label>
+                                        <textarea 
+                                            data-visual-field
+                                            rows={1}
+                                            value={visualAnalysis.colors}
+                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, colors: e.target.value})}
+                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                            placeholder="e.g. Earth tones..."
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                        />
+                                    </div>
+                                    
+                                    {/* Full width items */}
+                                    <div className="sm:col-span-2">
+                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                            <Target size={12} />
+                                            Target Audience
+                                        </label>
+                                        <textarea 
+                                            data-visual-field
+                                            rows={1}
+                                            value={visualAnalysis.target_audience}
+                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, target_audience: e.target.value})}
+                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                            placeholder="Who is this for? e.g. Gen Z..."
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                        />
+                                    </div>
+                                    
+                                     <div className="sm:col-span-2">
+                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                            <Heart size={12} />
+                                            Overall Vibe
+                                        </label>
+                                        <textarea 
+                                            data-visual-field
+                                            rows={1}
+                                            value={visualAnalysis.overall_vibe}
+                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, overall_vibe: e.target.value})}
+                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                            placeholder="e.g. Cozy, energetic, professional..."
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
    <OptimizationForm 
        key={`form-${formKey}`} 
        onAnalyze={handleAnalyze} 
+       onSaveDraft={handleSaveDraft}
+       isImageSelected={!!selectedImage || (!!results && !!results.imageUrl)}
        isLoading={isLoading} 
        onCancel={results ? handleCancel : null} 
        initialValues={analysisContext}

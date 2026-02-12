@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (5PennyAi)
-*Dernière mise à jour : 2026-02-09*
+*Dernière mise à jour : 2026-02-11*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -45,8 +45,17 @@
 - [UX] **Smart Inputs**: Auto-expanding text areas for Bio/Audience/Signature. Converted Brand Tone to text input for flexibility.
 - [Fix] **Relaunch Logic**: Implemented `ConfirmationModal` for credit checks, fixed `handleAnalyze` image validation bugs, and resolved `onRelaunchSEO` prop issues.
 - [Fix] **Image Persistence**: `ImageUpload` now correctly displays existing images when modifying settings or relaunching.
+- [Feature] **Dashboard**: Implemented comprehensive dashboard with Credits management, Status tracking (New/SEO done/Complete), and detailed listings table. Uses optimized Supabase views.
+- [Feature] **Visual Analysis** (2026-02-11): New 2-column grid layout in Product Studio — compact image upload (left 1/3) + 6 Visual Analysis fields (right 2/3): Aesthetic Style, Typography, Graphics, Color Palette, Target Audience, Overall Vibe. Fields auto-populated via `analyseImage` n8n webhook (AI vision), auto-resize to fit content.
+- [Feature] **Visual Analysis → SEO Pipeline**: Visual fields saved to `listings` table (`visual_aesthetic`, `visual_typography`, `visual_graphics`, `visual_colors`, `visual_target_audience`, `visual_overall_vibe`) and included in `generate_seo` and `drafting_seo` payloads for richer AI context.
+- [Fix] **Listing Reload from History**: Added `sub_niches(name)` join to Supabase query. Removed hardcoded `"Loaded from history"` / `"Unknown"` fallbacks — empty values now sent as `null`. Visual Analysis fields hydrated on reload.
+- [Fix] **Payload Cleanup**: `niche`, `sub_niche` in categorization payloads now default to `null` instead of `"General"` or `"Unknown"`.
+- [UX] **Default Product Type**: `OptimizationForm` now defaults to T-Shirt instead of first alphabetical product type.
+- [UI] **ImageUpload Compact Mode**: `ImageUpload.jsx` supports a `compact` prop for smaller rendering in the 1/3 column.
 
 ## 5. Next Steps (Action Items)
 - Polish the Login/Signup UI.
 - Implement the comprehensive Landing Page.
 - Build the Stripe Payment Integration (Credits & Subscriptions).
+- Test end-to-end Visual Analysis flow (analyze → save → reload → re-analyze).
+

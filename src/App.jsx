@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ProductStudio from './pages/ProductStudio';
 import LoginPage from './pages/LoginPage';
 import HistoryPage from './pages/HistoryPage';
+import Dashboard from './pages/Dashboard';
 import BrandProfilePage from './pages/BrandProfilePage';
 
 import { Toaster } from 'sonner';
@@ -40,7 +41,15 @@ export default function App() {
             } 
           />
           {/* Default redirect to studio (which will redirect to login if needed) */}
-          <Route path="/" element={<Navigate to="/studio" replace />} />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

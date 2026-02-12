@@ -1,7 +1,7 @@
 import { Upload } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-const ImageUpload = ({ onFileSelect, initialImage }) => {
+const ImageUpload = ({ onFileSelect, initialImage, compact = false }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [preview, setPreview] = useState(initialImage || null);
 
@@ -34,9 +34,16 @@ const ImageUpload = ({ onFileSelect, initialImage }) => {
     }
   };
 
+  const clearImage = (e) => {
+      e.stopPropagation();
+      setPreview(null);
+      onFileSelect(null);
+  };
+
   return (
     <div 
-      className={`relative border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-colors cursor-pointer bg-slate-50 overflow-hidden
+      className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center transition-colors cursor-pointer bg-slate-50 overflow-hidden group
+        ${compact ? 'p-4 min-h-[200px]' : 'p-8 min-h-[300px]'}
         ${isDragOver ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 hover:border-indigo-400'}`}
       onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
       onDragLeave={() => setIsDragOver(false)}
@@ -52,28 +59,32 @@ const ImageUpload = ({ onFileSelect, initialImage }) => {
       />
       
       {preview ? (
-        <div className="relative w-full h-48">
+        <div className={`relative w-full ${compact ? 'h-40' : 'h-64'}`}>
           <img src={preview} alt="Upload preview" className="w-full h-full object-contain rounded-lg" />
           <button 
-             onClick={(e) => { e.stopPropagation(); setPreview(null); onFileSelect(null); }}
-             className="absolute top-2 right-2 bg-white/80 p-1 rounded-full text-slate-700 hover:text-red-600 transition-colors"
+             onClick={clearImage}
+             className="absolute top-1 right-1 bg-white/90 p-1.5 rounded-full text-slate-500 hover:text-red-500 hover:bg-white shadow-sm transition-all opacity-0 group-hover:opacity-100"
+             title="Remove image"
           >
-            <Upload size={16} className="rotate-45" /> {/* Using rotate-45 Upload as Close icon equivalent for simplicity or verify Lucide */}
+            <Upload size={14} className="rotate-45" /> 
           </button>
         </div>
       ) : (
         <>
-          <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4">
-            <Upload size={32} className="text-indigo-600" />
+          <div className={`rounded-full shadow-sm flex items-center justify-center mb-3 bg-white ${compact ? 'w-12 h-12' : 'w-16 h-16'}`}>
+            <Upload size={compact ? 20 : 32} className="text-indigo-600" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-1">
-            Drag and drop your product image
+          <h3 className={`font-semibold text-slate-900 mb-1 ${compact ? 'text-sm' : 'text-lg'}`}>
+            {compact ? 'Upload Product Image' : 'Drag and drop your product image'}
           </h3>
-          <p className="text-sm text-slate-500 mb-6">
-            or click to upload (JPG, PNG)
-          </p>
-          <button className="px-6 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm pointer-events-none">
-            Select a file
+          {!compact && (
+            <p className="text-sm text-slate-500 mb-6">
+                or click to upload (JPG, PNG)
+            </p>
+          )}
+          <button className={`bg-white border border-slate-200 rounded-lg font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm pointer-events-none
+              ${compact ? 'px-3 py-1.5 text-xs' : 'px-6 py-2 text-sm'}`}>
+            Select file
           </button>
         </>
       )}
