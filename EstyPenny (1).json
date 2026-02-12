@@ -1,0 +1,1036 @@
+{
+  "name": "EstyPenny",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "9d856f4f-d5ae-4fce-b2da-72f584288dc2",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -832,
+        352
+      ],
+      "id": "695d3f8d-e9da-49a3-a4ef-1156be62bc4d",
+      "name": "Webhook",
+      "webhookId": "9d856f4f-d5ae-4fce-b2da-72f584288dc2"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "4f733227-b97d-4b45-b3bc-849792aee12c",
+                    "leftValue": "={{ $json.Action }}",
+                    "rightValue": "analyseImage",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "analyseImage"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.Action }}",
+                    "rightValue": "generate_seo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "23eb1fa1-657c-4c87-9ee8-683d3cd9988c"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "generate_seo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1d84a90f-ea5a-4316-802d-62f048979018",
+                    "leftValue": "={{ $json.Action }}",
+                    "rightValue": "drafting_seo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "drafting_seo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "98348aaf-e4f7-4fc0-b70b-20a3678e40cb",
+                    "leftValue": "={{ $json.Action }}",
+                    "rightValue": "analyseShop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "analyseShop"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -224,
+        320
+      ],
+      "id": "149a07db-15e7-42fe-8b31-fe02b833bded",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1e28318-1570-468e-9238-898592ca5c8a",
+              "name": "mockup_url",
+              "value": "={{ $json.body.payload.image_url }}",
+              "type": "string"
+            },
+            {
+              "id": "ee695f8c-b154-4a12-a265-c2b3d8f9885c",
+              "name": "ProductType",
+              "value": "={{ $json.body.payload.product_details.product_type }}",
+              "type": "string"
+            },
+            {
+              "id": "6a33fa73-8cf3-49ba-aa01-00554122c47a",
+              "name": "Description",
+              "value": "={{ $json.body.payload.product_details.client_description }}",
+              "type": "string"
+            },
+            {
+              "id": "d688e69e-a82c-4b49-93dd-fcfec5f268ca",
+              "name": "Theme",
+              "value": "={{ $json.body.payload.categorization.theme }}",
+              "type": "string"
+            },
+            {
+              "id": "0e521635-e488-466b-a0fe-63741b310f7a",
+              "name": "Niche",
+              "value": "={{ $json.body.payload.categorization.niche }}",
+              "type": "string"
+            },
+            {
+              "id": "7110b90b-0248-4387-939c-1783f3d3cc24",
+              "name": "SubNiche",
+              "value": "={{ $json.body.payload.categorization.sub_niche }}",
+              "type": "string"
+            },
+            {
+              "id": "c2a7483d-c14a-4cdc-80e9-0cc425569992",
+              "name": "Action",
+              "value": "={{ $json.body.action }}",
+              "type": "string"
+            },
+            {
+              "id": "57e5f2b4-cac1-4c72-b1e9-8958aeea5a51",
+              "name": "body.keywords",
+              "value": "={{ JSON.stringify($json.body.keywords) }}",
+              "type": "array"
+            },
+            {
+              "id": "251a29c0-2f67-40f4-8498-8517309b765f",
+              "name": "Tag_count",
+              "value": "={{ $json.body.payload.product_details.tag_count }}",
+              "type": "number"
+            },
+            {
+              "id": "9401307b-64d9-48f6-ac97-665d3cf8174a",
+              "name": "Shop_URL",
+              "value": "={{ $json.body.shop_url }}",
+              "type": "string"
+            },
+            {
+              "id": "73f827c1-fb4c-4821-81f1-ead32ad79bd0",
+              "name": "Shop_bio",
+              "value": "={{ $json.body.payload.shop_context.shop_bio }}",
+              "type": "string"
+            },
+            {
+              "id": "b1bde303-b36d-44e0-ac82-cf91aeb3ec17",
+              "name": "Target_audience",
+              "value": "={{ $json.body.payload.shop_context.target_audience }}",
+              "type": "string"
+            },
+            {
+              "id": "bc1bc383-a3a5-445b-838c-669dba7e8781",
+              "name": "Brand_tone",
+              "value": "={{ $json.body.payload.shop_context.brand_tone }}",
+              "type": "string"
+            },
+            {
+              "id": "1defae09-79f9-4a39-852c-8403cb450cea",
+              "name": "Brand_keywords",
+              "value": "={{ JSON.stringify($json.body.payload.shop_context.brand_keywords) }}",
+              "type": "array"
+            },
+            {
+              "id": "e8011d29-d793-43cd-ba68-9640f26a3539",
+              "name": "Shop_name",
+              "value": "={{ $json.body.payload.shop_context.shop_name }}",
+              "type": "string"
+            },
+            {
+              "id": "b8945dc3-d834-4f0d-9bbd-0aa409d1b63a",
+              "name": "Signature_text",
+              "value": "={{ $json.body.payload.shop_context.signature_text }}",
+              "type": "string"
+            },
+            {
+              "id": "2d5f64cc-0ada-480b-ba2b-f7637fb153a7",
+              "name": "visual_aesthetic",
+              "value": "={{ $json.body.payload.visual_aesthetic }}",
+              "type": "string"
+            },
+            {
+              "id": "1500142d-3734-43c6-8ca7-e5f02f6f8737",
+              "name": "visual_typography",
+              "value": "={{ $json.body.payload.visual_typography }}",
+              "type": "string"
+            },
+            {
+              "id": "6716ec4a-7cb9-43f8-9ae6-4a913f05d137",
+              "name": "visual_graphics",
+              "value": "={{ $json.body.payload.visual_graphics }}",
+              "type": "string"
+            },
+            {
+              "id": "5a9752d2-08b0-4722-870b-a5355b7ef1f0",
+              "name": "visual_colors",
+              "value": "={{ $json.body.payload.visual_colors }}",
+              "type": "string"
+            },
+            {
+              "id": "073ae6e0-793c-41b0-a244-5e9baa19fa9c",
+              "name": "visual_target_audience",
+              "value": "={{ $json.body.payload.visual_target_audience }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -560,
+        352
+      ],
+      "id": "4d89ddde-05f9-4e47-b8d1-16feb4314abd",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.mockup_url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -656,
+        -240
+      ],
+      "id": "64156fc0-ba18-4155-86c2-620c3b531310",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2FmarDG6ht0gwsv0",
+          "name": "Spider crawl Auth account"
+        },
+        "supabaseApi": {
+          "id": "b2JwRoCE98AC8FRn",
+          "name": "Supabase StudioPOD"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"keywords\": [\n    \"keyword 1\",\n    \"keyword 2\",\n    \"keyword 50\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        544,
+        224
+      ],
+      "id": "80e1c8c1-245a-4065-9c67-4c5a335c39ac",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1264,
+        -16
+      ],
+      "id": "4c16d73c-579c-4e27-88d5-d3ca571e5c03",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. On récupère l'objet principal\nconst input = $input.first().json;\n\n// 2. On parse la chaîne de caractères JSON contenue dans body.keywords\nconst keywordsArray = input.body.keywords;\n\n// 3. On génère le brief textuel pour le prompt\nconst seoBrief = keywordsArray.map(item => {\n  let statusBadges = [];\n  if (item.status.promising) statusBadges.push(\"Promising 💎\");\n  if (item.status.trending) statusBadges.push(\"Trending 🔥\");\n  if (item.status.evergreen) statusBadges.push(\"Evergreen 🌲\");\n\n  const badgeText = statusBadges.length > 0 ? statusBadges.join(\" + \") : \"Standard\";\n\n  return `- Keyword: \"${item.keyword}\" | Status: ${badgeText} | Volume: ${item.avg_volume} | Comp: ${item.competition}`;\n}).join('\\n');\n\n// 4. On retourne un objet complet prêt pour le nœud LLM\nreturn {\n  mockup_url: input.mockup_url,\n  product_type: input.ProductType,\n  slogan: input.Slogan,\n  design_description: input.Description,\n  niche_info: `${input.Theme} > ${input.Niche} > ${input.SubNiche}`,\n  seo_brief: seoBrief\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        432
+      ],
+      "id": "cbd9e64f-8fa6-4123-954a-d839aa9643d4",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"title\": \"...\",\n  \"description\": \"...\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        576,
+        688
+      ],
+      "id": "2bfe3ddd-dc69-4334-a3ed-c95c40adc14d",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1088,
+        448
+      ],
+      "id": "3b7c001a-3e96-4d94-80bf-fa1418de1c09",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the AI description from the previous node\nconst aiDescription = $input.first().json.output.description;\n\n// 2. Define your static Markdown block\nconst staticMarkdown = `\n---\n\n### 🛒 How to Order\n1. **Review** the sizing and color charts in the listing photos.\n2. **Select** your shirt size and color from the dropdown menus.\n3. **Click** \"Add to Cart\".\n\n*All standard listings are **Adult Unisex** unless otherwise stated.*\n\n---\n\n### ⭐ Product Specs\n* **Material:** 100% ring-spun U.S. cotton.\n* **Fabric:** Soft, breathable midweight fabric (**6.1 oz/yd²**).\n* **Finish:** Garment-dyed for a subtle, worn-in look and ultra-soft feel.\n* **Fit:** Relaxed fit, pre-shrunk.\n* **Construction:** Tubular body (no side seams) for a smooth, classic silhouette.\n* **Durability:** Double-needle stitching on all seams.\n* **Availability:** Sizes S–4XL in 12 premium colors.\n\n---\n\n### 📏 Sizing Tip\nThese are **Unisex** fit shirts. For a **fitted look**, order your normal size. For the popular **oversized look**, we recommend sizing up 1 or 2 sizes. Please refer to the size chart in the images for exact measurements.\n\n---\n\n### 🚚 Production & Shipping\n* **Production Time:** 1–3 business days (average 2).\n* **Shipping (U.S.):** 1–5 business days (average 3).\n* **Tracking:** A tracking number will be provided once your order is dispatched.\n\n*Note: Delivery times are estimates and are not guaranteed.*\n\n---\n\n### 🧺 Care Instructions\n* **Wash:** Machine wash cold (max 30°C / 90°F), inside out.\n* **Bleach:** Do not bleach.\n* **Dry:** Tumble dry on low heat.\n* **Iron:** Iron or steam on low heat; **do not iron directly over the design**.\n* **Dry Clean:** Do not dry clean.\n`;\n\n// 3. Merge them with double spacing\nreturn {\n  title:$input.first().json.output.title,\n  description: aiDescription //+ \"\\n\\n\" + staticMarkdown\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        448
+      ],
+      "id": "86007ada-36df-4b23-b531-5dee7dbe2dee",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// On récupère le contenu markdown du nœud précédent\nconst markdown = $input.first().json.data.markdown;\n\nif (!markdown) return items;\n\nlet cleanedText = markdown\n  // 1. Supprimer toutes les images ![](...)\n  .replace(/!\\[.*?\\]\\(.*?\\)/g, '')\n  \n  // 2. Supprimer les liens de navigation inutiles (Favoris, Contact, Sign-in, etc.)\n  .replace(/\\[.*?\\]\\(https:\\/\\/www\\.etsy\\.com\\/(signin|messages|people|conversations|cart|help).*?\\)/g, '')\n  \n  // 3. Supprimer les IDs de tracking et nonces (souvent des longues chaînes alphanumériques)\n  .replace(/[a-zA-Z0-0]{30,}/g, '')\n  \n  // 4. Supprimer les mentions de prix et \"Sale Price\" qui n'aident pas pour l'identité de marque\n  .replace(/(Sale Price|Original Price|off|\\$\\d+\\.\\d+)/gi, '')\n  \n  // 5. Supprimer les sections de cookies et de paramètres de confidentialité (souvent à la fin)\n  .split(\"Your Etsy Privacy Settings\")[0]\n  .split(\"Privacy Settings\")[0]\n  \n  // 6. Nettoyer les espaces vides multiples et les sauts de ligne excessifs\n  .replace(/\\n\\s*\\n/g, '\\n\\n')\n  .trim();\n\n// On renvoie le texte nettoyé\nreturn [{\n  json: {\n    cleaned_content: cleanedText\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        1104
+      ],
+      "id": "0a03c5ce-9b0f-4f45-b484-2a92611717fe",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        464,
+        1360
+      ],
+      "id": "7d3ea96b-240d-47fd-bd2d-5d90f4497319",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"shop_name\": \"...\",\n  \"brand_tone\": \"...\",\n  \"shop_bio\": \"...\",\n  \"target_audience\": \"...\",\n  \"brand_keywords\": [\"...\", \"...\", \"...\", \"...\", \"...\"],\n  \"signature_text\": \"...\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        1344
+      ],
+      "id": "55f4a1a7-2b17-4011-af56-d83bd9273101",
+      "name": "Structured Output Parser2"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        976,
+        1104
+      ],
+      "id": "db363459-c180-4ae4-95e8-cd7b284f790d",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=\n# Role\nYou are an expert Etsy Copywriter. Your goal is to write a product listing for t-shirt that feels authentic, emotional, and professional while maintaining high SEO performance.\nThe SEO Brief contains data on the tags of the listing.\n\nThe Niche is the specific niche of the listing.\n\n# Input Data\n- **Strategic SEO Brief:** {{ $json.seo_brief }}\n- **Product Details:**\n    - **Niche:** {{ $json.niche_info }}\n    \n\n# Task 1: Strategic Title (140 chars max)\n- Start with \"Promising 💎\" tags for maximum ranking potential.\n- Follow with \"Trending 🔥\" tags to capture current search volume.\n- Use \"|\" or \",\" to separate phrases. \n- Ensure it sounds like a premium product title.\n\n# Task 2: Natural \"Story & Specs\" Description\nWrite a description that avoids \"keyword stuffing\" by following this structure:\n\n1. **The Emotional Hook (The Story):**\n   - Start with a catchy opening sentence related to the niche.\n   - Write 2-3 fluid sentences describing the \"vibe\" of the shirt.\n   - Naturally weave in only the 4-6 most relevant tags (prioritize Trending and Promising). \n   - DO NOT bold the keywords. Keep the text clean and human.\n\n2. **The \"Why You'll Love It\" Section (The Specs):**\n   - Use a bulleted list to highlight quality.\n   - Integrate \"Evergreen 🌲\" tags here (e.g., \"Comfort colors tee\", \"Graphic tee\").\n   - Mention: Soft-washed garment-dyed fabric, relaxed unisex fit, and double-needle stitching for durability.\n\n3. **Call to Action:**\n   - A friendly closing sentence encouraging the purchase.\n\n# Constraints\n- Tone: Warm, boutique-style, and inviting.\n- Format: Strictly JSON output.\n- Formatting: Use Markdown for the description. No excessive bolding of keywords.\n\n# Output Format\n{\n  \"title\": \"...\",\n  \"description\": \"...\"\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1152,
+        608
+      ],
+      "id": "c80f53ba-35b3-4e2f-a581-d2b8fccd1c45",
+      "name": "AI Agent3",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Role\nYou are a Senior Visual Trend Analyst and E-commerce Marketing Specialist. \n\n# Task\nAnalyze the provided mockup and extract its visual DNA and its **Target Audience**.\n\n# Analysis Instructions\n1. **Aesthetic/Style:** (e.g., Gorpcore, Dark Academia, Y2K).\n2. **Typography:** (e.g., Distressed Serif, Minimalist Sans).\n3. **Graphic Elements:** (e.g., Fine-line floral, retro sunset).\n4. **Color Palette:** (e.g., Earthy tones, Neon vibrance).\n5. **Target Audience (NEW):** Based on the design cues, identify the ideal buyer profile.\n   - *Consider:* Age group, gender lean (if any), interests, and the \"buying occasion\" (e.g., \"Gen Z students interested in street photography\", \"Millennial dog moms who love minimalist home decor\").\n\n# Output Format\n{\n  \"visual_analysis\": {\n    \"aesthetic_style\": \"...\",\n    \"typography_details\": \"...\",\n    \"graphic_elements\": \"...\",\n    \"color_palette\": \"...\",\n    \"target_audience\": \"...\",\n    \"overall_vibe\": \"...\"\n  }\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -400,
+        -240
+      ],
+      "id": "fcb7d3e8-7e5a-4e52-880d-4eedc1239029",
+      "name": "AI Agent4",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"visual_analysis\": {\n    \"aesthetic_style\": \"...\",\n    \"typography_details\": \"...\",\n    \"graphic_elements\": \"...\",\n    \"color_palette\": \"...\",\n    \"target_audience\": \"...\",\n    \"overall_vibe\": \"...\"\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -224,
+        -16
+      ],
+      "id": "47c4cf9b-11a9-4310-90f5-bdc4153d6112",
+      "name": "Structured Output Parser3"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.mockup_url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        336,
+        -464
+      ],
+      "id": "92468fd0-ed20-476b-8c52-bec09e019ff6",
+      "name": "HTTP Request2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2FmarDG6ht0gwsv0",
+          "name": "Spider crawl Auth account"
+        },
+        "supabaseApi": {
+          "id": "b2JwRoCE98AC8FRn",
+          "name": "Supabase StudioPOD"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-pro-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        528,
+        -272
+      ],
+      "id": "be28675c-ef49-44a3-90e2-6617c36ef1b1",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"visual_analysis\": {\n    \"aesthetic_style\": \"...\",\n    \"typography_details\": \"...\",\n    \"graphic_elements\": \"...\",\n    \"color_palette\": \"...\",\n    \"target_audience\": \"...\",\n    \"overall_vibe\": \"...\"\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        752,
+        -256
+      ],
+      "id": "e895a1ab-2c52-4be1-8705-5efd5637d108",
+      "name": "Structured Output Parser4"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        912,
+        -464
+      ],
+      "id": "2ffbb6b2-7832-46e5-82b2-919ecc81fac6",
+      "name": "Respond to Webhook3"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Role\nYou are a Senior Visual Trend Analyst and E-commerce Marketing Specialist. \n\n# Task\nAnalyze the provided mockup and extract its visual DNA and its **Target Audience**.\n\n# Analysis Instructions\n1. **Aesthetic/Style:** (e.g., Gorpcore, Dark Academia, Y2K).\n2. **Typography:** (e.g., Distressed Serif, Minimalist Sans).\n3. **Graphic Elements:** (e.g., Fine-line floral, retro sunset).\n4. **Color Palette:** (e.g., Earthy tones, Neon vibrance).\n5. **Target Audience (NEW):** Based on the design cues, identify the ideal buyer profile.\n   - *Consider:* Age group, gender lean (if any), interests, and the \"buying occasion\" (e.g., \"Gen Z students interested in street photography\", \"Millennial dog moms who love minimalist home decor\").\n\n# Output Format\n{\n  \"visual_analysis\": {\n    \"aesthetic_style\": \"...\",\n    \"typography_details\": \"...\",\n    \"graphic_elements\": \"...\",\n    \"color_palette\": \"...\",\n    \"target_audience\": \"...\",\n    \"overall_vibe\": \"...\"\n  }\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        560,
+        -464
+      ],
+      "id": "a2d02b53-47a3-404b-a397-3e138240efe0",
+      "name": "Image analysis"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-pro-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        320,
+        256
+      ],
+      "id": "3bdd7b5b-f530-4a69-a01e-6bccb865f8fa",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.first().json.tasks[0].result;\nconst tag_count = $('Edit Fields').first().json.Tag_count\n\nlet processed = results\n  .filter(item => item.search_volume !== null && item.monthly_searches !== null)\n  .map(item => {\n    const avgVolume = item.search_volume;\n    const comp = item.competition || 0.5;\n    \n    // 1. Historique des volumes (du plus ancien au plus récent)\n    const monthlyVolumes = item.monthly_searches\n      .map(m => m.search_volume)\n      .reverse();\n\n    // 2. Calculs des tendances et statuts\n    const last3MonthsAvg = (monthlyVolumes[11] + monthlyVolumes[10] + monthlyVolumes[9]) / 3;\n    const first3MonthsAvg = (monthlyVolumes[0] + monthlyVolumes[1] + monthlyVolumes[2]) / 3;\n    \n    const isTrending = last3MonthsAvg > (first3MonthsAvg * 1.3);\n    const isEvergreen = monthlyVolumes.every(v => v > (avgVolume * 0.3));\n    const isPromising = avgVolume > 300 && comp < 0.3;\n\n    // 3. Score d'opportunité pondéré\n    let finalScore = (avgVolume * (1 - comp + 0.1)) / 10;\n    if (isTrending) finalScore *= 1.5;   // Boost tendance\n    if (isPromising) finalScore *= 1.3;  // Boost niche facile\n    if (item.keyword.split(' ').length >= 3) finalScore *= 1.2; // Boost longue traîne\n\n    const opportunityScore = Math.round(finalScore);\n\n    // FORMAT STRICTEMENT DEMANDÉ\n    return {\n      keyword: item.keyword,\n      avg_volume: avgVolume,\n      competition: comp,\n      opportunity_score: opportunityScore,\n      volumes_history: monthlyVolumes,\n      status: {\n        trending: isTrending,\n        evergreen: isEvergreen,\n        promising: isPromising\n      }\n    };\n  });\n\n// 4. Sélection des 13 meilleurs avec diversité sémantique\nconst selectedTags = [];\nconst wordTracker = {};\n\n// On trie par le nouveau score d'opportunité\nprocessed.sort((a, b) => b.opportunity_score - a.opportunity_score);\n\nfor (const item of processed) {\n  if (selectedTags.length >= tag_count) break;\n\n  const firstWord = item.keyword.split(' ')[0].toLowerCase();\n  wordTracker[firstWord] = (wordTracker[firstWord] || 0) + 1;\n\n  // Règle de diversité : maximum 3 tags commençant par le même mot\n  if (wordTracker[firstWord] <= 3) {\n    selectedTags.push(item);\n  }\n}\n\nreturn selectedTags;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        -272
+      ],
+      "id": "c1e0ebb8-b0ea-4e15-beea-5d50fffc2e08",
+      "name": "Code in JavaScript4",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Role\nYou are an expert Etsy SEO Specialist and E-commerce Copywriter specializing in the Print-on-Demand (POD) market. Your goal is to generate high-converting, relevant keywords that drive organic traffic.\n**Crucially, at least 50% of the keywords MUST include the Product Type to ensure they are transactional search terms.\n\n\n# Task\nAnalyze the provided product data and the pre-analyzed visual characteristics to brainstorm 80 highly relevant SEO keywords/phrases for an Etsy listing.\n\n\n# Product Data Input\n- **Product Type:** {{ $('Edit Fields').item.json.ProductType }}\n- **Theme:** {{ $('Edit Fields').item.json.Theme }}\n- **Niche:** {{ $('Edit Fields').item.json.Niche }}\n- **Sub-Niche:** {{ $('Edit Fields').item.json.SubNiche }}\n- **Product Description:** {{ $('Edit Fields').item.json.Description }}\n\n\n# 2. Visual & Marketing Data (Input from Image Analysis)\n- **Aesthetic/Style:** {{ $json.visual_aesthetic }}\n- **Typography:** {{ $json.visual_typography }}\n- **Graphic Elements:** {{ $json.visual_graphics }}\n- **Color Palette:** {{ $json.visual_colors }}\n- **Target Audience:** {{ $json.visual_target_audience }}\n- **Overall_vibe:**\n\n\n\n\n# Keyword Strategy Requirements\nGenerate a diverse list of 80 keywords following these specific transactional categories:\n- **Long-tail Keywords:** Phrases buyers actually type (e.g., \"Gift for retired English teacher\").\n- **Product-Anchored (Mandatory):** Combine the Niche/Theme directly with the product type (e.g., \"Lawyer shirt\", \"Teacher mug\")\n- **Transactional Intent:** Phrases that indicate a buyer is ready to purchase. (e.g., Use \"Gift for\", \"Present\", \"Office Decor\", or \"Personalized\" combined with the niche)\n- **Audience + Product:** Connect who is buying with what they are buying (e.g., \"Gifts for Dog lovers\", \"Coffee addict mug\").\n- **Occasion & Scenario:** Where will this be used? (e.g., \"Secret Santa gift idea\", \"White elephant t-shirt\", \"Birthday present for him\").\n- **Aesthetic & Vibe:** Describe the look + the product (e.g., \"Minimalist shirt\", \"Retro 70s sport design\").\n\n#Other strategies\n- **NO GENERIC TAGS:** Avoid phrases like \"Gift for him\", \"Funny shirt\", or \"Custom gift\" unless they are combined with a very specific niche word.\n- **PRIORITIZE SPECIFICITY:** If the shirt is about an \"Angry Snail\", focus on \"Snail lovers\", \"Sarcastic mollusk\", \"Medieval snail meme\" rather than \"Funny animal shirt\".\n\n\n# Constraints\n- Strictly 80 keywords.\n- No duplicates.\n- Maximum 3 words per keyword phrase.\n- Focus on high-intent buyer language.\n- Output MUST be a clean JSON array of strings for programmatic processing.\n- Focus on transactionnal categories keywords\n- Include product type in keywords at least 50% of times\n\n# Output Format\n{\n  \"keywords\": [\n    \"keyword 1\",\n    \"keyword 2\",\n    ...\n    \"keyword 50\"\n  ]\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        400,
+        -16
+      ],
+      "id": "abbdf050-1a1e-4d62-a58a-50861731b5ee",
+      "name": "Keywords generation",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/keywords_data/google/search_volume/live",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  {\n    \"keywords\": {{ JSON.stringify($json.output.keywords) }}, \n    \"location_name\": \"United States\", \n    \"language_name\": \"English\"\n  }\n]\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        800,
+        -16
+      ],
+      "id": "9cf9e174-dfe6-44b3-894c-10a027211c0a",
+      "name": "DataForSEO stats",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "EyflDjZ9IR19K2Gd",
+          "name": "DataForSEO account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Récupération des données d'entrée\nconst results = $input.first().json.tasks[0].result;\nconst editFields = $('Edit Fields').first().json;\nconst tag_count = editFields.Tag_count || 13;\nconst productType = (editFields.ProductType || 'mug').toLowerCase();\n\nlet processed = results\n  .filter(item => item.search_volume !== null && item.monthly_searches !== null)\n  .map(item => {\n    const avgVolume = item.search_volume;\n    const comp = item.competition || 0.5;\n    const kw = item.keyword.toLowerCase();\n    \n    // Historique des volumes (du plus ancien au plus récent)\n    const monthlyVolumes = item.monthly_searches.map(m => m.search_volume).reverse();\n\n    // Calculs des tendances et statuts\n    const last3MonthsAvg = (monthlyVolumes[11] + monthlyVolumes[10] + monthlyVolumes[9]) / 3;\n    const first3MonthsAvg = (monthlyVolumes[0] + monthlyVolumes[1] + monthlyVolumes[2]) / 3;\n    \n    const isTrending = last3MonthsAvg > (first3MonthsAvg * 1.3);\n    const isEvergreen = monthlyVolumes.every(v => v > (avgVolume * 0.2));\n    const isPromising = avgVolume > 200 && comp < 0.4;\n\n    // --- FORMULE DU SCORE D'OPPORTUNITÉ ---\n    // Utilisation de la racine carrée pour équilibrer le volume et la niche\n    let finalScore = (Math.sqrt(avgVolume) * (1 - comp + 0.2));\n\n    // DÉFINITION DES GROUPES D'INTENTION (Logique Cumulative)\n    const highIntentGroups = {\n        product: [productType, 'cup', 'drinkware', 'mug'], \n        custom: ['custom', 'personalized', 'name', 'initial'], \n        roles: ['mom', 'dad', 'teacher', 'nurse', 'coworker', 'boss', 'friend', 'grandma', 'colleague'], \n        occasions: ['birthday', 'wedding', 'christmas', 'graduation', 'retirement', 'anniversary', 'santa'], \n        gift: ['gift', 'present', 'token', 'memento', 'gag'] \n    };\n\n    let boostCount = 0;\n\n    // On applique un boost de 40% pour chaque catégorie d'intention trouvée\n    Object.values(highIntentGroups).forEach(group => {\n        if (group.some(word => kw.includes(word))) {\n            finalScore *= 1.4; \n            boostCount++;\n        }\n    });\n\n    // Bonus spécial \"Combo\" : si le tag touche 3 catégories ou plus (ex: \"Custom Teacher Gift\")\n    if (boostCount >= 3) finalScore *= 1.5;\n\n    // Boost Longue Traîne (Précision de recherche)\n    const wordCount = item.keyword.split(' ').length;\n    if (wordCount >= 3) finalScore *= 1.3;\n\n    // Boosts de Performance (Dataforseo trends)\n    if (isTrending) finalScore *= 1.3;\n    if (isPromising) finalScore *= 1.2;\n\n    return {\n      keyword: item.keyword,\n      avg_volume: avgVolume,\n      competition: comp,\n      opportunity_score: Math.round(finalScore),\n      volumes_history: monthlyVolumes,\n      status: {\n        trending: isTrending,\n        evergreen: isEvergreen,\n        promising: isPromising\n      }\n    };\n  });\n\n// 2. Sélection avec Diversité Sémantique (Concept Tracker)\nconst selectedTags = [];\nconst conceptTracker = {};\n\n// Tri par score d'opportunité décroissant\nprocessed.sort((a, b) => b.opportunity_score - a.opportunity_score);\n\nfor (const item of processed) {\n  if (selectedTags.length >= tag_count) break;\n\n  const words = item.keyword.toLowerCase().split(' ');\n  // On identifie le concept par les deux premiers mots\n  const concept = words.slice(0, 2).join(' ');\n\n  conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;\n\n  // Règle de diversité : maximum 2 tags par concept identique\n  if (conceptTracker[concept] <= 2) {\n    selectedTags.push(item);\n  }\n}\n\nreturn selectedTags;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        -16
+      ],
+      "id": "3c031069-2d0b-461c-b54d-3f2bbea6f170",
+      "name": "Filter keywords"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Role\nYou are an expert Etsy Copywriter acting as the voice of **{{ $('Edit Fields').item.json.Shop_name }}**. \nYour goal is to write a product listing that feels authentic to the brand's identity, speaks directly to its target audience, and maintains high SEO performance.\n\n# Brand Identity (Context)\n- **Shop Bio/Mission:** {{ $('Edit Fields').item.json.Shop_bio }}\n- **Brand Tone:** {{ $('Edit Fields').item.json.Brand_tone }}\n- **Target Audience:** {{ $('Edit Fields').item.json.Target_audience }}\n- **Brand Keywords:** {{ $('Edit Fields').item.json.Brand_keywords }}\n\n# Input Data\n- **Strategic SEO Brief:** {{ $json.seo_brief }}\n- **Product Details:**\n    - **Niche:** {{ $json.niche_info }}\n\n\n# Task 1: Strategic Title (140 chars max)\n- **Content:** Start with keywords identified as \"Promising\" in the brief, followed by \"Trending\" keywords. \n- **Formatting (CRITICAL):** - Use ONLY plain text. \n    - NO bolding, NO italics, NO Markdown (no `**` or `****`). \n    - NO emojis (no `💎`, `🔥`, etc.).\n    - Use \"|\" as separators.\n- **Goal:** A clean, professional title that looks exactly like a top-performing Etsy listing.\n- Ensure the language reflects a premium product from **{{ $('Edit Fields').item.json.Shop_name }}**.\n\n\n# Task 2: Natural \"Story & Specs\" Description\nWrite a description tailored for **{{ $('Edit Fields').item.json.Target_audience }}** using a **{{ $('Edit Fields').item.json.Brand_tone }}** tone.\n\n1. **The Emotional Hook (The Story):**\n   - Start with a catchy opening sentence that reflects the shop's \"vibe\" and the specific niche.\n   - Write 2-3 fluid sentences describing the shirt. \n   - Naturally weave in 4-6 tags (prioritize Trending and Promising). \n   - Keep the text clean, human, and conversational. No bolding of keywords.\n   - **NO FORMATTING:** Do NOT use bold (`**`), italics, or any highlighting for keywords. \n   - **NATURAL FLOW:** The keywords must fit so perfectly into the grammar that a reader wouldn't know they are SEO tags (e.g., instead of saying \"This is a **gift for coworker**\", say \"Looking for the perfect gift for a coworker?\").\n\n2. **The \"Why You'll Love It\" Section (The Specs):**\n   - Use a bulleted list to highlight quality.\n   - Integrate \"Evergreen 🌲\" tags here.\n   - Mention: Soft-washed garment-dyed fabric, relaxed unisex fit, and double-needle stitching for durability.\n\n3. **Brand Signature (Call to Action):**\n   - Strictly end the listing with this exact text: \"{{ $('Edit Fields').item.json.Signature_text }}\"\n\n# Constraints\n- **Tone Consistency:** Strictly adhere to the **{{ $('Edit Fields').item.json.Brand_tone }}** brand voice.\n- **Format:** Strictly JSON output.\n- **Formatting:** Use Markdown for the description. \n\n# Output Format\n{\n  \"title\": \"...\",\n  \"description\": \"...\"\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        432,
+        448
+      ],
+      "id": "a5fd2eb7-a5bc-4605-9b2f-94b08218c7fc",
+      "name": "Optimized Title and Description"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Role\nYou are a Senior Brand Strategist specialized in E-commerce and Etsy. Your goal is to transform raw scraped data into a structured brand identity for a print-on-demand shop.\n\n# Data Input\nHere is the cleaned Markdown content from the Etsy shop:\n---\n{{ $json.cleaned_content }}\n---\n\n# Instructions\nAnalyze the text to populate the following brand profile elements. \n\n## Guidelines for extraction:\n- **Shop Name**: Look for the main H1 or the name near \"Star Seller\" status.\n- **Brand Tone**: Analyze product titles and the announcement. (e.g., if you see \"Funny Meme\", \"Retro\", \"Silly Goose\", the tone is likely \"Humorous\" or \"Retro-Modern\").\n- **Shop Bio**: Summarize the \"Announcement\" section. Focus on the origin (e.g., Pacific Northwest), the ownership (e.g., female-owned), and the aesthetic (e.g., retro-modern graphic designs).\n- **Target Audience**: Look at categories and product descriptions. (e.g., \"Bookish\", \"LGBTQIA\", \"Teachers\", \"Meme lovers\").\n- **Brand Keywords**: Extract 5 recurring themes or values.\n- **Signature Text**: Craft a 1-sentence thank you message that reflects the shop's specific location or vibe mentioned in the text.\n\n# Constraints\n- Output must be ONLY a valid JSON object.\n- Language: English\n\n# Output Format (JSON)\n{\n  \"shop_name\": \"...\",\n  \"brand_tone\": \"...\",\n  \"shop_bio\": \"...\",\n  \"target_audience\": \"...\",\n  \"brand_keywords\": [\"...\", \"...\", \"...\", \"...\", \"...\"],\n  \"signature_text\": \"...\"\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        512,
+        1104
+      ],
+      "id": "6b424b5d-99e1-4a22-94dd-c7889a497d0e",
+      "name": "Write shop profile info"
+    },
+    {
+      "parameters": {
+        "operation": "scrape",
+        "additionalFields": {},
+        "useCustomBody": true,
+        "customBody": "={\n  \"url\": \"{{ $json.Shop_URL }}\",\n  \"formats\": [\"markdown\"],\n  \"onlyMainContent\": true,\n  \"waitFor\": 3000,\n  \"actions\": [\n    {\n      \"type\": \"wait\",\n      \"selector\": \".shop-name-and-title-container\",\n      \"includeTags\": [\n        \".shop-name-and-title-container\", \n        \"#shop-announcement\", \n        \".shop-home-about-section\",\n        \".responsive-listing-grid\"\n      ]\n    }\n  ]\n} ",
+        "requestOptions": {}
+      },
+      "type": "@mendable/n8n-nodes-firecrawl.firecrawl",
+      "typeVersion": 1,
+      "position": [
+        64,
+        1088
+      ],
+      "id": "55e67eb7-238b-47b4-8c1c-c363cfe592c9",
+      "name": "Scrape Esty shop wep page",
+      "credentials": {
+        "firecrawlApi": {
+          "id": "ZCv139vnWJ5eRaE4",
+          "name": "Firecrawl account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Keywords generation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Scrape Esty shop wep page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Keywords generation",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "AI Agent4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Optimized Title and Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Optimized Title and Description",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Write shop profile info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write shop profile info",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser2": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Write shop profile info",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent4": {
+      "main": [
+        []
+      ]
+    },
+    "Structured Output Parser3": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent4",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Image analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Image analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser4": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Image analysis",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image analysis": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Optimized Title and Description",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Keywords generation",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keywords generation": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO stats": {
+      "main": [
+        [
+          {
+            "node": "Filter keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter keywords": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Optimized Title and Description": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write shop profile info": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Esty shop wep page": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "4f73e704-1481-4d2d-a943-64c6f256fb16",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cfd1401e3f0b2075dfe4693ad7a10a5d7ad8db7a3e3bef4f1f623f48b2a7a4ed"
+  },
+  "id": "fpLJwWveS4JGdh8k",
+  "tags": []
+}
