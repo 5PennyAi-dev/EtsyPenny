@@ -1,8 +1,8 @@
-import { Document, Page, Text, View, StyleSheet, Image, Font, Svg, Path } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image, Font, Svg, Path, Circle } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
   page: {
-    padding: 30, // Reduced padding for more space
+    padding: 30,
     fontFamily: 'Helvetica',
     backgroundColor: '#FFFFFF',
     color: '#0F172A',
@@ -14,7 +14,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
     borderBottomWidth: 2,
-    borderBottomColor: '#4F46E5', // Indigo-600
+    borderBottomColor: '#4F46E5',
     paddingBottom: 10,
   },
   logoText: {
@@ -44,17 +44,15 @@ const styles = StyleSheet.create({
   topSection: {
     flexDirection: 'row',
     gap: 20,
-    marginBottom: 25,
     marginBottom: 20,
-    // removed fixed height
   },
   topLeft: {
-    width: '58%', // 58% width
+    width: '58%',
     marginRight: '2%',
-    height: 150, // Fixed height for image container
+    height: 150,
   },
   topRight: {
-    width: '40%', // 40% width
+    width: '40%',
     flexDirection: 'column',
     justifyContent: 'flex-start',
   },
@@ -67,35 +65,38 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 8,
-    color: '#4F46E5', // Indigo-600
+    color: '#4F46E5',
     textTransform: 'uppercase',
     fontWeight: 'bold',
     marginBottom: 6,
     letterSpacing: 0.5,
   },
   titleText: {
-    fontSize: 11, // Reduced font size
+    fontSize: 11,
     fontWeight: 'bold',
     lineHeight: 1.2,
     color: '#0F172A',
     marginBottom: 8,
   },
-  metadataBox: {
-    backgroundColor: '#F8FAFC',
-    padding: 10,
+
+  // Copy Paste Section
+  copyPasteBox: {
+    backgroundColor: '#F1F5F9',
+    padding: 6,
     borderRadius: 4,
+    marginTop: 4,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    minHeight: 40,
   },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
+  copyPasteText: {
+    fontSize: 7,
+    color: '#475569',
+    lineHeight: 1.3,
+    fontFamily: 'Helvetica',
   },
-  metaLabel: { fontSize: 8, color: '#64748B' },
-  metaValue: { fontSize: 8, fontWeight: 'bold', color: '#334155' },
 
-  // 3. Middle Section (Description)
+  // 3. Description Section
   descriptionSection: {
     marginBottom: 25,
     padding: 15,
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   descriptionText: {
-    fontSize: 9, 
+    fontSize: 9,
     lineHeight: 1.5,
     color: '#334155',
     textAlign: 'justify',
@@ -118,7 +119,7 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#F1F5F9', // Slate-100
+    backgroundColor: '#F1F5F9',
     paddingVertical: 6,
     paddingHorizontal: 8,
     borderTopLeftRadius: 4,
@@ -131,52 +132,64 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9', // Very light divider
+    borderBottomColor: '#F1F5F9',
     alignItems: 'center',
   },
   // Columns
   colTag: { width: '30%' },
   colVol: { width: '15%', textAlign: 'center' },
-  colTrend: { width: '15%', textAlign: 'center' },
+  colTrend: { width: '15%', textAlign: 'center', alignItems: 'center', justifyContent: 'center' },
   colComp: { width: '15%', textAlign: 'center' },
   colScore: { width: '10%', textAlign: 'center' },
-  colStatus: { width: '15%', textAlign: 'center' }, 
-  colStatusBody: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }, // Center icons in body
+  colStatus: { width: '15%', textAlign: 'center' },
+  colStatusBody: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
 
   // Text Styles in Table
-  // Text Styles in Table
-  thText: { fontSize: 8, fontWeight: 'bold', color: '#64748B', textTransform: 'uppercase' }, // Table Header Text
+  thText: { fontSize: 8, fontWeight: 'bold', color: '#64748B', textTransform: 'uppercase' },
   cellTag: { fontSize: 9, color: '#334155', fontWeight: 'bold' },
-  tagBadge: { backgroundColor: '#F1F5F9', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' }, // Badge style
+  tagBadge: { backgroundColor: '#F1F5F9', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' },
   cellVol: { fontSize: 9, color: '#64748B' },
   cellScore: { fontSize: 9, fontWeight: 'bold', color: '#4F46E5' },
-  
-  // Copy Paste Section
-  copyPasteBox: {
-    backgroundColor: '#F1F5F9', // Slate-100
-    padding: 6,
-    borderRadius: 4,
-    marginTop: 4,
+
+  // Competition Badges
+  badgeBase: { paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4, alignSelf: 'center', fontSize: 7, fontWeight: 'bold' },
+  compLow: { backgroundColor: '#DCFCE7', color: '#166534' },
+  compMed: { backgroundColor: '#FEF9C3', color: '#854D0E' },
+  compHigh: { backgroundColor: '#FEE2E2', color: '#991B1B' },
+
+  trendPos: { color: '#16A34A', fontSize: 6, fontWeight: 'bold', textAlign: 'center', marginTop: 2 },
+  trendNeg: { color: '#DC2626', fontSize: 6, fontWeight: 'bold', textAlign: 'center', marginTop: 2 },
+  trendNeutral: { color: '#64748B', fontSize: 6, textAlign: 'center', marginTop: 2 },
+
+  // 5. Strategic Insights Section
+  insightsSection: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    minHeight: 40, // Ensure minimum height
   },
-  copyPasteText: {
-    fontSize: 7, // Smaller font for list
-    color: '#475569',
-    lineHeight: 1.3,
-    fontFamily: 'Helvetica', // Changed from Courier for better fit? Or keep Courier but wrap?
-    // Courier is monospaced, takes more space. Helvetica is tighter.
+  insightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  
-  // Status Badges
-  badgeBase: { paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4, alignSelf: 'center', fontSize: 7, fontWeight: 'bold' },
-  compLow: { backgroundColor: '#DCFCE7', color: '#166534' }, // Green-100 / Green-800
-  compMed: { backgroundColor: '#FEF9C3', color: '#854D0E' }, // Yellow-100 / Yellow-800
-  compHigh: { backgroundColor: '#FEE2E2', color: '#991B1B' }, // Red-100 / Red-800
-
-  trendPos: { color: '#16A34A', fontSize: 8, fontWeight: 'bold' },
-  trendNeg: { color: '#DC2626', fontSize: 8, fontWeight: 'bold' },
+  insightKeyword: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#334155',
+    marginBottom: 2,
+  },
+  insightText: {
+    fontSize: 8,
+    color: '#64748B',
+    lineHeight: 1.4,
+  },
 
   footer: {
     position: 'absolute',
@@ -192,6 +205,119 @@ const styles = StyleSheet.create({
   }
 });
 
+// --- SVG Icon Components (Lucide-style paths) ---
+
+const FlameIcon = ({ size = 10 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
+      fill="#F97316"
+      fillOpacity={0.2}
+      stroke="#F97316"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const LeafIcon = ({ size = 10 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-3.8 10-10 10Z"
+      fill="#10B981"
+      fillOpacity={0.2}
+      stroke="#10B981"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"
+      stroke="#10B981"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const StarIcon = ({ size = 10 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+      fill="#F59E0B"
+      fillOpacity={0.3}
+      stroke="#F59E0B"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const LightbulbIcon = ({ color = '#22C55E', size = 10 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path d="M9 18h6" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    <Path d="M10 22h4" stroke={color} strokeWidth={2} strokeLinecap="round" />
+  </Svg>
+);
+
+// --- Sparkline SVG Component ---
+const SparklineSVG = ({ data, width = 55, height = 18 }) => {
+  if (!data || data.length < 2) {
+    return (
+      <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+        <Path
+          d={`M 0 ${height / 2} L ${width} ${height / 2}`}
+          stroke="#CBD5E1"
+          strokeWidth={1.5}
+          strokeDasharray="2,2"
+        />
+      </Svg>
+    );
+  }
+
+  const padding = 2;
+  const chartWidth = width - padding * 2;
+  const chartHeight = height - padding * 2;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+
+  const points = data.map((val, i) => {
+    const x = padding + (i / (data.length - 1)) * chartWidth;
+    const y = padding + chartHeight - ((val - min) / range) * chartHeight;
+    return { x: x.toFixed(1), y: y.toFixed(1) };
+  });
+
+  const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+  // Determine color based on trend direction
+  const isPositive = data[data.length - 1] >= data[0];
+  const strokeColor = isPositive ? '#16A34A' : '#EF4444';
+
+  return (
+    <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <Path
+        d={pathData}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+};
+
 const ListingPDFDocument = ({ listing }) => {
   const formattedDate = new Date().toLocaleDateString('fr-FR', {
     day: 'numeric', month: 'long', year: 'numeric',
@@ -199,58 +325,86 @@ const ListingPDFDocument = ({ listing }) => {
 
   const formatNumber = (num) => num ? num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") : '-';
   const keywordsList = listing.tags ? listing.tags.map(t => t.keyword).join(', ') : '';
-  
+
   const getCompBadge = (val) => {
-    // Determine level
     let level = 'high';
     let valNum = parseFloat(val);
+    let displayVal = !isNaN(valNum) ? valNum.toFixed(2) : val;
+
     if (!isNaN(valNum)) {
-        if (valNum < 0.35) level = 'low';
-        else if (valNum < 0.70) level = 'med';
+      if (valNum <= 0.4) level = 'low';
+      else if (valNum <= 0.7) level = 'med';
     }
 
-    if (level === 'low') return <Text style={[styles.badgeBase, styles.compLow]}>LOW</Text>;
-    if (level === 'med') return <Text style={[styles.badgeBase, styles.compMed]}>MED</Text>;
-    return <Text style={[styles.badgeBase, styles.compHigh]}>HIGH</Text>;
+    if (level === 'low') return <Text style={[styles.badgeBase, styles.compLow]}>{displayVal}</Text>;
+    if (level === 'med') return <Text style={[styles.badgeBase, styles.compMed]}>{displayVal}</Text>;
+    return <Text style={[styles.badgeBase, styles.compHigh]}>{displayVal}</Text>;
   };
 
   const renderStatusIcons = (k) => {
-      return (
-        <>
-            {k.is_trending && (
-                <Svg width="10" height="10" viewBox="0 0 24 24">
-                    <Path fill="#EF4444" d="M12 2L2 22h20L12 2z" />
-                </Svg>
-            )}
-            {k.is_evergreen && (
-                <Svg width="10" height="10" viewBox="0 0 24 24">
-                    <Path fill="#16A34A" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-                </Svg>
-            )}
-            {k.is_promising && (
-                <Svg width="10" height="10" viewBox="0 0 24 24">
-                    <Path fill="#8B5CF6" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                </Svg>
-            )}
-        </>
-      );
+    const hasAny = k.is_trending || k.is_evergreen || k.is_promising;
+    return (
+      <>
+        {k.is_trending && <FlameIcon size={12} />}
+        {k.is_evergreen && <LeafIcon size={12} />}
+        {k.is_promising && <StarIcon size={12} />}
+        {!hasAny && <Text style={{ fontSize: 8, color: '#CBD5E1' }}>-</Text>}
+      </>
+    );
   };
+
+  // Filter tags with insights for the Strategic Insights section
+  const insightTags = (listing.tags || []).filter(t => t.insight).slice(0, 5);
+
+  // Score strength config
+  const getStrengthConfig = (score) => {
+    if (score >= 80) return { color: '#16A34A', bgColor: '#DCFCE7', label: 'Strong', summary: 'High visibility potential. This listing is optimized for conversion.' };
+    if (score >= 50) return { color: '#F59E0B', bgColor: '#FEF9C3', label: 'Good', summary: 'Good foundation. Minor tweaks in secondary keywords could boost reach.' };
+    return { color: '#E11D48', bgColor: '#FEE2E2', label: 'Low', summary: 'Low visibility risk. Consider revising keywords to reduce competition.' };
+  };
+  const strengthScore = listing.global_strength;
+  const strengthConfig = strengthScore != null ? getStrengthConfig(strengthScore) : null;
+  // Use API-provided labels when available, fallback to tier defaults
+  const pdfStatusLabel = listing.status_label || (strengthConfig ? strengthConfig.label : '');
+  const pdfStrategicVerdict = listing.strategic_verdict || (strengthConfig ? strengthConfig.summary : '');
 
   return (
     <Document>
       <Page size="A4" style={styles.page} wrap>
-        
-        {/* Header (Fixed on all pages if wrapped? No, fixed prop handles that but we keep simple) */}
+
+        {/* Header */}
         <View style={styles.header}>
             <View>
                 <Text style={styles.logoText}>StudioDourliac <Text style={styles.logoAccent}>•</Text></Text>
                 <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 2 }}>AI Listing Strategy</Text>
             </View>
-            <View style={styles.headerMeta}>
-                <Text style={styles.date}>{formattedDate}</Text>
-                <Text style={styles.productNameRef}>{listing.productName || 'Untitled Project'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {strengthConfig && (
+                    <View style={{ alignItems: 'center' }}>
+                        <Svg width={40} height={40} viewBox="0 0 40 40">
+                            <Circle cx={20} cy={20} r={18} fill={strengthConfig.bgColor} />
+                            <Circle cx={20} cy={20} r={18} fill="none" stroke={strengthConfig.color} strokeWidth={2.5} />
+                        </Svg>
+                        <Text style={{ position: 'absolute', top: 8, left: 0, right: 0, textAlign: 'center', fontSize: 12, fontWeight: 'bold', color: strengthConfig.color }}>{strengthScore}</Text>
+                        <Text style={{ fontSize: 5, color: strengthConfig.color, marginTop: -2, fontWeight: 'bold' }}>{pdfStatusLabel}</Text>
+                    </View>
+                )}
+                <View style={styles.headerMeta}>
+                    <Text style={styles.date}>{formattedDate}</Text>
+                    <Text style={styles.productNameRef}>{listing.productName || 'Untitled Project'}</Text>
+                </View>
             </View>
         </View>
+
+        {/* Strategic Summary */}
+        {strengthConfig && (
+            <View style={{ backgroundColor: strengthConfig.bgColor, padding: 10, borderRadius: 4, marginBottom: 15, borderLeftWidth: 3, borderLeftColor: strengthConfig.color }}>
+                <Text style={{ fontSize: 8, color: '#334155', lineHeight: 1.4 }}>
+                    <Text style={{ fontWeight: 'bold', color: strengthConfig.color }}>Score {strengthScore}/100 — {pdfStatusLabel} — </Text>
+                    {pdfStrategicVerdict}
+                </Text>
+            </View>
+        )}
 
         {/* 2. Top Section (Image & Title) */}
         <View style={styles.topSection}>
@@ -266,7 +420,7 @@ const ListingPDFDocument = ({ listing }) => {
             <View style={styles.topRight}>
                 <Text style={styles.label}>OPTIMIZED TITLE</Text>
                 <Text style={styles.titleText}>{listing.title || 'No Title Generated'}</Text>
-                
+
                 <Text style={[styles.label, { marginTop: 6, marginBottom: 4 }]}>COPY KEYWORDS</Text>
                 <View style={styles.copyPasteBox}>
                      <Text style={styles.copyPasteText}>
@@ -303,21 +457,24 @@ const ListingPDFDocument = ({ listing }) => {
                             <Text style={styles.cellTag}>{tag.keyword}</Text>
                         </View>
                     </View>
-                    
+
                     <Text style={[styles.cellVol, styles.colVol]}>
                         {formatNumber(tag.volume)}
                     </Text>
-                    
-                    <Text style={[styles.colTrend, tag.trend > 0 ? styles.trendPos : (tag.trend < 0 ? styles.trendNeg : styles.cellVol)]}>
-                        {tag.trend ? `${tag.trend > 0 ? '+' : ''}${tag.trend}%` : '-'}
-                    </Text>
+
+                    <View style={styles.colTrend}>
+                        <SparklineSVG data={tag.volume_history} width={55} height={18} />
+                        <Text style={tag.trend > 0 ? styles.trendPos : (tag.trend < 0 ? styles.trendNeg : styles.trendNeutral)}>
+                            {tag.trend ? `${tag.trend > 0 ? '+' : ''}${tag.trend}%` : '0%'}
+                        </Text>
+                    </View>
 
                     <View style={styles.colComp}>
                         {getCompBadge(tag.competition)}
                     </View>
 
                     <Text style={[styles.cellScore, styles.colScore]}>{tag.score}</Text>
-                    
+
                     <View style={[styles.colStatus, styles.colStatusBody]}>
                         {renderStatusIcons(tag)}
                     </View>
@@ -332,19 +489,40 @@ const ListingPDFDocument = ({ listing }) => {
             {/* Legend */}
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10, gap: 15, paddingRight: 8 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Svg width="8" height="8" viewBox="0 0 24 24"><Path fill="#EF4444" d="M12 2L2 22h20L12 2z" /></Svg>
+                    <FlameIcon size={8} />
                     <Text style={{ fontSize: 7, color: '#64748B' }}>Trending</Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Svg width="8" height="8" viewBox="0 0 24 24"><Path fill="#16A34A" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" /></Svg>
+                    <LeafIcon size={8} />
                     <Text style={{ fontSize: 7, color: '#64748B' }}>Evergreen</Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Svg width="8" height="8" viewBox="0 0 24 24"><Path fill="#8B5CF6" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></Svg>
-                    <Text style={{ fontSize: 7, color: '#64748B' }}>Promising</Text>
+                    <StarIcon size={8} />
+                    <Text style={{ fontSize: 7, color: '#64748B' }}>Opportunity</Text>
                 </View>
             </View>
         </View>
+
+        {/* 5. Strategic Insights Section */}
+        {insightTags.length > 0 && (
+            <View style={styles.insightsSection} wrap={false}>
+                <Text style={[styles.label, { marginBottom: 10 }]}>STRATEGIC INSIGHTS</Text>
+                {insightTags.map((tag, i) => (
+                    <View key={i} style={[styles.insightRow, i === insightTags.length - 1 && { borderBottomWidth: 0, marginBottom: 0, paddingBottom: 0 }]}>
+                        <View style={{ marginTop: 1 }}>
+                            <LightbulbIcon
+                                size={12}
+                                color={tag.is_top === true ? '#22C55E' : tag.is_top === false ? '#F59E0B' : '#9CA3AF'}
+                            />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.insightKeyword}>{tag.keyword}</Text>
+                            <Text style={styles.insightText}>{tag.insight}</Text>
+                        </View>
+                    </View>
+                ))}
+            </View>
+        )}
 
         <View style={styles.footer} fixed>
             <Text>Generated by 5PennyAi • StudioDourliac - Confidential Strategy Document</Text>

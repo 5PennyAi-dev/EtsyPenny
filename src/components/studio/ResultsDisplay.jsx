@@ -1,5 +1,5 @@
-import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown } from 'lucide-react';
-import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
+import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
 
@@ -78,6 +78,90 @@ const CopyButton = ({ text, label = "Copy", className = "", tooltipSide = "top" 
         {copied ? 'Copied!' : label}
         <div className={`absolute left-1/2 -translate-x-1/2 border-4 ${arrowClasses}`}></div>
       </div>
+    </div>
+  );
+};
+
+const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority }) => {
+  const [animatedScore, setAnimatedScore] = useState(0);
+  const size = 130;
+  const strokeWidth = 11;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (animatedScore / 100) * circumference;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAnimatedScore(score || 0), 100);
+    return () => clearTimeout(timer);
+  }, [score]);
+
+  const getColor = (val) => {
+    if (val >= 80) return { stroke: '#16A34A', text: 'text-emerald-600', fallbackLabel: 'Strong Listing', fallbackSub: 'High visibility potential' };
+    if (val >= 50) return { stroke: '#F59E0B', text: 'text-amber-600', fallbackLabel: 'Good Foundation', fallbackSub: 'Minor tweaks could boost reach' };
+    return { stroke: '#E11D48', text: 'text-rose-600', fallbackLabel: 'Needs Work', fallbackSub: 'Consider revising keywords' };
+  };
+
+  const tier = getColor(score || 0);
+
+  if (score === null || score === undefined) return null;
+
+  const displayLabel = statusLabel || tier.fallbackLabel;
+  const displayVerdict = strategicVerdict || tier.fallbackSub;
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Main Gauge + Executive Summary */}
+      <div className="p-6 flex items-center gap-8">
+        {/* Gauge Circle */}
+        <div className="relative flex-shrink-0">
+          <svg width={size} height={size} className="-rotate-90">
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke="#F1F5F9"
+              strokeWidth={strokeWidth}
+            />
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={tier.stroke}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease' }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className={`text-3xl font-black ${tier.text}`}>{animatedScore}</span>
+            <span className="text-[10px] text-slate-400 font-medium">/100</span>
+          </div>
+        </div>
+
+        {/* Executive Summary */}
+        <div className="flex flex-col flex-1 min-w-0">
+          <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">Listing Strength</span>
+          <span className={`text-xl font-bold ${tier.text} leading-tight`}>{displayLabel}</span>
+          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">{displayVerdict}</p>
+        </div>
+      </div>
+
+      {/* Priority Banner */}
+      {improvementPriority && (
+        <div className="px-6 py-3.5 bg-amber-50/70 border-t border-amber-100 flex items-start gap-3">
+          <div className="p-1 bg-amber-100 rounded-lg flex-shrink-0 mt-0.5">
+            <AlertTriangle size={14} className="text-amber-600" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Priority Action</span>
+            <p className="text-sm text-amber-900 font-medium leading-relaxed mt-0.5">{improvementPriority}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -217,9 +301,19 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
         
         {/* --- MAIN CONTENT (Left - 8 Cols ~66%) --- */}
         <div className="lg:col-span-8 space-y-8">
-            
+
+            {/* Hero Audit Header */}
+            {results.global_strength !== null && results.global_strength !== undefined && (
+                <AuditHeader 
+                    score={results.global_strength}
+                    statusLabel={results.status_label}
+                    strategicVerdict={results.strategic_verdict}
+                    improvementPriority={results.improvement_priority}
+                />
+            )}
+
             {/* 1. Full Width Performance Table */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-visible">
                 <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                         <TrendingUp size={16} className="text-indigo-600" />
@@ -244,7 +338,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                          <span className="flex items-center gap-1"><Star size={12} className="text-amber-400"/> Opportunity</span>
                     </div>
                 </div>
-                <div className="overflow-x-auto">
+                <div>
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                             <tr>
@@ -306,7 +400,23 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
                                                 {row.keyword}
                                             </span>
-                                            {row.is_promising && <Star size={12} className="text-amber-400 fill-amber-400" />}
+                                            {row.insight && (
+                                                <div className="relative group/insight">
+                                                    <Lightbulb
+                                                        size={14}
+                                                        className={`cursor-help shrink-0 ${
+                                                            row.is_top === true ? "text-green-500" :
+                                                            row.is_top === false ? "text-amber-500" :
+                                                            "text-gray-400"
+                                                        }`}
+                                                    />
+                                                    {/* Tooltip */}
+                                                    <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-2 text-xs text-white bg-slate-800 rounded-lg shadow-xl opacity-0 invisible group-hover/insight:opacity-100 group-hover/insight:visible transition-all z-50 w-64 pointer-events-none leading-relaxed">
+                                                        {row.insight}
+                                                        <div className="absolute right-full top-1/2 -translate-y-1/2 border-[6px] border-r-slate-800 border-t-transparent border-b-transparent border-l-transparent"></div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="px-4 py-3 text-center text-slate-600 font-mono text-xs">
@@ -335,6 +445,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                         <div className="flex items-center justify-center gap-2">
                                             {row.is_trending && <Flame size={16} className="text-orange-500 fill-orange-500/20" />}
                                             {row.is_evergreen && <Leaf size={16} className="text-emerald-500 fill-emerald-500/20" />}
+                                            {row.is_promising && <Star size={16} className="text-amber-400 fill-amber-400/20" />}
                                             {(!row.is_trending && !row.is_evergreen && !row.is_promising) && <span className="text-slate-300">-</span>}
                                         </div>
                                     </td>
@@ -441,13 +552,16 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                             </div>
 
                                 <PDFDownloadLink
-                                    key={`pdf-${displayedTitle}-${selectedTags.length}-version4`}
+                                    key={`pdf-${displayedTitle}-${selectedTags.length}-version6`}
                                     document={
                                         <ListingPDFDocument 
                                             listing={{
                                                 title: displayedTitle,
                                                 description: displayedDescription,
                                                 imageUrl: results.imageUrl,
+                                                global_strength: results.global_strength ?? null,
+                                                status_label: results.status_label ?? null,
+                                                strategic_verdict: results.strategic_verdict ?? null,
                                                 productName: displayedTitle.split(' ').slice(0, 5).join(' ') + '...', // Simple truncated name
                                                 tags: results.analytics
                                                     .filter(k => selectedTags.includes(k.keyword))
@@ -466,9 +580,12 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                                             volume: k.volume,
                                                             competition: k.competition,
                                                             trend: trend,
+                                                            volume_history: k.volume_history || [],
                                                             is_trending: k.is_trending,
                                                             is_evergreen: k.is_evergreen,
-                                                            is_promising: k.is_promising
+                                                            is_promising: k.is_promising,
+                                                            insight: k.insight || null,
+                                                            is_top: k.is_top ?? null
                                                         };
                                                     })
                                             }}

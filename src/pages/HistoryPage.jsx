@@ -76,6 +76,13 @@ const HistoryPage = () => {
 
             if (statsError) throw statsError;
 
+            // Fetch global strength score from listings
+            const { data: listingRecord } = await supabase
+                .from('listings')
+                .select('global_strength')
+                .eq('id', listingId)
+                .single();
+
             // 2. Prepare Data for PDF
             const customData = item.custom_listing ? JSON.parse(item.custom_listing) : {};
             const listingData = {
@@ -83,6 +90,7 @@ const HistoryPage = () => {
                 description: item.user_description || "", 
                 
                 imageUrl: item.image_url,
+                global_strength: listingRecord?.global_strength ?? null,
                 productName: (item.display_title || item.title || "Untitled").split(' ').slice(0, 5).join(' ') + '...',
                 tags: stats.map(s => {
                     // Calculate Trend %
@@ -99,9 +107,12 @@ const HistoryPage = () => {
                         volume: s.search_volume,
                         competition: s.competition,
                         trend: trend,
+                        volume_history: s.volume_history || [],
                         is_trending: s.is_trending,
                         is_evergreen: s.is_evergreen,
-                        is_promising: s.is_promising
+                        is_promising: s.is_promising,
+                        insight: s.insight || null,
+                        is_top: s.is_top ?? null
                     };
                 })
             };

@@ -400,17 +400,30 @@ const ProductStudio = () => {
         let generatedDescription = "Please review the competition analysis below.";
 
         // Handle different response structures
-        if (Array.isArray(responseData)) {
-            // Case: Response is just the array of stats
+        // N8N wraps the response in an array: [{global_listing_strength, keywords: [...]}]
+        const unwrapped = Array.isArray(responseData) ? responseData[0] : responseData;
+        
+        // The keyword array can be under "keywords" or "seo_analysis"
+        const keywordArray = unwrapped?.keywords || unwrapped?.seo_analysis;
+        
+        if (keywordArray && Array.isArray(keywordArray)) {
+            seoAnalysis = keywordArray;
+            generatedTitle = unwrapped.title || generatedTitle;
+            generatedDescription = unwrapped.description || generatedDescription;
+        } else if (Array.isArray(responseData) && responseData.length > 0 && responseData[0]?.keyword) {
+            // Case: Response is a flat array of keyword objects directly
             seoAnalysis = responseData;
-        } else if (responseData && responseData.seo_analysis) {
-            // Case: Response is an object with metadata
-            seoAnalysis = responseData.seo_analysis;
-            generatedTitle = responseData.title || generatedTitle;
-            generatedDescription = responseData.description || generatedDescription;
         } else {
-             throw new Error("Invalid response structure from analysis service");
+            console.warn("Unexpected response structure:", unwrapped);
+            throw new Error("Invalid response structure from analysis service");
         }
+
+        // Extract global audit fields from the unwrapped response
+        const globalStrength = unwrapped?.global_listing_strength ?? null;
+        const statusLabel = unwrapped?.global_status_label ?? null;
+        const strategicVerdict = unwrapped?.global_strategic_verdict ?? null;
+        const improvementPriority = unwrapped?.improvement_priority ?? null;
+        console.log("Global Audit extracted:", { globalStrength, statusLabel, strategicVerdict, improvementPriority });
 
         // 4. Save Results to Database
         setIsLoading('saving');
@@ -422,7 +435,11 @@ const ProductStudio = () => {
                 generated_title: generatedTitle,
                 generated_description: generatedDescription,
                 status_id: STATUS_IDS.SEO_DONE,
-                title: listingName || generatedTitle
+                title: listingName || generatedTitle,
+                global_strength: globalStrength,
+                status_label: statusLabel,
+                strategic_verdict: strategicVerdict,
+                improvement_priority: improvementPriority
             })
             .eq('id', activeListingId);
 
@@ -430,7 +447,7 @@ const ProductStudio = () => {
 
         // Insert SEO Stats
         // transform seoAnalysis (array) to db format
-        const statsToInsert = seoAnalysis.map(item => ({
+        const statsToInsert = seoAnalysis.filter(item => item.keyword).map(item => ({
             listing_id: activeListingId,
             tag: item.keyword,
             search_volume: item.avg_volume || 0,
@@ -439,8 +456,18 @@ const ProductStudio = () => {
             volume_history: item.volumes_history || [],
             is_trending: item.status?.trending || false,
             is_evergreen: item.status?.evergreen || false,
-            is_promising: item.status?.promising || false
+            is_promising: item.status?.promising || false,
+            insight: item.insight || null,
+            is_top: item.is_top ?? null
         }));
+
+        // Delete old stats before inserting fresh ones (handles re-analysis / Refresh Data)
+        const { error: statsDeleteError } = await supabase
+            .from('listing_seo_stats')
+            .delete()
+            .eq('listing_id', activeListingId);
+
+        if (statsDeleteError) throw statsDeleteError;
 
         const { error: statsInsertError } = await supabase
             .from('listing_seo_stats')
@@ -453,6 +480,10 @@ const ProductStudio = () => {
             title: generatedTitle === "SEO Analysis Completed" ? null : generatedTitle, // Use null to trigger "Ready to Craft" state
             description: generatedDescription === "Please review the competition analysis below." ? null : generatedDescription,
             imageUrl: publicUrl,
+            global_strength: globalStrength,
+            status_label: statusLabel,
+            strategic_verdict: strategicVerdict,
+            improvement_priority: improvementPriority,
             tags: statsToInsert.map(s => s.tag),
             analytics: statsToInsert.map(s => ({
                 keyword: s.tag,
@@ -462,7 +493,9 @@ const ProductStudio = () => {
                 volume_history: s.volume_history,
                 is_trending: s.is_trending,
                 is_evergreen: s.is_evergreen,
-                is_promising: s.is_promising
+                is_promising: s.is_promising,
+                insight: s.insight,
+                is_top: s.is_top
             }))
         };
 
@@ -694,6 +727,10 @@ const ProductStudio = () => {
             title: listing.generated_title,
             description: listing.generated_description,
             imageUrl: listing.image_url,
+            global_strength: listing.global_strength ?? null,
+            status_label: listing.status_label ?? null,
+            strategic_verdict: listing.strategic_verdict ?? null,
+            improvement_priority: listing.improvement_priority ?? null,
             analytics: stats.map(s => ({
                 keyword: s.tag,
                 volume: s.search_volume,
@@ -702,7 +739,9 @@ const ProductStudio = () => {
                 volume_history: s.volume_history,
                 is_trending: s.is_trending,
                 is_evergreen: s.is_evergreen,
-                is_promising: s.is_promising
+                is_promising: s.is_promising,
+                insight: s.insight || null,
+                is_top: s.is_top ?? null
             }))
         });
 
