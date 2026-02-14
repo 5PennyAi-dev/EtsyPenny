@@ -1,4 +1,4 @@
-import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle } from 'lucide-react';
+import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2 } from 'lucide-react';
 import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
@@ -82,7 +82,84 @@ const CopyButton = ({ text, label = "Copy", className = "", tooltipSide = "top" 
   );
 };
 
-const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority }) => {
+// Full Skeleton Screen shown while generateInsight is loading (covers both columns)
+const InsightSkeleton = ({ phase = 'seo' }) => (
+  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+    {/* Left Column Skeleton */}
+    <div className="lg:col-span-8 space-y-8 animate-pulse">
+      {/* Audit Header Skeleton */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 flex items-center gap-8">
+          <div className="w-[130px] h-[130px] rounded-full bg-slate-100 flex-shrink-0" />
+          <div className="flex-1 space-y-3">
+            <div className="h-3 w-24 bg-slate-100 rounded" />
+            <div className="h-6 w-48 bg-slate-100 rounded" />
+            <div className="h-4 w-full bg-slate-100 rounded" />
+            <div className="h-4 w-3/4 bg-slate-100 rounded" />
+          </div>
+        </div>
+        <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100">
+          <div className="h-3 w-20 bg-slate-100 rounded mb-2" />
+          <div className="h-4 w-full bg-slate-100 rounded" />
+        </div>
+      </div>
+
+      {/* Table Skeleton */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+          <div className="h-5 w-44 bg-slate-100 rounded" />
+          <div className="flex gap-3">
+            <div className="h-4 w-16 bg-slate-100 rounded" />
+            <div className="h-4 w-16 bg-slate-100 rounded" />
+            <div className="h-4 w-16 bg-slate-100 rounded" />
+          </div>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-6 py-3.5">
+              <div className="w-4 h-4 bg-slate-100 rounded" />
+              <div className="h-5 w-32 bg-slate-100 rounded-full" />
+              <div className="flex-1" />
+              <div className="h-4 w-14 bg-slate-100 rounded" />
+              <div className="h-5 w-14 bg-slate-100 rounded" />
+              <div className="h-5 w-12 bg-slate-100 rounded" />
+              <div className="h-5 w-10 bg-slate-100 rounded" />
+              <div className="flex gap-1">
+                <div className="w-4 h-4 bg-slate-100 rounded-full" />
+                <div className="w-4 h-4 bg-slate-100 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    {/* Right Column Skeleton (Sidebar) */}
+    <div className="lg:col-span-4 sticky top-8">
+      <div className="bg-slate-50/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm p-1">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 min-h-[400px] flex flex-col items-center justify-center">
+          {/* Active spinner */}
+          <div className="relative mb-6">
+            <div className="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Sparkles size={20} className="text-indigo-600" />
+            </div>
+          </div>
+          <h4 className="text-slate-900 font-bold text-base mb-2">
+            {phase === 'seo' ? 'Generating SEO Tags...' : 'Generating Insights...'}
+          </h4>
+          <p className="text-slate-500 text-sm text-center px-4 leading-relaxed">
+            {phase === 'seo' 
+              ? 'Researching keywords and analyzing competition' 
+              : 'Analyzing keywords and calculating your listing score'}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority, onSEOSniper, isSniperLoading }) => {
   const [animatedScore, setAnimatedScore] = useState(0);
   const size = 130;
   const strokeWidth = 11;
@@ -110,7 +187,7 @@ const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Main Gauge + Executive Summary */}
+      {/* Main Gauge + Executive Summary + Sniper Button */}
       <div className="p-6 flex items-center gap-8">
         {/* Gauge Circle */}
         <div className="relative flex-shrink-0">
@@ -148,6 +225,33 @@ const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority
           <span className={`text-xl font-bold ${tier.text} leading-tight`}>{displayLabel}</span>
           <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">{displayVerdict}</p>
         </div>
+
+        {/* SEO Sniper Button — integrated top-right */}
+        {onSEOSniper && (
+          <div className="flex-shrink-0">
+            <button
+              onClick={onSEOSniper}
+              disabled={isSniperLoading}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200
+                ${isSniperLoading
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-md shadow-sm'
+                }`}
+            >
+              {isSniperLoading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Analyse en cours...</span>
+                </>
+              ) : (
+                <>
+                  <Target size={16} />
+                  <span>SEO Sniper</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Priority Banner */}
@@ -166,7 +270,7 @@ const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority
   );
 };
 
-const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO }) => {
+const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO, onSEOSniper, isSniperLoading, isInsightLoading }) => {
   const [displayedTitle, setDisplayedTitle] = useState("");
   const [displayedDescription, setDisplayedDescription] = useState("");
   const descriptionRef = useRef(null);
@@ -189,11 +293,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
     }
   }, [results]);
 
-  if (!results) return null;
-
-  const hasDraft = !!results.title && results.title !== "SEO Analysis Completed";
-  
-  // Tag Selection State
+  // Tag Selection State (must be declared before any early returns — Rules of Hooks)
   const [selectedTags, setSelectedTags] = useState([]);
 
   // Initialize selectedTags when results load
@@ -203,24 +303,8 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
     }
   }, [results]);
 
-  const toggleTag = (keyword) => {
-    setSelectedTags(prev => 
-        prev.includes(keyword) 
-            ? prev.filter(k => k !== keyword)
-            : [...prev, keyword]
-    );
-  };
-
-  const handleMagicDraft = () => {
-    if (selectedTags.length === 0) {
-        alert("Please select at least one tag to craft your listing.");
-        return;
-    }
-    onGenerateDraft(selectedTags);
-  };
-
   // Sorting Logic
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' }); // Default sorted by volume DESC if we set key: 'volume' initially, but let's keep it null
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
   
   const sortedAnalytics = useMemo(() => {
     if (!results?.analytics) return [];
@@ -245,16 +329,13 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                 bValue = ((bLast - bFirst) / bFirst) * 100;
                 break;
             case 'competition':
-                // Helper to score competition: Low=1, Medium=2, High=3 (Actually Low is better usually, but request says Low < Medium < High for sorting value)
-                // Let's interpret the request: "Low < Medium < High".
-                // If ASC: Low -> Medium -> High. This means Low has lower value.
                 const getCompScore = (val) => {
                     const numVal = parseFloat(val);
-                    if (!isNaN(numVal)) return numVal; // If number 0-1, use it directly (0.1 < 0.5 < 0.9)
+                    if (!isNaN(numVal)) return numVal;
                     if (val === 'Low') return 0.2;
                     if (val === 'Medium') return 0.5;
                     if (val === 'High') return 0.8;
-                    return 0.5; // Default medium
+                    return 0.5;
                 };
                 aValue = getCompScore(a.competition);
                 bValue = getCompScore(b.competition);
@@ -279,8 +360,39 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
     return sortableItems;
   }, [results?.analytics, sortConfig]);
 
+  // --- ALL HOOKS ARE ABOVE THIS LINE --- Early returns below are safe ---
+
+  // If insight/seo is loading, show full skeleton
+  if (isInsightLoading) {
+    return (
+      <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <InsightSkeleton phase={isInsightLoading} />
+      </div>
+    );
+  }
+
+  if (!results) return null;
+
+  const hasDraft = !!results.title && results.title !== "SEO Analysis Completed";
+
+  const toggleTag = (keyword) => {
+    setSelectedTags(prev => 
+        prev.includes(keyword) 
+            ? prev.filter(k => k !== keyword)
+            : [...prev, keyword]
+    );
+  };
+
+  const handleMagicDraft = () => {
+    if (selectedTags.length === 0) {
+        alert("Please select at least one tag to craft your listing.");
+        return;
+    }
+    onGenerateDraft(selectedTags);
+  };
+
   const requestSort = (key) => {
-    let direction = 'desc'; // Default to descending for numbers usually
+    let direction = 'desc';
     if (sortConfig.key === key && sortConfig.direction === 'desc') {
       direction = 'asc';
     }
@@ -302,13 +414,15 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
         {/* --- MAIN CONTENT (Left - 8 Cols ~66%) --- */}
         <div className="lg:col-span-8 space-y-8">
 
-            {/* Hero Audit Header */}
+            {/* Hero Audit Header with integrated SEO Sniper */}
             {results.global_strength !== null && results.global_strength !== undefined && (
                 <AuditHeader 
                     score={results.global_strength}
                     statusLabel={results.status_label}
                     strategicVerdict={results.strategic_verdict}
                     improvementPriority={results.improvement_priority}
+                    onSEOSniper={onSEOSniper}
+                    isSniperLoading={isSniperLoading}
                 />
             )}
 
@@ -336,6 +450,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                          <span className="flex items-center gap-1"><Flame size={12} className="text-orange-500"/> Trending</span>
                          <span className="flex items-center gap-1"><Leaf size={12} className="text-emerald-500"/> Evergreen</span>
                          <span className="flex items-center gap-1"><Star size={12} className="text-amber-400"/> Opportunity</span>
+                         <span className="flex items-center gap-1"><Target size={12} className="text-indigo-500"/> Sniper</span>
                     </div>
                 </div>
                 <div>
@@ -416,6 +531,9 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                                         <div className="absolute right-full top-1/2 -translate-y-1/2 border-[6px] border-r-slate-800 border-t-transparent border-b-transparent border-l-transparent"></div>
                                                     </div>
                                                 </div>
+                                            )}
+                                            {row.is_sniper_seo && (
+                                                <Target size={14} className="text-indigo-500 shrink-0" />
                                             )}
                                         </div>
                                     </td>

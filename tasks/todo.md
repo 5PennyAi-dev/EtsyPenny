@@ -1,13 +1,19 @@
-# Global Listing Intelligence Integration
+# Task: Implement SEO Sniper Trigger & Logic
 
-- [x] **ProductStudio.jsx — Save new fields**: Extract & save `status_label`, `strategic_verdict`, `improvement_priority` from n8n response to `listings` table.
-- [x] **ProductStudio.jsx — Pass to UI**: Add new fields to `formattedResults` and `handleLoadListing`.
-- [x] **ResultsDisplay.jsx — Refactor AuditHeader**: Replace `StrengthGauge` with `AuditHeader` component displaying gauge + executive summary + priority banner.
-- [x] **ListingPDFDocument.jsx — Update PDF header**: Pass real API labels to the PDF.
-- [x] **context.md — Update**: Append latest development entry.
+## Phase 1: State & Handler (ProductStudio.jsx)
+- [ ] Add `isSniperLoading` state variable
+- [ ] Create `handleSEOSniper` async function (builds payload like `drafting_seo` + visual analysis, POSTs to `VITE_N8N_SNIPER_WEBHOOK_URL`)
+- [ ] Pass `handleSEOSniper` and `isSniperLoading` as props to `ResultsDisplay`
+
+## Phase 2: UI Button (ResultsDisplay.jsx)
+- [ ] Accept `onSEOSniper` and `isSniperLoading` props
+- [ ] Add Sniper button inside the `AuditHeader` section (next to the gauge)
+- [ ] Style: Indigo gradient, pulse animation, Target icon
+- [ ] Loading state: spinner + "Analyse Sniper en cours..."
+
+## Phase 3: Cleanup & Context
+- [ ] Update `docs/context.md` with new feature entry
+- [ ] Remove any debug logs
 
 ## Review
-- **Changes Made**: 3 files modified (`ProductStudio.jsx`, `ResultsDisplay.jsx`, `ListingPDFDocument.jsx`) + `context.md` updated.
-- **Data Flow**: n8n response → extract audit fields → save to DB → pass to UI state → render in AuditHeader → pass to PDF. History reload hydrates all fields.
-- **No migration needed**: DB columns already existed.
-- **Next Steps**: Test end-to-end by running a new analysis and verifying the audit header, keyword table, and PDF export all render correctly.
+- [ ] Summary of changes and next steps

@@ -28,6 +28,8 @@ const ProductStudio = () => {
   const [listingId, setListingId] = useState(null);
   const [results, setResults] = useState(null);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+  const [isSniperLoading, setIsSniperLoading] = useState(false);
+  const [isInsightLoading, setIsInsightLoading] = useState(false); // false | 'seo' | 'insight'
   const [analysisContext, setAnalysisContext] = useState(null);
   const [listingName, setListingName] = useState("");
   
@@ -255,11 +257,14 @@ const ProductStudio = () => {
     }
 
     try {
-        setIsLoading('uploading');
         let activeListingId = listingId;
         setResults(null);
-        setShowResults(false);
-        setIsFormCollapsed(false);
+        
+        // Show skeleton immediately — user sees loading from the start
+        setIsInsightLoading('seo');
+        setIsLoading(false);
+        setShowResults(true);
+        setIsFormCollapsed(true);
         
         
         let publicUrl = formData.existingImageUrl;
@@ -286,9 +291,7 @@ const ProductStudio = () => {
             publicUrl = newUrl;
         }
         
-        setIsLoading('saving');
-
-        // 2. Database Operation
+        // 2. Database Operation (silently while skeleton shows)
         const customData = {
             theme: formData.custom_theme,
             niche: formData.custom_niche,
@@ -339,8 +342,6 @@ const ProductStudio = () => {
              activeListingId = listingData.id;
              setListingId(activeListingId);
         }
-
-        setIsLoading('triggering');
 
         // 3. Trigger Webhook (N8N)
         const webhookPayload = {
@@ -425,8 +426,7 @@ const ProductStudio = () => {
         const improvementPriority = unwrapped?.improvement_priority ?? null;
         console.log("Global Audit extracted:", { globalStrength, statusLabel, strategicVerdict, improvementPriority });
 
-        // 4. Save Results to Database
-        setIsLoading('saving');
+        // 4. Save Results to Database (silently, skeleton stays visible)
 
         // Update Listing with Title/Desc
         const { error: updateError } = await supabase
@@ -499,10 +499,12 @@ const ProductStudio = () => {
             }))
         };
 
+        // 6. Switch skeleton phase to 'insight' and set results
+        setIsInsightLoading('insight');
         setResults(formattedResults);
-        setIsLoading(false);
-        setShowResults(true);
-        setIsFormCollapsed(true); // Auto-collapse on success
+
+        // Auto-trigger Insight generation
+        handleGenerateInsight(formattedResults, formData, activeListingId);
 
     } catch (err) {
         console.error("Error in handleAnalyze:", err);
@@ -516,6 +518,7 @@ const ProductStudio = () => {
              toast.error("An error occurred: " + err.message);
         }
         setIsLoading(false);
+        setIsInsightLoading(false);
     }
   };
 
@@ -659,6 +662,321 @@ const ProductStudio = () => {
       }
   };
 
+  // Generate Insight Handler (auto-triggered after generate_seo)
+  const handleGenerateInsight = async (formattedResults, formData, activeListingId) => {
+    try {
+      const statsToUse = formattedResults.analytics || [];
+
+      const payload = {
+        action: 'generateInsight',
+        listing_id: activeListingId || listingId,
+        keywords: statsToUse.map(k => ({
+          keyword: k.keyword,
+          avg_volume: k.volume,
+          competition: typeof k.competition === 'string' && !isNaN(parseFloat(k.competition)) ? parseFloat(k.competition) : k.competition,
+          opportunity_score: k.score,
+          volumes_history: k.volume_history,
+          status: {
+            trending: k.is_trending,
+            evergreen: k.is_evergreen,
+            promising: k.is_promising
+          },
+          is_sniper_seo: true
+        })),
+        mockups: [formattedResults.imageUrl],
+        payload: {
+          image_url: formattedResults.imageUrl,
+          visual_aesthetic: visualAnalysis.aesthetic,
+          visual_typography: visualAnalysis.typography,
+          visual_graphics: visualAnalysis.graphics,
+          visual_colors: visualAnalysis.colors,
+          visual_target_audience: visualAnalysis.target_audience,
+          visual_overall_vibe: visualAnalysis.overall_vibe,
+          categorization: {
+            theme: formData.theme_name || null,
+            niche: formData.niche_name || null,
+            sub_niche: formData.sub_niche_name || null
+          },
+          product_details: {
+            product_type: formData.product_type_name || "Product",
+            tone: formData.tone_name || "Engaging",
+            client_description: formData.context || ""
+          },
+          shop_context: {
+            shop_name: profile?.shop_name,
+            shop_bio: profile?.shop_bio,
+            target_audience: profile?.target_audience,
+            brand_tone: profile?.brand_tone,
+            brand_keywords: profile?.brand_keywords,
+            signature_text: profile?.signature_text
+          }
+        },
+        metadata: {
+          app_version: "1.0.0",
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
+      console.log("Auto-triggering generateInsight:", webhookUrl);
+
+      const response = await axios.post(webhookUrl, payload);
+      console.log("generateInsight Response:", response.data);
+
+      // Parse response (n8n wraps in array)
+      const unwrapped = Array.isArray(response.data) ? response.data[0] : response.data;
+      if (!unwrapped) {
+        console.warn("generateInsight: Empty response");
+        return;
+      }
+
+      const insightListingId = activeListingId || listingId;
+
+      // 1. Save global audit fields to listings table
+      const globalStrength = unwrapped.global_listing_strength ?? null;
+      const statusLabel = unwrapped.global_status_label ?? null;
+      const strategicVerdict = unwrapped.global_strategic_verdict ?? null;
+      const improvementPriority = unwrapped.improvement_priority ?? null;
+
+      const { error: listingUpdateError } = await supabase
+        .from('listings')
+        .update({
+          global_strength: globalStrength,
+          status_label: statusLabel,
+          strategic_verdict: strategicVerdict,
+          improvement_priority: improvementPriority
+        })
+        .eq('id', insightListingId);
+
+      if (listingUpdateError) {
+        console.error("Failed to save insight global fields:", listingUpdateError);
+      }
+
+      // 2. Update listing_seo_stats with insight/is_top per keyword
+      const keywordsData = unwrapped.keywords || [];
+      for (const kw of keywordsData) {
+        if (kw.insight !== undefined || kw.is_top !== undefined) {
+          const updateFields = {};
+          if (kw.insight !== undefined) updateFields.insight = kw.insight;
+          if (kw.is_top !== undefined) updateFields.is_top = kw.is_top;
+
+          const { error: kwError } = await supabase
+            .from('listing_seo_stats')
+            .update(updateFields)
+            .eq('listing_id', insightListingId)
+            .eq('tag', kw.keyword);
+
+          if (kwError) {
+            console.error(`Failed to update insight for "${kw.keyword}":`, kwError);
+          }
+        }
+      }
+
+      // 3. Update UI state for live refresh
+      setResults(prev => {
+        if (!prev) return prev;
+        const updatedAnalytics = prev.analytics.map(existing => {
+          const match = keywordsData.find(kw => kw.keyword === existing.keyword);
+          if (match) {
+            return {
+              ...existing,
+              insight: match.insight ?? existing.insight,
+              is_top: match.is_top ?? existing.is_top
+            };
+          }
+          return existing;
+        });
+        return {
+          ...prev,
+          global_strength: globalStrength ?? prev.global_strength,
+          status_label: statusLabel ?? prev.status_label,
+          strategic_verdict: strategicVerdict ?? prev.strategic_verdict,
+          improvement_priority: improvementPriority ?? prev.improvement_priority,
+          analytics: updatedAnalytics
+        };
+      });
+
+      toast.success("Insights generated ✨");
+
+    } catch (err) {
+      console.error("handleGenerateInsight error:", err);
+      toast.error("Insight generation failed.");
+    } finally {
+      setIsInsightLoading(false);
+    }
+  };
+
+  // SEO Sniper Handler
+  const handleSEOSniper = async () => {
+    if (isSniperLoading || !results || !analysisContext) {
+      console.error("SEO Sniper Aborted: Missing prerequisites.");
+      return;
+    }
+    setIsSniperLoading(true);
+
+    try {
+      const statsToUse = results.analytics || [];
+
+      const payload = {
+        action: 'seo_sniper',
+        listing_id: listingId,
+        keywords: statsToUse.map(k => ({
+          keyword: k.keyword,
+          avg_volume: k.volume,
+          competition: typeof k.competition === 'string' && !isNaN(parseFloat(k.competition)) ? parseFloat(k.competition) : k.competition,
+          opportunity_score: k.score,
+          volumes_history: k.volume_history,
+          status: {
+            trending: k.is_trending,
+            evergreen: k.is_evergreen,
+            promising: k.is_promising
+          },
+          insight: k.insight || null,
+          is_top: k.is_top ?? null
+        })),
+        mockups: [results.imageUrl],
+        global_audit: {
+          global_strength: results.global_strength,
+          status_label: results.status_label,
+          strategic_verdict: results.strategic_verdict,
+          improvement_priority: results.improvement_priority
+        },
+        payload: {
+          image_url: results.imageUrl,
+          visual_aesthetic: visualAnalysis.aesthetic,
+          visual_typography: visualAnalysis.typography,
+          visual_graphics: visualAnalysis.graphics,
+          visual_colors: visualAnalysis.colors,
+          visual_target_audience: visualAnalysis.target_audience,
+          visual_overall_vibe: visualAnalysis.overall_vibe,
+          categorization: {
+            theme: analysisContext.theme_name || null,
+            niche: analysisContext.niche_name || null,
+            sub_niche: analysisContext.sub_niche_name || null
+          },
+          product_details: {
+            product_type: analysisContext.product_type_name || "Product",
+            tone: analysisContext.tone_name || "Engaging",
+            client_description: analysisContext.context || ""
+          },
+          shop_context: {
+            shop_name: profile?.shop_name,
+            shop_bio: profile?.shop_bio,
+            target_audience: profile?.target_audience,
+            brand_tone: profile?.brand_tone,
+            brand_keywords: profile?.brand_keywords,
+            signature_text: profile?.signature_text
+          }
+        },
+        metadata: {
+          app_version: "1.0.0",
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
+      console.log("Calling SEO Sniper Webhook:", webhookUrl);
+
+      const response = await axios.post(webhookUrl, payload);
+      console.log("SEO Sniper Raw Response:", JSON.stringify(response.data).substring(0, 500));
+      console.log("SEO Sniper response.data type:", typeof response.data, "isArray:", Array.isArray(response.data));
+
+      // Robust unwrapping: handle string, double-array, or object responses
+      let rawData = response.data;
+      
+      // If response is a string, parse it
+      if (typeof rawData === 'string') {
+        try { rawData = JSON.parse(rawData); } catch (e) { console.error("Failed to parse sniper response string:", e); }
+      }
+      
+      // Unwrap array (n8n wraps in array)
+      let unwrapped = Array.isArray(rawData) ? rawData[0] : rawData;
+      
+      // Handle double-wrapped arrays: [[{...}]]
+      if (Array.isArray(unwrapped)) {
+        unwrapped = unwrapped[0];
+      }
+
+      console.log("SEO Sniper unwrapped:", unwrapped ? Object.keys(unwrapped) : 'null/undefined');
+
+      if (!unwrapped) {
+        toast.error("SEO Sniper: Empty response");
+        return;
+      }
+
+      // 1. Extract sniper keywords (n8n returns under "listing_seo_stats" or "keywords")
+      const sniperKeywords = unwrapped.listing_seo_stats || unwrapped.keywords || [];
+      if (sniperKeywords.length === 0) {
+        toast.error("SEO Sniper: No keywords returned");
+        return;
+      }
+
+      // 2. Replace listing_seo_stats in DB with sniper keywords
+      const statsToInsert = sniperKeywords.filter(item => item.keyword).map(item => ({
+        listing_id: listingId,
+        tag: item.keyword,
+        search_volume: item.avg_volume || 0,
+        competition: String(item.competition),
+        opportunity_score: item.opportunity_score,
+        volume_history: item.volumes_history || [],
+        is_trending: item.status?.trending || false,
+        is_evergreen: item.status?.evergreen || false,
+        is_promising: item.status?.promising || false,
+        insight: item.insight || null,
+        is_top: item.is_top ?? null,
+        is_sniper_seo: item.is_sniper_seo ?? true
+      }));
+
+      // Delete old stats
+      const { error: deleteError } = await supabase
+        .from('listing_seo_stats')
+        .delete()
+        .eq('listing_id', listingId);
+      if (deleteError) console.error("Failed to delete old stats:", deleteError);
+
+      // Insert new sniper stats
+      const { error: insertError } = await supabase
+        .from('listing_seo_stats')
+        .insert(statsToInsert);
+      if (insertError) console.error("Failed to insert sniper stats:", insertError);
+
+      // 3. Update UI state (preserve existing global fields — generateInsight will update them)
+      const formattedResults = {
+        ...results,
+        tags: statsToInsert.map(s => s.tag),
+        analytics: statsToInsert.map(s => ({
+          keyword: s.tag,
+          volume: s.search_volume,
+          competition: s.competition,
+          score: s.opportunity_score,
+          volume_history: s.volume_history,
+          is_trending: s.is_trending,
+          is_evergreen: s.is_evergreen,
+          is_promising: s.is_promising,
+          insight: s.insight,
+          is_top: s.is_top,
+          is_sniper_seo: s.is_sniper_seo
+        }))
+      };
+
+      setResults(formattedResults);
+      toast.success("SEO Sniper keywords updated! 🎯");
+
+      // 5. Auto-trigger generateInsight with new sniper data
+      handleGenerateInsight(formattedResults, analysisContext, listingId);
+
+    } catch (err) {
+      console.error("SEO Sniper failed:", err);
+      if (err.response) {
+        toast.error(`SEO Sniper failed: Server returned ${err.response.status}`);
+      } else {
+        toast.error("SEO Sniper failed. Please try again.");
+      }
+    } finally {
+      setIsSniperLoading(false);
+    }
+  };
+
   const handleModifySettings = () => {
     setIsFormCollapsed(prev => !prev);
   };
@@ -741,7 +1059,8 @@ const ProductStudio = () => {
                 is_evergreen: s.is_evergreen,
                 is_promising: s.is_promising,
                 insight: s.insight || null,
-                is_top: s.is_top ?? null
+                is_top: s.is_top ?? null,
+                is_sniper_seo: s.is_sniper_seo ?? false
             }))
         });
 
@@ -1101,14 +1420,17 @@ const ProductStudio = () => {
              </div>
            )}
 
-           {/* Results Section */}
-           {showResults && results && !isLoading && (
+           {/* Results Section (show skeleton even without results during loading phases) */}
+           {(showResults && !isLoading && (results || isInsightLoading)) && (
              <ResultsDisplay 
                results={results} 
                isGeneratingDraft={isGeneratingDraft}
                onGenerateDraft={handleGenerateDraft}
-                onRelaunchSEO={handleRelaunchSEO}
-             />
+               onRelaunchSEO={handleRelaunchSEO}
+               onSEOSniper={handleSEOSniper}
+               isSniperLoading={isSniperLoading}
+               isInsightLoading={isInsightLoading}
+              />
            )}
 
            <RecentOptimizations onViewResults={handleLoadListing} />
