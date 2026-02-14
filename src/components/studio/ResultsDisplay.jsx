@@ -1,7 +1,8 @@
-import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, Info } from 'lucide-react';
+import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, Info, Plus, Minus } from 'lucide-react';
 import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
+import Accordion from '../ui/Accordion';
 
 const Sparkline = ({ data }) => {
   if (!data || data.length === 0) return <div className="text-slate-300 text-xs">-</div>;
@@ -287,7 +288,10 @@ const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority
   );
 };
 
-const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO, onSEOSniper, isSniperLoading, isInsightLoading, onCompetitionAnalysis, isCompetitionLoading }) => {
+const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO, onSEOSniper, isSniperLoading, isInsightLoading,  onCompetitionAnalysis,
+  isCompetitionLoading,
+  onAddKeyword
+}) => {
   const [displayedTitle, setDisplayedTitle] = useState("");
   const [displayedDescription, setDisplayedDescription] = useState("");
   const descriptionRef = useRef(null);
@@ -456,29 +460,33 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
             )}
 
             {/* 1. Full Width Performance Table */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
-                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <Accordion
+                defaultOpen={true}
+                title={
+                    <div className="flex items-center gap-2">
                         <TrendingUp size={16} className="text-indigo-600" />
-                        Keyword Performance
-                        <CopyButton text={selectedTags.join(', ')} label="Copy Keywords" tooltipSide="bottom" />
-                        <span className="text-xs font-normal text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full ml-1">
+                        <span className="text-sm font-bold text-slate-900">Keyword Performance</span>
+                        <span className="text-xs font-normal text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full ml-1">
                             {selectedTags.length} / {results.analytics.length} selected
                         </span>
-                        
+                    </div>
+                }
+                headerActions={
+                    <div className="flex items-center gap-2">
+                         <CopyButton text={selectedTags.join(', ')} label="Copy" className="mr-2" tooltipSide="bottom" />
+                         
                          <button 
-                            onClick={onRelaunchSEO}
-                            className="ml-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-100 shadow-sm"
+                            onClick={(e) => { e.stopPropagation(); onRelaunchSEO(); }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-100 shadow-sm"
                             title="Relaunch Analysis (Costs 1 Credit)"
                          >
                             <RefreshCw size={12} />
                             Refresh Data
                          </button>
-                    </h3>
-                    <div className="flex items-center gap-4 text-xs text-slate-500 hidden sm:flex">
+
                          {onCompetitionAnalysis && (
                              <button
-                                 onClick={onCompetitionAnalysis}
+                                 onClick={(e) => { e.stopPropagation(); onCompetitionAnalysis(); }}
                                  disabled={!!isCompetitionLoading}
                                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors border shadow-sm
                                      ${isCompetitionLoading
@@ -493,13 +501,16 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                  )}
                              </button>
                          )}
-                         <span className="flex items-center gap-1"><Flame size={12} className="text-orange-500"/> Trending</span>
-                         <span className="flex items-center gap-1"><Leaf size={12} className="text-emerald-500"/> Evergreen</span>
-                         <span className="flex items-center gap-1"><Star size={12} className="text-amber-400"/> Opportunity</span>
-                         <span className="flex items-center gap-1"><Target size={12} className="text-indigo-500"/> Sniper</span>
+                         <div className="flex items-center gap-3 text-xs text-slate-500 ml-2 hidden sm:flex border-l border-slate-200 pl-3">
+                             <span className="flex items-center gap-1" title="Trending"><Flame size={12} className="text-orange-500"/></span>
+                             <span className="flex items-center gap-1" title="Evergreen"><Leaf size={12} className="text-emerald-500"/></span>
+                             <span className="flex items-center gap-1" title="Opportunity"><Star size={12} className="text-amber-400"/></span>
+                             <span className="flex items-center gap-1" title="Sniper"><Target size={12} className="text-indigo-500"/></span>
+                         </div>
                     </div>
-                </div>
-                <div>
+                }
+            >
+                <div className="border-t border-slate-100">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                             <tr>
@@ -517,32 +528,33 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                         className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                                     />
                                 </th>
-                                <th className="px-3 py-2 font-semibold w-1/4">Tag / Keyword</th>
+                                <th className="px-3 py-2 font-semibold text-left">Tag / Keyword</th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[14%]"
                                     onClick={() => requestSort('volume')}
                                 >
                                     Avg. Vol <SortIcon columnKey="volume" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[14%]"
                                     onClick={() => requestSort('trend')}
                                 >
                                     Trend <SortIcon columnKey="trend" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[14%]"
                                     onClick={() => requestSort('competition')}
                                 >
                                     Competition <SortIcon columnKey="competition" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[10%]"
                                     onClick={() => requestSort('score')}
                                 >
                                     Score <SortIcon columnKey="score" />
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold">Status</th>
+                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[8%]">Status</th>
+                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[6%]"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -618,49 +630,60 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                             {(!row.is_trending && !row.is_evergreen && !row.is_promising) && <span className="text-slate-300">-</span>}
                                         </div>
                                     </td>
+                                    <td className="px-2 py-3 text-center">
+                                        <button disabled className="w-6 h-6 rounded-full flex items-center justify-center transition-colors border mx-auto bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed opacity-50">
+                                            <Minus size={14} />
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </Accordion>
 
             {/* 2. Competitors Keywords Table (Read-only) */}
             {competitionAnalytics.length > 0 && (
-                <div className="bg-white rounded-2xl border border-orange-200 shadow-sm">
-                    <div className="px-6 py-4 border-b border-orange-100 bg-orange-50/50 flex justify-between items-center">
-                        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Accordion
+                    defaultOpen={true}
+                    className="border-orange-200"
+                    title={
+                        <div className="flex items-center gap-2">
                             <Flame size={16} className="text-orange-500" />
-                            Competitors Keywords
-                            <span className="text-xs font-normal text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full ml-1">
-                                {competitionAnalytics.length} keywords
-                            </span>
+                            <span className="text-sm font-bold text-slate-900">Competitors Keywords</span>
                             {/* Info tooltip with competitor_seed */}
-                            <div className="relative group/compinfo">
-                                <div className="w-5 h-5 rounded-full bg-orange-100 hover:bg-orange-200 flex items-center justify-center cursor-help transition-colors border border-orange-200 hover:border-orange-300">
-                                    <Info size={12} className="text-orange-500 group-hover/compinfo:text-orange-700 transition-colors" />
+                            <div className="relative group/compinfo" onClick={(e) => e.stopPropagation()}>
+                                <div className="w-4 h-4 rounded-full bg-orange-100 hover:bg-orange-200 flex items-center justify-center cursor-help transition-colors border border-orange-200 hover:border-orange-300">
+                                    <Info size={10} className="text-orange-500 group-hover/compinfo:text-orange-700 transition-colors" />
                                 </div>
                                 <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-4 py-3 text-xs text-white bg-slate-800 rounded-lg shadow-xl opacity-0 invisible group-hover/compinfo:opacity-100 group-hover/compinfo:visible transition-all z-50 w-72 pointer-events-none leading-relaxed whitespace-normal">
                                     Based on the first ten Etsy listings returned by Google search with keywords <span className="font-bold text-orange-300">"{results?.competitor_seed || 'N/A'}"</span>.
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-[6px] border-b-slate-800 border-t-transparent border-l-transparent border-r-transparent"></div>
                                 </div>
                             </div>
-                        </h3>
-                        <div className="flex items-center gap-4 text-xs text-slate-500 hidden sm:flex">
-                            <span className="flex items-center gap-1"><Flame size={12} className="text-orange-500"/> Trending</span>
-                            <span className="flex items-center gap-1"><Leaf size={12} className="text-emerald-500"/> Evergreen</span>
+                            <span className="text-xs font-normal text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full ml-1">
+                                {competitionAnalytics.length} keywords
+                            </span>
                         </div>
-                    </div>
-                    <div>
+                    }
+                    headerActions={
+                        <div className="flex items-center gap-4 text-xs text-slate-500 hidden sm:flex">
+                             <span className="flex items-center gap-1"><Flame size={12} className="text-orange-500"/> Trending</span>
+                             <span className="flex items-center gap-1"><Leaf size={12} className="text-emerald-500"/> Evergreen</span>
+                        </div>
+                    }
+                >
+                    <div className="border-t border-orange-100">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-orange-50/30 text-slate-500 font-medium border-b border-orange-100">
                                 <tr>
-                                    <th className="px-4 py-2 font-semibold w-1/4">Tag / Keyword</th>
-                                    <th className="px-2 py-2 text-center font-semibold">Avg. Vol</th>
-                                    <th className="px-2 py-2 text-center font-semibold">Trend</th>
-                                    <th className="px-2 py-2 text-center font-semibold">Competition</th>
-                                    <th className="px-2 py-2 text-center font-semibold">Score</th>
-                                    <th className="px-2 py-2 text-center font-semibold">Status</th>
+                                    <th className="px-4 py-2 font-semibold text-left">Tag / Keyword</th>
+                                    <th className="px-2 py-2 text-center font-semibold w-[14%]">Avg. Vol</th>
+                                    <th className="px-2 py-2 text-center font-semibold w-[14%]">Trend</th>
+                                    <th className="px-2 py-2 text-center font-semibold w-[14%]">Competition</th>
+                                    <th className="px-2 py-2 text-center font-semibold w-[10%]">Score</th>
+                                    <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[8%]">Status</th>
+                                    <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[6%]"></th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-orange-50">
@@ -708,12 +731,40 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                                 {(!row.is_trending && !row.is_evergreen && !row.is_promising) && <span className="text-slate-300">-</span>}
                                             </div>
                                         </td>
+                                        <td className="px-2 py-3 text-center">
+                                            {(() => {
+                                                // Check if keyword exists in analytics AND is NOT a competitor keyword (i.e. it's in the main list)
+                                                // We check for !a.is_competition because we want to know if it's already in the "My Performance" list
+                                                const isAlreadyAdded = results?.analytics?.some(a => 
+                                                    a.keyword.toLowerCase() === row.keyword.toLowerCase() && !a.is_competition
+                                                );
+                                                return (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (!isAlreadyAdded && onAddKeyword) {
+                                                                onAddKeyword(row);
+                                                            }
+                                                        }}
+                                                        disabled={isAlreadyAdded}
+                                                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors border mx-auto ${
+                                                            isAlreadyAdded 
+                                                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-default' 
+                                                                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border-indigo-200'
+                                                        }`}
+                                                        title={isAlreadyAdded ? "Already in Performance Analysis" : "Add to Performance Analysis"}
+                                                    >
+                                                        {isAlreadyAdded ? <Check size={14} /> : <Plus size={14} />}
+                                                    </button>
+                                                );
+                                            })()}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </Accordion>
             )}
         </div>
 
