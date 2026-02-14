@@ -1,19 +1,42 @@
-# Task: Implement SEO Sniper Trigger & Logic
+# Task: Competition Keywords — Updated Response Format + competitor_seed
 
-## Phase 1: State & Handler (ProductStudio.jsx)
-- [ ] Add `isSniperLoading` state variable
-- [ ] Create `handleSEOSniper` async function (builds payload like `drafting_seo` + visual analysis, POSTs to `VITE_N8N_SNIPER_WEBHOOK_URL`)
-- [ ] Pass `handleSEOSniper` and `isSniperLoading` as props to `ResultsDisplay`
+## Completed Changes
 
-## Phase 2: UI Button (ResultsDisplay.jsx)
-- [ ] Accept `onSEOSniper` and `isSniperLoading` props
-- [ ] Add Sniper button inside the `AuditHeader` section (next to the gauge)
-- [ ] Style: Indigo gradient, pulse animation, Target icon
-- [ ] Loading state: spinner + "Analyse Sniper en cours..."
+- [x] **ProductStudio.jsx — handleCompetitionAnalysis**: Updated to parse `unwrapped.selectedTags` (new format) with fallbacks to `unwrapped.keywords` and flat array. Extracts `competitor_seed` and saves to `listings` table. Passes `competitor_seed` to UI state.
+- [x] **ProductStudio.jsx — handleLoadListing**: Hydrates `competitor_seed` from `listings` table on history reload.
+- [x] **ResultsDisplay.jsx**: Competition table header now includes an info (ℹ) tooltip with orange theme showing: "Based on the first ten Etsy listings returned by Google search with keywords [competitor_seed]".
+- [x] **docs/context.md**: Updated with new response format and competitor_seed feature.
 
-## Phase 3: Cleanup & Context
-- [ ] Update `docs/context.md` with new feature entry
-- [ ] Remove any debug logs
+## n8n Response Format (Current)
+```json
+[
+  {
+    "competitor_seed": "Funny Christian Tee",
+    "selectedTags": [
+      {
+        "keyword": "funny christian shirt",
+        "avg_volume": 1300,
+        "competition": 1,
+        "opportunity_score": 9,
+        "volumes_history": [1000, 1000, 1300, ...],
+        "is_competion": true,
+        "status": { "trending": false, "evergreen": true, "promising": false }
+      }
+    ]
+  }
+]
+```
 
-## Review
-- [ ] Summary of changes and next steps
+## Data Flow
+```
+Competition Analysis Button Click
+  → handleCompetitionAnalysis()
+  → POST to n8n (action: 'competitionAnalysis')
+  → n8n returns [{ competitor_seed: "...", selectedTags: [...] }]
+  → Save competitor_seed to listings table
+  → DELETE listing_seo_stats WHERE is_competition = true
+  → INSERT competition keywords with is_competition = true
+  → UI: setResults({ competitor_seed, analytics: [...primary, ...competition] })
+  → ResultsDisplay splits via useMemo → primary table + competition table
+  → Competition table shows ℹ tooltip with competitor_seed text
+```

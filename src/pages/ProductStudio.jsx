@@ -30,6 +30,7 @@ const ProductStudio = () => {
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [isSniperLoading, setIsSniperLoading] = useState(false);
   const [isInsightLoading, setIsInsightLoading] = useState(false); // false | 'seo' | 'insight'
+  const [isCompetitionLoading, setIsCompetitionLoading] = useState(false);
   const [analysisContext, setAnalysisContext] = useState(null);
   const [listingName, setListingName] = useState("");
   
@@ -458,7 +459,8 @@ const ProductStudio = () => {
             is_evergreen: item.status?.evergreen || false,
             is_promising: item.status?.promising || false,
             insight: item.insight || null,
-            is_top: item.is_top ?? null
+            is_top: item.is_top ?? null,
+            is_competition: false
         }));
 
         // Delete old stats before inserting fresh ones (handles re-analysis / Refresh Data)
@@ -495,7 +497,8 @@ const ProductStudio = () => {
                 is_evergreen: s.is_evergreen,
                 is_promising: s.is_promising,
                 insight: s.insight,
-                is_top: s.is_top
+                is_top: s.is_top,
+                is_competition: false
             }))
         };
 
@@ -815,6 +818,192 @@ const ProductStudio = () => {
     }
   };
 
+  // Competition Analysis Handler (same payload as generateInsight, different action)
+  const handleCompetitionAnalysis = async () => {
+    if (isCompetitionLoading || !results || !analysisContext) {
+      console.error("Competition Analysis Aborted: Missing prerequisites.");
+      return;
+    }
+    setIsCompetitionLoading(true);
+
+    try {
+      // Only send primary (non-competition) keywords in the payload
+      const primaryStats = (results.analytics || []).filter(k => !k.is_competition);
+
+      const payload = {
+        action: 'competitionAnalysis',
+        listing_id: listingId,
+        keywords: primaryStats.map(k => ({
+          keyword: k.keyword,
+          avg_volume: k.volume,
+          competition: typeof k.competition === 'string' && !isNaN(parseFloat(k.competition)) ? parseFloat(k.competition) : k.competition,
+          opportunity_score: k.score,
+          volumes_history: k.volume_history,
+          status: {
+            trending: k.is_trending,
+            evergreen: k.is_evergreen,
+            promising: k.is_promising
+          },
+          is_sniper_seo: k.is_sniper_seo ?? false
+        })),
+        mockups: [results.imageUrl],
+        payload: {
+          image_url: results.imageUrl,
+          visual_aesthetic: visualAnalysis.aesthetic,
+          visual_typography: visualAnalysis.typography,
+          visual_graphics: visualAnalysis.graphics,
+          visual_colors: visualAnalysis.colors,
+          visual_target_audience: visualAnalysis.target_audience,
+          visual_overall_vibe: visualAnalysis.overall_vibe,
+          categorization: {
+            theme: analysisContext.theme_name || null,
+            niche: analysisContext.niche_name || null,
+            sub_niche: analysisContext.sub_niche_name || null
+          },
+          product_details: {
+            product_type: analysisContext.product_type_name || "Product",
+            tone: analysisContext.tone_name || "Engaging",
+            client_description: analysisContext.context || ""
+          },
+          shop_context: {
+            shop_name: profile?.shop_name,
+            shop_bio: profile?.shop_bio,
+            target_audience: profile?.target_audience,
+            brand_tone: profile?.brand_tone,
+            brand_keywords: profile?.brand_keywords,
+            signature_text: profile?.signature_text
+          }
+        },
+        metadata: {
+          app_version: "1.0.0",
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
+      console.log("Calling Competition Analysis Webhook:", webhookUrl);
+
+      const response = await axios.post(webhookUrl, payload);
+      console.log("Competition Analysis Response:", response.data);
+      console.log("Competition Analysis response type:", typeof response.data, "isArray:", Array.isArray(response.data));
+
+      // Robust parsing: handle multiple n8n response formats
+      let rawData = response.data;
+      if (typeof rawData === 'string') {
+        try { rawData = JSON.parse(rawData); } catch (e) { console.error("Failed to parse competition response string:", e); }
+      }
+
+      const unwrapped = Array.isArray(rawData) ? rawData[0] : rawData;
+      console.log("Competition unwrapped:", unwrapped ? Object.keys(unwrapped) : 'null/undefined');
+
+      if (!unwrapped) {
+        toast.error("Competition Analysis: Empty response");
+        return;
+      }
+
+      // Extract competition keywords — handle multiple response formats
+      // Format 1 (current): [{ competitor_seed: "...", selectedTags: [...] }]
+      // Format 2 (legacy wrapped): [{ keywords: [...] }]
+      // Format 3 (legacy flat): [{keyword: "...", ...}, ...]
+      let competitionKeywords = unwrapped.selectedTags || unwrapped.keywords || [];
+      const competitorSeed = unwrapped.competitor_seed || null;
+
+      console.log("Competition competitor_seed:", competitorSeed);
+
+      // If unwrapped itself is a keyword object (flat array response), use the full rawData array
+      if (competitionKeywords.length === 0 && unwrapped.keyword && Array.isArray(rawData)) {
+        competitionKeywords = rawData;
+        console.log("Competition: Using flat array format, found", competitionKeywords.length, "keywords");
+      }
+
+      // Handle double-wrapped: unwrapped is itself an array
+      if (competitionKeywords.length === 0 && Array.isArray(unwrapped)) {
+        competitionKeywords = unwrapped;
+        console.log("Competition: Using double-wrapped array format, found", competitionKeywords.length, "keywords");
+      }
+
+      console.log("Competition keywords extracted:", competitionKeywords.length, competitionKeywords.slice(0, 2));
+
+      if (competitionKeywords.length === 0) {
+        toast.error("Competition Analysis: No keywords returned");
+        console.error("Competition Analysis: Could not extract keywords. Full response:", rawData);
+        return;
+      }
+
+      // Save competitor_seed to listings table
+      if (competitorSeed && listingId) {
+        const { error: seedError } = await supabase
+          .from('listings')
+          .update({ competitor_seed: competitorSeed })
+          .eq('id', listingId);
+        if (seedError) console.error("Failed to save competitor_seed:", seedError);
+      }
+
+      // Delete old competition keywords for this listing (keep primary keywords intact)
+      const { error: deleteCompError } = await supabase
+        .from('listing_seo_stats')
+        .delete()
+        .eq('listing_id', listingId)
+        .eq('is_competition', true);
+      if (deleteCompError) console.error("Failed to delete old competition stats:", deleteCompError);
+
+      // Insert new competition keywords
+      const compStatsToInsert = competitionKeywords.filter(item => item.keyword).map(item => ({
+        listing_id: listingId,
+        tag: item.keyword,
+        search_volume: item.avg_volume || 0,
+        competition: String(item.competition),
+        opportunity_score: item.opportunity_score,
+        volume_history: item.volumes_history || [],
+        is_trending: item.status?.trending || false,
+        is_evergreen: item.status?.evergreen || false,
+        is_promising: item.status?.promising || false,
+        insight: item.insight || null,
+        is_top: item.is_top ?? null,
+        is_competition: true
+      }));
+
+      if (compStatsToInsert.length > 0) {
+        const { error: insertError } = await supabase
+          .from('listing_seo_stats')
+          .insert(compStatsToInsert);
+        if (insertError) console.error("Failed to insert competition stats:", insertError);
+      }
+
+      // Build competition analytics for UI
+      const competitionAnalytics = compStatsToInsert.map(s => ({
+        keyword: s.tag,
+        volume: s.search_volume,
+        competition: s.competition,
+        score: s.opportunity_score,
+        volume_history: s.volume_history,
+        is_trending: s.is_trending,
+        is_evergreen: s.is_evergreen,
+        is_promising: s.is_promising,
+        insight: s.insight,
+        is_top: s.is_top,
+        is_competition: true
+      }));
+
+      // Keep existing primary keywords, replace old competition keywords
+      const existingPrimary = (results.analytics || []).filter(k => !k.is_competition);
+
+      setResults(prev => ({
+        ...prev,
+        competitor_seed: competitorSeed,
+        analytics: [...existingPrimary, ...competitionAnalytics]
+      }));
+
+      toast.success("Competition analysis complete! 📊");
+
+    } catch (err) {
+      console.error("Competition Analysis failed:", err);
+      toast.error("Competition analysis failed. Please try again.");
+    } finally {
+      setIsCompetitionLoading(false);
+    }
+  };
+
   // SEO Sniper Handler
   const handleSEOSniper = async () => {
     if (isSniperLoading || !results || !analysisContext) {
@@ -933,7 +1122,8 @@ const ProductStudio = () => {
         is_promising: item.status?.promising || false,
         insight: item.insight || null,
         is_top: item.is_top ?? null,
-        is_sniper_seo: item.is_sniper_seo ?? true
+        is_sniper_seo: item.is_sniper_seo ?? true,
+        is_competition: false
       }));
 
       // Delete old stats
@@ -964,7 +1154,8 @@ const ProductStudio = () => {
           is_promising: s.is_promising,
           insight: s.insight,
           is_top: s.is_top,
-          is_sniper_seo: s.is_sniper_seo
+          is_sniper_seo: s.is_sniper_seo,
+          is_competition: false
         }))
       };
 
@@ -1059,6 +1250,7 @@ const ProductStudio = () => {
             strategic_verdict: listing.strategic_verdict ?? null,
             improvement_priority: listing.improvement_priority ?? null,
             score_explanation: listing.score_explanation ?? null,
+            competitor_seed: listing.competitor_seed ?? null,
             analytics: stats.map(s => ({
                 keyword: s.tag,
                 volume: s.search_volume,
@@ -1070,7 +1262,8 @@ const ProductStudio = () => {
                 is_promising: s.is_promising,
                 insight: s.insight || null,
                 is_top: s.is_top ?? null,
-                is_sniper_seo: s.is_sniper_seo ?? false
+                is_sniper_seo: s.is_sniper_seo ?? false,
+                is_competition: s.is_competition ?? false
             }))
         });
 
@@ -1129,7 +1322,7 @@ const ProductStudio = () => {
 
   return (
     <Layout>
-      <div className="p-8 max-w-7xl mx-auto space-y-8">
+      <div className="p-8 space-y-8">
         
         {/* Header Section */}
         <div className="flex justify-between items-center">
@@ -1440,6 +1633,8 @@ const ProductStudio = () => {
                onSEOSniper={handleSEOSniper}
                isSniperLoading={isSniperLoading}
                isInsightLoading={isInsightLoading}
+               onCompetitionAnalysis={handleCompetitionAnalysis}
+               isCompetitionLoading={isCompetitionLoading}
               />
            )}
 

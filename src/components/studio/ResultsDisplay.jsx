@@ -84,9 +84,9 @@ const CopyButton = ({ text, label = "Copy", className = "", tooltipSide = "top" 
 
 // Full Skeleton Screen shown while generateInsight is loading (covers both columns)
 const InsightSkeleton = ({ phase = 'seo' }) => (
-  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+  <div className="flex flex-col lg:flex-row gap-8 items-start">
     {/* Left Column Skeleton */}
-    <div className="lg:col-span-8 space-y-8 animate-pulse">
+    <div className="flex-1 min-w-0 space-y-8 animate-pulse">
       {/* Audit Header Skeleton */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 flex items-center gap-8">
@@ -105,8 +105,8 @@ const InsightSkeleton = ({ phase = 'seo' }) => (
       </div>
 
       {/* Table Skeleton */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <div className="h-5 w-44 bg-slate-100 rounded" />
           <div className="flex gap-3">
             <div className="h-4 w-16 bg-slate-100 rounded" />
@@ -134,8 +134,8 @@ const InsightSkeleton = ({ phase = 'seo' }) => (
       </div>
     </div>
 
-    {/* Right Column Skeleton (Sidebar) */}
-    <div className="lg:col-span-4 sticky top-8">
+    {/* Right Column Skeleton (Sidebar — 33%) */}
+    <div className="w-full lg:w-1/3 lg:flex-shrink-0 sticky top-8">
       <div className="bg-slate-50/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm p-1">
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 min-h-[400px] flex flex-col items-center justify-center">
           {/* Active spinner */}
@@ -287,7 +287,7 @@ const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority
   );
 };
 
-const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO, onSEOSniper, isSniperLoading, isInsightLoading }) => {
+const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO, onSEOSniper, isSniperLoading, isInsightLoading, onCompetitionAnalysis, isCompetitionLoading }) => {
   const [displayedTitle, setDisplayedTitle] = useState("");
   const [displayedDescription, setDisplayedDescription] = useState("");
   const descriptionRef = useRef(null);
@@ -320,13 +320,24 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
     }
   }, [results]);
 
+  // Split analytics into primary and competition keywords
+  const primaryAnalytics = useMemo(() => {
+    if (!results?.analytics) return [];
+    return results.analytics.filter(k => !k.is_competition);
+  }, [results?.analytics]);
+
+  const competitionAnalytics = useMemo(() => {
+    if (!results?.analytics) return [];
+    return results.analytics.filter(k => k.is_competition);
+  }, [results?.analytics]);
+
   // Sorting Logic
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
   
   const sortedAnalytics = useMemo(() => {
-    if (!results?.analytics) return [];
+    if (!primaryAnalytics.length) return [];
     
-    let sortableItems = [...results.analytics];
+    let sortableItems = [...primaryAnalytics];
     if (sortConfig.key !== null) {
       sortableItems.sort((a, b) => {
         let aValue, bValue;
@@ -425,11 +436,11 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
   return (
     <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
       
-      {/* Main + Sidebar Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* Main + Sidebar Flex Layout */}
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
         
-        {/* --- MAIN CONTENT (Left - 8 Cols ~66%) --- */}
-        <div className="lg:col-span-8 space-y-8">
+        {/* --- MAIN CONTENT (Fluid width) --- */}
+        <div className="flex-1 min-w-0 space-y-8">
 
             {/* Hero Audit Header with integrated SEO Sniper */}
             {results.global_strength !== null && results.global_strength !== undefined && (
@@ -445,7 +456,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
             )}
 
             {/* 1. Full Width Performance Table */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-visible">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
                 <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                         <TrendingUp size={16} className="text-indigo-600" />
@@ -464,7 +475,24 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                             Refresh Data
                          </button>
                     </h3>
-                    <div className="flex gap-4 text-xs text-slate-500 hidden sm:flex">
+                    <div className="flex items-center gap-4 text-xs text-slate-500 hidden sm:flex">
+                         {onCompetitionAnalysis && (
+                             <button
+                                 onClick={onCompetitionAnalysis}
+                                 disabled={!!isCompetitionLoading}
+                                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors border shadow-sm
+                                     ${isCompetitionLoading
+                                         ? 'text-slate-400 bg-slate-50 border-slate-200 cursor-not-allowed'
+                                         : 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+                                     }`}
+                             >
+                                 {isCompetitionLoading ? (
+                                     <><Loader2 size={12} className="animate-spin" /> Analyzing...</>
+                                 ) : (
+                                     <><TrendingUp size={12} /> Analyse Competition</>
+                                 )}
+                             </button>
+                         )}
                          <span className="flex items-center gap-1"><Flame size={12} className="text-orange-500"/> Trending</span>
                          <span className="flex items-center gap-1"><Leaf size={12} className="text-emerald-500"/> Evergreen</span>
                          <span className="flex items-center gap-1"><Star size={12} className="text-amber-400"/> Opportunity</span>
@@ -596,10 +624,101 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                     </table>
                 </div>
             </div>
+
+            {/* 2. Competitors Keywords Table (Read-only) */}
+            {competitionAnalytics.length > 0 && (
+                <div className="bg-white rounded-2xl border border-orange-200 shadow-sm">
+                    <div className="px-6 py-4 border-b border-orange-100 bg-orange-50/50 flex justify-between items-center">
+                        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <Flame size={16} className="text-orange-500" />
+                            Competitors Keywords
+                            <span className="text-xs font-normal text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full ml-1">
+                                {competitionAnalytics.length} keywords
+                            </span>
+                            {/* Info tooltip with competitor_seed */}
+                            <div className="relative group/compinfo">
+                                <div className="w-5 h-5 rounded-full bg-orange-100 hover:bg-orange-200 flex items-center justify-center cursor-help transition-colors border border-orange-200 hover:border-orange-300">
+                                    <Info size={12} className="text-orange-500 group-hover/compinfo:text-orange-700 transition-colors" />
+                                </div>
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-4 py-3 text-xs text-white bg-slate-800 rounded-lg shadow-xl opacity-0 invisible group-hover/compinfo:opacity-100 group-hover/compinfo:visible transition-all z-50 w-72 pointer-events-none leading-relaxed whitespace-normal">
+                                    Based on the first ten Etsy listings returned by Google search with keywords <span className="font-bold text-orange-300">"{results?.competitor_seed || 'N/A'}"</span>.
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-[6px] border-b-slate-800 border-t-transparent border-l-transparent border-r-transparent"></div>
+                                </div>
+                            </div>
+                        </h3>
+                        <div className="flex items-center gap-4 text-xs text-slate-500 hidden sm:flex">
+                            <span className="flex items-center gap-1"><Flame size={12} className="text-orange-500"/> Trending</span>
+                            <span className="flex items-center gap-1"><Leaf size={12} className="text-emerald-500"/> Evergreen</span>
+                        </div>
+                    </div>
+                    <div>
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-orange-50/30 text-slate-500 font-medium border-b border-orange-100">
+                                <tr>
+                                    <th className="px-4 py-2 font-semibold w-1/4">Tag / Keyword</th>
+                                    <th className="px-2 py-2 text-center font-semibold">Avg. Vol</th>
+                                    <th className="px-2 py-2 text-center font-semibold">Trend</th>
+                                    <th className="px-2 py-2 text-center font-semibold">Competition</th>
+                                    <th className="px-2 py-2 text-center font-semibold">Score</th>
+                                    <th className="px-2 py-2 text-center font-semibold">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-orange-50">
+                                {competitionAnalytics.map((row, i) => (
+                                    <tr key={i} className="hover:bg-orange-50/30 transition-colors">
+                                        <td className="px-4 py-3 font-medium">
+                                            <div className="flex items-center gap-2">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200">
+                                                    {row.keyword}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center text-slate-600 font-mono text-xs">
+                                            {row.volume.toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex justify-center">
+                                                <Sparkline data={row.volume_history} />
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {(() => {
+                                                const numVal = parseFloat(row.competition);
+                                                const displayVal = !isNaN(numVal) ? numVal.toFixed(2) : row.competition;
+                                                const colorClass = (!isNaN(numVal) ? numVal : 0.5) < 0.3 
+                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                                    : (!isNaN(numVal) ? numVal : 0.5) < 0.7 
+                                                        ? 'bg-amber-50 text-amber-700 border-amber-100' 
+                                                        : 'bg-rose-50 text-rose-700 border-rose-100';
+                                                return (
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide border ${colorClass}`}>
+                                                        {displayVal}
+                                                    </span>
+                                                );
+                                            })()}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <div className="font-bold text-slate-700">{row.score}</div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                {row.is_trending && <Flame size={16} className="text-orange-500 fill-orange-500/20" />}
+                                                {row.is_evergreen && <Leaf size={16} className="text-emerald-500 fill-emerald-500/20" />}
+                                                {row.is_promising && <Star size={16} className="text-amber-400 fill-amber-400/20" />}
+                                                {(!row.is_trending && !row.is_evergreen && !row.is_promising) && <span className="text-slate-300">-</span>}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
 
-        {/* --- SIDEBAR: DRAFTING (Right - 4 Cols ~33%) --- */}
-        <div className="lg:col-span-4 sticky top-8 space-y-4">
+        {/* --- SIDEBAR: DRAFTING (33% width) --- */}
+        <div className="w-full lg:w-1/3 lg:flex-shrink-0 sticky top-8 space-y-4">
              <div className="bg-slate-50/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm p-1 transition-all duration-500">
                 <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 min-h-[400px] flex flex-col">
                     <div className="flex justify-between items-center mb-6">
