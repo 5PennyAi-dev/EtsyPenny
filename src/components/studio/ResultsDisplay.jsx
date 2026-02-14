@@ -1,4 +1,4 @@
-import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2 } from 'lucide-react';
+import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, Info } from 'lucide-react';
 import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
@@ -159,7 +159,7 @@ const InsightSkeleton = ({ phase = 'seo' }) => (
   </div>
 );
 
-const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority, onSEOSniper, isSniperLoading }) => {
+const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority, scoreExplanation, onSEOSniper, isSniperLoading }) => {
   const [animatedScore, setAnimatedScore] = useState(0);
   const size = 130;
   const strokeWidth = 11;
@@ -186,7 +186,7 @@ const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority
   const displayVerdict = strategicVerdict || tier.fallbackSub;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Main Gauge + Executive Summary + Sniper Button */}
       <div className="p-6 flex items-center gap-8">
         {/* Gauge Circle */}
@@ -221,7 +221,19 @@ const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority
 
         {/* Executive Summary */}
         <div className="flex flex-col flex-1 min-w-0">
-          <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">Listing Strength</span>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Listing Strength</span>
+            {/* Score Explanation Info Icon */}
+            <div className="relative group/score">
+              <div className="w-5 h-5 rounded-full bg-slate-100 hover:bg-indigo-100 flex items-center justify-center cursor-help transition-colors border border-slate-200 hover:border-indigo-300">
+                <Info size={12} className="text-slate-400 group-hover/score:text-indigo-600 transition-colors" />
+              </div>
+              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-4 py-3 text-xs text-white bg-slate-800 rounded-lg shadow-xl opacity-0 invisible group-hover/score:opacity-100 group-hover/score:visible transition-all z-50 w-80 pointer-events-none leading-relaxed whitespace-normal">
+                {scoreExplanation || "Score breakdown will appear after the next analysis."}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-[6px] border-b-slate-800 border-t-transparent border-l-transparent border-r-transparent"></div>
+              </div>
+            </div>
+          </div>
           <span className={`text-xl font-bold ${tier.text} leading-tight`}>{displayLabel}</span>
           <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">{displayVerdict}</p>
         </div>
@@ -231,17 +243,22 @@ const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority
           <div className="flex-shrink-0">
             <button
               onClick={onSEOSniper}
-              disabled={isSniperLoading}
+              disabled={!!isSniperLoading}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200
                 ${isSniperLoading
                   ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
                   : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-md shadow-sm'
                 }`}
             >
-              {isSniperLoading ? (
+              {isSniperLoading === 'sniper' ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Analyse en cours...</span>
+                  <span>Generating keywords...</span>
+                </>
+              ) : isSniperLoading === 'insight' ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Generating Insights...</span>
                 </>
               ) : (
                 <>
@@ -421,6 +438,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                     statusLabel={results.status_label}
                     strategicVerdict={results.strategic_verdict}
                     improvementPriority={results.improvement_priority}
+                    scoreExplanation={results.score_explanation}
                     onSEOSniper={onSEOSniper}
                     isSniperLoading={isSniperLoading}
                 />
@@ -546,15 +564,20 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                         </div>
                                     </td>
                                     <td className="px-4 py-3 text-center">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border
-                                            ${row.competition === 'Low' || (parseFloat(row.competition) < 0.3) ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 
-                                            row.competition === 'Medium' || (parseFloat(row.competition) < 0.7) ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                            'bg-rose-50 text-rose-700 border-rose-100'}`}>
-                                            {typeof row.competition === 'string' && isNaN(parseFloat(row.competition)) ? 
-                                                row.competition.substring(0,3) : 
-                                                (parseFloat(row.competition) < 0.3 ? 'Low' : parseFloat(row.competition) < 0.7 ? 'Med' : 'High')
-                                            }
-                                        </span>
+                                        {(() => {
+                                            const numVal = parseFloat(row.competition);
+                                            const displayVal = !isNaN(numVal) ? numVal.toFixed(2) : row.competition;
+                                            const colorClass = (!isNaN(numVal) ? numVal : 0.5) < 0.3 
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                                : (!isNaN(numVal) ? numVal : 0.5) < 0.7 
+                                                    ? 'bg-amber-50 text-amber-700 border-amber-100' 
+                                                    : 'bg-rose-50 text-rose-700 border-rose-100';
+                                            return (
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide border ${colorClass}`}>
+                                                    {displayVal}
+                                                </span>
+                                            );
+                                        })()}
                                     </td>
                                     <td className="px-4 py-3 text-center">
                                         <div className="font-bold text-slate-700">{row.score}</div>
@@ -703,7 +726,8 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                                             is_evergreen: k.is_evergreen,
                                                             is_promising: k.is_promising,
                                                             insight: k.insight || null,
-                                                            is_top: k.is_top ?? null
+                                                            is_top: k.is_top ?? null,
+                                                            is_sniper_seo: k.is_sniper_seo ?? false
                                                         };
                                                     })
                                             }}

@@ -256,6 +256,14 @@ const StarIcon = ({ size = 10 }) => (
   </Svg>
 );
 
+const TargetIcon = ({ size = 10, color = '#4F46E5' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Circle cx={12} cy={12} r={10} fill="none" stroke={color} strokeWidth={2} />
+    <Circle cx={12} cy={12} r={6} fill="none" stroke={color} strokeWidth={2} />
+    <Circle cx={12} cy={12} r={2} fill={color} />
+  </Svg>
+);
+
 const LightbulbIcon = ({ color = '#22C55E', size = 10 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
     <Path
@@ -380,13 +388,13 @@ const ListingPDFDocument = ({ listing }) => {
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 {strengthConfig && (
-                    <View style={{ alignItems: 'center' }}>
-                        <Svg width={40} height={40} viewBox="0 0 40 40">
-                            <Circle cx={20} cy={20} r={18} fill={strengthConfig.bgColor} />
-                            <Circle cx={20} cy={20} r={18} fill="none" stroke={strengthConfig.color} strokeWidth={2.5} />
+                    <View style={{ alignItems: 'center', minWidth: 50 }}>
+                        <Svg width={44} height={44} viewBox="0 0 44 44">
+                            <Circle cx={22} cy={22} r={20} fill={strengthConfig.bgColor} />
+                            <Circle cx={22} cy={22} r={20} fill="none" stroke={strengthConfig.color} strokeWidth={2.5} />
                         </Svg>
-                        <Text style={{ position: 'absolute', top: 8, left: 0, right: 0, textAlign: 'center', fontSize: 12, fontWeight: 'bold', color: strengthConfig.color }}>{strengthScore}</Text>
-                        <Text style={{ fontSize: 5, color: strengthConfig.color, marginTop: -2, fontWeight: 'bold' }}>{pdfStatusLabel}</Text>
+                        <Text style={{ position: 'absolute', top: 10, left: 0, right: 0, textAlign: 'center', fontSize: 13, fontWeight: 'bold', color: strengthConfig.color }}>{strengthScore}</Text>
+                        <Text style={{ fontSize: 6, color: strengthConfig.color, marginTop: 4, fontWeight: 'bold' }}>{pdfStatusLabel}</Text>
                     </View>
                 )}
                 <View style={styles.headerMeta}>
@@ -437,7 +445,28 @@ const ListingPDFDocument = ({ listing }) => {
         </View>
 
         {/* 4. SEO Performance Table */}
-        <Text style={[styles.label, { marginBottom: 15, marginTop: 20 }]}>SEO KEYWORD PERFORMANCE</Text>
+        <Text style={[styles.label, { marginBottom: 8, marginTop: 20 }]}>SEO KEYWORD PERFORMANCE</Text>
+        
+        {/* Legend (before table) */}
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8, gap: 15, paddingRight: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <FlameIcon size={8} />
+                <Text style={{ fontSize: 7, color: '#64748B' }}>Trending</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <LeafIcon size={8} />
+                <Text style={{ fontSize: 7, color: '#64748B' }}>Evergreen</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <StarIcon size={8} />
+                <Text style={{ fontSize: 7, color: '#64748B' }}>Opportunity</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <TargetIcon size={8} />
+                <Text style={{ fontSize: 7, color: '#64748B' }}>Sniper</Text>
+            </View>
+        </View>
+
         <View style={styles.tableContainer}>
             {/* Header */}
             <View style={styles.tableHeader}>
@@ -453,8 +482,11 @@ const ListingPDFDocument = ({ listing }) => {
             {listing.tags && listing.tags.map((tag, i) => (
                 <View key={i} style={styles.tableRow} wrap={false}>
                     <View style={styles.colTag}>
-                        <View style={styles.tagBadge}>
-                            <Text style={styles.cellTag}>{tag.keyword}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <View style={styles.tagBadge}>
+                                <Text style={styles.cellTag}>{tag.keyword}</Text>
+                            </View>
+                            {tag.is_sniper_seo && <TargetIcon size={9} />}
                         </View>
                     </View>
 
@@ -499,6 +531,10 @@ const ListingPDFDocument = ({ listing }) => {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <StarIcon size={8} />
                     <Text style={{ fontSize: 7, color: '#64748B' }}>Opportunity</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <TargetIcon size={8} />
+                    <Text style={{ fontSize: 7, color: '#64748B' }}>Sniper</Text>
                 </View>
             </View>
         </View>

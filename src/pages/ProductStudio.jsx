@@ -662,8 +662,8 @@ const ProductStudio = () => {
       }
   };
 
-  // Generate Insight Handler (auto-triggered after generate_seo)
-  const handleGenerateInsight = async (formattedResults, formData, activeListingId) => {
+  // Generate Insight Handler (auto-triggered after generate_seo or seo_sniper)
+  const handleGenerateInsight = async (formattedResults, formData, activeListingId, fromSniper = false) => {
     try {
       const statsToUse = formattedResults.analytics || [];
 
@@ -737,6 +737,7 @@ const ProductStudio = () => {
       const statusLabel = unwrapped.global_status_label ?? null;
       const strategicVerdict = unwrapped.global_strategic_verdict ?? null;
       const improvementPriority = unwrapped.improvement_priority ?? null;
+      const scoreExplanation = unwrapped.score_explanation ?? null;
 
       const { error: listingUpdateError } = await supabase
         .from('listings')
@@ -744,7 +745,8 @@ const ProductStudio = () => {
           global_strength: globalStrength,
           status_label: statusLabel,
           strategic_verdict: strategicVerdict,
-          improvement_priority: improvementPriority
+          improvement_priority: improvementPriority,
+          score_explanation: scoreExplanation
         })
         .eq('id', insightListingId);
 
@@ -772,37 +774,44 @@ const ProductStudio = () => {
         }
       }
 
-      // 3. Update UI state for live refresh
-      setResults(prev => {
-        if (!prev) return prev;
-        const updatedAnalytics = prev.analytics.map(existing => {
-          const match = keywordsData.find(kw => kw.keyword === existing.keyword);
-          if (match) {
-            return {
-              ...existing,
-              insight: match.insight ?? existing.insight,
-              is_top: match.is_top ?? existing.is_top
-            };
-          }
-          return existing;
-        });
-        return {
-          ...prev,
-          global_strength: globalStrength ?? prev.global_strength,
-          status_label: statusLabel ?? prev.status_label,
-          strategic_verdict: strategicVerdict ?? prev.strategic_verdict,
-          improvement_priority: improvementPriority ?? prev.improvement_priority,
-          analytics: updatedAnalytics
-        };
+      // 3. Update UI — use formattedResults as base (works for both normal and sniper flows)
+      const base = formattedResults;
+      const updatedAnalytics = base.analytics.map(existing => {
+        const match = keywordsData.find(kw => kw.keyword === existing.keyword);
+        if (match) {
+          return {
+            ...existing,
+            insight: match.insight ?? existing.insight,
+            is_top: match.is_top ?? existing.is_top
+          };
+        }
+        return existing;
       });
 
+      const mergedResults = {
+        ...base,
+        global_strength: globalStrength ?? base.global_strength,
+        status_label: statusLabel ?? base.status_label,
+        strategic_verdict: strategicVerdict ?? base.strategic_verdict,
+        improvement_priority: improvementPriority ?? base.improvement_priority,
+        score_explanation: scoreExplanation ?? base.score_explanation,
+        analytics: updatedAnalytics
+      };
+
+      // Atomic swap — for sniper flow this is the first time results update
+      setResults(mergedResults);
       toast.success("Insights generated ✨");
 
     } catch (err) {
       console.error("handleGenerateInsight error:", err);
       toast.error("Insight generation failed.");
     } finally {
-      setIsInsightLoading(false);
+      // Clear the correct loading state based on caller
+      if (fromSniper) {
+        setIsSniperLoading(false);
+      } else {
+        setIsInsightLoading(false);
+      }
     }
   };
 
@@ -812,7 +821,7 @@ const ProductStudio = () => {
       console.error("SEO Sniper Aborted: Missing prerequisites.");
       return;
     }
-    setIsSniperLoading(true);
+    setIsSniperLoading('sniper');
 
     try {
       const statsToUse = results.analytics || [];
@@ -959,11 +968,12 @@ const ProductStudio = () => {
         }))
       };
 
-      setResults(formattedResults);
-      toast.success("SEO Sniper keywords updated! 🎯");
+      // Switch to insight phase — old results stay visible, button shows "Generating Insights..."
+      setIsSniperLoading('insight');
 
-      // 5. Auto-trigger generateInsight with new sniper data
-      handleGenerateInsight(formattedResults, analysisContext, listingId);
+      // Auto-trigger generateInsight with sniper data (fromSniper=true)
+      // Results will be swapped atomically when insight completes
+      handleGenerateInsight(formattedResults, analysisContext, listingId, true);
 
     } catch (err) {
       console.error("SEO Sniper failed:", err);
@@ -972,7 +982,6 @@ const ProductStudio = () => {
       } else {
         toast.error("SEO Sniper failed. Please try again.");
       }
-    } finally {
       setIsSniperLoading(false);
     }
   };
@@ -1049,6 +1058,7 @@ const ProductStudio = () => {
             status_label: listing.status_label ?? null,
             strategic_verdict: listing.strategic_verdict ?? null,
             improvement_priority: listing.improvement_priority ?? null,
+            score_explanation: listing.score_explanation ?? null,
             analytics: stats.map(s => ({
                 keyword: s.tag,
                 volume: s.search_volume,
