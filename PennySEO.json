@@ -1,0 +1,1943 @@
+{
+  "name": "EstyPenny",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "9d856f4f-d5ae-4fce-b2da-72f584288dc2",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -832,
+        352
+      ],
+      "id": "695d3f8d-e9da-49a3-a4ef-1156be62bc4d",
+      "name": "Webhook",
+      "webhookId": "9d856f4f-d5ae-4fce-b2da-72f584288dc2"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "4f733227-b97d-4b45-b3bc-849792aee12c",
+                    "leftValue": "={{ $json.Action }}",
+                    "rightValue": "analyseImage",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "analyseImage"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.Action }}",
+                    "rightValue": "generate_seo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "23eb1fa1-657c-4c87-9ee8-683d3cd9988c"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "generate_seo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "57469c50-9911-4f4b-a6ac-9ce159ff2aa9",
+                    "leftValue": "={{ $('Webhook').item.json.body.action }}",
+                    "rightValue": "generateInsight",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "generateInsight"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1d84a90f-ea5a-4316-802d-62f048979018",
+                    "leftValue": "={{ $json.Action }}",
+                    "rightValue": "drafting_seo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "drafting_seo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "98348aaf-e4f7-4fc0-b70b-20a3678e40cb",
+                    "leftValue": "={{ $json.Action }}",
+                    "rightValue": "analyseShop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "analyseShop"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b308dae2-4762-4134-8580-1fd86d08c94b",
+                    "leftValue": "={{ $json.Action }}",
+                    "rightValue": "seo_sniper",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "seo_sniper"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -224,
+        320
+      ],
+      "id": "149a07db-15e7-42fe-8b31-fe02b833bded",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1e28318-1570-468e-9238-898592ca5c8a",
+              "name": "mockup_url",
+              "value": "={{ $json.body.payload.image_url }}",
+              "type": "string"
+            },
+            {
+              "id": "ee695f8c-b154-4a12-a265-c2b3d8f9885c",
+              "name": "ProductType",
+              "value": "={{ $json.body.payload.product_details.product_type }}",
+              "type": "string"
+            },
+            {
+              "id": "6a33fa73-8cf3-49ba-aa01-00554122c47a",
+              "name": "Description",
+              "value": "={{ $json.body.payload.product_details.client_description }}",
+              "type": "string"
+            },
+            {
+              "id": "d688e69e-a82c-4b49-93dd-fcfec5f268ca",
+              "name": "Theme",
+              "value": "={{ $json.body.payload.categorization.theme }}",
+              "type": "string"
+            },
+            {
+              "id": "0e521635-e488-466b-a0fe-63741b310f7a",
+              "name": "Niche",
+              "value": "={{ $json.body.payload.categorization.niche }}",
+              "type": "string"
+            },
+            {
+              "id": "7110b90b-0248-4387-939c-1783f3d3cc24",
+              "name": "SubNiche",
+              "value": "={{ $json.body.payload.categorization.sub_niche }}",
+              "type": "string"
+            },
+            {
+              "id": "c2a7483d-c14a-4cdc-80e9-0cc425569992",
+              "name": "Action",
+              "value": "={{ $json.body.action }}",
+              "type": "string"
+            },
+            {
+              "id": "57e5f2b4-cac1-4c72-b1e9-8958aeea5a51",
+              "name": "body.keywords",
+              "value": "={{ JSON.stringify($json.body.keywords) }}",
+              "type": "array"
+            },
+            {
+              "id": "251a29c0-2f67-40f4-8498-8517309b765f",
+              "name": "Tag_count",
+              "value": "={{ $json.body.payload.product_details.tag_count }}",
+              "type": "number"
+            },
+            {
+              "id": "9401307b-64d9-48f6-ac97-665d3cf8174a",
+              "name": "Shop_URL",
+              "value": "={{ $json.body.shop_url }}",
+              "type": "string"
+            },
+            {
+              "id": "73f827c1-fb4c-4821-81f1-ead32ad79bd0",
+              "name": "Shop_bio",
+              "value": "={{ $json.body.payload.shop_context.shop_bio }}",
+              "type": "string"
+            },
+            {
+              "id": "b1bde303-b36d-44e0-ac82-cf91aeb3ec17",
+              "name": "Target_audience",
+              "value": "={{ $json.body.payload.shop_context.target_audience }}",
+              "type": "string"
+            },
+            {
+              "id": "bc1bc383-a3a5-445b-838c-669dba7e8781",
+              "name": "Brand_tone",
+              "value": "={{ $json.body.payload.shop_context.brand_tone }}",
+              "type": "string"
+            },
+            {
+              "id": "1defae09-79f9-4a39-852c-8403cb450cea",
+              "name": "Brand_keywords",
+              "value": "={{ JSON.stringify($json.body.payload.shop_context.brand_keywords) }}",
+              "type": "array"
+            },
+            {
+              "id": "e8011d29-d793-43cd-ba68-9640f26a3539",
+              "name": "Shop_name",
+              "value": "={{ $json.body.payload.shop_context.shop_name }}",
+              "type": "string"
+            },
+            {
+              "id": "b8945dc3-d834-4f0d-9bbd-0aa409d1b63a",
+              "name": "Signature_text",
+              "value": "={{ $json.body.payload.shop_context.signature_text }}",
+              "type": "string"
+            },
+            {
+              "id": "2d5f64cc-0ada-480b-ba2b-f7637fb153a7",
+              "name": "visual_aesthetic",
+              "value": "={{ $json.body.payload.visual_aesthetic }}",
+              "type": "string"
+            },
+            {
+              "id": "1500142d-3734-43c6-8ca7-e5f02f6f8737",
+              "name": "visual_typography",
+              "value": "={{ $json.body.payload.visual_typography }}",
+              "type": "string"
+            },
+            {
+              "id": "6716ec4a-7cb9-43f8-9ae6-4a913f05d137",
+              "name": "visual_graphics",
+              "value": "={{ $json.body.payload.visual_graphics }}",
+              "type": "string"
+            },
+            {
+              "id": "5a9752d2-08b0-4722-870b-a5355b7ef1f0",
+              "name": "visual_colors",
+              "value": "={{ $json.body.payload.visual_colors }}",
+              "type": "string"
+            },
+            {
+              "id": "073ae6e0-793c-41b0-a244-5e9baa19fa9c",
+              "name": "visual_target_audience",
+              "value": "={{ $json.body.payload.visual_target_audience }}",
+              "type": "string"
+            },
+            {
+              "id": "5939232f-2052-4787-8611-7d7afa952476",
+              "name": "visual_overall_vibe",
+              "value": "={{ $json.body.payload.visual_overall_vibe }}",
+              "type": "string"
+            },
+            {
+              "id": "8ac7245f-099c-4fd7-9f19-9669a0f97514",
+              "name": "improvement_priority",
+              "value": "={{ $json.body.global_audit.improvement_priority }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -560,
+        352
+      ],
+      "id": "4d89ddde-05f9-4e47-b8d1-16feb4314abd",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"keywords\": [\n    \"keyword 1\",\n    \"keyword 2\",\n    \"keyword 50\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        512,
+        -80
+      ],
+      "id": "80e1c8c1-245a-4065-9c67-4c5a335c39ac",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"title\": \"...\",\n  \"description\": \"...\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        864,
+        1296
+      ],
+      "id": "2bfe3ddd-dc69-4334-a3ed-c95c40adc14d",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1376,
+        1056
+      ],
+      "id": "3b7c001a-3e96-4d94-80bf-fa1418de1c09",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the AI description from the previous node\nconst aiDescription = $input.first().json.output.description;\n\n// 2. Define your static Markdown block\nconst staticMarkdown = `\n---\n\n### 🛒 How to Order\n1. **Review** the sizing and color charts in the listing photos.\n2. **Select** your shirt size and color from the dropdown menus.\n3. **Click** \"Add to Cart\".\n\n*All standard listings are **Adult Unisex** unless otherwise stated.*\n\n---\n\n### ⭐ Product Specs\n* **Material:** 100% ring-spun U.S. cotton.\n* **Fabric:** Soft, breathable midweight fabric (**6.1 oz/yd²**).\n* **Finish:** Garment-dyed for a subtle, worn-in look and ultra-soft feel.\n* **Fit:** Relaxed fit, pre-shrunk.\n* **Construction:** Tubular body (no side seams) for a smooth, classic silhouette.\n* **Durability:** Double-needle stitching on all seams.\n* **Availability:** Sizes S–4XL in 12 premium colors.\n\n---\n\n### 📏 Sizing Tip\nThese are **Unisex** fit shirts. For a **fitted look**, order your normal size. For the popular **oversized look**, we recommend sizing up 1 or 2 sizes. Please refer to the size chart in the images for exact measurements.\n\n---\n\n### 🚚 Production & Shipping\n* **Production Time:** 1–3 business days (average 2).\n* **Shipping (U.S.):** 1–5 business days (average 3).\n* **Tracking:** A tracking number will be provided once your order is dispatched.\n\n*Note: Delivery times are estimates and are not guaranteed.*\n\n---\n\n### 🧺 Care Instructions\n* **Wash:** Machine wash cold (max 30°C / 90°F), inside out.\n* **Bleach:** Do not bleach.\n* **Dry:** Tumble dry on low heat.\n* **Iron:** Iron or steam on low heat; **do not iron directly over the design**.\n* **Dry Clean:** Do not dry clean.\n`;\n\n// 3. Merge them with double spacing\nreturn {\n  title:$input.first().json.output.title,\n  description: aiDescription //+ \"\\n\\n\" + staticMarkdown\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        1056
+      ],
+      "id": "86007ada-36df-4b23-b531-5dee7dbe2dee",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// On récupère le contenu markdown du nœud précédent\nconst markdown = $input.first().json.data.markdown;\n\nif (!markdown) return items;\n\nlet cleanedText = markdown\n  // 1. Supprimer toutes les images ![](...)\n  .replace(/!\\[.*?\\]\\(.*?\\)/g, '')\n  \n  // 2. Supprimer les liens de navigation inutiles (Favoris, Contact, Sign-in, etc.)\n  .replace(/\\[.*?\\]\\(https:\\/\\/www\\.etsy\\.com\\/(signin|messages|people|conversations|cart|help).*?\\)/g, '')\n  \n  // 3. Supprimer les IDs de tracking et nonces (souvent des longues chaînes alphanumériques)\n  .replace(/[a-zA-Z0-0]{30,}/g, '')\n  \n  // 4. Supprimer les mentions de prix et \"Sale Price\" qui n'aident pas pour l'identité de marque\n  .replace(/(Sale Price|Original Price|off|\\$\\d+\\.\\d+)/gi, '')\n  \n  // 5. Supprimer les sections de cookies et de paramètres de confidentialité (souvent à la fin)\n  .split(\"Your Etsy Privacy Settings\")[0]\n  .split(\"Privacy Settings\")[0]\n  \n  // 6. Nettoyer les espaces vides multiples et les sauts de ligne excessifs\n  .replace(/\\n\\s*\\n/g, '\\n\\n')\n  .trim();\n\n// On renvoie le texte nettoyé\nreturn [{\n  json: {\n    cleaned_content: cleanedText\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        1744
+      ],
+      "id": "0a03c5ce-9b0f-4f45-b484-2a92611717fe",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        752,
+        2000
+      ],
+      "id": "7d3ea96b-240d-47fd-bd2d-5d90f4497319",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"shop_name\": \"...\",\n  \"brand_tone\": \"...\",\n  \"shop_bio\": \"...\",\n  \"target_audience\": \"...\",\n  \"brand_keywords\": [\"...\", \"...\", \"...\", \"...\", \"...\"],\n  \"signature_text\": \"...\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        960,
+        1984
+      ],
+      "id": "55f4a1a7-2b17-4011-af56-d83bd9273101",
+      "name": "Structured Output Parser2"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1264,
+        1744
+      ],
+      "id": "db363459-c180-4ae4-95e8-cd7b284f790d",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.mockup_url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        352,
+        -864
+      ],
+      "id": "92468fd0-ed20-476b-8c52-bec09e019ff6",
+      "name": "HTTP Request2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2FmarDG6ht0gwsv0",
+          "name": "Spider crawl Auth account"
+        },
+        "supabaseApi": {
+          "id": "b2JwRoCE98AC8FRn",
+          "name": "Supabase StudioPOD"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-pro-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        544,
+        -672
+      ],
+      "id": "be28675c-ef49-44a3-90e2-6617c36ef1b1",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"visual_analysis\": {\n    \"aesthetic_style\": \"...\",\n    \"typography_details\": \"...\",\n    \"graphic_elements\": \"...\",\n    \"color_palette\": \"...\",\n    \"target_audience\": \"...\",\n    \"overall_vibe\": \"...\"\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        768,
+        -656
+      ],
+      "id": "e895a1ab-2c52-4be1-8705-5efd5637d108",
+      "name": "Structured Output Parser4"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        928,
+        -864
+      ],
+      "id": "2ffbb6b2-7832-46e5-82b2-919ecc81fac6",
+      "name": "Respond to Webhook3"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Role\nYou are a Senior Visual Trend Analyst and E-commerce Marketing Specialist. \n\n# Task\nAnalyze the provided mockup and extract its visual DNA and its **Target Audience**.\n\n# Analysis Instructions\n1. **Aesthetic/Style:** (e.g., Gorpcore, Dark Academia, Y2K).\n2. **Typography:** (e.g., Distressed Serif, Minimalist Sans).\n3. **Graphic Elements:** (e.g., Fine-line floral, retro sunset).\n4. **Color Palette:** (e.g., Earthy tones, Neon vibrance).\n5. **Target Audience (NEW):** Based on the design cues, identify the ideal buyer profile.\n   - *Consider:* Age group, gender lean (if any), interests, and the \"buying occasion\" (e.g., \"Gen Z students interested in street photography\", \"Millennial dog moms who love minimalist home decor\").\n\n# Output Format\n{\n  \"visual_analysis\": {\n    \"aesthetic_style\": \"...\",\n    \"typography_details\": \"...\",\n    \"graphic_elements\": \"...\",\n    \"color_palette\": \"...\",\n    \"target_audience\": \"...\",\n    \"overall_vibe\": \"...\"\n  }\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        576,
+        -864
+      ],
+      "id": "a2d02b53-47a3-404b-a397-3e138240efe0",
+      "name": "Image analysis",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-pro-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        336,
+        -96
+      ],
+      "id": "3bdd7b5b-f530-4a69-a01e-6bccb865f8fa",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Role\nYou are an expert Etsy SEO Specialist and E-commerce Copywriter specializing in the Print-on-Demand (POD) market. Your goal is to generate high-converting, relevant keywords that drive organic traffic.\n**Crucially, at least 75% of the keywords MUST include the Product Type to ensure they are transactional search terms.\n\n\n# Task\nAnalyze the provided product data and the pre-analyzed visual characteristics to brainstorm 80 highly relevant SEO keywords/phrases for an Etsy listing.\n\n\n# Product Data Input\n- **Product Type:** {{ $('Edit Fields').item.json.ProductType }}\n- **Theme:** {{ $('Edit Fields').item.json.Theme }}\n- **Niche:** {{ $('Edit Fields').item.json.Niche }}\n- **Sub-Niche:** {{ $('Edit Fields').item.json.SubNiche }}\n- **Product Description:** {{ $('Edit Fields').item.json.Description }}\n\n\n# 2. Visual & Marketing Data (Input from Image Analysis)\n- **Aesthetic/Style:** {{ $json.visual_aesthetic }}\n- **Typography:** {{ $json.visual_typography }}\n- **Graphic Elements:** {{ $json.visual_graphics }}\n- **Color Palette:** {{ $json.visual_colors }}\n- **Target Audience:** {{ $json.visual_target_audience }}\n- **Overall_vibe:**{{ $('Edit Fields').item.json.visual_overall_vibe }}\n\n\n\n\n# Keyword Strategy Requirements\nGenerate a diverse list of 100 keywords following these specific transactional categories:\n- **Long-tail Keywords:** Phrases buyers actually type (e.g., \"Gift for retired English teacher\").\n- **Product-Anchored (Mandatory):** Combine the Niche/Theme directly with the product type (e.g., \"Lawyer shirt\", \"Teacher mug\")\n- **Transactional Intent:** Phrases that indicate a buyer is ready to purchase. (e.g., Use \"Gift for\", \"Present\", \"Office Decor\", or \"Personalized\" combined with the niche)\n- **Audience + Product:** Connect who is buying with what they are buying (e.g., \"Gifts for Dog lovers\", \"Coffee addict mug\").\n- **Occasion & Scenario:** Where will this be used? (e.g., \"Secret Santa gift idea\", \"White elephant t-shirt\", \"Birthday present for him\").\n- **Aesthetic & Vibe:** Describe the look + the product (e.g., \"Minimalist shirt\", \"Retro 70s sport design\").\n\n#Other strategies\n- **NO GENERIC TAGS:** Avoid phrases like \"Gift for him\", \"Funny shirt\", or \"Custom gift\" unless they are combined with a very specific niche word.\n- **PRIORITIZE SPECIFICITY:** If the shirt is about an \"Angry Snail\", focus on \"Snail lovers\", \"Sarcastic mollusk\", \"Medieval snail meme\" rather than \"Funny animal shirt\".\n\n\n# Constraints\n- Strictly 100 keywords.\n- No duplicates.\n- Maximum 3 words per keyword phrase.\n- Focus on high-intent buyer language.\n- Output MUST be a clean JSON array of strings for programmatic processing.\n- Focus on transactionnal categories keywords\n- Include product type in keywords at least 50% of times\n\n\n**IMPORTANT** Generate up to 100 highly relevant keywords. Quality is priority over quantity, but aim for 100 if the niche allows.\n\n# Output Format\n{\n  \"keywords\": [\n    \"keyword 1\",\n    \"keyword 2\",\n    ...\n    \"keyword 50\"\n  ]\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        384,
+        -320
+      ],
+      "id": "abbdf050-1a1e-4d62-a58a-50861731b5ee",
+      "name": "Keywords generation",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/keywords_data/google/search_volume/live",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  {\n    \"keywords\": {{ JSON.stringify($json.output.keywords) }}, \n    \"location_name\": \"United States\", \n    \"language_name\": \"English\"\n  }\n]\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        768,
+        -320
+      ],
+      "id": "9cf9e174-dfe6-44b3-894c-10a027211c0a",
+      "name": "DataForSEO stats",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "EyflDjZ9IR19K2Gd",
+          "name": "DataForSEO account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Récupération des données d'entrée\nconst results = $input.first().json.tasks[0].result;\nconst editFields = $('Edit Fields').first().json;\nconst tag_count = editFields.Tag_count || 13;\nconst productType = (editFields.ProductType || 'mug').toLowerCase();\n\nlet processed = results\n  .filter(item => item.search_volume !== null && item.monthly_searches !== null)\n  .map(item => {\n    const avgVolume = item.search_volume;\n    const comp = item.competition || 0.5;\n    const kw = item.keyword.toLowerCase();\n    \n    // Historique des volumes (du plus ancien au plus récent)\n    const monthlyVolumes = item.monthly_searches.map(m => m.search_volume).reverse();\n\n    // Calculs des tendances et statuts\n    const last3MonthsAvg = (monthlyVolumes[11] + monthlyVolumes[10] + monthlyVolumes[9]) / 3;\n    const first3MonthsAvg = (monthlyVolumes[0] + monthlyVolumes[1] + monthlyVolumes[2]) / 3;\n    \n    const isTrending = last3MonthsAvg > (first3MonthsAvg * 1.3);\n    const isEvergreen = monthlyVolumes.every(v => v > (avgVolume * 0.2));\n    const isPromising = avgVolume > 200 && comp < 0.4;\n\n    // --- FORMULE DU SCORE D'OPPORTUNITÉ ---\n    // Utilisation de la racine carrée pour équilibrer le volume et la niche\n    let finalScore = (Math.sqrt(avgVolume) * (1 - comp + 0.2));\n\n    // DÉFINITION DES GROUPES D'INTENTION (Logique Cumulative)\n    const highIntentGroups = {\n        product: [productType, 'cup', 'drinkware', 'mug'], \n        custom: ['custom', 'personalized', 'name', 'initial'], \n        roles: ['mom', 'dad', 'teacher', 'nurse', 'coworker', 'boss', 'friend', 'grandma', 'colleague'], \n        occasions: ['birthday', 'wedding', 'christmas', 'graduation', 'retirement', 'anniversary', 'santa'], \n        gift: ['gift', 'present', 'token', 'memento', 'gag'] \n    };\n\n    let boostCount = 0;\n\n    // On applique un boost de 40% pour chaque catégorie d'intention trouvée\n    Object.values(highIntentGroups).forEach(group => {\n        if (group.some(word => kw.includes(word))) {\n            finalScore *= 1.4; \n            boostCount++;\n        }\n    });\n\n    // Bonus spécial \"Combo\" : si le tag touche 3 catégories ou plus (ex: \"Custom Teacher Gift\")\n    if (boostCount >= 3) finalScore *= 1.5;\n\n    // Boost Longue Traîne (Précision de recherche)\n    const wordCount = item.keyword.split(' ').length;\n    if (wordCount >= 3) finalScore *= 1.3;\n\n    // Boosts de Performance (Dataforseo trends)\n    if (isTrending) finalScore *= 1.3;\n    if (isPromising) finalScore *= 1.2;\n\n    return {\n      keyword: item.keyword,\n      avg_volume: avgVolume,\n      competition: comp,\n      opportunity_score: Math.round(finalScore),\n      volumes_history: monthlyVolumes,\n      status: {\n        trending: isTrending,\n        evergreen: isEvergreen,\n        promising: isPromising\n      }\n    };\n  });\n\n// 2. Sélection avec Diversité Sémantique (Concept Tracker)\nconst selectedTags = [];\nconst conceptTracker = {};\n\n// Tri par score d'opportunité décroissant\nprocessed.sort((a, b) => b.opportunity_score - a.opportunity_score);\n\nfor (const item of processed) {\n  if (selectedTags.length >= tag_count) break;\n\n  const words = item.keyword.toLowerCase().split(' ');\n  // On identifie le concept par les deux premiers mots\n  const concept = words.slice(0, 2).join(' ');\n\n  conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;\n\n  // Règle de diversité : maximum 2 tags par concept identique\n  if (conceptTracker[concept] <= 2) {\n    selectedTags.push(item);\n  }\n}\n\nreturn selectedTags;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        -320
+      ],
+      "id": "3c031069-2d0b-461c-b54d-3f2bbea6f170",
+      "name": "Filter keywords"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Role\nYou are an expert Etsy Copywriter acting as the voice of **{{ $('Edit Fields').item.json.Shop_name }}**. \nYour goal is to write a product listing that feels authentic to the brand's identity, speaks directly to its target audience, and maintains high SEO performance.\n\n# Brand Identity (Context)\n- **Shop Bio/Mission:** {{ $('Edit Fields').item.json.Shop_bio }}\n- **Brand Tone:** {{ $('Edit Fields').item.json.Brand_tone }}\n- **Target Audience:** {{ $('Edit Fields').item.json.Target_audience }}\n- **Brand Keywords:** {{ $('Edit Fields').item.json.Brand_keywords }}\n\n# Input Data\n- **Strategic SEO Brief:** {{ $json.seo_brief }}\n- **Product Details:**\n    - **Niche:** {{ $json.niche_info }}\n\n\n# Task 1: Strategic Title (140 chars max)\n- **Content:** Start with keywords identified as \"Promising\" in the brief, followed by \"Trending\" keywords. \n- **Formatting (CRITICAL):** - Use ONLY plain text. \n    - NO bolding, NO italics, NO Markdown (no `**` or `****`). \n    - NO emojis (no `💎`, `🔥`, etc.).\n    - Use \"|\" as separators.\n- **Goal:** A clean, professional title that looks exactly like a top-performing Etsy listing.\n- Ensure the language reflects a premium product from **{{ $('Edit Fields').item.json.Shop_name }}**.\n\n\n# Task 2: Natural \"Story & Specs\" Description\nWrite a description tailored for **{{ $('Edit Fields').item.json.Target_audience }}** using a **{{ $('Edit Fields').item.json.Brand_tone }}** tone.\n\n1. **The Emotional Hook (The Story):**\n   - Start with a catchy opening sentence that reflects the shop's \"vibe\" and the specific niche.\n   - Write 2-3 fluid sentences describing the shirt. \n   - Naturally weave in 4-6 tags (prioritize Trending and Promising). \n   - Keep the text clean, human, and conversational. No bolding of keywords.\n   - **NO FORMATTING:** Do NOT use bold (`**`), italics, or any highlighting for keywords. \n   - **NATURAL FLOW:** The keywords must fit so perfectly into the grammar that a reader wouldn't know they are SEO tags (e.g., instead of saying \"This is a **gift for coworker**\", say \"Looking for the perfect gift for a coworker?\").\n\n2. **The \"Why You'll Love It\" Section (The Specs):**\n   - Use a bulleted list to highlight quality.\n   - Integrate \"Evergreen 🌲\" tags here.\n   - Mention: Soft-washed garment-dyed fabric, relaxed unisex fit, and double-needle stitching for durability.\n\n3. **Brand Signature (Call to Action):**\n   - Strictly end the listing with this exact text: \"{{ $('Edit Fields').item.json.Signature_text }}\"\n\n# Constraints\n- **Tone Consistency:** Strictly adhere to the **{{ $('Edit Fields').item.json.Brand_tone }}** brand voice.\n- **Format:** Strictly JSON output.\n- **Formatting:** Use Markdown for the description. \n\n# Output Format\n{\n  \"title\": \"...\",\n  \"description\": \"...\"\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        720,
+        1056
+      ],
+      "id": "a5fd2eb7-a5bc-4605-9b2f-94b08218c7fc",
+      "name": "Optimized Title and Description"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Role\nYou are a Senior Brand Strategist specialized in E-commerce and Etsy. Your goal is to transform raw scraped data into a structured brand identity for a print-on-demand shop.\n\n# Data Input\nHere is the cleaned Markdown content from the Etsy shop:\n---\n{{ $json.cleaned_content }}\n---\n\n# Instructions\nAnalyze the text to populate the following brand profile elements. \n\n## Guidelines for extraction:\n- **Shop Name**: Look for the main H1 or the name near \"Star Seller\" status.\n- **Brand Tone**: Analyze product titles and the announcement. (e.g., if you see \"Funny Meme\", \"Retro\", \"Silly Goose\", the tone is likely \"Humorous\" or \"Retro-Modern\").\n- **Shop Bio**: Summarize the \"Announcement\" section. Focus on the origin (e.g., Pacific Northwest), the ownership (e.g., female-owned), and the aesthetic (e.g., retro-modern graphic designs).\n- **Target Audience**: Look at categories and product descriptions. (e.g., \"Bookish\", \"LGBTQIA\", \"Teachers\", \"Meme lovers\").\n- **Brand Keywords**: Extract 5 recurring themes or values.\n- **Signature Text**: Craft a 1-sentence thank you message that reflects the shop's specific location or vibe mentioned in the text.\n\n# Constraints\n- Output must be ONLY a valid JSON object.\n- Language: English\n\n# Output Format (JSON)\n{\n  \"shop_name\": \"...\",\n  \"brand_tone\": \"...\",\n  \"shop_bio\": \"...\",\n  \"target_audience\": \"...\",\n  \"brand_keywords\": [\"...\", \"...\", \"...\", \"...\", \"...\"],\n  \"signature_text\": \"...\"\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        800,
+        1744
+      ],
+      "id": "6b424b5d-99e1-4a22-94dd-c7889a497d0e",
+      "name": "Write shop profile info"
+    },
+    {
+      "parameters": {
+        "operation": "scrape",
+        "additionalFields": {},
+        "useCustomBody": true,
+        "customBody": "={\n  \"url\": \"{{ $json.Shop_URL }}\",\n  \"formats\": [\"markdown\"],\n  \"onlyMainContent\": true,\n  \"waitFor\": 3000,\n  \"actions\": [\n    {\n      \"type\": \"wait\",\n      \"selector\": \".shop-name-and-title-container\",\n      \"includeTags\": [\n        \".shop-name-and-title-container\", \n        \"#shop-announcement\", \n        \".shop-home-about-section\",\n        \".responsive-listing-grid\"\n      ]\n    }\n  ]\n} ",
+        "requestOptions": {}
+      },
+      "type": "@mendable/n8n-nodes-firecrawl.firecrawl",
+      "typeVersion": 1,
+      "position": [
+        352,
+        1728
+      ],
+      "id": "55e67eb7-238b-47b4-8c1c-c363cfe592c9",
+      "name": "Scrape Esty shop wep page",
+      "credentials": {
+        "firecrawlApi": {
+          "id": "ZCv139vnWJ5eRaE4",
+          "name": "Firecrawl account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Récupération sécurisée des 13 tags depuis \"Edit Fields\"\n// On utilise .first().json pour cibler l'objet racine du nœud\nconst data = $('Edit Fields').first().json;\nconst allTags = data.body.keywords || [];\n\n// 2. Tri de la liste par opportunity_score décroissant (du plus haut au plus bas)\n// On utilise (b - a) pour avoir les meilleurs en premier\nconst sortedTags = [...allTags].sort((a, b) => {\n  return (b.opportunity_score || 0) - (a.opportunity_score || 0);\n});\n\n// 3. Sélection des 3 meilleurs\nconst top3 = sortedTags.slice(0, 3).map(t => ({ \n  ...t, \n  target_type: 'top' \n}));\n\n// 4. Sélection des 2 moins bons (les deux derniers de la liste triée)\nconst bottom2 = sortedTags.slice(-2).map(t => ({ \n  ...t, \n  target_type: 'bottom' \n}));\n\n// 5. Retour des données regroupées\nreturn {\n  targets: [...top3, ...bottom2]\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        368
+      ],
+      "id": "5f559148-9eac-4143-913d-4d942dc4fb97",
+      "name": "Tags to evaluate"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. On récupère l'objet principal\nconst input = $input.first().json;\n\n// 2. On parse la chaîne de caractères JSON contenue dans body.keywords\nconst keywordsArray = input.body.keywords;\n\n// 3. On génère le brief textuel pour le prompt\nconst seoBrief = keywordsArray.map(item => {\n  let statusBadges = [];\n  if (item.status.promising) statusBadges.push(\"Promising 💎\");\n  if (item.status.trending) statusBadges.push(\"Trending 🔥\");\n  if (item.status.evergreen) statusBadges.push(\"Evergreen 🌲\");\n\n  const badgeText = statusBadges.length > 0 ? statusBadges.join(\" + \") : \"Standard\";\n\n  return `- Keyword: \"${item.keyword}\" | Status: ${badgeText} | Volume: ${item.avg_volume} | Comp: ${item.competition}`;\n}).join('\\n');\n\n// 4. On retourne un objet complet prêt pour le nœud LLM\nreturn {\n  mockup_url: input.mockup_url,\n  product_type: input.ProductType,\n  slogan: input.Slogan,\n  design_description: input.Description,\n  niche_info: `${input.Theme} > ${input.Niche} > ${input.SubNiche}`,\n  seo_brief: seoBrief\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        1040
+      ],
+      "id": "cbd9e64f-8fa6-4123-954a-d839aa9643d4",
+      "name": "Prepare SEO brief"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-pro-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        624,
+        2544
+      ],
+      "id": "d07c4aa3-ad97-4af2-9002-21396df0045d",
+      "name": "Google Gemini Chat Model5",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extraction et regroupement pour PennySEO\nconst keywords = items[0].json.body.keywords;\n\nconst scoredKeywords = keywords.map(k => {\n  let score = k.opportunity_score || 0;\n  \n  // 1. Priorité aux recommandations (is_top)\n  if (k.is_top === true) score *= 2.0;\n  if (k.is_top === false) score *= 0.5;\n\n  // 2. Bonus de vélocité\n  if (k.status.promising) score *= 1.5;\n  else if (k.status.trending) score *= 1.2;\n\n  // 3. Bonus Long-tail (3 mots ou plus)\n  const wordCount = k.keyword.split(' ').length;\n  if (wordCount >= 3) score *= 1.3;\n\n  return { ...k, final_rank_score: score };\n});\n\n// 4. Tri par score pondéré\nlet sorted = scoredKeywords.sort((a, b) => b.final_rank_score - a.final_rank_score);\n\n// 5. Garantie Evergreen\nlet top5 = sorted.slice(0, 5);\nconst hasEvergreen = top5.some(k => k.status.evergreen);\n\nif (!hasEvergreen) {\n    const bestEvergreen = sorted.slice(5).find(k => k.status.evergreen);\n    if (bestEvergreen) {\n        top5[4] = bestEvergreen;\n    }\n}\n\n// 6. REGROUPEMENT : On retourne un seul objet contenant la liste\nreturn [{\n  json: {\n    selected_keywords: top5,\n    keyword_list_string: top5.map(k => k.keyword).join(', '), // Pratique pour les prompts\n    count: top5.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        2320
+      ],
+      "id": "94f56d5f-8974-425d-afcf-4ab77cdb348d",
+      "name": "Filter 5 best"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"keywords\": [\n    \"keyword 1\",\n    \"keyword 2\",\n    \"keyword 50\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        800,
+        2528
+      ],
+      "id": "9efed03d-6c47-4273-9dba-8176bba4945a",
+      "name": "Structured Output Parser7"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/keywords_data/google/search_volume/live",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  {\n    \"keywords\": {{ JSON.stringify($json.output.keywords) }}, \n    \"location_name\": \"United States\", \n    \"language_name\": \"English\"\n  }\n]\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1152,
+        2320
+      ],
+      "id": "5a040a6b-b989-4a7a-b9ef-3bbb887daac5",
+      "name": "DataForSEO stats1",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "EyflDjZ9IR19K2Gd",
+          "name": "DataForSEO account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Récupération des données d'entrée\nconst results = $input.first().json.tasks[0].result;\nconst editFields = $('Edit Fields').first().json;\nconst tag_count = editFields.Tag_count || 13;\nconst productType = (editFields.ProductType || 'mug').toLowerCase();\n\nlet processed = results\n  .filter(item => item.search_volume !== null && item.monthly_searches !== null)\n  .map(item => {\n    const avgVolume = item.search_volume;\n    const comp = item.competition || 0.5;\n    const kw = item.keyword.toLowerCase();\n    \n    const monthlyVolumes = item.monthly_searches.map(m => m.search_volume).reverse();\n\n    const last3MonthsAvg = (monthlyVolumes[11] + monthlyVolumes[10] + monthlyVolumes[9]) / 3;\n    const first3MonthsAvg = (monthlyVolumes[0] + monthlyVolumes[1] + monthlyVolumes[2]) / 3;\n    \n    const isTrending = last3MonthsAvg > (first3MonthsAvg * 1.3);\n    const isEvergreen = monthlyVolumes.every(v => v > (avgVolume * 0.2));\n    const isPromising = avgVolume > 200 && comp < 0.4;\n\n    // --- FORMULE DU SCORE MODIFIÉE ---\n    // On garde la logique de base mais on ajoute un plancher de viabilité\n    let finalScore = (Math.sqrt(avgVolume) * (1 - comp + 0.2));\n\n    // AJUSTEMENT DE VIABILITÉ (Anti-volume mort)\n    if (avgVolume < 50) finalScore *= 0.3;      // Pénalité lourde pour les volumes quasi nuls\n    else if (avgVolume > 1000) finalScore *= 1.5; // Bonus de portée pour assurer la visibilité\n\n    const highIntentGroups = {\n        product: [productType, 'cup', 'drinkware', 'mug', 'tee', 'shirt', 'apparel'], \n        custom: ['custom', 'personalized', 'name', 'initial'], \n        roles: ['mom', 'dad', 'teacher', 'nurse', 'coworker', 'friend', 'autistic', 'neurodivergent'], \n        occasions: ['birthday', 'wedding', 'christmas', 'graduation', 'anniversary'], \n        gift: ['gift', 'present', 'token', 'memento', 'gag'] \n    };\n\n    let boostCount = 0;\n    Object.values(highIntentGroups).forEach(group => {\n        if (group.some(word => kw.includes(word))) {\n            finalScore *= 1.4; \n            boostCount++;\n        }\n    });\n\n    if (boostCount >= 3) finalScore *= 1.5;\n    const wordCount = item.keyword.split(' ').length;\n    if (wordCount >= 3) finalScore *= 1.3;\n    if (isTrending) finalScore *= 1.3;\n    if (isPromising) finalScore *= 1.2;\n\n    return {\n      keyword: item.keyword,\n      avg_volume: avgVolume,\n      competition: comp,\n      opportunity_score: Math.round(finalScore),\n      volumes_history: monthlyVolumes,\n      status: {\n        trending: isTrending,\n        evergreen: isEvergreen,\n        promising: isPromising\n      }\n    };\n  });\n\n// 2. Sélection avec Diversité Sémantique\nconst selectedTags = [];\nconst conceptTracker = {};\n\n// On s'assure d'avoir au moins un \"Evergreen\" solide dans la sélection finale\nprocessed.sort((a, b) => b.opportunity_score - a.opportunity_score);\n\nfor (const item of processed) {\n  if (selectedTags.length >= tag_count) break;\n\n  const words = item.keyword.toLowerCase().split(' ');\n  const concept = words.slice(0, 2).join(' ');\n\n  conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;\n\n  // Diversité : Max 2 tags par concept\n  if (conceptTracker[concept] <= 2) {\n    selectedTags.push(item);\n  }\n}\n\n// Validation finale : Si aucun Evergreen n'est présent, on force le meilleur Evergreen dispo\nif (!selectedTags.some(t => t.status.evergreen) && processed.length > 0) {\n    const bestEvergreen = processed.find(t => t.status.evergreen);\n    if (bestEvergreen) selectedTags[selectedTags.length - 1] = bestEvergreen;\n}\n\nreturn selectedTags;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        2320
+      ],
+      "id": "e57ee988-2423-4fa2-a465-1e3485c8eb15",
+      "name": "Filter keywords1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// On récupère les 13 tags du nœud précédent\nconst tags = $input.all().map(item => item.json);\n\n// Sélection des 3 meilleurs\nconst top3 = tags.slice(0, 3).map(t => ({ ...t, target_type: 'top' }));\n\n// Sélection des 2 moins bons\nconst bottom2 = tags.slice(-2).map(t => ({ ...t, target_type: 'bottom' }));\n\nreturn {\n  targets: [...top3, ...bottom2]\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        2320
+      ],
+      "id": "2c73ad86-aa8f-4a5a-8228-3c65886788a9",
+      "name": "sniper_keywords"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Récupération des deux sources\nconst editFieldsNode = $('Edit Fields').first().json;\nconst sniperNode = $('sniper_keywords').first().json;\n\n// Extraction sécurisée\nconst existingKeywords = editFieldsNode?.body?.keywords || [];\n// CORRECTION : On cible spécifiquement la clé 'targets' identifiée dans ton JSON\nconst sniperKeywords = sniperNode?.targets || [];\n\n// 2. Trier les 13 existants par score croissant pour identifier les plus faibles\nlet rankedExisting = [...existingKeywords].sort((a, b) => \n  (a.opportunity_score || 0) - (b.opportunity_score || 0)\n);\n\n// Identification des 5 plus faibles (en minuscules pour comparaison)\nconst keywordsToReplace = rankedExisting.slice(0, 5).map(k => k.keyword.toLowerCase());\n\n// 3. Filtrer pour garder les 8 plus forts (is_sniper_seo: false)\nconst strongExisting = existingKeywords\n  .filter(k => !keywordsToReplace.includes(k.keyword.toLowerCase()))\n  .map(k => ({ ...k, is_sniper_seo: false }));\n\n// 4. Préparer les Snipers avec le flag (is_sniper_seo: true)\nconst preparedSnipers = sniperKeywords.map(k => ({\n  ...k,\n  is_sniper_seo: true\n}));\n\n// 5. Fusion et Dédoublonnage via Map\nconst finalMap = new Map();\n\n// On remplit avec les 8 forts\nstrongExisting.forEach(k => finalMap.set(k.keyword.toLowerCase(), k));\n\n// On ajoute les snipers (ils marquent ou ajoutent)\npreparedSnipers.forEach(k => finalMap.set(k.keyword.toLowerCase(), k));\n\n// 6. Reconstruction et complétion à 13\nlet finalListing = Array.from(finalMap.values());\n\n// Sécurité : Si on a moins de 13 après fusion (doublons), on repêche dans les \"faibles\"\nif (finalListing.length < 13) {\n  for (const k of rankedExisting) {\n    if (finalListing.length >= 13) break;\n    const key = k.keyword.toLowerCase();\n    if (!finalMap.has(key)) {\n      finalListing.push({ ...k, is_sniper_seo: false });\n      finalMap.set(key, k);\n    }\n  }\n}\n\n// Tri final par score décroissant pour l'affichage\nfinalListing.sort((a, b) => (b.opportunity_score || 0) - (a.opportunity_score || 0));\n\nreturn [{\n  json: {\n    listing_seo_stats: finalListing,\n    tag_list: finalListing.map(k => k.keyword),\n    sniper_count: finalListing.filter(k => k.is_sniper_seo).length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        2320
+      ],
+      "id": "66fc16b7-d262-4d9e-8035-bf789ae7a137",
+      "name": "finalSeolist"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        576,
+        1264
+      ],
+      "id": "c16b38f7-e8cd-4f0e-9bc2-b2aeba238878",
+      "name": "Google Gemini Chat Model6",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2496,
+        400
+      ],
+      "id": "028f0c9a-bb67-46af-bb1c-f088cce65f11",
+      "name": "Respond to Webhook4"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        944,
+        640
+      ],
+      "id": "98db1934-ac3b-4d4b-81c4-6af5166f0d16",
+      "name": "Google Gemini Chat Model7",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"evaluations\": [\n    {\n      \"keyword\": \"string\",\n      \"insight\": \"string\",\n      \"is_top\": true\n    }\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1216,
+        640
+      ],
+      "id": "ae6f7975-0355-4174-99f6-7510616a8191",
+      "name": "Structured Output Parser8"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Role\nAct as an expert Etsy SEO and Marketing Consultant.\n\n# Context\nYou are analyzing a specific keyword for an Etsy listing.\n\n# Product details\nProduct Type:{{ $('Edit Fields').first().json.ProductType }}\nProduct Description:{{ $('Edit Fields').first().json.Description }}\nTheme:{{ $('Edit Fields').first().json.Theme }}\nNiche:{{ $('Edit Fields').first().json.Niche }}\nSub-niche:{{ $('Edit Fields').first().json.SubNiche }}\nVisual Aesthetic: {{ $('Edit Fields').first().json.visual_aesthetic }}\nTarget Audience: {{ $('Edit Fields').first().json.visual_target_audience }}\nTypography:{{ $('Edit Fields').first().json.visual_typography }}\nGraphic:{{ $('Edit Fields').first().json.visual_graphics }}\nColors:{{ $('Edit Fields').first().json.visual_colors }}\n\n# Keyword Data\nKeyword: \"{{ $json.keyword }}\"\nSearch Volume: {{ $json.avg_volume }}\nTrend (last 12 months volume): {{ $json.volumes_history }}\nCompetition:{{ $json.competition }}\nOpportunity Score: {{ $json.opportunity_score }}\nTarget type:{{ $json.target_type }}\n\n# Task\nWrite a single, high-impact \"Marketing Insight\" for this keyword. \nThe insight must explain WHY this keyword is strategic for THIS specific product. Take into account the product details. \n- If target_type is 'top', justify why it's a winning opportunity.\n- If target_type is 'bottom', explain the risk (competition, low intent, or broadness) and why it might not be the best keyword.\n\nFocus on one of these angles: \n1. The \"Opportunity Gap\" (High volume/Low competition).\n2. The \"Viral Momentum\" (Explosive trend).\n3. The \"Buyer Intent\" (Specific niche or occasion alignment).\n\n# Constraint\n- Output MUST be in English.\n- Maximum 40 words.\n- Be punchy and professional.\n\n\nOUTPUT FORMAT (JSON ONLY):\n{\n  \"evaluations\": [\n    {\n      \"keyword\": \"string\",\n      \"insight\": \"string\",\n      \"is_top\": boolean\n    }\n  ]\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1040,
+        384
+      ],
+      "id": "ec606265-290a-46c9-ad11-45e1f87dcaef",
+      "name": "Tags insights1",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Récupération des données des nœuds précédents\n//const originalTags = $('Filter keywords').all().map(item => item.json);\n\nconst data = $('Edit Fields').first().json;\nconst originalTags = data.body.keywords || [];\n\n\nconst allEvaluations = $('Tags insights1').all().flatMap(item => item.json.output.evaluations);\n\n// 2. Fusion des insights et calcul des moyennes pour le score global\nlet top3Sum = 0;\nlet bottom10Sum = 0;\n\nconst mergedTags = originalTags.map((tag, index) => {\n  // Fusion avec les insights de l'IA\n  const match = allEvaluations.find(item => item.keyword === tag.keyword);\n  \n  const enhancedTag = {\n    ...tag,\n    insight: match ? match.insight : null,\n    is_top: match ? match.is_top : null\n  };\n\n  // Accumulation pour le calcul du score (basé sur l'opportunity_score)\n  // On suppose que la liste est déjà triée par score décroissant\n  if (index < 3) {\n    top3Sum += tag.opportunity_score || 0;\n  } else {\n    bottom10Sum += tag.opportunity_score || 0;\n  }\n\n  return enhancedTag;\n});\n\n// 3. Calcul de la Listing Strength (Moyenne pondérée 60/40)\nconst top3Avg = top3Sum / 3;\nconst bottom10Avg = bottom10Sum / 10;\n\n// On normalise le score sur 100 (ajuste le diviseur 2 selon tes scores habituels)\nconst rawGlobalScore = (top3Avg * 0.6) + (bottom10Avg * 0.4);\nconst listingStrength = Math.min(100, Math.round(rawGlobalScore / 2)); \n\n// 4. Retour des données restructurées (le score global est inclus une seule fois à la racine)\nreturn [\n  {\n    global_listing_strength: listingStrength,\n    keywords: mergedTags\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        384
+      ],
+      "id": "c5cc1565-ccbb-4e30-af4c-81254449edda",
+      "name": "Global scoring1"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"global_status_label\": \"string\",\n  \"global_strategic_verdict\": \"string\",\n  \"score_explanation\": \"2-sentence breakdown of the calculated strength vs keyword relevance\",\n  \"improvement_priority\": \"Specific list of keywords to remove/add and the primary action to take\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2000,
+        608
+      ],
+      "id": "e2ce99c2-a681-4cf0-b345-f45d2fe5f8bb",
+      "name": "Structured Output Parser9"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-pro-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1616,
+        656
+      ],
+      "id": "a91ffa8f-ae77-441c-9f0b-a0327af9fe46",
+      "name": "Google Gemini Chat Model8",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Récupération du bloc scoring (Score + Keywords)\nconst scoringData = $('Global scoring1').first().json;\n\n// 2. Récupération du bloc audit (Analyse de l'IA)\n// On suppose que ce nœud est placé juste après l'agent IA\nconst auditData = $('Global Eval').first().json.output\n// 3. Fusion totale dans un objet unique et structuré\nreturn [\n  {\n    // Données globales pour la table 'listings'\n    global_listing_strength: scoringData.global_listing_strength,\n    global_status_label: auditData.global_status_label,\n    global_strategic_verdict: auditData.global_strategic_verdict,\n    score_explanation:auditData.score_explanation,\n    improvement_priority: auditData.improvement_priority,\n    \n    // Liste pour la table 'listing_seo_stats'\n    keywords: scoringData.keywords\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        384
+      ],
+      "id": "45179f79-0fc4-4b62-b060-6099793724fb",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1200,
+        -320
+      ],
+      "id": "7819def4-cd0b-4335-ba78-933b47e46e8b",
+      "name": "Respond to Webhook5"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "targets",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        768,
+        384
+      ],
+      "id": "749adb90-cba9-4f97-b7a7-c9cc632407c0",
+      "name": "Split Out1"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2144,
+        2320
+      ],
+      "id": "7bde8383-fd19-42a8-a556-668214c7eff8",
+      "name": "Respond to Webhook6"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Act as a Senior Etsy Marketplace SEO Strategist and Conversion-Focused Keyword Auditor.\n\nYou specialize exclusively in optimizing product listings on Etsy’s internal search engine.  \nYou understand how ranking is influenced by:\n- exact keyword matching\n- buyer intent\n- competition density\n- long-tail opportunities\n- tag portfolio balance (Evergreen vs Niche vs Trend)\n- commercial conversion probability (not just traffic)\n\nYour mission is to deliver an honest, data-driven executive assessment of the listing’s SEO strength and provide specific, actionable keyword decisions that directly improve visibility, ranking, and sales potential.\n\nYou do not give generic advice.  \nYou think like a growth consultant: diagnose → explain → prescribe.\n\nBe concise, strategic, and pragmatic.\n\n\n# Task\n\nUsing:\n- the calculated listing strength score\n- the full keyword list with SEO statistics\n- the product details\n- the visual aesthetic and target audience\n\nPerform a strategic audit of the keyword portfolio.\n\nAnalyze:\n\n1. Relevance alignment between keywords and the product’s aesthetic and target audience  \n2. Balance between:\n   - high-volume competitive (Evergreen)\n   - low-competition niche/long-tail\n   - trendy or emerging opportunities  \n3. Presence of:\n   - overly broad or saturated tags\n   - weak, redundant, or low-intent tags\n   - missing high-intent or underserved phrases  \n4. Whether the keyword mix realistically supports BOTH ranking potential AND conversions\n\nThen produce:\n\n- A short business-style status label (2–3 words)\n- A concise 2-sentence strategic verdict explaining overall performance\n- A 2-sentence explanation connecting the calculated strength score with real keyword relevance and competitiveness\n- A clear improvement plan listing exactly which keywords to remove and which to add, plus the single most impactful primary action\n\nBe direct and honest.  \nIf the listing is weak, say so clearly.  \nIf strong, justify why with evidence from the keyword mix.\n\n# Data to Analyze\n# Product details\nProduct Type:{{ $('Edit Fields').first().json.ProductType }}\nProduct Description:{{ $('Edit Fields').first().json.Description }}\nTheme:{{ $('Edit Fields').first().json.Theme }}\nNiche:{{ $('Edit Fields').first().json.Niche }}\nSub-niche:{{ $('Edit Fields').first().json.SubNiche }}\n\n#Visual info (from mockup analysis)\nVisual Aesthetic: {{ $('Edit Fields').first().json.visual_aesthetic }}\nTarget Audience: {{ $('Edit Fields').first().json.visual_target_audience }}\nTypography:{{ $('Edit Fields').first().json.visual_typography }}\nGraphic:{{ $('Edit Fields').first().json.visual_graphics }}\nColors:{{ $('Edit Fields').first().json.visual_colors }}\n- Calculated Listing Strength: {{ $json.global_listing_strength }}/100\n- Full Keywords List: \n{{ JSON.stringify($node[\"Global scoring1\"].json.keywords) }}\n\n\n\n# Output Format (Strict JSON)\n\n{\n  \"global_status_label\": \"string\",\n  \"global_strategic_verdict\": \"string\",\n  \"score_explanation\": \"2-sentence breakdown of the calculated strength vs keyword relevance\",\n  \"improvement_priority\": \"Specific list of keywords to remove/add and the primary action to take\"\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1824,
+        384
+      ],
+      "id": "259b8eaa-dbe6-4984-8a90-aef7f6be53be",
+      "name": "Global Eval"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Role\nYou are an Advanced Etsy SEO Researcher specializing in \"Niche Deep-Diving\". Your task is to take a set of proven SEO winners and expand the semantic field to find 100 NEW high-potential keywords.\n\n# Context\n\n# Product Data Input\nProduct Type:{{ $('Edit Fields').first().json.ProductType }}\nProduct Description:{{ $('Edit Fields').first().json.Description }}\nTheme:{{ $('Edit Fields').first().json.Theme }}\nNiche:{{ $('Edit Fields').first().json.Niche }}\nSub-niche:{{ $('Edit Fields').first().json.SubNiche }}\n\n# 2. Visual & Marketing Data (Input from Image Analysis)\nVisual Aesthetic: {{ $('Edit Fields').first().json.visual_aesthetic }}\nTarget Audience: {{ $('Edit Fields').first().json.visual_target_audience }}\nTypography:{{ $('Edit Fields').first().json.visual_typography }}\nGraphic:{{ $('Edit Fields').first().json.visual_graphics }}\nColors:{{ $('Edit Fields').first().json.visual_colors }}\n- **Overall_vibe:**\n\n\n\n# The Winners (Top 5 Performers)\nThese keywords have already shown high Opportunity Scores. Analyze their intent, style, and target audience:\n{{ JSON.stringify($node[\"Filter 5 best\"].json.selected_keywords) }}\n\n# Mission: The \"Deep Dive\" expansion\nGenerate 100 NEW and UNIQUE keywords. Do NOT repeat the winners listed above. \nExplore these 3 specific directions based on the Winners' DNA:\n\n1. **Semantic Variations**: Use synonyms, alternative phrasing, and specific terminology used by this niche's subculture.\n2. **Occasion & Persona**: If the winners are \"gifts\", find specific gift-giving moments. If they are \"style-based\", find specific sub-aesthetics (e.g., if \"Dark Academia\" won, explore \"Light Academia\", \"Library Core\", \"Classic Literature style\").\n3. **Compound Long-Tail**: Create highly specific 2-3 word phrases that combine the attributes of the winners with buyer intent (e.g., \"minimalist [winner] aesthetic\", \"[winner] gift for [persona]\").\n\n# Constraints\n- **NO DUPLICATES**: Do not include any of the 5 winners in the new list.\n- **DATA-DRIVEN**: Aim for terms that actual humans type, avoiding overly poetic or \"hallucinated\" AI phrases.\n- **ETSY FOCUS**: Keep it relevant to physical products and the Etsy marketplace.\n\n\n#Priority action from previous keywords evaluation\n{{ $('Edit Fields').item.json.improvement_priority }}\n\n# Output Format\nReturn ONLY a JSON array of strings, ready for API processing:\n# Output Format\n{\n  \"keywords\": [\n    \"keyword 1\",\n    \"keyword 2\",\n    ...\n    \"keyword 100\"\n  ]\n}\n",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        624,
+        2320
+      ],
+      "id": "04aa23d1-b565-43c3-b69c-63c9867cda75",
+      "name": "sniper prompt",
+      "retryOnFail": true
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.srv840060.hstgr.cloud",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+            "content-length": "5505",
+            "accept": "application/json, text/plain, */*",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+            "content-type": "application/json",
+            "origin": "http://localhost:5173",
+            "priority": "u=1, i",
+            "referer": "http://localhost:5173/",
+            "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Google Chrome\";v=\"145\", \"Chromium\";v=\"145\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "x-forwarded-for": "207.253.153.5",
+            "x-forwarded-host": "n8n.srv840060.hstgr.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "6b424419687d",
+            "x-real-ip": "207.253.153.5"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "action": "generateInsight",
+            "listing_id": "72671cad-752c-4d02-aa65-044783547dfa",
+            "keywords": [
+              {
+                "keyword": "Teacher appreciation gift",
+                "avg_volume": 49500,
+                "competition": 1,
+                "opportunity_score": 113,
+                "volumes_history": [
+                  14800,
+                  9900,
+                  18100,
+                  135000,
+                  301000,
+                  14800,
+                  6600,
+                  18100,
+                  12100,
+                  4400,
+                  5400,
+                  8100
+                ],
+                "status": {
+                  "trending": false,
+                  "evergreen": false,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Secret santa gift",
+                "avg_volume": 8100,
+                "competition": 0.91,
+                "opportunity_score": 86,
+                "volumes_history": [
+                  1900,
+                  720,
+                  880,
+                  720,
+                  880,
+                  590,
+                  720,
+                  590,
+                  1600,
+                  5400,
+                  27100,
+                  60500
+                ],
+                "status": {
+                  "trending": true,
+                  "evergreen": false,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Book lover gift",
+                "avg_volume": 22200,
+                "competition": 1,
+                "opportunity_score": 71,
+                "volumes_history": [
+                  18100,
+                  12100,
+                  12100,
+                  12100,
+                  12100,
+                  8100,
+                  9900,
+                  9900,
+                  9900,
+                  14800,
+                  49500,
+                  74000
+                ],
+                "status": {
+                  "trending": true,
+                  "evergreen": true,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Girlfriend gift idea",
+                "avg_volume": 9900,
+                "competition": 1,
+                "opportunity_score": 66,
+                "volumes_history": [
+                  9900,
+                  6600,
+                  6600,
+                  8100,
+                  8100,
+                  8100,
+                  8100,
+                  6600,
+                  8100,
+                  8100,
+                  18100,
+                  33100
+                ],
+                "status": {
+                  "trending": true,
+                  "evergreen": true,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Stocking stuffer idea",
+                "avg_volume": 22200,
+                "competition": 0.99,
+                "opportunity_score": 53,
+                "volumes_history": [
+                  2900,
+                  1000,
+                  1300,
+                  1000,
+                  1000,
+                  880,
+                  1900,
+                  1600,
+                  4400,
+                  18100,
+                  74000,
+                  201000
+                ],
+                "status": {
+                  "trending": true,
+                  "evergreen": false,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Sister birthday gift",
+                "avg_volume": 9900,
+                "competition": 1,
+                "opportunity_score": 51,
+                "volumes_history": [
+                  14800,
+                  12100,
+                  14800,
+                  12100,
+                  12100,
+                  9900,
+                  9900,
+                  9900,
+                  9900,
+                  8100,
+                  8100,
+                  5400
+                ],
+                "status": {
+                  "trending": false,
+                  "evergreen": true,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Dog mom gift",
+                "avg_volume": 4400,
+                "competition": 1,
+                "opportunity_score": 44,
+                "volumes_history": [
+                  2900,
+                  1900,
+                  1900,
+                  5400,
+                  12100,
+                  1900,
+                  1900,
+                  1600,
+                  1600,
+                  1900,
+                  5400,
+                  12100
+                ],
+                "status": {
+                  "trending": true,
+                  "evergreen": true,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Reader gift",
+                "avg_volume": 8100,
+                "competition": 1,
+                "opportunity_score": 33,
+                "volumes_history": [
+                  5400,
+                  4400,
+                  4400,
+                  3600,
+                  4400,
+                  2900,
+                  2900,
+                  3600,
+                  3600,
+                  5400,
+                  18100,
+                  33100
+                ],
+                "status": {
+                  "trending": true,
+                  "evergreen": true,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Best friend gift",
+                "avg_volume": 1300,
+                "competition": 1,
+                "opportunity_score": 24,
+                "volumes_history": [
+                  1600,
+                  1000,
+                  1000,
+                  1000,
+                  1300,
+                  1000,
+                  1000,
+                  1000,
+                  1000,
+                  1000,
+                  1900,
+                  3600
+                ],
+                "status": {
+                  "trending": true,
+                  "evergreen": true,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Puppy love shirt",
+                "avg_volume": 5400,
+                "competition": 1,
+                "opportunity_score": 19,
+                "volumes_history": [
+                  8100,
+                  3600,
+                  3600,
+                  4400,
+                  5400,
+                  4400,
+                  5400,
+                  6600,
+                  4400,
+                  5400,
+                  5400,
+                  4400
+                ],
+                "status": {
+                  "trending": false,
+                  "evergreen": true,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Book club gift",
+                "avg_volume": 1600,
+                "competition": 1,
+                "opportunity_score": 19,
+                "volumes_history": [
+                  1300,
+                  1000,
+                  1000,
+                  880,
+                  880,
+                  720,
+                  720,
+                  880,
+                  880,
+                  1300,
+                  4400,
+                  4400
+                ],
+                "status": {
+                  "trending": true,
+                  "evergreen": true,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Dog mom shirt",
+                "avg_volume": 1900,
+                "competition": 1,
+                "opportunity_score": 16,
+                "volumes_history": [
+                  1300,
+                  1300,
+                  1600,
+                  2400,
+                  3600,
+                  1600,
+                  1600,
+                  1300,
+                  1300,
+                  1300,
+                  1300,
+                  2400
+                ],
+                "status": {
+                  "trending": false,
+                  "evergreen": true,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              },
+              {
+                "keyword": "Mothers day shirt",
+                "avg_volume": 3600,
+                "competition": 1,
+                "opportunity_score": 16,
+                "volumes_history": [
+                  880,
+                  1300,
+                  3600,
+                  14800,
+                  22200,
+                  1300,
+                  480,
+                  320,
+                  590,
+                  320,
+                  260,
+                  210
+                ],
+                "status": {
+                  "trending": false,
+                  "evergreen": false,
+                  "promising": false
+                },
+                "is_sniper_seo": true
+              }
+            ],
+            "mockups": [
+              "https://cpzbipqceavfeoiqkenz.supabase.co/storage/v1/object/public/mockups_bucket/a9267dac-3307-4444-b58e-2493147bca71/1771039058138_Group_143.jpg"
+            ],
+            "payload": {
+              "image_url": "https://cpzbipqceavfeoiqkenz.supabase.co/storage/v1/object/public/mockups_bucket/a9267dac-3307-4444-b58e-2493147bca71/1771039058138_Group_143.jpg",
+              "visual_aesthetic": "Cozy Minimalist / Bookish Casual",
+              "visual_typography": "Bold, heavy-weight geometric sans-serif font in all-caps (similar to Futura Extra Bold or Cooper Hewitt Heavy) featuring a definitive period at the end of the phrase.",
+              "visual_graphics": "Minimalist line-art illustration featuring a puppy/dog head peeking over the top of an open hardcover book.",
+              "visual_colors": "Terracotta / Rust / Burnt Orange fabric base with solid Black ink print.",
+              "visual_target_audience": "Millennial and Gen Z women who identify as 'Dog Moms' and avid readers (active in BookTok or Bookstagram communities). Ideal for librarians, teachers, and introverts looking for comfortable loungewear.",
+              "visual_overall_vibe": "Wholesome, relatable, warm, and introverted. It radiates a 'perfect weekend' energy focused on quiet comfort.",
+              "categorization": {
+                "theme": "Hobby",
+                "niche": "Book lover",
+                "sub_niche": "None"
+              },
+              "product_details": {
+                "product_type": "T-shirt",
+                "tone": "Auto-detect",
+                "client_description": "Dogs & book shirt. Cute dog."
+              },
+              "shop_context": {
+                "shop_name": "DourliacStudio",
+                "shop_bio": "DourliacStudio offers a diverse collection of print-on-demand apparel, ranging from cozy book and pet-themed designs to humorous neurodivergent and inspirational Christian faith apparel.",
+                "target_audience": "Book lovers, cat and dog owners, tech enthusiasts, neurodivergent individuals, and people seeking Christian faith-based apparel.",
+                "brand_tone": "Eclectic, Humorous, and Inspirational",
+                "brand_keywords": [
+                  "Reading",
+                  "Animals",
+                  "Neurodiversity",
+                  "Christian Faith",
+                  "Humor"
+                ],
+                "signature_text": "Thank you for choosing DourliacStudio – your support helps us share a diverse range of cozy, humorous, and faith-inspired designs!"
+              }
+            },
+            "metadata": {
+              "app_version": "1.0.0",
+              "timestamp": "2026-02-14T04:05:41.766Z"
+            }
+          },
+          "webhookUrl": "https://n8n.srv840060.hstgr.cloud/webhook/9d856f4f-d5ae-4fce-b2da-72f584288dc2",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Keywords generation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tags to evaluate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare SEO brief",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Scrape Esty shop wep page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Filter 5 best",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Keywords generation",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Optimized Title and Description",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Write shop profile info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write shop profile info",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser2": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Write shop profile info",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Image analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Image analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser4": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Image analysis",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image analysis": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Keywords generation",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keywords generation": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO stats": {
+      "main": [
+        [
+          {
+            "node": "Filter keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter keywords": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Optimized Title and Description": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write shop profile info": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Esty shop wep page": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tags to evaluate": {
+      "main": [
+        [
+          {
+            "node": "Split Out1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare SEO brief": {
+      "main": [
+        [
+          {
+            "node": "Optimized Title and Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "sniper prompt",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter 5 best": {
+      "main": [
+        [
+          {
+            "node": "sniper prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser7": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "sniper prompt",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO stats1": {
+      "main": [
+        [
+          {
+            "node": "Filter keywords1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter keywords1": {
+      "main": [
+        [
+          {
+            "node": "sniper_keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sniper_keywords": {
+      "main": [
+        [
+          {
+            "node": "finalSeolist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model6": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Optimized Title and Description",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model7": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Tags insights1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser8": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Tags insights1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tags insights1": {
+      "main": [
+        [
+          {
+            "node": "Global scoring1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Global scoring1": {
+      "main": [
+        [
+          {
+            "node": "Global Eval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser9": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Global Eval",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model8": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Global Eval",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out1": {
+      "main": [
+        [
+          {
+            "node": "Tags insights1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "finalSeolist": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Global Eval": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sniper prompt": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO stats1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "03531822-bc43-4ad4-8669-cda3bb45c88d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cfd1401e3f0b2075dfe4693ad7a10a5d7ad8db7a3e3bef4f1f623f48b2a7a4ed"
+  },
+  "id": "fpLJwWveS4JGdh8k",
+  "tags": []
+}
