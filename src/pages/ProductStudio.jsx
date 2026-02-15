@@ -42,7 +42,30 @@ const STATUS_IDS = {
    );
  };
  
- const ProductStudio = () => {
+ const formatCategorizationPayload = (context) => {
+    // Check for specific custom niche markers set by OptimizationForm
+    const isCustom = context.theme_name === 'Custom Theme' && context.niche_name === 'Custom Niche';
+    
+    if (isCustom) {
+        return {
+            theme: null,
+            niche: null,
+            sub_niche: null,
+            custom_niche: context.sub_niche_name, // The actual custom value is here
+            custom_listing: context.custom_listing // Preserve existing logic if needed
+        };
+    }
+    
+    return {
+        theme: context.theme_name || null,
+        niche: context.niche_name || null,
+        sub_niche: context.sub_niche_name || null,
+        custom_niche: null, // Explicitly null for standard niches
+        custom_listing: context.custom_listing || null
+    };
+};
+
+const ProductStudio = () => {
   const { user, profile } = useAuth();
   const location = useLocation();
   const [showResults, setShowResults] = useState(false);
@@ -152,7 +175,7 @@ const STATUS_IDS = {
                   const { error: updateError } = await supabase
                       .from('listings')
                       .update({ 
-                          is_imageAnalysed: true,
+                          is_image_analysed: true,
                           visual_aesthetic: data.aesthetic_style,
                           visual_typography: data.typography_details,
                           visual_graphics: data.graphic_elements,
@@ -282,7 +305,10 @@ const STATUS_IDS = {
 
   const handleAnalyze = async (formData) => {
     // Save context for drafting phase
-    setAnalysisContext(formData);
+    setAnalysisContext({
+        ...formData,
+        is_custom: formData.theme_name === 'Custom Theme' && formData.niche_name === 'Custom Niche'
+    });
     // Fallback: Use existing result image if valid and no new image selected
     if (!selectedImage && !formData.existingImageUrl && results?.imageUrl) {
 
@@ -301,7 +327,13 @@ const STATUS_IDS = {
 
     try {
         let activeListingId = listingId;
-        setResults(null);
+
+        
+        // Preserve existing competitor data before clearing state
+        const preservedCompetitorSeed = results?.competitor_seed;
+        const preservedCompetitorAnalytics = results?.analytics?.filter(k => k.is_competition) || [];
+
+
         
         // Show skeleton immediately — user sees loading from the start
         setIsInsightLoading('seo');
@@ -400,12 +432,7 @@ const STATUS_IDS = {
                 visual_colors: visualAnalysis.colors,
                 visual_target_audience: visualAnalysis.target_audience,
                 visual_overall_vibe: visualAnalysis.overall_vibe,
-                categorization: {
-                    theme: formData.theme_name || null,
-                    niche: formData.niche_name || null,
-                    sub_niche: formData.sub_niche_name || null,
-                    custom_listing: formData.custom_theme || formData.custom_niche ? JSON.stringify(customData) : null
-                },
+                categorization: formatCategorizationPayload(formData),
                 product_details: {
                     product_type: formData.product_type_name,
                     tone: formData.tone_name,
@@ -440,8 +467,8 @@ const STATUS_IDS = {
         const responseData = response.data;
         
         let seoAnalysis = [];
-        let generatedTitle = "SEO Analysis Completed";
-        let generatedDescription = "Please review the competition analysis below.";
+        let generatedTitle = results?.title || "SEO Analysis Completed";
+        let generatedDescription = results?.description || "Please review the competition analysis below.";
 
         // Handle different response structures
         // N8N wraps the response in an array: [{global_listing_strength, keywords: [...]}]
@@ -452,8 +479,9 @@ const STATUS_IDS = {
         
         if (keywordArray && Array.isArray(keywordArray)) {
             seoAnalysis = keywordArray;
-            generatedTitle = unwrapped.title || generatedTitle;
-            generatedDescription = unwrapped.description || generatedDescription;
+            // Only update title/desc if explicitly returned by AI
+            if (unwrapped.title) generatedTitle = unwrapped.title;
+            if (unwrapped.description) generatedDescription = unwrapped.description;
         } else if (Array.isArray(responseData) && responseData.length > 0 && responseData[0]?.keyword) {
             // Case: Response is a flat array of keyword objects directly
             seoAnalysis = responseData;
@@ -506,10 +534,14 @@ const STATUS_IDS = {
         }));
 
         // Delete old stats before inserting fresh ones (handles re-analysis / Refresh Data)
+
+        // Delete old stats before inserting fresh ones (handles re-analysis / Refresh Data)
+        // IMPORTANT: Only delete non-competitor stats to preserve competition analysis
         const { error: statsDeleteError } = await supabase
             .from('listing_seo_stats')
             .delete()
-            .eq('listing_id', activeListingId);
+            .eq('listing_id', activeListingId)
+            .eq('is_competition', false); // Only delete standard SEO keywords
 
         if (statsDeleteError) throw statsDeleteError;
 
@@ -529,19 +561,23 @@ const STATUS_IDS = {
             strategic_verdict: strategicVerdict,
             improvement_priority: improvementPriority,
             tags: statsToInsert.map(s => s.tag),
-            analytics: statsToInsert.map(s => ({
-                keyword: s.tag,
-                volume: s.search_volume,
-                competition: s.competition,
-                score: s.opportunity_score,
-                volume_history: s.volume_history,
-                is_trending: s.is_trending,
-                is_evergreen: s.is_evergreen,
-                is_promising: s.is_promising,
-                insight: s.insight,
-                is_top: s.is_top,
-                is_competition: false
-            }))
+            analytics: [
+                ...statsToInsert.map(s => ({
+                    keyword: s.tag,
+                    volume: s.search_volume,
+                    competition: s.competition,
+                    score: s.opportunity_score,
+                    volume_history: s.volume_history,
+                    is_trending: s.is_trending,
+                    is_evergreen: s.is_evergreen,
+                    is_promising: s.is_promising,
+                    insight: s.insight,
+                    is_top: s.is_top,
+                    is_competition: false
+                })),
+                // Merge preserved competitor analytics back into the results
+                ...preservedCompetitorAnalytics
+            ]
         };
 
         // 6. Switch skeleton phase to 'insight' and set results
@@ -658,11 +694,7 @@ const STATUS_IDS = {
                 visual_colors: visualAnalysis.colors,
                 visual_target_audience: visualAnalysis.target_audience,
                 visual_overall_vibe: visualAnalysis.overall_vibe,
-                categorization: {
-                    theme: analysisContext.theme_name || null,
-                    niche: analysisContext.niche_name || null,
-                    sub_niche: analysisContext.sub_niche_name || null
-                },
+                categorization: formatCategorizationPayload(analysisContext),
                 product_details: {
                     product_type: analysisContext.product_type_name || "Product",
                     tone: analysisContext.tone_name || "Engaging",
@@ -758,7 +790,7 @@ const STATUS_IDS = {
             evergreen: k.is_evergreen,
             promising: k.is_promising
           },
-          is_sniper_seo: true
+          is_sniper_seo: fromSniper
         })),
         mockups: [formattedResults.imageUrl],
         payload: {
@@ -769,11 +801,7 @@ const STATUS_IDS = {
           visual_colors: visualAnalysis.colors,
           visual_target_audience: visualAnalysis.target_audience,
           visual_overall_vibe: visualAnalysis.overall_vibe,
-          categorization: {
-            theme: formData.theme_name || null,
-            niche: formData.niche_name || null,
-            sub_niche: formData.sub_niche_name || null
-          },
+          categorization: formatCategorizationPayload(formData),
           product_details: {
             product_type: formData.product_type_name || "Product",
             tone: formData.tone_name || "Engaging",
@@ -810,25 +838,29 @@ const STATUS_IDS = {
       const insightListingId = activeListingId || listingId;
 
       // 1. Save global audit fields to listings table
-      const globalStrength = unwrapped.global_listing_strength ?? null;
-      const statusLabel = unwrapped.global_status_label ?? null;
-      const strategicVerdict = unwrapped.global_strategic_verdict ?? null;
-      const improvementPriority = unwrapped.improvement_priority ?? null;
-      const scoreExplanation = unwrapped.score_explanation ?? null;
+      // Use existing values as fallbacks if API returns null/undefined
+      const globalStrength = unwrapped.global_listing_strength;
+      const statusLabel = unwrapped.global_status_label;
+      const strategicVerdict = unwrapped.global_strategic_verdict;
+      const improvementPriority = unwrapped.improvement_priority;
+      const scoreExplanation = unwrapped.score_explanation;
 
-      const { error: listingUpdateError } = await supabase
-        .from('listings')
-        .update({
-          global_strength: globalStrength,
-          status_label: statusLabel,
-          strategic_verdict: strategicVerdict,
-          improvement_priority: improvementPriority,
-          score_explanation: scoreExplanation
-        })
-        .eq('id', insightListingId);
+      const updatePayload = {};
+      if (globalStrength !== undefined) updatePayload.global_strength = globalStrength;
+      if (statusLabel !== undefined) updatePayload.status_label = statusLabel;
+      if (strategicVerdict !== undefined) updatePayload.strategic_verdict = strategicVerdict;
+      if (improvementPriority !== undefined) updatePayload.improvement_priority = improvementPriority;
+      if (scoreExplanation !== undefined) updatePayload.score_explanation = scoreExplanation;
 
-      if (listingUpdateError) {
-        console.error("Failed to save insight global fields:", listingUpdateError);
+      if (Object.keys(updatePayload).length > 0) {
+        const { error: listingUpdateError } = await supabase
+          .from('listings')
+          .update(updatePayload)
+          .eq('id', insightListingId);
+
+        if (listingUpdateError) {
+          console.error("Failed to save insight global fields:", listingUpdateError);
+        }
       }
 
       // 2. Update listing_seo_stats with insight/is_top per keyword
@@ -929,11 +961,7 @@ const STATUS_IDS = {
           visual_colors: visualAnalysis.colors,
           visual_target_audience: visualAnalysis.target_audience,
           visual_overall_vibe: visualAnalysis.overall_vibe,
-          categorization: {
-            theme: analysisContext.theme_name || null,
-            niche: analysisContext.niche_name || null,
-            sub_niche: analysisContext.sub_niche_name || null
-          },
+          categorization: formatCategorizationPayload(analysisContext),
           product_details: {
             product_type: analysisContext.product_type_name || "Product",
             tone: analysisContext.tone_name || "Engaging",
@@ -1088,6 +1116,8 @@ const STATUS_IDS = {
 
     try {
       const statsToUse = results.analytics || [];
+      // Preserve competitor analytics
+      const preservedCompetitorAnalytics = results.analytics?.filter(k => k.is_competition) || [];
 
       const payload = {
         action: 'seo_sniper',
@@ -1121,11 +1151,7 @@ const STATUS_IDS = {
           visual_colors: visualAnalysis.colors,
           visual_target_audience: visualAnalysis.target_audience,
           visual_overall_vibe: visualAnalysis.overall_vibe,
-          categorization: {
-            theme: analysisContext.theme_name || null,
-            niche: analysisContext.niche_name || null,
-            sub_niche: analysisContext.sub_niche_name || null
-          },
+          categorization: formatCategorizationPayload(analysisContext),
           product_details: {
             product_type: analysisContext.product_type_name || "Product",
             tone: analysisContext.tone_name || "Engaging",
@@ -1204,7 +1230,8 @@ const STATUS_IDS = {
       const { error: deleteError } = await supabase
         .from('listing_seo_stats')
         .delete()
-        .eq('listing_id', listingId);
+        .eq('listing_id', listingId)
+        .eq('is_competition', false); // Only delete non-competitor stats
       if (deleteError) console.error("Failed to delete old stats:", deleteError);
 
       // Insert new sniper stats
@@ -1217,20 +1244,24 @@ const STATUS_IDS = {
       const formattedResults = {
         ...results,
         tags: statsToInsert.map(s => s.tag),
-        analytics: statsToInsert.map(s => ({
-          keyword: s.tag,
-          volume: s.search_volume,
-          competition: s.competition,
-          score: s.opportunity_score,
-          volume_history: s.volume_history,
-          is_trending: s.is_trending,
-          is_evergreen: s.is_evergreen,
-          is_promising: s.is_promising,
-          insight: s.insight,
-          is_top: s.is_top,
-          is_sniper_seo: s.is_sniper_seo,
-          is_competition: false
-        }))
+        analytics: [
+          ...statsToInsert.map(s => ({
+            keyword: s.tag,
+            volume: s.search_volume,
+            competition: s.competition,
+            score: s.opportunity_score,
+            volume_history: s.volume_history,
+            is_trending: s.is_trending,
+            is_evergreen: s.is_evergreen,
+            is_promising: s.is_promising,
+            insight: s.insight,
+            is_top: s.is_top,
+            is_sniper_seo: s.is_sniper_seo,
+            is_competition: false
+          })),
+          // Merge preserved competitor analytics
+          ...preservedCompetitorAnalytics
+        ]
       };
 
       // Switch to insight phase — old results stay visible, button shows "Generating Insights..."
@@ -1300,7 +1331,6 @@ const STATUS_IDS = {
 
         setAnalysisContext({
             theme_name: listing.themes?.name || "",
-            niche_name: listing.niches?.name || "",
             sub_niche_name: listing.sub_niches?.name || "", 
             product_type_name: listing.product_types?.name || parsedCustom.product_type || "",
             tone_name: listing.tones?.name || "",
@@ -1342,8 +1372,11 @@ const STATUS_IDS = {
                 is_sniper_seo: s.is_sniper_seo ?? false,
                 is_competition: s.is_competition ?? false
             })),
-            is_imageAnalysed: listing.is_imageAnalysed
+            is_imageAnalysed: listing.is_image_analysed || listing.is_imageAnalysed || listing.is_imageanalysed || false
         });
+
+        // Sync local state for the form button
+        setIsImageAnalyzedState(listing.is_image_analysed || listing.is_imageAnalysed || listing.is_imageanalysed || false);
 
         setListingId(listingId);
       

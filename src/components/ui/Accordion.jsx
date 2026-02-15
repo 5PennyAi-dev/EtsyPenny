@@ -8,9 +8,22 @@ const Accordion = ({
     children, 
     headerActions, 
     defaultOpen = true,
-    className = ""
+    className = "",
+    isOpen: controlledIsOpen,
+    onToggle
 }) => {
-    const [isOpen, setIsOpen] = useState(defaultOpen);
+    const [internalIsOpen, setInternalIsOpen] = useState(defaultOpen);
+    
+    const isControlled = controlledIsOpen !== undefined;
+    const isOpen = isControlled ? controlledIsOpen : internalIsOpen;
+
+    const handleToggle = () => {
+        if (isControlled && onToggle) {
+            onToggle(!isOpen);
+        } else {
+            setInternalIsOpen(!isOpen);
+        }
+    };
 
     return (
         <div className={clsx("bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden", className)}>
@@ -21,7 +34,7 @@ const Accordion = ({
                     !isOpen && "border-b-0",
                     isOpen && "border-b border-slate-100"
                 )}
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={handleToggle}
             >
                 <div className="flex items-center gap-2 flex-1">
                     {typeof title === 'string' ? (

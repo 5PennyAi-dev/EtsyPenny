@@ -1,4 +1,4 @@
-import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, Info, Plus, Minus, Save } from 'lucide-react';
+﻿import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
@@ -34,8 +34,8 @@ const Sparkline = ({ data }) => {
           points={points}
         />
       </svg>
-      <span className={`text-[10px] font-bold mt-1 ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-        {isPositive ? '↗' : '↘'} {Math.abs(percentChange).toFixed(0)}%
+      <span className={`text-[10px] font-bold mt-1 flex items-center gap-0.5 ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
+        {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />} {Math.abs(percentChange).toFixed(0)}%
       </span>
     </div>
   );
@@ -102,55 +102,66 @@ const AuditSkeleton = () => (
   </div>
 );
 
-const TableSkeleton = () => (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-pulse mb-8">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-            <div className="h-5 w-44 bg-slate-100 rounded" />
-            <div className="flex gap-3">
-            <div className="h-4 w-16 bg-slate-100 rounded" />
-            <div className="h-4 w-16 bg-slate-100 rounded" />
-            <div className="h-4 w-16 bg-slate-100 rounded" />
+// Reusable Loading Spinner with Message
+const LoadingSpinner = ({ message, subMessage }) => (
+    <div className="flex flex-col items-center justify-center p-12 text-center animate-in fade-in duration-500">
+        <div className="relative mb-6">
+            <div className="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+                <Sparkles size={20} className="text-indigo-600" />
             </div>
         </div>
-        <div className="divide-y divide-slate-100">
-            {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 px-6 py-3.5">
-                <div className="w-4 h-4 bg-slate-100 rounded" />
-                <div className="h-5 w-32 bg-slate-100 rounded-full" />
-                <div className="flex-1" />
-                <div className="h-4 w-14 bg-slate-100 rounded" />
-                <div className="h-5 w-14 bg-slate-100 rounded" />
-                <div className="h-5 w-12 bg-slate-100 rounded" />
-                <div className="h-5 w-10 bg-slate-100 rounded" />
-                <div className="flex gap-1">
-                <div className="w-4 h-4 bg-slate-100 rounded-full" />
-                <div className="w-4 h-4 bg-slate-100 rounded-full" />
-                </div>
+        <h4 className="text-slate-900 font-bold text-base mb-2">
+            {message || 'Loading...'}
+        </h4>
+        <p className="text-slate-500 text-sm max-w-xs mx-auto leading-relaxed">
+            {subMessage || 'Please wait while we analyze your data.'}
+        </p>
+    </div>
+);
+
+const TableSkeleton = ({ message, subMessage }) => (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-8 relative overflow-hidden">
+        {/* Header Skeleton */}
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center opacity-50">
+            <div className="h-5 w-44 bg-slate-200 rounded animate-pulse" />
+            <div className="flex gap-3">
+                <div className="h-4 w-16 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-16 bg-slate-200 rounded animate-pulse" />
             </div>
-            ))}
+        </div>
+        
+        {/* Content with Overlay Spinner */}
+        <div className="relative min-h-[300px]">
+            {/* Background Skeleton Rows */}
+            <div className="divide-y divide-slate-100 opacity-30 pointer-events-none">
+                {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 px-6 py-4">
+                        <div className="w-4 h-4 bg-slate-100 rounded" />
+                        <div className="h-5 w-32 bg-slate-100 rounded-full" />
+                        <div className="flex-1" />
+                        <div className="h-4 w-14 bg-slate-100 rounded" />
+                        <div className="h-5 w-14 bg-slate-100 rounded" />
+                    </div>
+                ))}
+            </div>
+
+            {/* Centered Loading Spinner */}
+            <div className="absolute inset-0 flex items-center justify-center backdrop-blur-[1px]">
+                  <LoadingSpinner message={message} subMessage={subMessage} />
+            </div>
         </div>
     </div>
 );
 
 const SidebarSkeleton = ({ phase }) => (
     <div className="bg-slate-50/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm p-1">
-    <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 min-h-[400px] flex flex-col items-center justify-center">
-        {/* Active spinner */}
-        <div className="relative mb-6">
-        <div className="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin" />
-        <div className="absolute inset-0 flex items-center justify-center">
-            <Sparkles size={20} className="text-indigo-600" />
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 min-h-[400px] flex flex-col items-center justify-center">
+            <LoadingSpinner 
+                message={phase === 'seo' ? 'Generating SEO Tags...' : 'Generating Insights...'} 
+                subMessage={phase === 'seo' ? 'Researching keywords and analyzing competition' : 'Analyzing keywords and calculating your listing score'}
+            />
         </div>
-        </div>
-        <h4 className="text-slate-900 font-bold text-base mb-2">
-        {phase === 'seo' ? 'Generating SEO Tags...' : 'Generating Insights...'}
-        </h4>
-        <p className="text-slate-500 text-sm text-center px-4 leading-relaxed">
-        {phase === 'seo' 
-            ? 'Researching keywords and analyzing competition' 
-            : 'Analyzing keywords and calculating your listing score'}
-        </p>
-    </div>
     </div>
 );
 
@@ -175,7 +186,7 @@ const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority
 
   const tier = getColor(score || 0);
 
-  if (score === null || score === undefined) return null;
+  // if (score === null || score === undefined) return null;
 
   const displayLabel = statusLabel || tier.fallbackLabel;
   const displayVerdict = strategicVerdict || tier.fallbackSub;
@@ -233,7 +244,7 @@ const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority
           <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">{displayVerdict}</p>
         </div>
 
-        {/* SEO Sniper Button — integrated top-right */}
+        {/* SEO Sniper Button â€” integrated top-right */}
         {onSEOSniper && (
           <div className="flex-shrink-0">
             <button
@@ -292,6 +303,16 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
   const [displayedDescription, setDisplayedDescription] = useState("");
   const descriptionRef = useRef(null);
 
+  // --- Accordion State Management ---
+  const [isCompetitionOpen, setIsCompetitionOpen] = useState(false);
+
+  // Auto-open competition accordion when loading starts
+  useEffect(() => {
+    if (isCompetitionLoading) {
+        setIsCompetitionOpen(true);
+    }
+  }, [isCompetitionLoading]);
+
   // Auto-resize description with robust handling
   useLayoutEffect(() => {
     if (descriptionRef.current) {
@@ -310,7 +331,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
     }
   }, [results]);
 
-  // Tag Selection State (must be declared before any early returns — Rules of Hooks)
+  // Tag Selection State (must be declared before any early returns â€” Rules of Hooks)
   const [selectedTags, setSelectedTags] = useState([]);
 
   // Initialize selectedTags when results load
@@ -439,7 +460,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
             {/* Hero Audit Header with integrated SEO Sniper */}
             {isInsightLoading ? (
                 <AuditSkeleton />
-            ) : (results?.global_strength !== null && results?.global_strength !== undefined && (
+            ) : (results && (
                 <AuditHeader 
                     score={results.global_strength}
                     statusLabel={results.status_label}
@@ -453,7 +474,10 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
 
             {/* 1. Full Width Performance Table */}
             {isInsightLoading ? (
-                <TableSkeleton />
+                <TableSkeleton 
+                    message={isInsightLoading === 'insight' ? "Insight generation" : "Generating SEO data"}
+                    subMessage={isInsightLoading === 'insight' ? "Analyzing keywords and calculating your listing score." : "Analyzing search volume, competition, and trends."}
+                />
             ) : (
                 <div className={!results ? "opacity-50 grayscale pointer-events-none" : ""}>
                 <Accordion
@@ -490,23 +514,6 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                             Refresh Data
                          </button>
 
-                         {onCompetitionAnalysis && (
-                             <button
-                                 onClick={(e) => { e.stopPropagation(); onCompetitionAnalysis(); }}
-                                 disabled={!!isCompetitionLoading}
-                                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors border shadow-sm
-                                     ${isCompetitionLoading
-                                         ? 'text-slate-400 bg-slate-50 border-slate-200 cursor-not-allowed'
-                                         : 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
-                                     }`}
-                             >
-                                 {isCompetitionLoading ? (
-                                     <><Loader2 size={12} className="animate-spin" /> Analyzing...</>
-                                 ) : (
-                                     <><TrendingUp size={12} /> Analyse Competition</>
-                                 )}
-                             </button>
-                         )}
                          <div className="flex items-center gap-3 text-xs text-slate-500 ml-2 hidden sm:flex border-l border-slate-200 pl-3">
                              <span className="flex items-center gap-1" title="Trending"><Flame size={12} className="text-orange-500"/></span>
                              <span className="flex items-center gap-1" title="Evergreen"><Leaf size={12} className="text-emerald-500"/></span>
@@ -659,9 +666,10 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
             )}
 
             {/* 2. Competitors Keywords Table (Read-only) */}
-            <div className={!results || isInsightLoading ? "opacity-50 grayscale pointer-events-none" : ""}>
+            <div className={!results && !isCompetitionLoading ? "opacity-50 grayscale pointer-events-none" : ""}>
                 <Accordion
-                    defaultOpen={!!results} // Collapsed if no results
+                    isOpen={isCompetitionOpen}
+                    onToggle={setIsCompetitionOpen}
                     className="border-orange-200"
                     title={
                         <div className="flex items-center gap-2">
@@ -675,7 +683,11 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                     <Info size={10} className="text-orange-500 group-hover/compinfo:text-orange-700 transition-colors" />
                                 </div>
                                 <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-4 py-3 text-xs text-white bg-slate-800 rounded-lg shadow-xl opacity-0 invisible group-hover/compinfo:opacity-100 group-hover/compinfo:visible transition-all z-50 w-72 pointer-events-none leading-relaxed whitespace-normal">
-                                    Based on the first ten Etsy listings returned by Google search with keywords <span className="font-bold text-orange-300">"{results?.competitor_seed || 'N/A'}"</span>.
+                                    {results?.competitor_seed && competitionAnalytics.length > 0 ? (
+                                        <>Based on the first ten Etsy listings returned by Google search with keywords <span className="font-bold text-orange-300">"{results.competitor_seed}"</span>.</>
+                                    ) : (
+                                        "Launch competition analysis to see results"
+                                    )}
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-[6px] border-b-slate-800 border-t-transparent border-l-transparent border-r-transparent"></div>
                                 </div>
                             </div>
@@ -688,14 +700,41 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                     }
                     headerActions={
                         results && (
-                        <div className="flex items-center gap-4 text-xs text-slate-500 hidden sm:flex">
-                             <span className="flex items-center gap-1"><Flame size={12} className="text-orange-500"/> Trending</span>
-                             <span className="flex items-center gap-1"><Leaf size={12} className="text-emerald-500"/> Evergreen</span>
+                        <div className="flex items-center gap-2">
+                             {onCompetitionAnalysis && (
+                                 <button
+                                     onClick={(e) => { e.stopPropagation(); onCompetitionAnalysis(); }}
+                                     disabled={!!isCompetitionLoading}
+                                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors border shadow-sm
+                                         ${isCompetitionLoading
+                                             ? 'text-slate-400 bg-slate-50 border-slate-200 cursor-not-allowed'
+                                             : 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+                                         }`}
+                                 >
+                                     {isCompetitionLoading ? (
+                                         <><Loader2 size={12} className="animate-spin" /> Analyzing...</>
+                                     ) : (
+                                         <><TrendingUp size={12} /> Analyse Competition</>
+                                     )}
+                                 </button>
+                             )}
+                             <div className="flex items-center gap-4 text-xs text-slate-500 hidden sm:flex border-l border-slate-200 pl-3">
+                                  <span className="flex items-center gap-1"><Flame size={12} className="text-orange-500"/> Trending</span>
+                                  <span className="flex items-center gap-1"><Leaf size={12} className="text-emerald-500"/> Evergreen</span>
+                             </div>
                         </div>
                         )
                     }
                 >
-                    <div className="border-t border-orange-100">
+                    <div className="border-t border-orange-100 relative min-h-[300px]">
+                        {isCompetitionLoading ? (
+                            <div className="flex items-center justify-center p-12 h-[300px]">
+                                <LoadingSpinner 
+                                    message="Analysing Competitors..." 
+                                    subMessage="Identifiying best keywords from top performing listings." 
+                                />
+                            </div>
+                        ) : (
                         <table className="w-full text-sm text-left">
                             <thead className="bg-orange-50/30 text-slate-500 font-medium border-b border-orange-100">
                                 <tr>
@@ -797,6 +836,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                 ))}
                             </tbody>
                         </table>
+                        )}
                     </div>
                 </Accordion>
                 </div>
@@ -911,44 +951,47 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                                         .map(k => {
                                                             // Calculate Trend %
                                                             let trend = 0;
-                                                            if (k.volume_history && k.volume_history.length > 0) {
-                                                                const first = k.volume_history[0] || 1; // Avoid divide by zero
-                                                                const last = k.volume_history[k.volume_history.length - 1] || 0;
-                                                                trend = Math.round(((last - first) / first) * 100);
-                                                            }
-
-                                                            return { 
-                                                                keyword: k.keyword, 
-                                                                score: k.score,
+                                                            const first = k.volume_history?.[0] || 1;
+                                                            const last = k.volume_history?.[k.volume_history.length - 1] || 0;
+                                                            trend = Math.round(((last - first) / first) * 100);
+                                                            
+                                                            return {
+                                                                keyword: k.keyword,
                                                                 volume: k.volume,
-                                                                competition: k.competition,
+                                                                competition: k.competition, 
+                                                                score: k.score,
                                                                 trend: trend,
-                                                                volume_history: k.volume_history || [],
                                                                 is_trending: k.is_trending,
                                                                 is_evergreen: k.is_evergreen,
-                                                                is_promising: k.is_promising,
-                                                                insight: k.insight || null,
-                                                                is_top: k.is_top ?? null,
-                                                                is_sniper_seo: k.is_sniper_seo ?? false
+                                                                is_promising: k.is_promising
                                                             };
                                                         })
-                                                }}
+                                                }} 
+                                                fileName={`${displayedTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_analysis.pdf`}
                                             />
                                         }
-                                        fileName={`${displayedTitle.substring(0, 20).replace(/\s+/g, '_')}_SEO_v4.pdf`}
-                                        className="w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium rounded-lg border border-indigo-200 transition-all flex items-center justify-center gap-2"
+                                        className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold rounded-lg border border-transparent transition-all flex items-center justify-center gap-2 shadow-sm"
                                     >
-                                        {({ blob, url, loading, error }) => (
-                                            loading ? 'Generating PDF...' : <><FileDown size={16} /> Export to PDF</>
-                                        )}
+                                        {({ blob, url, loading, error }) =>
+                                            loading ? (
+                                                <>
+                                                    <Loader2 size={16} className="animate-spin" />
+                                                    <span>Preparing PDF...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Download size={16} />
+                                                    <span>Export PDF Report</span>
+                                                </>
+                                            )
+                                        }
                                     </PDFDownloadLink>
-                                )}
-                            </div>
+                                    )}
+                                </div>
                         </div>
                     )}
-                </div>
+             </div>
         </div>
-
       </div>
     </div>
   );
