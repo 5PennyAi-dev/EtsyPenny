@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Zap, Sparkles, Edit3, RefreshCw, ChevronRight, ChevronUp, Wand2, Palette, Type, LayoutTemplate, Target, Heart } from 'lucide-react';
+import { Zap, Sparkles, Edit3, RefreshCw, ChevronRight, ChevronUp, Wand2, Palette, Type, LayoutTemplate, Target, Heart, Shirt } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ImageUpload from '../components/studio/ImageUpload';
 import OptimizationForm from '../components/studio/OptimizationForm';
@@ -18,8 +18,31 @@ const STATUS_IDS = {
   SEO_DONE: '35660e24-94bb-4586-aa5a-a5027546b4a1',
   COMPLETE: '28a11ca0-bcfc-42e0-971d-efc320f78424'
 };
-
-const ProductStudio = () => {
+ 
+ const AutoResizeTextarea = ({ value, onChange, placeholder, className, ...props }) => {
+   const textareaRef = useRef(null); // useRef is imported in the file? Yes line 1 says import { useState, useEffect }... wait check line 1.
+ 
+   useEffect(() => {
+     if (textareaRef.current) {
+       textareaRef.current.style.height = 'auto';
+       textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+     }
+   }, [value]);
+ 
+   return (
+     <textarea
+       ref={textareaRef}
+       value={value}
+       onChange={onChange}
+       placeholder={placeholder}
+       className={`resize-none overflow-hidden ${className}`}
+       rows={1}
+       {...props}
+     />
+   );
+ };
+ 
+ const ProductStudio = () => {
   const { user, profile } = useAuth();
   const location = useLocation();
   const [showResults, setShowResults] = useState(false);
@@ -33,6 +56,7 @@ const ProductStudio = () => {
   const [isCompetitionLoading, setIsCompetitionLoading] = useState(false);
   const [analysisContext, setAnalysisContext] = useState(null);
   const [listingName, setListingName] = useState("");
+  const [isImageAnalyzedState, setIsImageAnalyzedState] = useState(false);
   
   // Visual Analysis State
   const [isAnalyzingDesign, setIsAnalyzingDesign] = useState(false);
@@ -53,6 +77,9 @@ const ProductStudio = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingRelaunchData, setPendingRelaunchData] = useState(null);
 
+  // Active Session State for "New Listing" flow
+  const [isNewListingActive, setIsNewListingActive] = useState(false);
+
   // No changes to imports
 
   // ... (keep useEffect for realtime as a backup or removal? Let's keep it but focusing on the direct response)
@@ -60,12 +87,7 @@ const ProductStudio = () => {
   // But since the Status won't change to 'completed' until WE do it here, the realtime won't fire early.
   // Let's rely on the direct response for speed and reliability if N8N returns data.
   // Auto-resize visual analysis textareas when values change programmatically
-  useEffect(() => {
-      document.querySelectorAll('[data-visual-field]').forEach(el => {
-          el.style.height = 'auto';
-          el.style.height = el.scrollHeight + 'px';
-      });
-  }, [visualAnalysis]);
+
 
   // Visual Analysis Handler
   const handleAnalyzeDesign = async () => {
@@ -107,7 +129,7 @@ const ProductStudio = () => {
           };
 
           const response = await axios.post(webhookUrl, payload);
-          console.log("Visual Analysis Response:", response.data);
+
           
           // Handle n8n array structure: [{ output: { visual_analysis: { ... } } }]
           // Or direct object if changed later
@@ -123,6 +145,26 @@ const ProductStudio = () => {
                   target_audience: data.target_audience || "",
                   overall_vibe: data.overall_vibe || ""
               });
+
+              setIsImageAnalyzedState(true);
+
+              if (listingId) {
+                  const { error: updateError } = await supabase
+                      .from('listings')
+                      .update({ 
+                          is_imageAnalysed: true,
+                          visual_aesthetic: data.aesthetic_style,
+                          visual_typography: data.typography_details,
+                          visual_graphics: data.graphic_elements,
+                          visual_colors: data.color_palette,
+                          visual_target_audience: data.target_audience,
+                          visual_overall_vibe: data.overall_vibe
+                      })
+                      .eq('id', listingId);
+                  
+                  if (updateError) console.error("Failed to update visual analysis stats:", updateError);
+              }
+
               toast.success("Visual analysis complete! ✨");
           }
 
@@ -243,7 +285,7 @@ const ProductStudio = () => {
     setAnalysisContext(formData);
     // Fallback: Use existing result image if valid and no new image selected
     if (!selectedImage && !formData.existingImageUrl && results?.imageUrl) {
-        console.log("Restoring existing image URL from results");
+
         formData.existingImageUrl = results.imageUrl;
     }
 
@@ -271,11 +313,11 @@ const ProductStudio = () => {
         let publicUrl = formData.existingImageUrl;
 
         if (formData.existingImageUrl) {
-            console.log("Using existing image:", formData.existingImageUrl);
+
              // Skip upload, use existing URL
         } else {
             // 1. Upload Image
-            console.log("Starting upload process...");
+
             const sanitizedFileName = selectedImage.name.replace(/[^a-zA-Z0-9.-]/g, '_');
             const filename = `${user.id}/${Date.now()}_${sanitizedFileName}`;
 
@@ -387,14 +429,14 @@ const ProductStudio = () => {
 
         // Note: We expect the N8N workflow to return the analysis data in the response
         const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-        console.log("Calling Webhook:", webhookUrl);
+
 
         const response = await axios.post(
             webhookUrl, 
             webhookPayload
         );
 
-        console.log("N8N Response:", response.data);
+
         const responseData = response.data;
         
         let seoAnalysis = [];
@@ -425,7 +467,7 @@ const ProductStudio = () => {
         const statusLabel = unwrapped?.global_status_label ?? null;
         const strategicVerdict = unwrapped?.global_strategic_verdict ?? null;
         const improvementPriority = unwrapped?.improvement_priority ?? null;
-        console.log("Global Audit extracted:", { globalStrength, statusLabel, strategicVerdict, improvementPriority });
+
 
         // 4. Save Results to Database (silently, skeleton stays visible)
 
@@ -546,8 +588,40 @@ const ProductStudio = () => {
 
 
 
+
+  const handleSaveListingInfo = async (title, description) => {
+    if (!listingId) {
+        toast.error("No active listing to save.");
+        return;
+    }
+
+    try {
+        const { error } = await supabase
+            .from('listings')
+            .update({
+                generated_title: title,
+                generated_description: description
+            })
+            .eq('id', listingId);
+
+        if (error) throw error;
+        
+        // Update local state to reflect saved changes
+        setResults(prev => ({
+            ...prev,
+            title: title,
+            description: description
+        }));
+
+        toast.success("Listing saved successfully!");
+    } catch (err) {
+        console.error("Error saving listing info:", err);
+        toast.error("Failed to save changes.");
+    }
+  };
+
   const handleGenerateDraft = async (selectedTags = []) => {
-      console.log("Draft Gen: Context Check", { isGeneratingDraft, hasResults: !!results, hasContext: !!analysisContext });
+
       if (isGeneratingDraft || !results || !analysisContext) {
           console.error("Draft Generation Aborted: Missing prerequisites.");
           return;
@@ -606,7 +680,7 @@ const ProductStudio = () => {
         };
 
         const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-        console.log("Calling Draft Webhook:", webhookUrl);
+
 
         const response = await axios.post(
             webhookUrl,
@@ -647,7 +721,7 @@ const ProductStudio = () => {
                  console.error("Failed to save draft status:", updateError);
                  toast.error("Draft generated but failed to update status.");
              } else {
-                 console.log("Listing status updated to COMPLETE");
+
                  toast.success("Magic Draft generated and listing completed!");
              }
         }
@@ -721,10 +795,10 @@ const ProductStudio = () => {
       };
 
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-      console.log("Auto-triggering generateInsight:", webhookUrl);
+
 
       const response = await axios.post(webhookUrl, payload);
-      console.log("generateInsight Response:", response.data);
+
 
       // Parse response (n8n wraps in array)
       const unwrapped = Array.isArray(response.data) ? response.data[0] : response.data;
@@ -881,11 +955,11 @@ const ProductStudio = () => {
       };
 
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-      console.log("Calling Competition Analysis Webhook:", webhookUrl);
+
 
       const response = await axios.post(webhookUrl, payload);
-      console.log("Competition Analysis Response:", response.data);
-      console.log("Competition Analysis response type:", typeof response.data, "isArray:", Array.isArray(response.data));
+
+
 
       // Robust parsing: handle multiple n8n response formats
       let rawData = response.data;
@@ -894,7 +968,7 @@ const ProductStudio = () => {
       }
 
       const unwrapped = Array.isArray(rawData) ? rawData[0] : rawData;
-      console.log("Competition unwrapped:", unwrapped ? Object.keys(unwrapped) : 'null/undefined');
+
 
       if (!unwrapped) {
         toast.error("Competition Analysis: Empty response");
@@ -908,21 +982,21 @@ const ProductStudio = () => {
       let competitionKeywords = unwrapped.selectedTags || unwrapped.keywords || [];
       const competitorSeed = unwrapped.competitor_seed || null;
 
-      console.log("Competition competitor_seed:", competitorSeed);
+
 
       // If unwrapped itself is a keyword object (flat array response), use the full rawData array
       if (competitionKeywords.length === 0 && unwrapped.keyword && Array.isArray(rawData)) {
         competitionKeywords = rawData;
-        console.log("Competition: Using flat array format, found", competitionKeywords.length, "keywords");
+
       }
 
       // Handle double-wrapped: unwrapped is itself an array
       if (competitionKeywords.length === 0 && Array.isArray(unwrapped)) {
         competitionKeywords = unwrapped;
-        console.log("Competition: Using double-wrapped array format, found", competitionKeywords.length, "keywords");
+
       }
 
-      console.log("Competition keywords extracted:", competitionKeywords.length, competitionKeywords.slice(0, 2));
+
 
       if (competitionKeywords.length === 0) {
         toast.error("Competition Analysis: No keywords returned");
@@ -1073,11 +1147,11 @@ const ProductStudio = () => {
       };
 
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-      console.log("Calling SEO Sniper Webhook:", webhookUrl);
+
 
       const response = await axios.post(webhookUrl, payload);
-      console.log("SEO Sniper Raw Response:", JSON.stringify(response.data).substring(0, 500));
-      console.log("SEO Sniper response.data type:", typeof response.data, "isArray:", Array.isArray(response.data));
+
+
 
       // Robust unwrapping: handle string, double-array, or object responses
       let rawData = response.data;
@@ -1095,7 +1169,7 @@ const ProductStudio = () => {
         unwrapped = unwrapped[0];
       }
 
-      console.log("SEO Sniper unwrapped:", unwrapped ? Object.keys(unwrapped) : 'null/undefined');
+
 
       if (!unwrapped) {
         toast.error("SEO Sniper: Empty response");
@@ -1185,6 +1259,8 @@ const ProductStudio = () => {
      setIsFormCollapsed(true);
   };
 
+
+
   const handleNewAnalysis = () => {
     setIsFormCollapsed(false);
     setShowResults(false);
@@ -1194,6 +1270,7 @@ const ProductStudio = () => {
     setAnalysisContext(null);
     setListingName("");
     setFormKey(prev => prev + 1); // Reset form state
+    setIsNewListingActive(true); // Manually activate the form for a new session
   };
 
   const handleLoadListing = async (listingId) => {
@@ -1264,7 +1341,8 @@ const ProductStudio = () => {
                 is_top: s.is_top ?? null,
                 is_sniper_seo: s.is_sniper_seo ?? false,
                 is_competition: s.is_competition ?? false
-            }))
+            })),
+            is_imageAnalysed: listing.is_imageAnalysed
         });
 
         setListingId(listingId);
@@ -1318,6 +1396,54 @@ const ProductStudio = () => {
             <span className="italic">{tone_name}</span>
         </div>
     );
+  };
+
+  // --- ADD COMPETITOR KEYWORD TO PERFORMANCE ---
+  const handleAddKeywordToPerformance = async (keywordData) => {
+    // Fix: Use state listingId instead of results.listing_id which might be missing
+    const currentListingId = listingId || results?.listing_id;
+    
+    if (!currentListingId) {
+        console.error("Missing listing ID. State:", { listingId, results });
+        toast.error("Error: Missing listing ID");
+        return;
+    }
+
+    try {
+        const statsToInsert = {
+            listing_id: currentListingId,
+            tag: keywordData.keyword,
+            search_volume: keywordData.volume,
+            competition: keywordData.competition,
+            opportunity_score: keywordData.score,
+            is_competition: false,
+            volume_history: keywordData.volume_history || [],
+            is_trending: keywordData.is_trending,
+            is_evergreen: keywordData.is_evergreen,
+            is_promising: keywordData.is_promising
+        };
+
+
+
+        const { error } = await supabase
+            .from('listing_seo_stats')
+            .insert(statsToInsert);
+
+        if (error) {
+            console.error("Supabase insert error:", error);
+            toast.error(`Failed to add keyword: ${error.message}`);
+            return;
+        }
+
+        toast.success(`Keyword "${keywordData.keyword}" added!`);
+        
+        // Refresh data
+        await handleLoadListing(currentListingId);
+
+    } catch (err) {
+        console.error("Unexpected error in handleAddKeywordToPerformance:", err);
+        toast.error("An unexpected error occurred");
+    }
   };
 
   return (
@@ -1388,50 +1514,39 @@ const ProductStudio = () => {
                             {/* Breadcrumbs */}
                             {getContextString()}
                          </div>
-
-                         {/* Actions */}
-                         <div className="flex items-center gap-2">
-                             <motion.button
-                                onClick={handleModifySettings}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                animate={isFormCollapsed 
-                                    ? { boxShadow: ["0 0 0 0 rgba(79, 70, 229, 0)", "0 0 0 4px rgba(79, 70, 229, 0.1)"] }
-                                    : { boxShadow: "none" }
-                                }
-                                transition={{ boxShadow: { duration: 2, repeat: Infinity, active: isFormCollapsed } }}
-                                className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors
-                                   ${!isFormCollapsed 
-                                       ? 'text-slate-500 bg-slate-50 border-slate-200 hover:bg-slate-100 hover:text-slate-700' 
-                                       : 'text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100'
-                                   }`}
-                             >
-                                {isFormCollapsed ? (
-                                    <>
-                                        <Edit3 size={14} />
-                                        Modify Settings
-                                    </>
-                                ) : (
-                                    <>
-                                        <ChevronUp size={14} />
-                                        Close
-                                    </>
-                                )}
-                             </motion.button>
-
-                             <button
-                                onClick={handleNewAnalysis}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
-                             >
-                                <RefreshCw size={14} />
-                                New Analysis
-                             </button>
-                         </div>
                     </motion.div>
                   )}
               </AnimatePresence>
 
-              {/* Form Content - Always Mounted to Preserve State */}
+              {/* Header - Always visible & Clickable */}
+              <div 
+                  onClick={() => setIsFormCollapsed(!isFormCollapsed)}
+                  className="px-6 py-5 border-b border-indigo-50 bg-indigo-50/50 flex justify-between items-center cursor-pointer hover:bg-indigo-100/50 transition-colors group select-none"
+              >
+                  <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg transition-all ${isFormCollapsed ? 'bg-indigo-100 text-indigo-600' : 'bg-white text-indigo-600 shadow-sm'}`}>
+                        <Shirt size={18} />
+                      </div>
+                      <div className="flex flex-col">
+                        <h2 className="font-bold text-slate-900 flex items-center gap-2">
+                            SEO LISTING
+                            <ChevronUp size={16} className={`text-slate-400 transition-transform duration-300 ${isFormCollapsed ? 'rotate-180' : ''}`} />
+                        </h2>
+                        {isFormCollapsed && <span className="text-xs text-slate-500 font-medium animate-in fade-in slide-in-from-left-2">Click to expand & edit</span>}
+                      </div>
+                  </div>
+
+                   {/* New Listing Button */}
+                   <button
+                      onClick={(e) => { e.stopPropagation(); handleNewAnalysis(); }}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm z-10"
+                  >
+                      <Sparkles size={16} />
+                      New listing
+                  </button>
+              </div>
+
+              {/* Form Content - Collapsible */}
               <motion.div
                   animate={{
                       height: isFormCollapsed ? 0 : 'auto',
@@ -1441,12 +1556,7 @@ const ProductStudio = () => {
                   transition={{ duration: 0.4, ease: "easeInOut" }}
                   style={{ overflow: 'hidden' }}
               >
-                    <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-                        <Sparkles className="text-indigo-600" size={18} />
-                        <h2 className="font-bold text-slate-900">NEW OPTIMIZATION</h2>
-                    </div>
-                    
-                    <div className="p-8">
+                    <div className={`p-8 transition-all duration-300 ${!isNewListingActive && !listingId && !selectedImage && !results ? 'opacity-40 pointer-events-none grayscale' : ''}`}>
                         <div className="mb-6">
                            <label htmlFor="listingName" className="block text-sm font-medium text-slate-700 mb-1">Listing name</label>
                            <input
@@ -1464,12 +1574,12 @@ const ProductStudio = () => {
                             
                             {/* Left Column: Image Area */}
                             <div className="md:col-span-1 flex flex-col gap-4">
-                                <div className={`relative rounded-xl overflow-hidden transition-all ${isAnalyzingDesign ? 'ring-4 ring-indigo-500/20' : ''}`}>
+                                <div className={`relative rounded-xl overflow-hidden transition-all flex-1 ${isAnalyzingDesign ? 'ring-4 ring-indigo-500/20' : ''}`}>
                                     <ImageUpload 
                                         key={`img-${formKey}`} 
                                         onFileSelect={setSelectedImage} 
                                         initialImage={results?.imageUrl}
-                                        compact={true} 
+                                        className="h-full"
                                     />
                                     {isAnalyzingDesign && (
                                         <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-10">
@@ -1503,14 +1613,11 @@ const ProductStudio = () => {
                                             <Palette size={12} />
                                             Aesthetic Style
                                         </label>
-                                        <textarea 
-                                            data-visual-field
-                                            rows={1}
+                                        <AutoResizeTextarea 
                                             value={visualAnalysis.aesthetic}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, aesthetic: e.target.value})}
-                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                             placeholder="e.g. Minimalist, Boho..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
                                     
@@ -1519,14 +1626,11 @@ const ProductStudio = () => {
                                             <Type size={12} />
                                             Typography
                                         </label>
-                                        <textarea 
-                                            data-visual-field
-                                            rows={1}
+                                        <AutoResizeTextarea 
                                             value={visualAnalysis.typography}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, typography: e.target.value})}
-                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                             placeholder="e.g. Bold Serif..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
 
@@ -1535,14 +1639,11 @@ const ProductStudio = () => {
                                             <LayoutTemplate size={12} />
                                             Graphic Elements
                                         </label>
-                                        <textarea 
-                                            data-visual-field
-                                            rows={1}
+                                        <AutoResizeTextarea 
                                             value={visualAnalysis.graphics}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, graphics: e.target.value})}
-                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                             placeholder="e.g. Geometric shapes..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
 
@@ -1551,14 +1652,11 @@ const ProductStudio = () => {
                                             <Palette size={12} />
                                             Color Palette
                                         </label>
-                                        <textarea 
-                                            data-visual-field
-                                            rows={1}
+                                        <AutoResizeTextarea 
                                             value={visualAnalysis.colors}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, colors: e.target.value})}
-                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                             placeholder="e.g. Earth tones..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
                                     
@@ -1568,14 +1666,11 @@ const ProductStudio = () => {
                                             <Target size={12} />
                                             Target Audience
                                         </label>
-                                        <textarea 
-                                            data-visual-field
-                                            rows={1}
+                                        <AutoResizeTextarea 
                                             value={visualAnalysis.target_audience}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, target_audience: e.target.value})}
-                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                             placeholder="Who is this for? e.g. Gen Z..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
                                     
@@ -1584,14 +1679,11 @@ const ProductStudio = () => {
                                             <Heart size={12} />
                                             Overall Vibe
                                         </label>
-                                        <textarea 
-                                            data-visual-field
-                                            rows={1}
+                                        <AutoResizeTextarea 
                                             value={visualAnalysis.overall_vibe}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, overall_vibe: e.target.value})}
-                                            onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                             placeholder="e.g. Cozy, energetic, professional..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none overflow-hidden"
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
                                 </div>
@@ -1602,6 +1694,7 @@ const ProductStudio = () => {
        onAnalyze={handleAnalyze} 
        onSaveDraft={handleSaveDraft}
        isImageSelected={!!selectedImage || (!!results && !!results.imageUrl)}
+       isImageAnalysed={results?.is_imageAnalysed || isImageAnalyzedState}
        isLoading={isLoading} 
        onCancel={results ? handleCancel : null} 
        initialValues={analysisContext}
@@ -1623,8 +1716,8 @@ const ProductStudio = () => {
              </div>
            )}
 
-           {/* Results Section (show skeleton even without results during loading phases) */}
-           {(showResults && !isLoading && (results || isInsightLoading)) && (
+           {/* Results Section (Always show unless main loader is active, to display empty/inactive tables initially) */}
+           {!isLoading && (
              <ResultsDisplay 
                results={results} 
                isGeneratingDraft={isGeneratingDraft}
@@ -1635,10 +1728,14 @@ const ProductStudio = () => {
                isInsightLoading={isInsightLoading}
                onCompetitionAnalysis={handleCompetitionAnalysis}
                isCompetitionLoading={isCompetitionLoading}
-              />
+               onAddKeyword={handleAddKeywordToPerformance}
+               onSaveListingInfo={handleSaveListingInfo}
+              >
+                <RecentOptimizations onViewResults={handleLoadListing} />
+              </ResultsDisplay>
            )}
 
-           <RecentOptimizations onViewResults={handleLoadListing} />
+
 
         </div>
 

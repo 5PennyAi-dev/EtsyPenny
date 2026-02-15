@@ -1,3 +1,24 @@
+# Task: Unified Creatable Search & Niche Selection
+
+## 1. Data Fetching
+- [x] **Fetch Logic**: Query `unified_niche_search` view with fuzzy search and user filter.
+
+## 2. UI Component (SmartNicheAutocomplete)
+- [x] **SmartNicheAutocomplete.jsx**: Implement searchable autocomplete.
+- [x] **Display**: Show `name`, `parent_context`, and badges (Theme/Niche/Sub/Custom).
+- [x] **Creatable**: Allow creating custom niches if no match found.
+
+## 3. Insertion Logic
+- [x] **Custom Creation**: Insert new niche into `user_custom_niches`.
+- [x] **State Update**: Select the newly created niche.
+- [x] **RLS**: Added SELECT, INSERT, DELETE policies on `user_custom_niches`.
+
+## 4. Integration
+- [x] **OptimizationForm**: Uses `SmartNicheAutocomplete` (was already integrated).
+- [x] **Hydration**: Handles reload from history via `initialValues`.
+
+---
+
 # Task: Competition Keywords — Updated Response Format + competitor_seed
 
 ## Completed Changes

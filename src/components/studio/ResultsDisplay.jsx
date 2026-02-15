@@ -1,4 +1,4 @@
-import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, Info, Plus, Minus } from 'lucide-react';
+import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, Info, Plus, Minus, Save } from 'lucide-react';
 import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
@@ -83,81 +83,75 @@ const CopyButton = ({ text, label = "Copy", className = "", tooltipSide = "top" 
   );
 };
 
-// Full Skeleton Screen shown while generateInsight is loading (covers both columns)
-const InsightSkeleton = ({ phase = 'seo' }) => (
-  <div className="flex flex-col lg:flex-row gap-8 items-start">
-    {/* Left Column Skeleton */}
-    <div className="flex-1 min-w-0 space-y-8 animate-pulse">
-      {/* Audit Header Skeleton */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 flex items-center gap-8">
-          <div className="w-[130px] h-[130px] rounded-full bg-slate-100 flex-shrink-0" />
-          <div className="flex-1 space-y-3">
-            <div className="h-3 w-24 bg-slate-100 rounded" />
-            <div className="h-6 w-48 bg-slate-100 rounded" />
-            <div className="h-4 w-full bg-slate-100 rounded" />
-            <div className="h-4 w-3/4 bg-slate-100 rounded" />
-          </div>
-        </div>
-        <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100">
-          <div className="h-3 w-20 bg-slate-100 rounded mb-2" />
-          <div className="h-4 w-full bg-slate-100 rounded" />
-        </div>
-      </div>
-
-      {/* Table Skeleton */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
-                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-          <div className="h-5 w-44 bg-slate-100 rounded" />
-          <div className="flex gap-3">
-            <div className="h-4 w-16 bg-slate-100 rounded" />
-            <div className="h-4 w-16 bg-slate-100 rounded" />
-            <div className="h-4 w-16 bg-slate-100 rounded" />
-          </div>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 px-6 py-3.5">
-              <div className="w-4 h-4 bg-slate-100 rounded" />
-              <div className="h-5 w-32 bg-slate-100 rounded-full" />
-              <div className="flex-1" />
-              <div className="h-4 w-14 bg-slate-100 rounded" />
-              <div className="h-5 w-14 bg-slate-100 rounded" />
-              <div className="h-5 w-12 bg-slate-100 rounded" />
-              <div className="h-5 w-10 bg-slate-100 rounded" />
-              <div className="flex gap-1">
-                <div className="w-4 h-4 bg-slate-100 rounded-full" />
-                <div className="w-4 h-4 bg-slate-100 rounded-full" />
-              </div>
-            </div>
-          ))}
-        </div>
+// Component Helper Skeletons
+const AuditSkeleton = () => (
+  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse mb-8">
+    <div className="p-6 flex items-center gap-8">
+      <div className="w-[130px] h-[130px] rounded-full bg-slate-100 flex-shrink-0" />
+      <div className="flex-1 space-y-3">
+        <div className="h-3 w-24 bg-slate-100 rounded" />
+        <div className="h-6 w-48 bg-slate-100 rounded" />
+        <div className="h-4 w-full bg-slate-100 rounded" />
+        <div className="h-4 w-3/4 bg-slate-100 rounded" />
       </div>
     </div>
-
-    {/* Right Column Skeleton (Sidebar — 33%) */}
-    <div className="w-full lg:w-1/3 lg:flex-shrink-0 sticky top-8">
-      <div className="bg-slate-50/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm p-1">
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 min-h-[400px] flex flex-col items-center justify-center">
-          {/* Active spinner */}
-          <div className="relative mb-6">
-            <div className="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Sparkles size={20} className="text-indigo-600" />
-            </div>
-          </div>
-          <h4 className="text-slate-900 font-bold text-base mb-2">
-            {phase === 'seo' ? 'Generating SEO Tags...' : 'Generating Insights...'}
-          </h4>
-          <p className="text-slate-500 text-sm text-center px-4 leading-relaxed">
-            {phase === 'seo' 
-              ? 'Researching keywords and analyzing competition' 
-              : 'Analyzing keywords and calculating your listing score'}
-          </p>
-        </div>
-      </div>
+    <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100">
+      <div className="h-3 w-20 bg-slate-100 rounded mb-2" />
+      <div className="h-4 w-full bg-slate-100 rounded" />
     </div>
   </div>
+);
+
+const TableSkeleton = () => (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-pulse mb-8">
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+            <div className="h-5 w-44 bg-slate-100 rounded" />
+            <div className="flex gap-3">
+            <div className="h-4 w-16 bg-slate-100 rounded" />
+            <div className="h-4 w-16 bg-slate-100 rounded" />
+            <div className="h-4 w-16 bg-slate-100 rounded" />
+            </div>
+        </div>
+        <div className="divide-y divide-slate-100">
+            {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-6 py-3.5">
+                <div className="w-4 h-4 bg-slate-100 rounded" />
+                <div className="h-5 w-32 bg-slate-100 rounded-full" />
+                <div className="flex-1" />
+                <div className="h-4 w-14 bg-slate-100 rounded" />
+                <div className="h-5 w-14 bg-slate-100 rounded" />
+                <div className="h-5 w-12 bg-slate-100 rounded" />
+                <div className="h-5 w-10 bg-slate-100 rounded" />
+                <div className="flex gap-1">
+                <div className="w-4 h-4 bg-slate-100 rounded-full" />
+                <div className="w-4 h-4 bg-slate-100 rounded-full" />
+                </div>
+            </div>
+            ))}
+        </div>
+    </div>
+);
+
+const SidebarSkeleton = ({ phase }) => (
+    <div className="bg-slate-50/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm p-1">
+    <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 min-h-[400px] flex flex-col items-center justify-center">
+        {/* Active spinner */}
+        <div className="relative mb-6">
+        <div className="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center">
+            <Sparkles size={20} className="text-indigo-600" />
+        </div>
+        </div>
+        <h4 className="text-slate-900 font-bold text-base mb-2">
+        {phase === 'seo' ? 'Generating SEO Tags...' : 'Generating Insights...'}
+        </h4>
+        <p className="text-slate-500 text-sm text-center px-4 leading-relaxed">
+        {phase === 'seo' 
+            ? 'Researching keywords and analyzing competition' 
+            : 'Analyzing keywords and calculating your listing score'}
+        </p>
+    </div>
+    </div>
 );
 
 const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority, scoreExplanation, onSEOSniper, isSniperLoading }) => {
@@ -290,7 +284,9 @@ const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority
 
 const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO, onSEOSniper, isSniperLoading, isInsightLoading,  onCompetitionAnalysis,
   isCompetitionLoading,
-  onAddKeyword
+  onAddKeyword,
+  onSaveListingInfo,
+  children
 }) => {
   const [displayedTitle, setDisplayedTitle] = useState("");
   const [displayedDescription, setDisplayedDescription] = useState("");
@@ -394,18 +390,12 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
 
   // --- ALL HOOKS ARE ABOVE THIS LINE --- Early returns below are safe ---
 
-  // If insight/seo is loading, show full skeleton
-  if (isInsightLoading) {
-    return (
-      <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
-        <InsightSkeleton phase={isInsightLoading} />
-      </div>
-    );
-  }
 
-  if (!results) return null;
 
-  const hasDraft = !!results.title && results.title !== "SEO Analysis Completed";
+  // Allow rendering even without results (for empty state tables)
+  // if (!results) return null; // REMOVED
+
+  const hasDraft = !!results?.title && results?.title !== "SEO Analysis Completed";
 
   const toggleTag = (keyword) => {
     setSelectedTags(prev => 
@@ -447,7 +437,9 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
         <div className="flex-1 min-w-0 space-y-8">
 
             {/* Hero Audit Header with integrated SEO Sniper */}
-            {results.global_strength !== null && results.global_strength !== undefined && (
+            {isInsightLoading ? (
+                <AuditSkeleton />
+            ) : (results?.global_strength !== null && results?.global_strength !== undefined && (
                 <AuditHeader 
                     score={results.global_strength}
                     statusLabel={results.status_label}
@@ -457,23 +449,37 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                     onSEOSniper={onSEOSniper}
                     isSniperLoading={isSniperLoading}
                 />
-            )}
+            ))}
 
             {/* 1. Full Width Performance Table */}
-            <Accordion
-                defaultOpen={true}
+            {isInsightLoading ? (
+                <TableSkeleton />
+            ) : (
+                <div className={!results ? "opacity-50 grayscale pointer-events-none" : ""}>
+                <Accordion
+                    defaultOpen={!!results} // Collapsed if no results
                 title={
                     <div className="flex items-center gap-2">
-                        <TrendingUp size={16} className="text-indigo-600" />
+                        <TrendingUp size={16} className={`text-indigo-600 ${!results ? 'text-slate-400' : ''}`} />
                         <span className="text-sm font-bold text-slate-900">Keyword Performance</span>
-                        <span className="text-xs font-normal text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full ml-1">
-                            {selectedTags.length} / {results.analytics.length} selected
-                        </span>
+                         {results && (
+                            <CopyButton 
+                                text={selectedTags.join(', ')} 
+                                label="Copy selected keywords to clipboard." 
+                                className="mx-2 text-slate-400 hover:text-indigo-600" 
+                                tooltipSide="right" 
+                            />
+                         )}
+                         {results && (
+                            <span className="text-xs font-normal text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full ml-1">
+                                {selectedTags.length} / {results.analytics.length} selected
+                            </span>
+                         )}
                     </div>
                 }
                 headerActions={
+                    results && (
                     <div className="flex items-center gap-2">
-                         <CopyButton text={selectedTags.join(', ')} label="Copy" className="mr-2" tooltipSide="bottom" />
                          
                          <button 
                             onClick={(e) => { e.stopPropagation(); onRelaunchSEO(); }}
@@ -508,6 +514,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                              <span className="flex items-center gap-1" title="Sniper"><Target size={12} className="text-indigo-500"/></span>
                          </div>
                     </div>
+                    )
                 }
             >
                 <div className="border-t border-slate-100">
@@ -517,15 +524,16 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                 <th className="px-4 py-2 w-10 text-center">
                                     <input 
                                         type="checkbox" 
-                                        checked={selectedTags.length === results.analytics.length && results.analytics.length > 0}
+                                        checked={results && selectedTags.length === results.analytics.length && results.analytics.length > 0}
                                         onChange={(e) => {
-                                            if (e.target.checked) {
+                                            if (e.target.checked && results) {
                                                 setSelectedTags(results.analytics.map(r => r.keyword));
                                             } else {
                                                 setSelectedTags([]);
                                             }
                                         }}
-                                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                        disabled={!results}
+                                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
                                     />
                                 </th>
                                 <th className="px-3 py-2 font-semibold text-left">Tag / Keyword</th>
@@ -558,7 +566,13 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {sortedAnalytics.map((row, i) => (
+                            {!results ? (
+                                <tr>
+                                    <td colSpan="8" className="px-4 py-8 text-center text-slate-400 italic">
+                                        No analysis results yet. Start a new listing analysis.
+                                    </td>
+                                </tr>
+                            ) : sortedAnalytics.map((row, i) => (
                                 <tr key={i} className={`hover:bg-slate-50 transition-colors group ${!selectedTags.includes(row.keyword) ? 'opacity-50 grayscale-[0.5]' : ''}`}>
                                     <td className="px-4 py-3 text-center">
                                         <input 
@@ -641,17 +655,21 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                     </table>
                 </div>
             </Accordion>
+            </div>
+            )}
 
             {/* 2. Competitors Keywords Table (Read-only) */}
-            {competitionAnalytics.length > 0 && (
+            <div className={!results || isInsightLoading ? "opacity-50 grayscale pointer-events-none" : ""}>
                 <Accordion
-                    defaultOpen={true}
+                    defaultOpen={!!results} // Collapsed if no results
                     className="border-orange-200"
                     title={
                         <div className="flex items-center gap-2">
-                            <Flame size={16} className="text-orange-500" />
+                            <Flame size={16} className={`text-orange-500 ${!results ? 'text-slate-400' : ''}`} />
                             <span className="text-sm font-bold text-slate-900">Competitors Keywords</span>
                             {/* Info tooltip with competitor_seed */}
+                            {results && (
+                            <>
                             <div className="relative group/compinfo" onClick={(e) => e.stopPropagation()}>
                                 <div className="w-4 h-4 rounded-full bg-orange-100 hover:bg-orange-200 flex items-center justify-center cursor-help transition-colors border border-orange-200 hover:border-orange-300">
                                     <Info size={10} className="text-orange-500 group-hover/compinfo:text-orange-700 transition-colors" />
@@ -664,13 +682,17 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                             <span className="text-xs font-normal text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full ml-1">
                                 {competitionAnalytics.length} keywords
                             </span>
+                            </>
+                            )}
                         </div>
                     }
                     headerActions={
+                        results && (
                         <div className="flex items-center gap-4 text-xs text-slate-500 hidden sm:flex">
                              <span className="flex items-center gap-1"><Flame size={12} className="text-orange-500"/> Trending</span>
                              <span className="flex items-center gap-1"><Leaf size={12} className="text-emerald-500"/> Evergreen</span>
                         </div>
+                        )
                     }
                 >
                     <div className="border-t border-orange-100">
@@ -687,7 +709,19 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-orange-50">
-                                {competitionAnalytics.map((row, i) => (
+                                {!results ? (
+                                    <tr>
+                                        <td colSpan="7" className="px-4 py-8 text-center text-slate-400 italic">
+                                            No competitor analysis yet.
+                                        </td>
+                                    </tr>
+                                ) : competitionAnalytics.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="7" className="px-4 py-8 text-center text-slate-400 italic">
+                                            No competitor keywords found in this analysis.
+                                        </td>
+                                    </tr>
+                                ) : competitionAnalytics.map((row, i) => (
                                     <tr key={i} className="hover:bg-orange-50/30 transition-colors">
                                         <td className="px-4 py-3 font-medium">
                                             <div className="flex items-center gap-2">
@@ -765,56 +799,35 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                         </table>
                     </div>
                 </Accordion>
-            )}
+                </div>
+        {/* Injected Content (e.g. Recent History) */}
+        {children}
         </div>
 
         {/* --- SIDEBAR: DRAFTING (33% width) --- */}
         <div className="w-full lg:w-1/3 lg:flex-shrink-0 sticky top-8 space-y-4">
-             <div className="bg-slate-50/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm p-1 transition-all duration-500">
-                <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 min-h-[400px] flex flex-col">
+             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 min-h-[400px] flex flex-col transition-all duration-500">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                            <Pencil size={16} className="text-indigo-600" />
-                            Listing Preview
+                            <Info size={16} className="text-indigo-600" />
+                            Listing Info
                         </h3>
-                        {hasDraft && (
-                            <div className="flex items-center gap-2">
-                                <button 
-                                    onClick={() => onGenerateDraft(selectedTags)}
-                                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-100"
-                                    title="Regenerate Draft"
-                                >
-                                    <RefreshCw size={12} />
-                                    Regenerate
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {!hasDraft && !isGeneratingDraft ? (
-                         // STATE B: READY TO CRAFT
-                         <div className="flex-1 flex flex-col items-center justify-center text-center py-8 animate-in fade-in slide-in-from-bottom-4">
-                             <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse-slow">
-                                 <Sparkles className="text-indigo-600" size={32} />
-                             </div>
-                             <h4 className="text-slate-900 font-bold text-lg mb-2">Ready to Craft?</h4>
-                             <p className="text-slate-500 text-sm mb-8 px-4 leading-relaxed">
-                                 We found <span className="text-indigo-600 font-bold">{results.analytics.length} high-opportunity keywords</span>. 
-                                 Ready to turn them into a high-converting listing?
-                             </p>
+                         <div className="flex items-center gap-2">
+                             {/* Optimize Button - Moved to Header */}
                              <button 
                                 onClick={handleMagicDraft}
                                 disabled={selectedTags.length === 0}
-                                className={`w-full py-3 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2
+                                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shadow-sm border
                                     ${selectedTags.length === 0 
-                                        ? 'bg-slate-300 cursor-not-allowed shadow-none' 
-                                        : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5'}`}
+                                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' 
+                                        : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 hover:shadow-indigo-200'}`}
                              >
-                                <Sparkles size={18} /> Magic Draft ✨
+                                <Sparkles size={14} /> Optimize with AI
                              </button>
                          </div>
-                    ) : isGeneratingDraft ? (
-                        // STATE C: DRAFTING (LOADING)
+                    </div>
+
+                    {isGeneratingDraft ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-center py-8 space-y-6 animate-in fade-in">
                             <div className="relative">
                                 <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
@@ -823,12 +836,11 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <h4 className="text-slate-900 font-medium">Writing your story...</h4>
-                                <p className="text-slate-400 text-xs">Integrating keywords & optimizing for conversion</p>
+                                <h4 className="text-slate-900 font-medium">Refining your listing...</h4>
+                                <p className="text-slate-400 text-xs">Optimizing title & description with AI</p>
                             </div>
                         </div>
                     ) : (
-                        // STATE D: DRAFT READY (EDITOR)
                         <div className="flex-1 flex flex-col space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* Title Input */}
                             <div className="space-y-1.5">
@@ -842,6 +854,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                 <textarea 
                                     value={displayedTitle}
                                     onChange={(e) => setDisplayedTitle(e.target.value)}
+                                    placeholder="Product title will appear here..."
                                     className={`w-full px-3 py-2 text-sm text-slate-700 bg-slate-50/50 border rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none transition-all
                                         ${displayedTitle.length > 140 ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-200'}`}
                                     rows={3}
@@ -858,62 +871,82 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                     ref={descriptionRef}
                                     value={displayedDescription}
                                     onChange={(e) => setDisplayedDescription(e.target.value)}
+                                    placeholder="Product description will appear here..."
                                     className="w-full px-3 py-2 text-sm text-slate-700 bg-slate-50/50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none transition-all custom-scrollbar flex-grow overflow-hidden min-h-[300px]"
                                 />
                             </div>
 
-                                <PDFDownloadLink
-                                    key={`pdf-${displayedTitle}-${selectedTags.length}-version6`}
-                                    document={
-                                        <ListingPDFDocument 
-                                            listing={{
-                                                title: displayedTitle,
-                                                description: displayedDescription,
-                                                imageUrl: results.imageUrl,
-                                                global_strength: results.global_strength ?? null,
-                                                status_label: results.status_label ?? null,
-                                                strategic_verdict: results.strategic_verdict ?? null,
-                                                productName: displayedTitle.split(' ').slice(0, 5).join(' ') + '...', // Simple truncated name
-                                                tags: results.analytics
-                                                    .filter(k => selectedTags.includes(k.keyword))
-                                                    .map(k => {
-                                                        // Calculate Trend %
-                                                        let trend = 0;
-                                                        if (k.volume_history && k.volume_history.length > 0) {
-                                                            const first = k.volume_history[0] || 1; // Avoid divide by zero
-                                                            const last = k.volume_history[k.volume_history.length - 1] || 0;
-                                                            trend = Math.round(((last - first) / first) * 100);
-                                                        }
-
-                                                        return { 
-                                                            keyword: k.keyword, 
-                                                            score: k.score,
-                                                            volume: k.volume,
-                                                            competition: k.competition,
-                                                            trend: trend,
-                                                            volume_history: k.volume_history || [],
-                                                            is_trending: k.is_trending,
-                                                            is_evergreen: k.is_evergreen,
-                                                            is_promising: k.is_promising,
-                                                            insight: k.insight || null,
-                                                            is_top: k.is_top ?? null,
-                                                            is_sniper_seo: k.is_sniper_seo ?? false
-                                                        };
-                                                    })
-                                            }}
-                                        />
-                                    }
-                                    fileName={`${displayedTitle.substring(0, 20).replace(/\s+/g, '_')}_SEO_v4.pdf`}
-                                    className="w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium rounded-lg border border-indigo-200 transition-all flex items-center justify-center gap-2"
+                                {/* Save Info & Export Buttons */}
+                                <div className="flex flex-col gap-2 pt-2">
+                                {results ? (
+                                <button
+                                    onClick={() => onSaveListingInfo(displayedTitle, displayedDescription)}
+                                    className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-lg border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center justify-center gap-2 shadow-sm"
                                 >
-                                    {({ blob, url, loading, error }) => (
-                                        loading ? 'Generating PDF...' : <><FileDown size={16} /> Export to PDF</>
-                                    )}
-                                </PDFDownloadLink>
+                                    <Save size={16} />
+                                    <span className="font-bold">Save Info</span>
+                                </button>
+                                ) : (
+                                    <button disabled className="w-full py-2.5 bg-slate-100 text-slate-400 text-sm font-medium rounded-lg border border-slate-200 cursor-not-allowed flex items-center justify-center gap-2">
+                                        <Save size={16} />
+                                        <span className="font-bold">Save Info</span>
+                                    </button>
+                                )}
+
+                                {results && (
+                                    <PDFDownloadLink
+                                        key={`pdf-${displayedTitle}-${selectedTags.length}-version6`}
+                                        document={
+                                            <ListingPDFDocument 
+                                                listing={{
+                                                    title: displayedTitle,
+                                                    description: displayedDescription,
+                                                    imageUrl: results.imageUrl,
+                                                    global_strength: results.global_strength ?? null,
+                                                    status_label: results.status_label ?? null,
+                                                    strategic_verdict: results.strategic_verdict ?? null,
+                                                    productName: displayedTitle.split(' ').slice(0, 5).join(' ') + '...', // Simple truncated name
+                                                    tags: results.analytics
+                                                        .filter(k => selectedTags.includes(k.keyword))
+                                                        .map(k => {
+                                                            // Calculate Trend %
+                                                            let trend = 0;
+                                                            if (k.volume_history && k.volume_history.length > 0) {
+                                                                const first = k.volume_history[0] || 1; // Avoid divide by zero
+                                                                const last = k.volume_history[k.volume_history.length - 1] || 0;
+                                                                trend = Math.round(((last - first) / first) * 100);
+                                                            }
+
+                                                            return { 
+                                                                keyword: k.keyword, 
+                                                                score: k.score,
+                                                                volume: k.volume,
+                                                                competition: k.competition,
+                                                                trend: trend,
+                                                                volume_history: k.volume_history || [],
+                                                                is_trending: k.is_trending,
+                                                                is_evergreen: k.is_evergreen,
+                                                                is_promising: k.is_promising,
+                                                                insight: k.insight || null,
+                                                                is_top: k.is_top ?? null,
+                                                                is_sniper_seo: k.is_sniper_seo ?? false
+                                                            };
+                                                        })
+                                                }}
+                                            />
+                                        }
+                                        fileName={`${displayedTitle.substring(0, 20).replace(/\s+/g, '_')}_SEO_v4.pdf`}
+                                        className="w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium rounded-lg border border-indigo-200 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        {({ blob, url, loading, error }) => (
+                                            loading ? 'Generating PDF...' : <><FileDown size={16} /> Export to PDF</>
+                                        )}
+                                    </PDFDownloadLink>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
-             </div>
         </div>
 
       </div>

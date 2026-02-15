@@ -1,9 +1,10 @@
 
-import { useState, useRef, useEffect } from 'react';
-import { Sparkles, ArrowRight, ChevronDown, ChevronRight, Settings, Lock } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Sparkles, Package, Settings, ChevronRight, ChevronDown, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '../../lib/supabase';
 import ProductTypeCombobox from './ProductTypeCombobox';
+import SmartNicheAutocomplete from './SmartNicheAutocomplete';
 
 const TONE_OPTIONS = [
   { value: 'auto', label: '✨ Auto-detect from image' },
@@ -16,57 +17,18 @@ const TONE_OPTIONS = [
 
 const MAX_TAGS_LIMIT = 13;
 
-const CustomInput = ({ isVisible, value, onChange, placeholder }) => (
-  <div className={`grid transition-all duration-300 ease-in-out ${isVisible ? 'grid-rows-[1fr] opacity-100 mt-2' : 'grid-rows-[0fr] opacity-0'}`}>
-    <div className="overflow-hidden">
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-4 py-2 bg-indigo-50 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-indigo-700 placeholder:text-indigo-300 text-sm"
-      />
-    </div>
-  </div>
-);
+const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isImageAnalysed, isLoading, onCancel, initialValues }) => {
 
-const Select = ({ label, value, onChange, options, disabled, id, loading }) => (
-  <div className="space-y-1">
-    <label htmlFor={id} className={`text-sm font-medium ${disabled ? 'text-slate-400' : 'text-slate-700'}`}>{label}</label>
-    <div className="relative">
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className={`w-full px-4 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none transition-all
-          ${disabled ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'text-slate-700 hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500'}`}
-      >
-        <option value="">{loading ? 'Loading...' : `Select ${label}...`}</option>
-        <option value="custom" className="font-semibold text-indigo-600">+ Custom / Other...</option>
-        {options.length > 0 && <hr />}
-        {options.map((opt) => (
-          <option key={opt.id} value={opt.id}>{opt.name}</option>
-        ))}
-      </select>
-      <ChevronDown size={16} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${disabled ? 'text-slate-300' : 'text-slate-500'}`} />
-    </div>
-  </div>
-);
-
-const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, onCancel, initialValues }) => {
   // Data State
-  const [themes, setThemes] = useState([]);
-  const [nichesList, setNichesList] = useState([]);
-  const [subNichesList, setSubNichesList] = useState([]);
   const [groupedProductTypes, setGroupedProductTypes] = useState([]);
 
-  // Selection State (IDs or 'custom')
-  const [theme, setTheme] = useState("");
-  const [niche, setNiche] = useState("");
-  const [subNiche, setSubNiche] = useState("");
+  // Selection State
   const [tone, setTone] = useState('auto');
   const [tagLimit, setTagLimit] = useState(MAX_TAGS_LIMIT);
+  
+  // Smart Niche Selection State (Flat Object)
+  // Expected structure: { id, name, theme_name, niche_name, is_custom }
+  const [nicheSelection, setNicheSelection] = useState(null);
 
   // Advanced section toggle
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
@@ -75,19 +37,11 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
   const [productTypeName, setProductTypeName] = useState("");
   const [productTypeId, setProductTypeId] = useState(null);
 
-  // Custom Input State
-  const [customTheme, setCustomTheme] = useState("");
-  const [customNiche, setCustomNiche] = useState("");
-  const [customSubNiche, setCustomSubNiche] = useState("");
-
   const contextRef = useRef(null);
 
-  // Initial Fetch (Themes, Product Categories+Types, Tones)
+  // Initial Fetch (Product Categories+Types only)
   useEffect(() => {
     const fetchData = async () => {
-      const { data: themesData } = await supabase.from('themes').select('id, name').order('name');
-      if (themesData) setThemes(themesData);
-
       // Fetch product types grouped by category
       const { data: categoriesData } = await supabase
         .from('product_categories')
@@ -119,53 +73,28 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
 
     };
     fetchData();
-  }, []);
-
-  // Fetch Niches when Theme changes
-  useEffect(() => {
-    if (theme && theme !== 'custom') {
-      const fetchNiches = async () => {
-        const { data } = await supabase.from('niches').select('id, name').eq('theme_id', theme).order('name');
-        if (data) setNichesList(data);
-      };
-      fetchNiches();
-    } else {
-      setNichesList([]);
-    }
-  }, [theme]);
-
-  // Fetch Sub-niches when Niche changes
-  useEffect(() => {
-    if (niche && niche !== 'custom') {
-      const fetchSubNiches = async () => {
-        const { data } = await supabase.from('sub_niches').select('id, name').eq('niche_id', niche).order('name');
-        if (data) setSubNichesList(data);
-      };
-      fetchSubNiches();
-    } else {
-      setSubNichesList([]);
-    }
-  }, [niche]);
+  }, []); // Run once on mount
 
   // Initialize from initialValues
   useEffect(() => {
       if (initialValues) {
-          setTheme(initialValues.theme_id || (initialValues.custom_theme ? 'custom' : ""));
-          setCustomTheme(initialValues.custom_theme || "");
+          // Hydrate Niche Selection
+          // If we have IDs or Names
+          if (initialValues.sub_niche_name || initialValues.custom_sub_niche) {
+              setNicheSelection({
+                  id: initialValues.sub_niche_id || null,
+                  name: initialValues.sub_niche_name || initialValues.custom_sub_niche,
+                  theme_name: initialValues.theme_name || initialValues.custom_theme || 'Unknown Theme',
+                  niche_name: initialValues.niche_name || initialValues.custom_niche || 'Unknown Niche',
+                  is_custom: !initialValues.sub_niche_id
+              });
+          }
           
-          setNiche(initialValues.niche_id || (initialValues.custom_niche ? 'custom' : ""));
-          setCustomNiche(initialValues.custom_niche || "");
-
-          setSubNiche(initialValues.sub_niche_id || (initialValues.custom_sub_niche ? 'custom' : ""));
-          setCustomSubNiche(initialValues.custom_sub_niche || "");
-
           // Product Type: hydrate from ID (find name) or from name directly
           if (initialValues.product_type_id) {
             setProductTypeId(initialValues.product_type_id);
-            // Name will be resolved once groupedProductTypes loads
             setProductTypeName(initialValues.product_type_name || "");
           } else if (initialValues.product_type_name) {
-            // Custom type — no ID
             setProductTypeId(null);
             setProductTypeName(initialValues.product_type_name);
           }
@@ -192,39 +121,10 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
     }
   }, [productTypeId, groupedProductTypes]);
 
-  // Handlers with Reset Logic
-  const handleThemeChange = (newTheme) => {
-      setTheme(newTheme);
-      if (newTheme !== 'custom') {
-          setNiche("");
-          setSubNiche("");
-          setCustomTheme("");
-          setCustomNiche("");
-          setCustomSubNiche("");
-      }
-  };
-
-  const handleNicheChange = (newNiche) => {
-      setNiche(newNiche);
-      if (newNiche !== 'custom') {
-          setSubNiche("");
-          setCustomNiche("");
-          setCustomSubNiche("");
-      }
-  };
-
-  const handleSubNicheChange = (newSubNiche) => {
-      setSubNiche(newSubNiche);
-      if (newSubNiche !== 'custom') {
-          setCustomSubNiche("");
-      }
-  };
-
   const handleProductTypeChange = (id, name) => {
       setProductTypeId(id);
       setProductTypeName(name);
   };
-
 
   const getFormData = () => {
     if (!productTypeName) {
@@ -232,30 +132,68 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
         return null;
     }
 
+    if (!nicheSelection || !nicheSelection.name) {
+         toast.error("Please select a target Niche.");
+         return null;
+    }
+
     // Resolve tone label
     const toneOption = TONE_OPTIONS.find(t => t.value === tone);
     const resolvedToneName = tone === 'auto' ? 'Auto-detect' : (toneOption?.label || 'Auto-detect');
     
-    // Find Categorization Names (if not custom)
-    const selectedTheme = theme !== 'custom' ? themes.find(t => t.id === theme)?.name : customTheme;
-    const selectedNiche = niche !== 'custom' ? nichesList.find(t => t.id === niche)?.name : customNiche;
-    const selectedSubNiche = subNiche !== 'custom' ? subNichesList.find(t => t.id === subNiche)?.name : customSubNiche;
+    // Categorization from unified state
+    const { id, name, type, theme_name, niche_name, theme_id, niche_id, is_custom } = nicheSelection;
+    
+    // Default nulls
+    let final_theme_id = null;
+    let final_niche_id = null;
+    let final_sub_niche_id = null;
+
+    let final_theme_name = "None";
+    let final_niche_name = "None";
+    let final_sub_niche_name = "None";
+
+    // Logic based on Type
+    if (is_custom) {
+        // Custom niche: sub_niche_id must stay null (FK constraint to sub_niches table)
+        // Custom data is persisted via the custom_listing JSON field
+        final_theme_name = "Custom Theme";
+        final_niche_name = "Custom Niche";
+        final_sub_niche_name = name;
+    } else {
+        if (type === 'Theme') {
+            final_theme_id = id;
+            final_theme_name = name;
+        } else if (type === 'Niche') {
+            final_theme_id = theme_id;
+            final_theme_name = theme_name;
+            final_niche_id = id; // The selected item ID is the Niche ID
+            final_niche_name = name;
+        } else if (type === 'Sub-niche') {
+            final_theme_id = theme_id;
+            final_theme_name = theme_name;
+            final_niche_id = niche_id;
+            final_niche_name = niche_name;
+            final_sub_niche_id = id; // The selected item ID is the Sub-niche ID
+            final_sub_niche_name = name;
+        }
+    }
 
     return {
       // Categorization (IDs)
-      theme_id: (theme === 'custom' || theme === "") ? null : theme,
-      niche_id: (niche === 'custom' || niche === "") ? null : niche,
-      sub_niche_id: (subNiche === 'custom' || subNiche === "") ? null : subNiche,
+      theme_id: final_theme_id,
+      niche_id: final_niche_id,
+      sub_niche_id: final_sub_niche_id,
       
       // Categorization (Names/Text for AI)
-      theme_name: selectedTheme || "None",
-      niche_name: selectedNiche || "None",
-      sub_niche_name: selectedSubNiche || "None",
+      theme_name: final_theme_name,
+      niche_name: final_niche_name,
+      sub_niche_name: final_sub_niche_name,
 
-      // Custom Inputs
-      custom_theme: theme === 'custom' ? customTheme : null,
-      custom_niche: niche === 'custom' ? customNiche : null,
-      custom_sub_niche: subNiche === 'custom' ? customSubNiche : null,
+      // Custom Inputs (legacy support)
+      custom_theme: is_custom ? final_theme_name : null, 
+      custom_niche: is_custom ? final_niche_name : null,
+      custom_sub_niche: is_custom ? final_sub_niche_name : null,
       
       // Product Details
       product_type_id: productTypeId,
@@ -263,7 +201,7 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
       tone_id: null,
       tone_name: resolvedToneName,
       
-      ton_name: resolvedToneName,
+      ton_name: resolvedToneName, 
       tag_count: Math.min(tagLimit, MAX_TAGS_LIMIT),
       
       context: contextRef.current.value
@@ -285,96 +223,49 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       
-      {/* PRODUCT TYPE — Prominent position above categorization */}
-      <div>
-        <ProductTypeCombobox
-          groupedOptions={groupedProductTypes}
-          value={productTypeName}
-          onChange={handleProductTypeChange}
-          disabled={false}
-        />
-      </div>
-
-      {/* CATEGORIZATION SECTION */}
-      <div className="space-y-4">
-        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2">
-          Categorization
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          
-          {/* 1. Theme */}
-          <div>
-            <Select 
-              id="theme" 
-              label="Theme" 
-              value={theme} 
-              onChange={handleThemeChange} 
-              options={themes} 
-              disabled={false} 
-            />
-            <CustomInput 
-              isVisible={theme === 'custom'} 
-              value={customTheme} 
-              onChange={setCustomTheme} 
-              placeholder="Enter custom theme..." 
-            />
-          </div>
-
-          {/* 2. Niche */}
-          <div>
-            <Select 
-              id="niche" 
-              label="Niche" 
-              value={niche} 
-              onChange={handleNicheChange} 
-              options={nichesList} 
-              disabled={!theme || (theme === 'custom' && !customTheme)}
-            />
-             <CustomInput 
-              isVisible={niche === 'custom'} 
-              value={customNiche} 
-              onChange={setCustomNiche} 
-              placeholder="Enter custom niche..." 
-            />
-          </div>
-
-          {/* 3. Sub-niche */}
-          <div>
-            <Select 
-              id="subniche" 
-              label="Sub-niche" 
-              value={subNiche} 
-              onChange={handleSubNicheChange} 
-              options={subNichesList} 
-              disabled={!niche || (niche === 'custom' && !customNiche)}
-            />
-             <CustomInput 
-              isVisible={subNiche === 'custom'} 
-              value={customSubNiche} 
-              onChange={setCustomSubNiche} 
-              placeholder="Enter custom sub-niche..." 
-            />
-          </div>
-
+      {/* PRODUCT DETAILS BOX */}
+      <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-100">
+        <div className="flex items-center gap-2 mb-4">
+            <Package size={16} className="text-indigo-500" />
+            <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Product Details</h3>
         </div>
-      </div>
 
-      {/* DETAILS SECTION */}
-      <div className="space-y-3">
-          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2">
-            Details
-          </h3>
-          <div className="space-y-1">
-              <label htmlFor="context" className="text-sm font-medium text-slate-700">Instructions / Details</label>
-              <textarea
-                ref={contextRef}
-                id="context"
-                rows="3"
-                placeholder="ex: Witty and modern tone, for cat lovers..."
-                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 resize-none"
-              />
-          </div>
+        <div className="space-y-6">
+            {/* PRODUCT TYPE */}
+            <div>
+                <ProductTypeCombobox
+                groupedOptions={groupedProductTypes}
+                value={productTypeName}
+                onChange={handleProductTypeChange}
+                disabled={false}
+                />
+            </div>
+
+            {/* NICHE SELECTION (NEW SMART AUTOCOMPLETE) */}
+            <div>
+                <SmartNicheAutocomplete 
+                    label="Target Niche (Sub-niche)"
+                    value={nicheSelection}
+                    onChange={setNicheSelection}
+                />
+                <p className="text-xs text-slate-400 mt-1.5 ml-1">
+                    Search for specific niches like "Cat Lover" or "Minimalist Decor".
+                </p>
+            </div>
+
+            {/* DETAILS SECTION */}
+            <div className="space-y-1">
+                <label htmlFor="context" className="text-sm font-medium text-slate-700">Instructions / Details</label>
+                <textarea
+                    ref={contextRef}
+                    id="context"
+                    rows="3"
+                    placeholder="ex: Witty and modern tone, for cat lovers..."
+                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 resize-none"
+                    defaultValue={initialValues?.context || ""}
+                />
+            </div>
+        </div>
       </div>
 
       {/* ADVANCED SEO SETTINGS — Collapsible */}
@@ -452,16 +343,7 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
       </div>
 
       <div className="flex gap-4">
-          {onCancel && (
-             <button
-                type="button"
-                onClick={onCancel}
-                disabled={isLoading}
-                className="px-8 py-4 rounded-xl font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors border border-slate-200 hover:border-slate-300"
-             >
-                Close settings
-             </button>
-          )}
+
 
           {onSaveDraft && (
              <button
@@ -480,10 +362,10 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
 
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !isImageSelected || !isImageAnalysed || !productTypeName}
             className={`flex-1 py-4 rounded-xl font-bold shadow-lg transition-all transform flex items-center justify-center gap-2
-            ${isLoading 
-                ? 'bg-indigo-400 cursor-not-allowed shadow-none translate-y-0' 
+            ${isLoading || !isImageSelected || !isImageAnalysed || !productTypeName
+                ? 'bg-indigo-400 cursor-not-allowed shadow-none translate-y-0 opacity-70' 
                 : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5'
             }`}
           >
@@ -492,8 +374,12 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isLoading, 
             {isLoading === 'saving' && 'SAVING...'}
             {isLoading === 'triggering' && 'STARTING...'}
             {isLoading === true && 'ANALYZING...'} 
-            {!isLoading && 'ANALYZE (1 Credit)'}
-            {!isLoading && <span className="text-indigo-200">🚀</span>}
+            {!isLoading && (
+                !isImageAnalysed ? 'GENERATE SEO DATA' :
+                !productTypeName ? 'SELECT PRODUCT TYPE' :
+                'ANALYZE (1 Credit)'
+            )}
+            {!isLoading && isImageAnalysed && productTypeName && <span className="text-indigo-200">🚀</span>}
           </button>
       </div>
 

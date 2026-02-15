@@ -1,10 +1,9 @@
 import { Upload } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-const ImageUpload = ({ onFileSelect, initialImage, compact = false }) => {
+const ImageUpload = ({ onFileSelect, initialImage, compact = false, className = "" }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [preview, setPreview] = useState(initialImage || null);
-
   // Update preview if initialImage changes
   useEffect(() => {
     if (initialImage) {
@@ -39,12 +38,12 @@ const ImageUpload = ({ onFileSelect, initialImage, compact = false }) => {
       setPreview(null);
       onFileSelect(null);
   };
-
   return (
     <div 
       className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center transition-colors cursor-pointer bg-slate-50 overflow-hidden group
         ${compact ? 'p-4 min-h-[200px]' : 'p-8 min-h-[300px]'}
-        ${isDragOver ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 hover:border-indigo-400'}`}
+        ${isDragOver ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 hover:border-indigo-400'}
+        ${className}`}
       onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
       onDragLeave={() => setIsDragOver(false)}
       onDrop={handleDrop}
