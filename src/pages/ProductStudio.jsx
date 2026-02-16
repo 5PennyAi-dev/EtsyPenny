@@ -878,6 +878,18 @@ const ProductStudio = () => {
           relevance_label: k.relevance_label
         })),
         mockups: [formattedResults.imageUrl],
+        global_audit: {
+           global_strength: formattedResults.global_strength,
+           status_label: formattedResults.status_label,
+           strategic_verdict: formattedResults.strategic_verdict,
+           improvement_priority: formattedResults.improvement_priority,
+           // New metrics
+           listing_strength: formattedResults.listing_strength,
+           listing_visibility: formattedResults.listing_visibility,
+           listing_conversion: formattedResults.listing_conversion,
+           listing_relevance: formattedResults.listing_relevance,
+           listing_raw_visibility_index: formattedResults.listing_raw_visibility_index
+        },
         payload: {
           image_url: formattedResults.imageUrl,
           visual_aesthetic: visualAnalysis.aesthetic,
@@ -930,12 +942,27 @@ const ProductStudio = () => {
       const improvementPriority = unwrapped.improvement_priority;
       const scoreExplanation = unwrapped.score_explanation;
 
+      // Extract new metric fields
+      const listingStrength = unwrapped.listing_strength ?? unwrapped.listing_strenght; // Handle potential typo in response if any
+      const listingVisibility = unwrapped.listing_visibility;
+      const listingConversion = unwrapped.listing_conversion;
+      const listingRelevance = unwrapped.listing_relevance;
+      const listingRawVisibilityIndex = unwrapped.listing_raw_visibility_index;
+
       const updatePayload = {};
       if (globalStrength !== undefined) updatePayload.global_strength = globalStrength;
       if (statusLabel !== undefined) updatePayload.status_label = statusLabel;
       if (strategicVerdict !== undefined) updatePayload.strategic_verdict = strategicVerdict;
       if (improvementPriority !== undefined) updatePayload.improvement_priority = improvementPriority;
       if (scoreExplanation !== undefined) updatePayload.score_explanation = scoreExplanation;
+      
+      // Add new metrics to update payload
+      if (listingStrength !== undefined) updatePayload.listing_strength = listingStrength;
+      if (listingVisibility !== undefined) updatePayload.listing_visibility = listingVisibility;
+      if (listingConversion !== undefined) updatePayload.listing_conversion = listingConversion;
+      if (listingRelevance !== undefined) updatePayload.listing_relevance = listingRelevance;
+      if (listingRawVisibilityIndex !== undefined) updatePayload.listing_raw_visibility_index = listingRawVisibilityIndex;
+
 
       if (Object.keys(updatePayload).length > 0) {
         const { error: listingUpdateError } = await supabase
@@ -993,6 +1020,12 @@ const ProductStudio = () => {
         strategic_verdict: strategicVerdict ?? base.strategic_verdict,
         improvement_priority: improvementPriority ?? base.improvement_priority,
         score_explanation: scoreExplanation ?? base.score_explanation,
+        // Update new metrics in local state
+        listing_strength: listingStrength ?? base.listing_strength,
+        listing_visibility: listingVisibility ?? base.listing_visibility,
+        listing_conversion: listingConversion ?? base.listing_conversion,
+        listing_relevance: listingRelevance ?? base.listing_relevance,
+        listing_raw_visibility_index: listingRawVisibilityIndex ?? base.listing_raw_visibility_index,
         analytics: updatedAnalytics
       };
 
