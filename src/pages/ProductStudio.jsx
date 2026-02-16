@@ -521,15 +521,21 @@ const ProductStudio = () => {
         const statsToInsert = seoAnalysis.filter(item => item.keyword).map(item => ({
             listing_id: activeListingId,
             tag: item.keyword,
-            search_volume: item.avg_volume || 0,
+            search_volume: item.search_volume || 0,
             competition: String(item.competition), 
             opportunity_score: item.opportunity_score,
-            volume_history: item.volumes_history || [],
+            volume_history: item.monthly_searches 
+                ? item.monthly_searches.map(m => m.search_volume).reverse() 
+                : (item.volumes_history || []),
             is_trending: item.status?.trending || false,
             is_evergreen: item.status?.evergreen || false,
             is_promising: item.status?.promising || false,
             insight: item.insight || null,
             is_top: item.is_top ?? null,
+            transactional_score: item.transactional_score || null,
+            intent_label: item.intent_label || null,
+            niche_score: item.niche_score || null,
+            relevance_label: item.relevance_label || null,
             is_competition: false
         }));
 
@@ -573,6 +579,10 @@ const ProductStudio = () => {
                     is_promising: s.is_promising,
                     insight: s.insight,
                     is_top: s.is_top,
+                    transactional_score: s.transactional_score,
+                    intent_label: s.intent_label,
+                    niche_score: s.niche_score,
+                    relevance_label: s.relevance_label,
                     is_competition: false
                 })),
                 // Merge preserved competitor analytics back into the results
@@ -790,7 +800,11 @@ const ProductStudio = () => {
             evergreen: k.is_evergreen,
             promising: k.is_promising
           },
-          is_sniper_seo: fromSniper
+          is_sniper_seo: fromSniper,
+          transactional_score: k.transactional_score,
+          intent_label: k.intent_label,
+          niche_score: k.niche_score,
+          relevance_label: k.relevance_label
         })),
         mockups: [formattedResults.imageUrl],
         payload: {
@@ -891,7 +905,11 @@ const ProductStudio = () => {
           return {
             ...existing,
             insight: match.insight ?? existing.insight,
-            is_top: match.is_top ?? existing.is_top
+            is_top: match.is_top ?? existing.is_top,
+            transactional_score: match.transactional_score ?? existing.transactional_score,
+            intent_label: match.intent_label ?? existing.intent_label,
+            niche_score: match.niche_score ?? existing.niche_score,
+            relevance_label: match.relevance_label ?? existing.relevance_label
           };
         }
         return existing;
@@ -950,7 +968,11 @@ const ProductStudio = () => {
             evergreen: k.is_evergreen,
             promising: k.is_promising
           },
-          is_sniper_seo: k.is_sniper_seo ?? false
+          is_sniper_seo: k.is_sniper_seo ?? false,
+          transactional_score: k.transactional_score,
+          intent_label: k.intent_label,
+          niche_score: k.niche_score,
+          relevance_label: k.relevance_label
         })),
         mockups: [results.imageUrl],
         payload: {
@@ -1053,15 +1075,21 @@ const ProductStudio = () => {
       const compStatsToInsert = competitionKeywords.filter(item => item.keyword).map(item => ({
         listing_id: listingId,
         tag: item.keyword,
-        search_volume: item.avg_volume || 0,
+        search_volume: item.search_volume || 0,
         competition: String(item.competition),
         opportunity_score: item.opportunity_score,
-        volume_history: item.volumes_history || [],
+        volume_history: item.monthly_searches 
+            ? item.monthly_searches.map(m => m.search_volume).reverse() 
+            : (item.volumes_history || []),
         is_trending: item.status?.trending || false,
         is_evergreen: item.status?.evergreen || false,
         is_promising: item.status?.promising || false,
         insight: item.insight || null,
         is_top: item.is_top ?? null,
+        transactional_score: item.transactional_score || null,
+        intent_label: item.intent_label || null,
+        niche_score: item.niche_score || null,
+        relevance_label: item.relevance_label || null,
         is_competition: true
       }));
 
@@ -1084,6 +1112,10 @@ const ProductStudio = () => {
         is_promising: s.is_promising,
         insight: s.insight,
         is_top: s.is_top,
+        transactional_score: s.transactional_score,
+        intent_label: s.intent_label,
+        niche_score: s.niche_score,
+        relevance_label: s.relevance_label,
         is_competition: true
       }));
 
@@ -1134,7 +1166,11 @@ const ProductStudio = () => {
             promising: k.is_promising
           },
           insight: k.insight || null,
-          is_top: k.is_top ?? null
+          is_top: k.is_top ?? null,
+          transactional_score: k.transactional_score,
+          intent_label: k.intent_label,
+          niche_score: k.niche_score,
+          relevance_label: k.relevance_label
         })),
         mockups: [results.imageUrl],
         global_audit: {
@@ -1213,15 +1249,21 @@ const ProductStudio = () => {
       const statsToInsert = sniperKeywords.filter(item => item.keyword).map(item => ({
         listing_id: listingId,
         tag: item.keyword,
-        search_volume: item.avg_volume || 0,
+        search_volume: item.search_volume || 0,
         competition: String(item.competition),
         opportunity_score: item.opportunity_score,
-        volume_history: item.volumes_history || [],
+        volume_history: item.monthly_searches 
+            ? item.monthly_searches.map(m => m.search_volume).reverse() 
+            : (item.volumes_history || []),
         is_trending: item.status?.trending || false,
         is_evergreen: item.status?.evergreen || false,
         is_promising: item.status?.promising || false,
         insight: item.insight || null,
         is_top: item.is_top ?? null,
+        transactional_score: item.transactional_score || null,
+        intent_label: item.intent_label || null,
+        niche_score: item.niche_score || null,
+        relevance_label: item.relevance_label || null,
         is_sniper_seo: item.is_sniper_seo ?? true,
         is_competition: false
       }));
@@ -1256,6 +1298,10 @@ const ProductStudio = () => {
             is_promising: s.is_promising,
             insight: s.insight,
             is_top: s.is_top,
+            transactional_score: s.transactional_score,
+            intent_label: s.intent_label,
+            niche_score: s.niche_score,
+            relevance_label: s.relevance_label,
             is_sniper_seo: s.is_sniper_seo,
             is_competition: false
           })),
@@ -1369,6 +1415,8 @@ const ProductStudio = () => {
                 is_promising: s.is_promising,
                 insight: s.insight || null,
                 is_top: s.is_top ?? null,
+                transactional_score: s.transactional_score ?? null,
+                intent_label: s.intent_label ?? null,
                 is_sniper_seo: s.is_sniper_seo ?? false,
                 is_competition: s.is_competition ?? false
             })),

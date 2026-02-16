@@ -1,4 +1,4 @@
-﻿import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+﻿import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart, Pin, Tag } from 'lucide-react';
 import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
@@ -545,28 +545,37 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                 </th>
                                 <th className="px-3 py-2 font-semibold text-left">Tag / Keyword</th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[14%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[10%]"
+                                    onClick={() => requestSort('score')}
+                                >
+                                    Score <SortIcon columnKey="score" />
+                                </th>
+                                <th className="px-2 py-2 text-center font-semibold w-[10%]">
+                                    Conv. Intent.
+                                </th>
+                                <th className="px-2 py-2 text-center font-semibold w-[10%]">
+                                    Relevance
+                                </th>
+                                <th className="px-2 py-2 text-center font-semibold w-[10%]">
+                                    Placement
+                                </th>
+                                <th 
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[12%]"
                                     onClick={() => requestSort('volume')}
                                 >
                                     Avg. Vol <SortIcon columnKey="volume" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[14%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[12%]"
                                     onClick={() => requestSort('trend')}
                                 >
                                     Trend <SortIcon columnKey="trend" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[14%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[12%]"
                                     onClick={() => requestSort('competition')}
                                 >
                                     Competition <SortIcon columnKey="competition" />
-                                </th>
-                                <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[10%]"
-                                    onClick={() => requestSort('score')}
-                                >
-                                    Score <SortIcon columnKey="score" />
                                 </th>
                                 <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[8%]">Status</th>
                                 <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[6%]"></th>
@@ -616,6 +625,72 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                             )}
                                         </div>
                                     </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="font-bold text-slate-700">{row.score}</div>
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        {(() => {
+                                            const score = row.transactional_score;
+                                            if (!score) return <span className="text-slate-300">-</span>;
+                                            
+                                            let colorClass = "text-slate-400";
+                                            let showIcon = false;
+                                            
+                                            if (score >= 8) {
+                                                colorClass = "text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded";
+                                                showIcon = true;
+                                            } else if (score >= 5) {
+                                                colorClass = "text-slate-600 font-medium";
+                                            }
+                                            
+                                            return (
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    {showIcon && <ShoppingCart size={14} className="text-emerald-500" />}
+                                                    <span className={colorClass}>{score}/10</span>
+                                                </div>
+                                            );
+                                        })()}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        {(() => {
+                                            const score = row.niche_score;
+                                            if (!score) return <span className="text-slate-300">-</span>;
+                                            
+                                            let colorClass = "text-slate-400";
+                                            let showIcon = false;
+                                            
+                                            if (score >= 8) {
+                                                colorClass = "text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded";
+                                                showIcon = true;
+                                            } else if (score >= 5) {
+                                                colorClass = "text-slate-600 font-medium";
+                                            }
+                                            
+                                            return (
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    {showIcon && <Target size={14} className="text-emerald-500" />}
+                                                    <span className={colorClass}>{score}/10</span>
+                                                </div>
+                                            );
+                                        })()}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        {(() => {
+                                            const label = row.intent_label;
+                                            if (!label) return <span className="text-slate-300">-</span>;
+                                            
+                                            return (
+                                                <div className="flex items-center justify-center gap-1.5 text-slate-600 text-xs font-medium bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                                                    {label === "Title" ? (
+                                                        <Pin size={12} className="text-indigo-500" />
+                                                    ) : (
+                                                        <Tag size={12} className="text-slate-400" />
+                                                    )}
+                                                    {label}
+                                                </div>
+                                            );
+                                        })()}
+                                    </td>
                                     <td className="px-4 py-3 text-center text-slate-600 font-mono text-xs">
                                         {row.volume.toLocaleString()}
                                     </td>
@@ -639,9 +714,6 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                                 </span>
                                             );
                                         })()}
-                                    </td>
-                                    <td className="px-4 py-3 text-center">
-                                        <div className="font-bold text-slate-700">{row.score}</div>
                                     </td>
                                     <td className="px-4 py-3 text-center">
                                         <div className="flex items-center justify-center gap-2">
