@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (5PennyAi)
-*Dernière mise à jour : 2026-02-14 (Session 3)*
+*Dernière mise à jour : 2026-02-15 (Session 4)*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -87,12 +87,25 @@
     - **Relevance:** Shows `niche_score`/10 with conditional formatting (Green + Target icon 🎯 for 8-10, Dark/Light Grey for lower).
     - **UI**: Keyword Performance table reordered to: Tag/Keyword → Score → Conv. Intent. → Relevance → Placement → Avg. Vol → Trend → Comp → Status.
 
+- [Feature] **Text-Based Niche Selection** (2026-02-15): Migrated `OptimizationForm.jsx` from `SmartNicheAutocomplete` (rigid ID-based dropdown) to 3 flexible text inputs: Theme, Niche, Sub-niche.
+    - **Frontend**: Users can now type any value freely. Visual analysis still pre-fills via text.
+    - **Data Flow**: `ProductStudio.jsx` updated to send plain text `theme`, `niche`, `sub_niche` in `generate_seo` and `drafting_seo` payloads. Legacy ID fields sent as `null`.
+    - **Database**: `listings` table columns `theme`, `niche`, `sub_niche` (TEXT) used for storage.
+
+    - **Visual Analysis JSON**: Updated `ProductStudio.jsx` to parse and save `theme`, `niche`, and `sub-niche` from the new n8n visual analysis response structure. These values now auto-fill the text-based categorization form.
+
+    - **Bug Fix**: Resolved issue where visual analysis data wasn't saving and image disappeared. Added logic to INSERT new listing if missing and persist `imageUrl` in React state during form updates.
+    - **New SEO Metrics**: Integrated `listing_strength`, `listing_visibility`, `listing_conversion`, `listing_relevance`, and `listing_raw_visibility_index` into the database and frontend logic.
+    - **New Listing Workflow**: Fixed "New Listing" button in Product Studio to clear visual analysis fields. Updated Dashboard button to "New Listing" and ensured it activates the form in Product Studio.
+    - **UX Improvement**: Removed default "T-shirt" product type to force explicit user selection.
+    - **Bug Fix**: Fixed issue where Product Type was erased after visual analysis by preventing unnecessary form remounting.
+    - **Form Persistence**: Updated Visual Analysis to save manually entered Product Type and Instructions to the database alongside AI results.
+
 ## 5. Next Steps (Action Items)
 - Clean up debug `console.log` statements from `ProductStudio.jsx` and `ResultsDisplay.jsx`.
 - Polish the Login/Signup UI.
 - Implement the comprehensive Landing Page.
 - Build the Stripe Payment Integration (Credits & Subscriptions).
-- Test full SEO Sniper → Insight pipeline end-to-end (sniper → new keywords → auto-insight → updated audit score + score_explanation).
-- Test history reload with sniper keywords (`is_sniper_seo` flag hydration).
-- Verify `score_explanation` tooltip renders correctly with real AI-generated content.
-
+- Test full SEO Sniper → Insight pipeline end-to-end.
+- Test history reload with sniper keywords.
+- Verify `score_explanation` tooltip renders correctly.

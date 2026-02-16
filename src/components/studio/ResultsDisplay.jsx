@@ -496,7 +496,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                          )}
                          {results && (
                             <span className="text-xs font-normal text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full ml-1">
-                                {selectedTags.length} / {results.analytics.length} selected
+                                {selectedTags.length} / {results.analytics?.length || 0} selected
                             </span>
                          )}
                     </div>
@@ -531,9 +531,9 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                 <th className="px-4 py-2 w-10 text-center">
                                     <input 
                                         type="checkbox" 
-                                        checked={results && selectedTags.length === results.analytics.length && results.analytics.length > 0}
+                                        checked={results && results.analytics && selectedTags.length === results.analytics.length && results.analytics.length > 0}
                                         onChange={(e) => {
-                                            if (e.target.checked && results) {
+                                            if (e.target.checked && results && results.analytics) {
                                                 setSelectedTags(results.analytics.map(r => r.keyword));
                                             } else {
                                                 setSelectedTags([]);
@@ -1018,7 +1018,7 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                                     status_label: results.status_label ?? null,
                                                     strategic_verdict: results.strategic_verdict ?? null,
                                                     productName: displayedTitle.split(' ').slice(0, 5).join(' ') + '...', // Simple truncated name
-                                                    tags: results.analytics
+                                                    tags: (results.analytics || [])
                                                         .filter(k => selectedTags.includes(k.keyword))
                                                         .map(k => {
                                                             // Calculate Trend %

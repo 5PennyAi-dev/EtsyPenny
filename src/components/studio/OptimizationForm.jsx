@@ -1,10 +1,10 @@
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Sparkles, Package, Settings, ChevronRight, ChevronDown, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import ProductTypeCombobox from './ProductTypeCombobox';
-import SmartNicheAutocomplete from './SmartNicheAutocomplete';
+// import SmartNicheAutocomplete from './SmartNicheAutocomplete';
 
 const TONE_OPTIONS = [
   { value: 'auto', label: '✨ Auto-detect from image' },
@@ -17,7 +17,7 @@ const TONE_OPTIONS = [
 
 const MAX_TAGS_LIMIT = 13;
 
-const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isImageAnalysed, isLoading, onCancel, initialValues }) => {
+const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, isImageAnalysed, isLoading, onCancel, initialValues }, ref) => {
 
   // Data State
   const [groupedProductTypes, setGroupedProductTypes] = useState([]);
@@ -26,9 +26,10 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isImageAnal
   const [tone, setTone] = useState('auto');
   const [tagLimit, setTagLimit] = useState(MAX_TAGS_LIMIT);
   
-  // Smart Niche Selection State (Flat Object)
-  // Expected structure: { id, name, theme_name, niche_name, is_custom }
-  const [nicheSelection, setNicheSelection] = useState(null);
+  // Niche Selection State
+  const [themeName, setThemeName] = useState("");
+  const [nicheName, setNicheName] = useState("");
+  const [subNicheName, setSubNicheName] = useState("");
 
   // Advanced section toggle
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
@@ -58,17 +59,7 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isImageAnal
         
         setGroupedProductTypes(grouped);
 
-        // Default to T-Shirt if available and no value set yet
-        if (!productTypeName) {
-          for (const group of grouped) {
-            const tshirt = group.types.find((t) => t.name.toLowerCase().includes('t-shirt'));
-            if (tshirt) {
-              setProductTypeName(tshirt.name);
-              setProductTypeId(tshirt.id);
-              break;
-            }
-          }
-        }
+
       }
 
     };
@@ -78,17 +69,10 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isImageAnal
   // Initialize from initialValues
   useEffect(() => {
       if (initialValues) {
-          // Hydrate Niche Selection
-          // If we have IDs or Names
-          if (initialValues.sub_niche_name || initialValues.custom_sub_niche) {
-              setNicheSelection({
-                  id: initialValues.sub_niche_id || null,
-                  name: initialValues.sub_niche_name || initialValues.custom_sub_niche,
-                  theme_name: initialValues.theme_name || initialValues.custom_theme || 'Unknown Theme',
-                  niche_name: initialValues.niche_name || initialValues.custom_niche || 'Unknown Niche',
-                  is_custom: !initialValues.sub_niche_id
-              });
-          }
+          // Hydrate Niche Selection - Strings Only
+          setThemeName(initialValues.theme_name || initialValues.theme || initialValues.custom_theme || "");
+          setNicheName(initialValues.niche_name || initialValues.niche || initialValues.custom_niche || "");
+          setSubNicheName(initialValues.sub_niche_name || initialValues.sub_niche || initialValues.custom_sub_niche || "");
           
           // Product Type: hydrate from ID (find name) or from name directly
           if (initialValues.product_type_id) {
@@ -132,8 +116,8 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isImageAnal
         return null;
     }
 
-    if (!nicheSelection || !nicheSelection.name) {
-         toast.error("Please select a target Niche.");
+    if (!themeName && !nicheName && !subNicheName) {
+         toast.error("Please enter at least one categorization field (Theme, Niche, or Sub-niche).");
          return null;
     }
 
@@ -141,59 +125,21 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isImageAnal
     const toneOption = TONE_OPTIONS.find(t => t.value === tone);
     const resolvedToneName = tone === 'auto' ? 'Auto-detect' : (toneOption?.label || 'Auto-detect');
     
-    // Categorization from unified state
-    const { id, name, type, theme_name, niche_name, theme_id, niche_id, is_custom } = nicheSelection;
-    
-    // Default nulls
-    let final_theme_id = null;
-    let final_niche_id = null;
-    let final_sub_niche_id = null;
-
-    let final_theme_name = "None";
-    let final_niche_name = "None";
-    let final_sub_niche_name = "None";
-
-    // Logic based on Type
-    if (is_custom) {
-        // Custom niche: sub_niche_id must stay null (FK constraint to sub_niches table)
-        // Custom data is persisted via the custom_listing JSON field
-        final_theme_name = "Custom Theme";
-        final_niche_name = "Custom Niche";
-        final_sub_niche_name = name;
-    } else {
-        if (type === 'Theme') {
-            final_theme_id = id;
-            final_theme_name = name;
-        } else if (type === 'Niche') {
-            final_theme_id = theme_id;
-            final_theme_name = theme_name;
-            final_niche_id = id; // The selected item ID is the Niche ID
-            final_niche_name = name;
-        } else if (type === 'Sub-niche') {
-            final_theme_id = theme_id;
-            final_theme_name = theme_name;
-            final_niche_id = niche_id;
-            final_niche_name = niche_name;
-            final_sub_niche_id = id; // The selected item ID is the Sub-niche ID
-            final_sub_niche_name = name;
-        }
-    }
-
     return {
-      // Categorization (IDs)
-      theme_id: final_theme_id,
-      niche_id: final_niche_id,
-      sub_niche_id: final_sub_niche_id,
+      // Categorization (Text for AI & DB)
+      theme_name: themeName,
+      niche_name: nicheName,
+      sub_niche_name: subNicheName,
       
-      // Categorization (Names/Text for AI)
-      theme_name: final_theme_name,
-      niche_name: final_niche_name,
-      sub_niche_name: final_sub_niche_name,
+      // Legacy ID support (sending explicit nulls to avoid confusion)
+      theme_id: null,
+      niche_id: null,
+      sub_niche_id: null,
 
-      // Custom Inputs (legacy support)
-      custom_theme: is_custom ? final_theme_name : null, 
-      custom_niche: is_custom ? final_niche_name : null,
-      custom_sub_niche: is_custom ? final_sub_niche_name : null,
+      // Custom Inputs (legacy support - map directly to our new strings)
+      custom_theme: themeName, 
+      custom_niche: nicheName,
+      custom_sub_niche: subNicheName,
       
       // Product Details
       product_type_id: productTypeId,
@@ -207,6 +153,26 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isImageAnal
       context: contextRef.current.value
     };
   };
+
+  // Expose state to parent via ref
+  useImperativeHandle(ref, () => ({
+      getCurrentState: () => {
+          // Resolve tone label
+          const toneOption = TONE_OPTIONS.find(t => t.value === tone);
+          const resolvedToneName = tone === 'auto' ? 'Auto-detect' : (toneOption?.label || 'Auto-detect');
+
+          return {
+              product_type_id: productTypeId,
+              product_type_name: productTypeName,
+              tone_name: resolvedToneName,
+              context: contextRef.current?.value || "",
+              
+              theme_name: themeName,
+              niche_name: nicheName,
+              sub_niche_name: subNicheName
+          };
+      }
+  }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -241,16 +207,46 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isImageAnal
                 />
             </div>
 
-            {/* NICHE SELECTION (NEW SMART AUTOCOMPLETE) */}
-            <div>
-                <SmartNicheAutocomplete 
-                    label="Target Niche (Sub-niche)"
-                    value={nicheSelection}
-                    onChange={setNicheSelection}
-                />
-                <p className="text-xs text-slate-400 mt-1.5 ml-1">
-                    Search for specific niches like "Cat Lover" or "Minimalist Decor".
-                </p>
+            {/* CATEGORIZATION (TEXT INPUTS) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* THEME */}
+                <div className="space-y-1">
+                    <label htmlFor="theme" className="text-sm font-medium text-slate-700">Theme</label>
+                    <input
+                        type="text"
+                        id="theme"
+                        value={themeName}
+                        onChange={(e) => setThemeName(e.target.value)}
+                        placeholder="e.g. Occasions"
+                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                    />
+                </div>
+
+                {/* NICHE */}
+                <div className="space-y-1">
+                    <label htmlFor="niche" className="text-sm font-medium text-slate-700">Niche</label>
+                    <input
+                        type="text"
+                        id="niche"
+                        value={nicheName}
+                        onChange={(e) => setNicheName(e.target.value)}
+                        placeholder="e.g. Wedding"
+                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                    />
+                </div>
+
+                {/* SUB-NICHE */}
+                <div className="space-y-1">
+                    <label htmlFor="subNiche" className="text-sm font-medium text-slate-700">Sub-niche</label>
+                    <input
+                        type="text"
+                        id="subNiche"
+                        value={subNicheName}
+                        onChange={(e) => setSubNicheName(e.target.value)}
+                        placeholder="e.g. Bridesmaid Gift"
+                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                    />
+                </div>
             </div>
 
             {/* DETAILS SECTION */}
@@ -385,6 +381,6 @@ const OptimizationForm = ({ onAnalyze, onSaveDraft, isImageSelected, isImageAnal
 
     </form>
   );
-};
+});
 
 export default OptimizationForm;

@@ -43,24 +43,12 @@ const STATUS_IDS = {
  };
  
  const formatCategorizationPayload = (context) => {
-    // Check for specific custom niche markers set by OptimizationForm
-    const isCustom = context.theme_name === 'Custom Theme' && context.niche_name === 'Custom Niche';
-    
-    if (isCustom) {
-        return {
-            theme: null,
-            niche: null,
-            sub_niche: null,
-            custom_niche: context.sub_niche_name, // The actual custom value is here
-            custom_listing: context.custom_listing // Preserve existing logic if needed
-        };
-    }
-    
+    // Simplified payload for text-based system
     return {
         theme: context.theme_name || null,
         niche: context.niche_name || null,
         sub_niche: context.sub_niche_name || null,
-        custom_niche: null, // Explicitly null for standard niches
+        custom_niche: null, // Legacy field, keeping null for safety
         custom_listing: context.custom_listing || null
     };
 };
@@ -111,8 +99,9 @@ const ProductStudio = () => {
   // Let's rely on the direct response for speed and reliability if N8N returns data.
   // Auto-resize visual analysis textareas when values change programmatically
 
+  // Ref for OptimizationForm to access its state
+  const optimizationFormRef = useRef(null);
 
-  // Visual Analysis Handler
   const handleAnalyzeDesign = async () => {
       // 1. Check if image selected
       if (!selectedImage && !results?.imageUrl) {
@@ -138,6 +127,9 @@ const ProductStudio = () => {
                
                const { data: { publicUrl: newUrl } } = supabase.storage.from('mockups_bucket').getPublicUrl(filename);
                publicUrl = newUrl;
+
+               // IMMEDIATELY update results with the new URL so it persists across re-renders
+               setResults(prev => ({ ...(prev || {}), imageUrl: newUrl }));
           }
 
           // Trigger n8n webhook
@@ -160,32 +152,94 @@ const ProductStudio = () => {
           const data = responseData?.output?.visual_analysis || responseData?.visual_analysis || responseData;
 
           if (data) {
+              // Extract new categorization fields from AI response
+              const aiTheme = data.theme || "";
+              const aiNiche = data.niche || "";
+              const aiSubNiche = data["sub-niche"] || data.sub_niche || "";
+
+              // Capture current form state (Product Type, Instructions) to preserve/save
+              const currentFormData = optimizationFormRef.current?.getCurrentState() || {};
+
               setVisualAnalysis({
                   aesthetic: data.aesthetic_style || "",
                   typography: data.typography_details || "",
                   graphics: data.graphic_elements || "",
                   colors: data.color_palette || "",
                   target_audience: data.target_audience || "",
-                  overall_vibe: data.overall_vibe || ""
+                  overall_vibe: data.overall_vibe || "",
+                  // Add these to state so we can pass them to form via a prop or context update
+                  theme: aiTheme,
+                  niche: aiNiche,
+                  sub_niche: aiSubNiche
               });
 
+              // Force update form initialValues by updating analysisContext or a specific state
+              // We'll use a new state or force re-render by updating key
+              setAnalysisContext(prev => ({
+                    ...prev,
+                    theme_name: aiTheme,
+                    niche_name: aiNiche,
+                    sub_niche_name: aiSubNiche,
+                    // Ensure other fields are preserved if they exist
+              }));
+              
+              // Also update formKey to force re-initialization of OptimizationForm with new values
+              // setFormKey(prev => prev + 1); // REMOVED: Prevent form reset (keeps Product Type)
+
+
               setIsImageAnalyzedState(true);
+
+              const dbPayload = {
+                  is_image_analysed: true,
+                  visual_aesthetic: data.aesthetic_style,
+                  visual_typography: data.typography_details,
+                  visual_graphics: data.graphic_elements,
+                  visual_colors: data.color_palette,
+                  visual_target_audience: data.target_audience,
+                  visual_overall_vibe: data.overall_vibe,
+                  
+                  // Save categorization (AI Priority)
+                  theme: aiTheme,
+                  niche: aiNiche,
+                  sub_niche: aiSubNiche,
+                  
+                  // Save Manual Fields (User Priority)
+                  product_type_id: currentFormData.product_type_id,
+                  user_description: currentFormData.context, // Instructions/Details
+                  
+                  // We could also save product_type_name if we stored it, but ID is usually enough. 
+                  // If product_type_id is null/custom, maybe we need validation?
+                  // For now, save what we have. It might be null if not selected.
+                  
+                  image_url: publicUrl
+              };
 
               if (listingId) {
                   const { error: updateError } = await supabase
                       .from('listings')
-                      .update({ 
-                          is_image_analysed: true,
-                          visual_aesthetic: data.aesthetic_style,
-                          visual_typography: data.typography_details,
-                          visual_graphics: data.graphic_elements,
-                          visual_colors: data.color_palette,
-                          visual_target_audience: data.target_audience,
-                          visual_overall_vibe: data.overall_vibe
-                      })
+                      .update(dbPayload)
                       .eq('id', listingId);
                   
                   if (updateError) console.error("Failed to update visual analysis stats:", updateError);
+              } else {
+                  // INSERT new listing if none exists
+                   const { data: newListing, error: insertError } = await supabase
+                      .from('listings')
+                      .insert({
+                          ...dbPayload,
+                          user_id: user.id,
+                          status_id: STATUS_IDS.NEW,
+                          title: "New Visual Analysis"
+                      })
+                      .select()
+                      .single();
+
+                   if (insertError) {
+                       console.error("Failed to insert new listing for visual analysis:", insertError);
+                       toast.error("Failed to save analysis results.");
+                   } else {
+                       setListingId(newListing.id);
+                   }
               }
 
               toast.success("Visual analysis complete! ✨");
@@ -242,9 +296,9 @@ const ProductStudio = () => {
           
           // 2. Database Operation
           const customData = {
-              theme: formData.custom_theme,
-              niche: formData.custom_niche,
-              sub_niche: formData.custom_sub_niche
+              theme: formData.theme_name,
+              niche: formData.niche_name,
+              sub_niche: formData.sub_niche_name
           };
 
           const commonFields = {
@@ -307,7 +361,7 @@ const ProductStudio = () => {
     // Save context for drafting phase
     setAnalysisContext({
         ...formData,
-        is_custom: formData.theme_name === 'Custom Theme' && formData.niche_name === 'Custom Niche'
+        is_custom: true // Always treat as custom text now
     });
     // Fallback: Use existing result image if valid and no new image selected
     if (!selectedImage && !formData.existingImageUrl && results?.imageUrl) {
@@ -368,9 +422,9 @@ const ProductStudio = () => {
         
         // 2. Database Operation (silently while skeleton shows)
         const customData = {
-            theme: formData.custom_theme,
-            niche: formData.custom_niche,
-            sub_niche: formData.custom_sub_niche,
+            theme: formData.theme_name,
+            niche: formData.niche_name,
+            sub_niche: formData.sub_niche_name,
             product_type: formData.product_type_id ? null : formData.product_type_name
         };
 
@@ -491,10 +545,16 @@ const ProductStudio = () => {
         }
 
         // Extract global audit fields from the unwrapped response
-        const globalStrength = unwrapped?.global_listing_strength ?? null;
+        const globalStrength = unwrapped?.global_listing_strength ?? unwrapped?.listing_strength ?? null;
         const statusLabel = unwrapped?.global_status_label ?? null;
         const strategicVerdict = unwrapped?.global_strategic_verdict ?? null;
         const improvementPriority = unwrapped?.improvement_priority ?? null;
+
+        // Extract new SEO metrics (handle nested breakdown/stats or flat structure)
+        const listingVisibility = unwrapped?.listing_visibility ?? unwrapped?.breakdown?.visibility ?? null;
+        const listingConversion = unwrapped?.listing_conversion ?? unwrapped?.breakdown?.conversion ?? null;
+        const listingRelevance = unwrapped?.listing_relevance ?? unwrapped?.breakdown?.relevance ?? null;
+        const listingRawVisibilityIndex = unwrapped?.listing_raw_visibility_index ?? unwrapped?.stats?.raw_visibility_index ?? null;
 
 
         // 4. Save Results to Database (silently, skeleton stays visible)
@@ -510,7 +570,13 @@ const ProductStudio = () => {
                 global_strength: globalStrength,
                 status_label: statusLabel,
                 strategic_verdict: strategicVerdict,
-                improvement_priority: improvementPriority
+                improvement_priority: improvementPriority,
+                // New metrics
+                listing_strength: globalStrength, // Saving to both columns if needed, or prefer listing_strength
+                listing_visibility: listingVisibility,
+                listing_conversion: listingConversion,
+                listing_relevance: listingRelevance,
+                listing_raw_visibility_index: listingRawVisibilityIndex
             })
             .eq('id', activeListingId);
 
@@ -566,6 +632,11 @@ const ProductStudio = () => {
             status_label: statusLabel,
             strategic_verdict: strategicVerdict,
             improvement_priority: improvementPriority,
+            listing_strength: globalStrength,
+            listing_visibility: listingVisibility,
+            listing_conversion: listingConversion,
+            listing_relevance: listingRelevance,
+            listing_raw_visibility_index: listingRawVisibilityIndex,
             tags: statsToInsert.map(s => s.tag),
             analytics: [
                 ...statsToInsert.map(s => ({
@@ -1346,6 +1417,14 @@ const ProductStudio = () => {
     setSelectedImage(null);
     setAnalysisContext(null);
     setListingName("");
+    setVisualAnalysis({
+        aesthetic: "",
+        typography: "",
+        graphics: "",
+        colors: "",
+        target_audience: "",
+        overall_vibe: ""
+    });
     setFormKey(prev => prev + 1); // Reset form state
     setIsNewListingActive(true); // Manually activate the form for a new session
   };
@@ -1403,6 +1482,11 @@ const ProductStudio = () => {
             strategic_verdict: listing.strategic_verdict ?? null,
             improvement_priority: listing.improvement_priority ?? null,
             score_explanation: listing.score_explanation ?? null,
+            listing_strength: listing.listing_strength ?? listing.global_strength ?? null,
+            listing_visibility: listing.listing_visibility ?? null,
+            listing_conversion: listing.listing_conversion ?? null,
+            listing_relevance: listing.listing_relevance ?? null,
+            listing_raw_visibility_index: listing.listing_raw_visibility_index ?? null,
             competitor_seed: listing.competitor_seed ?? null,
             analytics: stats.map(s => ({
                 keyword: s.tag,
@@ -1457,6 +1541,9 @@ const ProductStudio = () => {
         handleLoadListing(location.state.listingId);
         // Clear state to prevent reload loop (optional, but good practice)
         window.history.replaceState({}, document.title)
+    } else if (location.state?.newListing) {
+        handleNewAnalysis();
+        window.history.replaceState({}, document.title);
     }
   }, [location.state]);
 
@@ -1771,6 +1858,7 @@ const ProductStudio = () => {
                             </div>
                         </div>
    <OptimizationForm 
+       ref={optimizationFormRef}
        key={`form-${formKey}`} 
        onAnalyze={handleAnalyze} 
        onSaveDraft={handleSaveDraft}
