@@ -546,16 +546,19 @@ const ProductStudio = () => {
         }
 
         // Extract global audit fields from the unwrapped response
-        const globalStrength = unwrapped?.global_listing_strength ?? unwrapped?.listing_strength ?? null;
-        const statusLabel = unwrapped?.global_status_label ?? null;
-        const strategicVerdict = unwrapped?.global_strategic_verdict ?? null;
+        // Support both legacy (global_listing_strength) and direct (global_strength) keys
+        // User JSON structure: { listing_strength: 63, breakdown: { visibility, conversion, relevance }, stats: { raw_visibility_index } }
+        const globalStrength = unwrapped?.listing_strength ?? unwrapped?.global_listing_strength ?? unwrapped?.global_strength ?? null;
+        const statusLabel = unwrapped?.global_status_label ?? unwrapped?.status_label ?? null;
+        const strategicVerdict = unwrapped?.global_strategic_verdict ?? unwrapped?.strategic_verdict ?? null;
         const improvementPriority = unwrapped?.improvement_priority ?? null;
+        const scoreExplanation = unwrapped?.score_explanation ?? null; 
 
         // Extract new SEO metrics (handle nested breakdown/stats or flat structure)
-        const listingVisibility = unwrapped?.listing_visibility ?? unwrapped?.breakdown?.visibility ?? null;
-        const listingConversion = unwrapped?.listing_conversion ?? unwrapped?.breakdown?.conversion ?? null;
-        const listingRelevance = unwrapped?.listing_relevance ?? unwrapped?.breakdown?.relevance ?? null;
-        const listingRawVisibilityIndex = unwrapped?.listing_raw_visibility_index ?? unwrapped?.stats?.raw_visibility_index ?? null;
+        const listingVisibility = unwrapped?.breakdown?.visibility ?? unwrapped?.listing_visibility ?? null;
+        const listingConversion = unwrapped?.breakdown?.conversion ?? unwrapped?.listing_conversion ?? null;
+        const listingRelevance = unwrapped?.breakdown?.relevance ?? unwrapped?.listing_relevance ?? null;
+        const listingRawVisibilityIndex = unwrapped?.stats?.raw_visibility_index ?? unwrapped?.listing_raw_visibility_index ?? null;
 
 
         // 4. Save Results to Database (silently, skeleton stays visible)
@@ -568,16 +571,7 @@ const ProductStudio = () => {
                 generated_description: generatedDescription,
                 status_id: STATUS_IDS.SEO_DONE,
                 title: listingName || generatedTitle,
-                global_strength: globalStrength,
-                status_label: statusLabel,
-                strategic_verdict: strategicVerdict,
-                improvement_priority: improvementPriority,
-                // New metrics
-                listing_strength: globalStrength, // Saving to both columns if needed, or prefer listing_strength
-                listing_visibility: listingVisibility,
-                listing_conversion: listingConversion,
-                listing_relevance: listingRelevance,
-                listing_raw_visibility_index: listingRawVisibilityIndex
+                // Legacy columns update removed - data is now saved to listings_global_eval via handleGenerateInsight
             })
             .eq('id', activeListingId);
 
@@ -624,6 +618,51 @@ const ProductStudio = () => {
 
         if (statsInsertError) throw statsInsertError;
 
+        // 4b. Save Global Eval Data (Step 1: Initial Diagnosis)
+        // We save this immediately because these fields come from the first webhook (generate_seo)
+        const globalEvalPayloadInit = {
+            listing_id: activeListingId,
+            seo_mode: formData.seo_mode || 'balanced',
+            global_strength: globalStrength,
+            // Double-write to legacy and new columns to ensure data sticks
+            status_label: statusLabel, 
+            global_status_label: statusLabel,
+            strategic_verdict: strategicVerdict,
+            global_strategic_verdict: strategicVerdict,
+            improvement_priority: improvementPriority,
+            score_explanation: scoreExplanation,
+            
+            listing_strength: globalStrength,
+            listing_visibility: listingVisibility,
+            listing_conversion: listingConversion,
+            listing_relevance: listingRelevance,
+            listing_raw_visibility_index: listingRawVisibilityIndex,
+            
+            updated_at: new Date().toISOString()
+        };
+
+        // Manual Upsert Logic (Inline) - Bypassing native upsert which fails on missing constraints
+        try {
+            const { data: existingRows } = await supabase
+                .from('listings_global_eval')
+                .select('id')
+                .eq('listing_id', globalEvalPayloadInit.listing_id)
+                .eq('seo_mode', globalEvalPayloadInit.seo_mode);
+
+            if (existingRows?.length > 0) {
+                 await supabase
+                    .from('listings_global_eval')
+                    .update(globalEvalPayloadInit)
+                    .eq('id', existingRows[0].id);
+            } else {
+                 await supabase
+                    .from('listings_global_eval')
+                    .insert(globalEvalPayloadInit);
+            }
+        } catch (manualErr) {
+            console.error("Manual upsert failed (handleAnalyze):", manualErr);
+        }
+
         // 5. Update UI
         const formattedResults = {
             title: generatedTitle === "SEO Analysis Completed" ? null : generatedTitle, // Use null to trigger "Ready to Craft" state
@@ -633,6 +672,7 @@ const ProductStudio = () => {
             status_label: statusLabel,
             strategic_verdict: strategicVerdict,
             improvement_priority: improvementPriority,
+            score_explanation: scoreExplanation, // Added to results
             listing_strength: globalStrength,
             listing_visibility: listingVisibility,
             listing_conversion: listingConversion,
@@ -935,48 +975,33 @@ const ProductStudio = () => {
 
       const insightListingId = activeListingId || listingId;
 
-      // 1. Save global audit fields to listings table
-      // Use existing values as fallbacks if API returns null/undefined
-      const globalStrength = unwrapped.global_listing_strength;
-      const statusLabel = unwrapped.global_status_label;
-      const strategicVerdict = unwrapped.global_strategic_verdict;
-      const improvementPriority = unwrapped.improvement_priority;
-      const scoreExplanation = unwrapped.score_explanation;
+      // 1. Get SEO Mode from Form Ref
+      const currentState = optimizationFormRef.current?.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
+      const seoMode = currentState.seo_mode || 'balanced';
 
-      // Extract new metric fields
-      const listingStrength = unwrapped.listing_strength ?? unwrapped.listing_strenght; // Handle potential typo in response if any
-      const listingVisibility = unwrapped.listing_visibility;
-      const listingConversion = unwrapped.listing_conversion;
-      const listingRelevance = unwrapped.listing_relevance;
-      const listingRawVisibilityIndex = unwrapped.listing_raw_visibility_index;
-
-      const updatePayload = {};
-      if (globalStrength !== undefined) updatePayload.global_strength = globalStrength;
-      if (statusLabel !== undefined) updatePayload.status_label = statusLabel;
-      if (strategicVerdict !== undefined) updatePayload.strategic_verdict = strategicVerdict;
-      if (improvementPriority !== undefined) updatePayload.improvement_priority = improvementPriority;
-      if (scoreExplanation !== undefined) updatePayload.score_explanation = scoreExplanation;
+      // 1.1 Update listings table (legacy columns + new metrics for easy access)
+      // Legacy columns update removed - data is now saved to listings_global_eval
+      // We keep the variable extraction if needed for listings_global_eval payload construction
       
-      // Add new metrics to update payload
-      if (listingStrength !== undefined) updatePayload.listing_strength = listingStrength;
-      if (listingVisibility !== undefined) updatePayload.listing_visibility = listingVisibility;
-      if (listingConversion !== undefined) updatePayload.listing_conversion = listingConversion;
-      if (listingRelevance !== undefined) updatePayload.listing_relevance = listingRelevance;
-      if (listingRawVisibilityIndex !== undefined) updatePayload.listing_raw_visibility_index = listingRawVisibilityIndex;
+      // PRIORITY: Use formattedResults (arg1) for fields that come from the FIRST webhook (handleAnalyze)
+      // Fallback to unwrapped (current webhook) if formattedResults is missing them, but strictly prefer formattedResults
+      // because the second webhook often returns these as null/undefined.
+      const globalStrength = formattedResults?.global_strength ?? unwrapped.global_strength ?? unwrapped.global_listing_strength; 
+      const statusLabel = formattedResults?.status_label ?? unwrapped.status_label ?? unwrapped.global_status_label;
+      const strategicVerdict = formattedResults?.strategic_verdict ?? unwrapped.strategic_verdict ?? unwrapped.global_strategic_verdict;
+      const improvementPriority = formattedResults?.improvement_priority ?? unwrapped.improvement_priority;
+      const scoreExplanation = formattedResults?.score_explanation ?? unwrapped.score_explanation;
+
+      // Extract new metric fields (Same priority logic)
+      const listingStrength = formattedResults?.listing_strength ?? unwrapped.listing_strength ?? unwrapped?.global_listing_strength;
+      const listingVisibility = formattedResults?.listing_visibility ?? unwrapped?.breakdown?.visibility ?? unwrapped.listing_visibility;
+      const listingConversion = formattedResults?.listing_conversion ?? unwrapped?.breakdown?.conversion ?? unwrapped.listing_conversion;
+      const listingRelevance = formattedResults?.listing_relevance ?? unwrapped?.breakdown?.relevance ?? unwrapped.listing_relevance;
+      const listingRawVisibilityIndex = formattedResults?.listing_raw_visibility_index ?? unwrapped?.stats?.raw_visibility_index ?? unwrapped.listing_raw_visibility_index;
 
 
-      if (Object.keys(updatePayload).length > 0) {
-        const { error: listingUpdateError } = await supabase
-          .from('listings')
-          .update(updatePayload)
-          .eq('id', insightListingId);
-
-        if (listingUpdateError) {
-          console.error("Failed to save insight global fields:", listingUpdateError);
-        }
-      }
-
-      // 1.2 Save to listings_global_eval
+      // 1.2 Upsert to listings_global_eval with SEO Mode
+      // This is the new source of truth for multi-strategy evaluation
       const scoreJustificationVisibility = unwrapped.score_justification_visibility;
       const scoreJustificationRelevance = unwrapped.score_justification_relevance;
       const scoreJustificationConversion = unwrapped.score_justification_conversion;
@@ -985,10 +1010,36 @@ const ProductStudio = () => {
       const improvementPlanAdd = unwrapped.improvement_plan_add || [];
       const improvementPlanPrimaryAction = unwrapped.improvement_plan_primary_action;
 
+
+
+
+
+
+
+
+
+
+
       const globalEvalPayload = {
           listing_id: insightListingId,
+          seo_mode: seoMode, // NEW: Save the mode
+          // Persist the fields we (likely) got from Step 1
+          global_strength: globalStrength,
+          // Double-write to legacy and new columns
+          status_label: statusLabel,
           global_status_label: statusLabel,
+          strategic_verdict: strategicVerdict,
           global_strategic_verdict: strategicVerdict,
+          improvement_priority: improvementPriority,
+          score_explanation: scoreExplanation,
+          
+          listing_strength: listingStrength,
+          listing_visibility: listingVisibility,
+          listing_conversion: listingConversion,
+          listing_relevance: listingRelevance,
+          listing_raw_visibility_index: listingRawVisibilityIndex,
+
+          // Add the new fields from Step 2
           score_justification_visibility: scoreJustificationVisibility,
           score_justification_relevance: scoreJustificationRelevance,
           score_justification_conversion: scoreJustificationConversion,
@@ -999,26 +1050,29 @@ const ProductStudio = () => {
           
           updated_at: new Date().toISOString()
       };
-
-      // Check if exists for this listing_id (Assuming 1:1 relationship for latest eval)
-      const { data: existingEval } = await supabase
-          .from('listings_global_eval')
-          .select('id')
-          .eq('listing_id', insightListingId)
-          .maybeSingle();
-
-      if (existingEval) {
-          const { error: evalUpdateError } = await supabase
+      
+      // Manual Upsert Logic (Inline)
+      try {
+          const { data: existingRows } = await supabase
               .from('listings_global_eval')
-              .update(globalEvalPayload)
-              .eq('id', existingEval.id);
-          if (evalUpdateError) console.error("Failed to update global eval:", evalUpdateError);
-      } else {
-          const { error: evalInsertError } = await supabase
-              .from('listings_global_eval')
-              .insert(globalEvalPayload);
-          if (evalInsertError) console.error("Failed to insert global eval:", evalInsertError);
+              .select('id')
+              .eq('listing_id', globalEvalPayload.listing_id)
+              .eq('seo_mode', globalEvalPayload.seo_mode);
+
+          if (existingRows?.length > 0) {
+               await supabase
+                  .from('listings_global_eval')
+                  .update(globalEvalPayload)
+                  .eq('id', existingRows[0].id);
+          } else {
+               await supabase
+                  .from('listings_global_eval')
+                  .insert(globalEvalPayload);
+          }
+      } catch (manualErr) {
+          console.error("Manual upsert failed (handleGenerateInsight):", manualErr);
       }
+
 
       // 2. Update listing_seo_stats with insight/is_top per keyword
       const keywordsData = unwrapped.keywords || [];
@@ -1350,13 +1404,16 @@ const ProductStudio = () => {
 
         if (statsError) throw statsError;
 
-        // Fetch Global Eval Data (New Diagnostic Dashboard)
-        const { data: globalEval } = await supabase
+        // Fetch Global Eval Data (Fetch all versions)
+        const { data: globalEvals } = await supabase
             .from('listings_global_eval')
             .select('*')
             .eq('listing_id', listingId)
-            .maybeSingle();
+            .order('updated_at', { ascending: false });
 
+        // Determine active eval (latest updated or fallback to balanced)
+        const activeEval = globalEvals && globalEvals.length > 0 ? globalEvals[0] : null;
+        
         // Reconstruct Analysis Context (Handle missing relations gracefully)
         const parsedCustom = listing.custom_listing ? JSON.parse(listing.custom_listing) : {};
 
@@ -1375,38 +1432,38 @@ const ProductStudio = () => {
             custom_theme: parsedCustom.theme || null,
             custom_niche: parsedCustom.niche || null,
             custom_sub_niche: parsedCustom.sub_niche || null,
-            tag_count: 15
+            tag_count: 15,
+            seo_mode: activeEval?.seo_mode || 'balanced' // Hydrate Mode
         });
 
-        // Set Results
         // Set Results
         setResults({
             title: listing.generated_title,
             description: listing.generated_description,
             imageUrl: listing.image_url,
             
-            // Global Audit Fields (Prioritize listings table as global_eval columns were removed)
-            global_strength: listing.global_strength ?? null,
-            status_label: globalEval?.global_status_label ?? listing.status_label ?? null,
-            strategic_verdict: globalEval?.global_strategic_verdict ?? listing.strategic_verdict ?? null,
-            improvement_priority: listing.improvement_priority ?? null, 
-            score_explanation: listing.score_explanation ?? null,
+            // Global Audit Fields (Prioritize global_eval)
+            global_strength: activeEval?.global_strength ?? listing.global_strength ?? null,
+            status_label: activeEval?.status_label ?? activeEval?.global_status_label ?? listing.status_label ?? null,
+            strategic_verdict: activeEval?.strategic_verdict ?? activeEval?.global_strategic_verdict ?? listing.strategic_verdict ?? null,
+            improvement_priority: activeEval?.improvement_priority ?? listing.improvement_priority ?? null, 
+            score_explanation: activeEval?.score_explanation ?? listing.score_explanation ?? null,
 
-            // Diagnostic Pillars (Back to listings table source)
-            listing_strength: listing.listing_strength ?? listing.global_strength ?? null,
-            listing_visibility: listing.listing_visibility ?? null,
-            listing_conversion: listing.listing_conversion ?? null,
-            listing_relevance: listing.listing_relevance ?? null,
-            listing_raw_visibility_index: listing.listing_raw_visibility_index ?? null,
+            // Diagnostic Pillars (Prioritize activeEval)
+            listing_strength: activeEval?.listing_strength ?? listing.listing_strength ?? null,
+            listing_visibility: activeEval?.listing_visibility ?? listing.listing_visibility ?? null,
+            listing_conversion: activeEval?.listing_conversion ?? listing.listing_conversion ?? null,
+            listing_relevance: activeEval?.listing_relevance ?? listing.listing_relevance ?? null,
+            listing_raw_visibility_index: activeEval?.listing_raw_visibility_index ?? listing.listing_raw_visibility_index ?? null,
             
             // Detailed Justifications & Plans (From global_eval)
-            score_justification_visibility: globalEval?.score_justification_visibility,
-            score_justification_relevance: globalEval?.score_justification_relevance,
-            score_justification_conversion: globalEval?.score_justification_conversion,
-            score_justification_strength: globalEval?.score_justification_strength,
-            improvement_plan_remove: globalEval?.improvement_plan_remove || [],
-            improvement_plan_add: globalEval?.improvement_plan_add || [],
-            improvement_plan_primary_action: globalEval?.improvement_plan_primary_action,
+            score_justification_visibility: activeEval?.score_justification_visibility,
+            score_justification_relevance: activeEval?.score_justification_relevance,
+            score_justification_conversion: activeEval?.score_justification_conversion,
+            score_justification_strength: activeEval?.score_justification_strength,
+            improvement_plan_remove: activeEval?.improvement_plan_remove || [],
+            improvement_plan_add: activeEval?.improvement_plan_add || [],
+            improvement_plan_primary_action: activeEval?.improvement_plan_primary_action,
 
             competitor_seed: listing.competitor_seed ?? null,
             analytics: stats.map(s => ({
