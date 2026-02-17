@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Zap, Sparkles, Edit3, RefreshCw, ChevronRight, ChevronUp, Wand2, Palette, Type, LayoutTemplate, Target, Heart, Shirt } from 'lucide-react';
+import { Wand2, History, RotateCcw, AlertTriangle, ArrowRight, Loader2, Sparkles, Shirt, ChevronUp, ChevronRight, Palette, Type, LayoutTemplate, Heart, Target, Save, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ImageUpload from '../components/studio/ImageUpload';
 import OptimizationForm from '../components/studio/OptimizationForm';
@@ -62,7 +62,7 @@ const ProductStudio = () => {
   const [listingId, setListingId] = useState(null);
   const [results, setResults] = useState(null);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
-  const [isSniperLoading, setIsSniperLoading] = useState(false);
+
   const [isInsightLoading, setIsInsightLoading] = useState(false); // false | 'seo' | 'insight'
   const [isCompetitionLoading, setIsCompetitionLoading] = useState(false);
   const [analysisContext, setAnalysisContext] = useState(null);
@@ -491,7 +491,8 @@ const ProductStudio = () => {
                     product_type: formData.product_type_name,
                     tone: formData.tone_name,
                     client_description: formData.context,
-                    tag_count: formData.tag_count
+                    tag_count: formData.tag_count,
+                    seo_mode: formData.seo_mode || 'balanced'
                 },
                 shop_context: {
                     shop_name: profile?.shop_name,
@@ -975,6 +976,50 @@ const ProductStudio = () => {
         }
       }
 
+      // 1.2 Save to listings_global_eval
+      const scoreJustificationVisibility = unwrapped.score_justification_visibility;
+      const scoreJustificationRelevance = unwrapped.score_justification_relevance;
+      const scoreJustificationConversion = unwrapped.score_justification_conversion;
+      const scoreJustificationStrength = unwrapped.score_justification_strength;
+      const improvementPlanRemove = unwrapped.improvement_plan_remove || [];
+      const improvementPlanAdd = unwrapped.improvement_plan_add || [];
+      const improvementPlanPrimaryAction = unwrapped.improvement_plan_primary_action;
+
+      const globalEvalPayload = {
+          listing_id: insightListingId,
+          global_status_label: statusLabel,
+          global_strategic_verdict: strategicVerdict,
+          score_justification_visibility: scoreJustificationVisibility,
+          score_justification_relevance: scoreJustificationRelevance,
+          score_justification_conversion: scoreJustificationConversion,
+          score_justification_strength: scoreJustificationStrength,
+          improvement_plan_remove: improvementPlanRemove,
+          improvement_plan_add: improvementPlanAdd,
+          improvement_plan_primary_action: improvementPlanPrimaryAction,
+          
+          updated_at: new Date().toISOString()
+      };
+
+      // Check if exists for this listing_id (Assuming 1:1 relationship for latest eval)
+      const { data: existingEval } = await supabase
+          .from('listings_global_eval')
+          .select('id')
+          .eq('listing_id', insightListingId)
+          .maybeSingle();
+
+      if (existingEval) {
+          const { error: evalUpdateError } = await supabase
+              .from('listings_global_eval')
+              .update(globalEvalPayload)
+              .eq('id', existingEval.id);
+          if (evalUpdateError) console.error("Failed to update global eval:", evalUpdateError);
+      } else {
+          const { error: evalInsertError } = await supabase
+              .from('listings_global_eval')
+              .insert(globalEvalPayload);
+          if (evalInsertError) console.error("Failed to insert global eval:", evalInsertError);
+      }
+
       // 2. Update listing_seo_stats with insight/is_top per keyword
       const keywordsData = unwrapped.keywords || [];
       for (const kw of keywordsData) {
@@ -1025,7 +1070,16 @@ const ProductStudio = () => {
         listing_visibility: listingVisibility ?? base.listing_visibility,
         listing_conversion: listingConversion ?? base.listing_conversion,
         listing_relevance: listingRelevance ?? base.listing_relevance,
+
         listing_raw_visibility_index: listingRawVisibilityIndex ?? base.listing_raw_visibility_index,
+        // Global Eval Fields
+        score_justification_visibility: scoreJustificationVisibility,
+        score_justification_relevance: scoreJustificationRelevance,
+        score_justification_conversion: scoreJustificationConversion,
+        score_justification_strength: scoreJustificationStrength,
+        improvement_plan_remove: improvementPlanRemove,
+        improvement_plan_add: improvementPlanAdd,
+        improvement_plan_primary_action: improvementPlanPrimaryAction,
         analytics: updatedAnalytics
       };
 
@@ -1242,195 +1296,7 @@ const ProductStudio = () => {
     }
   };
 
-  // SEO Sniper Handler
-  const handleSEOSniper = async () => {
-    if (isSniperLoading || !results || !analysisContext) {
-      console.error("SEO Sniper Aborted: Missing prerequisites.");
-      return;
-    }
-    setIsSniperLoading('sniper');
 
-    try {
-      const statsToUse = results.analytics || [];
-      // Preserve competitor analytics
-      const preservedCompetitorAnalytics = results.analytics?.filter(k => k.is_competition) || [];
-
-      const payload = {
-        action: 'seo_sniper',
-        listing_id: listingId,
-        keywords: statsToUse.map(k => ({
-          keyword: k.keyword,
-          avg_volume: k.volume,
-          competition: typeof k.competition === 'string' && !isNaN(parseFloat(k.competition)) ? parseFloat(k.competition) : k.competition,
-          opportunity_score: k.score,
-          volumes_history: k.volume_history,
-          status: {
-            trending: k.is_trending,
-            evergreen: k.is_evergreen,
-            promising: k.is_promising
-          },
-          insight: k.insight || null,
-          is_top: k.is_top ?? null,
-          transactional_score: k.transactional_score,
-          intent_label: k.intent_label,
-          niche_score: k.niche_score,
-          relevance_label: k.relevance_label
-        })),
-        mockups: [results.imageUrl],
-        global_audit: {
-          global_strength: results.global_strength,
-          status_label: results.status_label,
-          strategic_verdict: results.strategic_verdict,
-          improvement_priority: results.improvement_priority
-        },
-        payload: {
-          image_url: results.imageUrl,
-          visual_aesthetic: visualAnalysis.aesthetic,
-          visual_typography: visualAnalysis.typography,
-          visual_graphics: visualAnalysis.graphics,
-          visual_colors: visualAnalysis.colors,
-          visual_target_audience: visualAnalysis.target_audience,
-          visual_overall_vibe: visualAnalysis.overall_vibe,
-          categorization: formatCategorizationPayload(analysisContext),
-          product_details: {
-            product_type: analysisContext.product_type_name || "Product",
-            tone: analysisContext.tone_name || "Engaging",
-            client_description: analysisContext.context || ""
-          },
-          shop_context: {
-            shop_name: profile?.shop_name,
-            shop_bio: profile?.shop_bio,
-            target_audience: profile?.target_audience,
-            brand_tone: profile?.brand_tone,
-            brand_keywords: profile?.brand_keywords,
-            signature_text: profile?.signature_text
-          }
-        },
-        metadata: {
-          app_version: "1.0.0",
-          timestamp: new Date().toISOString()
-        }
-      };
-
-      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-
-
-      const response = await axios.post(webhookUrl, payload);
-
-
-
-      // Robust unwrapping: handle string, double-array, or object responses
-      let rawData = response.data;
-      
-      // If response is a string, parse it
-      if (typeof rawData === 'string') {
-        try { rawData = JSON.parse(rawData); } catch (e) { console.error("Failed to parse sniper response string:", e); }
-      }
-      
-      // Unwrap array (n8n wraps in array)
-      let unwrapped = Array.isArray(rawData) ? rawData[0] : rawData;
-      
-      // Handle double-wrapped arrays: [[{...}]]
-      if (Array.isArray(unwrapped)) {
-        unwrapped = unwrapped[0];
-      }
-
-
-
-      if (!unwrapped) {
-        toast.error("SEO Sniper: Empty response");
-        return;
-      }
-
-      // 1. Extract sniper keywords (n8n returns under "listing_seo_stats" or "keywords")
-      const sniperKeywords = unwrapped.listing_seo_stats || unwrapped.keywords || [];
-      if (sniperKeywords.length === 0) {
-        toast.error("SEO Sniper: No keywords returned");
-        return;
-      }
-
-      // 2. Replace listing_seo_stats in DB with sniper keywords
-      const statsToInsert = sniperKeywords.filter(item => item.keyword).map(item => ({
-        listing_id: listingId,
-        tag: item.keyword,
-        search_volume: item.search_volume || 0,
-        competition: String(item.competition),
-        opportunity_score: item.opportunity_score,
-        volume_history: item.monthly_searches 
-            ? item.monthly_searches.map(m => m.search_volume).reverse() 
-            : (item.volumes_history || []),
-        is_trending: item.status?.trending || false,
-        is_evergreen: item.status?.evergreen || false,
-        is_promising: item.status?.promising || false,
-        insight: item.insight || null,
-        is_top: item.is_top ?? null,
-        transactional_score: item.transactional_score || null,
-        intent_label: item.intent_label || null,
-        niche_score: item.niche_score || null,
-        relevance_label: item.relevance_label || null,
-        is_sniper_seo: item.is_sniper_seo ?? true,
-        is_competition: false
-      }));
-
-      // Delete old stats
-      const { error: deleteError } = await supabase
-        .from('listing_seo_stats')
-        .delete()
-        .eq('listing_id', listingId)
-        .eq('is_competition', false); // Only delete non-competitor stats
-      if (deleteError) console.error("Failed to delete old stats:", deleteError);
-
-      // Insert new sniper stats
-      const { error: insertError } = await supabase
-        .from('listing_seo_stats')
-        .insert(statsToInsert);
-      if (insertError) console.error("Failed to insert sniper stats:", insertError);
-
-      // 3. Update UI state (preserve existing global fields — generateInsight will update them)
-      const formattedResults = {
-        ...results,
-        tags: statsToInsert.map(s => s.tag),
-        analytics: [
-          ...statsToInsert.map(s => ({
-            keyword: s.tag,
-            volume: s.search_volume,
-            competition: s.competition,
-            score: s.opportunity_score,
-            volume_history: s.volume_history,
-            is_trending: s.is_trending,
-            is_evergreen: s.is_evergreen,
-            is_promising: s.is_promising,
-            insight: s.insight,
-            is_top: s.is_top,
-            transactional_score: s.transactional_score,
-            intent_label: s.intent_label,
-            niche_score: s.niche_score,
-            relevance_label: s.relevance_label,
-            is_sniper_seo: s.is_sniper_seo,
-            is_competition: false
-          })),
-          // Merge preserved competitor analytics
-          ...preservedCompetitorAnalytics
-        ]
-      };
-
-      // Switch to insight phase — old results stay visible, button shows "Generating Insights..."
-      setIsSniperLoading('insight');
-
-      // Auto-trigger generateInsight with sniper data (fromSniper=true)
-      // Results will be swapped atomically when insight completes
-      handleGenerateInsight(formattedResults, analysisContext, listingId, true);
-
-    } catch (err) {
-      console.error("SEO Sniper failed:", err);
-      if (err.response) {
-        toast.error(`SEO Sniper failed: Server returned ${err.response.status}`);
-      } else {
-        toast.error("SEO Sniper failed. Please try again.");
-      }
-      setIsSniperLoading(false);
-    }
-  };
 
   const handleModifySettings = () => {
     setIsFormCollapsed(prev => !prev);
@@ -1484,6 +1350,13 @@ const ProductStudio = () => {
 
         if (statsError) throw statsError;
 
+        // Fetch Global Eval Data (New Diagnostic Dashboard)
+        const { data: globalEval } = await supabase
+            .from('listings_global_eval')
+            .select('*')
+            .eq('listing_id', listingId)
+            .maybeSingle();
+
         // Reconstruct Analysis Context (Handle missing relations gracefully)
         const parsedCustom = listing.custom_listing ? JSON.parse(listing.custom_listing) : {};
 
@@ -1506,20 +1379,35 @@ const ProductStudio = () => {
         });
 
         // Set Results
+        // Set Results
         setResults({
             title: listing.generated_title,
             description: listing.generated_description,
             imageUrl: listing.image_url,
+            
+            // Global Audit Fields (Prioritize listings table as global_eval columns were removed)
             global_strength: listing.global_strength ?? null,
-            status_label: listing.status_label ?? null,
-            strategic_verdict: listing.strategic_verdict ?? null,
-            improvement_priority: listing.improvement_priority ?? null,
+            status_label: globalEval?.global_status_label ?? listing.status_label ?? null,
+            strategic_verdict: globalEval?.global_strategic_verdict ?? listing.strategic_verdict ?? null,
+            improvement_priority: listing.improvement_priority ?? null, 
             score_explanation: listing.score_explanation ?? null,
+
+            // Diagnostic Pillars (Back to listings table source)
             listing_strength: listing.listing_strength ?? listing.global_strength ?? null,
             listing_visibility: listing.listing_visibility ?? null,
             listing_conversion: listing.listing_conversion ?? null,
             listing_relevance: listing.listing_relevance ?? null,
             listing_raw_visibility_index: listing.listing_raw_visibility_index ?? null,
+            
+            // Detailed Justifications & Plans (From global_eval)
+            score_justification_visibility: globalEval?.score_justification_visibility,
+            score_justification_relevance: globalEval?.score_justification_relevance,
+            score_justification_conversion: globalEval?.score_justification_conversion,
+            score_justification_strength: globalEval?.score_justification_strength,
+            improvement_plan_remove: globalEval?.improvement_plan_remove || [],
+            improvement_plan_add: globalEval?.improvement_plan_add || [],
+            improvement_plan_primary_action: globalEval?.improvement_plan_primary_action,
+
             competitor_seed: listing.competitor_seed ?? null,
             analytics: stats.map(s => ({
                 keyword: s.tag,
@@ -1534,6 +1422,8 @@ const ProductStudio = () => {
                 is_top: s.is_top ?? null,
                 transactional_score: s.transactional_score ?? null,
                 intent_label: s.intent_label ?? null,
+                niche_score: s.niche_score ?? null,
+                relevance_label: s.relevance_label ?? null,
                 is_sniper_seo: s.is_sniper_seo ?? false,
                 is_competition: s.is_competition ?? false
             })),
@@ -1722,7 +1612,7 @@ const ProductStudio = () => {
               {/* Header - Always visible & Clickable */}
               <div 
                   onClick={() => setIsFormCollapsed(!isFormCollapsed)}
-                  className="px-6 py-5 border-b border-indigo-50 bg-indigo-50/50 flex justify-between items-center cursor-pointer hover:bg-indigo-100/50 transition-colors group select-none"
+                  className="px-4 py-3 border-b border-indigo-50 bg-indigo-50/50 flex justify-between items-center cursor-pointer hover:bg-indigo-100/50 transition-colors group select-none"
               >
                   <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg transition-all ${isFormCollapsed ? 'bg-indigo-100 text-indigo-600' : 'bg-white text-indigo-600 shadow-sm'}`}>
@@ -1737,7 +1627,25 @@ const ProductStudio = () => {
                       </div>
                   </div>
 
-                   {/* New Listing Button */}
+                   <div className="flex items-center gap-2">
+                       {/* Save Listing Button (Ghost Style) */}
+                       {/* Save Listing Button (Ghost Style) */}
+                       <button
+                           onClick={(e) => {
+                               e.stopPropagation();
+                               if (optimizationFormRef.current) {
+                                    const data = optimizationFormRef.current.getCurrentState();
+                                    if (data) handleSaveDraft(data);
+                               }
+                           }}
+                           disabled={isLoading}
+                           className="bg-transparent border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                       >
+                           <Save size={14} />
+                           Save
+                       </button>
+
+                       {/* New Listing Button */}
                    <button
                       onClick={(e) => { e.stopPropagation(); handleNewAnalysis(); }}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm z-10"
@@ -1745,6 +1653,7 @@ const ProductStudio = () => {
                       <Sparkles size={16} />
                       New listing
                   </button>
+                   </div>
               </div>
 
               {/* Form Content - Collapsible */}
@@ -1757,21 +1666,21 @@ const ProductStudio = () => {
                   transition={{ duration: 0.4, ease: "easeInOut" }}
                   style={{ overflow: 'hidden' }}
               >
-                    <div className={`p-8 transition-all duration-300 ${!isNewListingActive && !listingId && !selectedImage && !results ? 'opacity-40 pointer-events-none grayscale' : ''}`}>
-                        <div className="mb-6">
-                           <label htmlFor="listingName" className="block text-sm font-medium text-slate-700 mb-1">Listing name</label>
+                    <div className={`p-4 transition-all duration-300 ${!isNewListingActive && !listingId && !selectedImage && !results ? 'opacity-40 pointer-events-none grayscale' : ''}`}>
+                       <div className="mb-3">
+                           <label htmlFor="listingName" className="block text-xs font-medium text-slate-700 mb-1">Listing name</label>
                            <input
                               type="text"
                               id="listingName"
                               value={listingName}
                               onChange={(e) => setListingName(e.target.value)}
                               placeholder="e.g. Vintage Floral T-Shirt"
-                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 text-slate-900"
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 text-slate-900 text-sm"
                            />
                         </div>
 
                         {/* NEW 2-Column Grid Layout */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                             
                             {/* Left Column: Image Area */}
                             <div className="md:col-span-1 flex flex-col gap-4">
@@ -1802,13 +1711,13 @@ const ProductStudio = () => {
                             </div>
 
                             {/* Right Column: Visual Analysis Fields */}
-                            <div className="md:col-span-2 bg-slate-50/50 rounded-2xl p-6 border border-slate-100">
-                                <div className="flex items-center gap-2 mb-4">
+                            <div className="md:col-span-2 bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
+                                <div className="flex items-center gap-2 mb-3">
                                     <Wand2 size={16} className="text-indigo-500" />
                                     <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Visual Analysis</h3>
                                 </div>
                                 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <div className="group">
                                         <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
                                             <Palette size={12} />
@@ -1818,7 +1727,7 @@ const ProductStudio = () => {
                                             value={visualAnalysis.aesthetic}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, aesthetic: e.target.value})}
                                             placeholder="e.g. Minimalist, Boho..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
                                     
@@ -1831,7 +1740,7 @@ const ProductStudio = () => {
                                             value={visualAnalysis.typography}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, typography: e.target.value})}
                                             placeholder="e.g. Bold Serif..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
 
@@ -1844,7 +1753,7 @@ const ProductStudio = () => {
                                             value={visualAnalysis.graphics}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, graphics: e.target.value})}
                                             placeholder="e.g. Geometric shapes..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
 
@@ -1857,7 +1766,7 @@ const ProductStudio = () => {
                                             value={visualAnalysis.colors}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, colors: e.target.value})}
                                             placeholder="e.g. Earth tones..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
                                     
@@ -1871,7 +1780,7 @@ const ProductStudio = () => {
                                             value={visualAnalysis.target_audience}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, target_audience: e.target.value})}
                                             placeholder="Who is this for? e.g. Gen Z..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
                                     
@@ -1884,7 +1793,7 @@ const ProductStudio = () => {
                                             value={visualAnalysis.overall_vibe}
                                             onChange={(e) => setVisualAnalysis({...visualAnalysis, overall_vibe: e.target.value})}
                                             placeholder="e.g. Cozy, energetic, professional..."
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
                                 </div>
@@ -1925,8 +1834,7 @@ const ProductStudio = () => {
                isGeneratingDraft={isGeneratingDraft}
                onGenerateDraft={handleGenerateDraft}
                onRelaunchSEO={handleRelaunchSEO}
-               onSEOSniper={handleSEOSniper}
-               isSniperLoading={isSniperLoading}
+
                isInsightLoading={isInsightLoading}
                onCompetitionAnalysis={handleCompetitionAnalysis}
                isCompetitionLoading={isCompetitionLoading}

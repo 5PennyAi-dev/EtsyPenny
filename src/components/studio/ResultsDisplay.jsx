@@ -165,312 +165,397 @@ const SidebarSkeleton = ({ phase }) => (
     </div>
 );
 
-const AuditHeader = ({ score, statusLabel, strategicVerdict, improvementPriority, scoreExplanation, onSEOSniper, isSniperLoading }) => {
-  const [animatedScore, setAnimatedScore] = useState(0);
-  const size = 130;
-  const strokeWidth = 11;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (animatedScore / 100) * circumference;
+const AuditHeader = ({
+    score,
+    statusLabel,
+    strategicVerdict,
+    improvementPriority,
+    scoreExplanation,
 
-  useEffect(() => {
-    const timer = setTimeout(() => setAnimatedScore(score || 0), 100);
-    return () => clearTimeout(timer);
-  }, [score]);
-
-  const getColor = (val) => {
-    if (val >= 80) return { stroke: '#16A34A', text: 'text-emerald-600', fallbackLabel: 'Strong Listing', fallbackSub: 'High visibility potential' };
-    if (val >= 50) return { stroke: '#F59E0B', text: 'text-amber-600', fallbackLabel: 'Good Foundation', fallbackSub: 'Minor tweaks could boost reach' };
-    return { stroke: '#E11D48', text: 'text-rose-600', fallbackLabel: 'Needs Work', fallbackSub: 'Consider revising keywords' };
-  };
-
-  const tier = getColor(score || 0);
-
-  // if (score === null || score === undefined) return null;
-
-  const displayLabel = statusLabel || tier.fallbackLabel;
-  const displayVerdict = strategicVerdict || tier.fallbackSub;
-
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Main Gauge + Executive Summary + Sniper Button */}
-      <div className="p-6 flex items-center gap-8">
-        {/* Gauge Circle */}
-        <div className="relative flex-shrink-0">
-          <svg width={size} height={size} className="-rotate-90">
-            <circle
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              fill="none"
-              stroke="#F1F5F9"
-              strokeWidth={strokeWidth}
-            />
-            <circle
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              fill="none"
-              stroke={tier.stroke}
-              strokeWidth={strokeWidth}
-              strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={offset}
-              style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease' }}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={`text-3xl font-black ${tier.text}`}>{animatedScore}</span>
-            <span className="text-[10px] text-slate-400 font-medium">/100</span>
-          </div>
-        </div>
-
-        {/* Executive Summary */}
-        <div className="flex flex-col flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Listing Strength</span>
-            {/* Score Explanation Info Icon */}
-            <div className="relative group/score">
-              <div className="w-5 h-5 rounded-full bg-slate-100 hover:bg-indigo-100 flex items-center justify-center cursor-help transition-colors border border-slate-200 hover:border-indigo-300">
-                <Info size={12} className="text-slate-400 group-hover/score:text-indigo-600 transition-colors" />
-              </div>
-              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-4 py-3 text-xs text-white bg-slate-800 rounded-lg shadow-xl opacity-0 invisible group-hover/score:opacity-100 group-hover/score:visible transition-all z-50 w-80 pointer-events-none leading-relaxed whitespace-normal">
-                {scoreExplanation || "Score breakdown will appear after the next analysis."}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-[6px] border-b-slate-800 border-t-transparent border-l-transparent border-r-transparent"></div>
-              </div>
+    // New Props for Diagnostic Dashboard
+    scoreJustificationVisibility,
+    scoreJustificationRelevance,
+    scoreJustificationConversion,
+    listingVisibility,
+    listingRawVisibilityIndex,
+    listingConversion,
+    listingRelevance,
+    improvementPlanRemove,
+    improvementPlanAdd,
+    primaryAction,
+  }) => {
+    const [animatedScore, setAnimatedScore] = useState(0);
+    const size = 130;
+    const strokeWidth = 11;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (animatedScore / 100) * circumference;
+  
+    useEffect(() => {
+      const timer = setTimeout(() => setAnimatedScore(score || 0), 100);
+      return () => clearTimeout(timer);
+    }, [score]);
+  
+    const getColor = (val) => {
+      if (val >= 80) return { stroke: '#16A34A', text: 'text-emerald-600', fallbackLabel: 'Strong Listing', fallbackSub: 'High visibility potential' };
+      if (val >= 50) return { stroke: '#F59E0B', text: 'text-amber-600', fallbackLabel: 'Good Foundation', fallbackSub: 'Minor tweaks could boost reach' };
+      return { stroke: '#E11D48', text: 'text-rose-600', fallbackLabel: 'Needs Work', fallbackSub: 'Consider revising keywords' };
+    };
+  
+    const tier = getColor(score || 0);
+    const displayLabel = statusLabel || tier.fallbackLabel;
+    const displayVerdict = strategicVerdict || tier.fallbackSub;
+  
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden">
+        {/* --- 1. HEALTH OVERVIEW --- */}
+        <div className="p-6 flex flex-col md:flex-row items-center gap-8 border-b border-slate-100 bg-slate-50/30">
+          {/* Gauge Circle */}
+          <div className="relative flex-shrink-0">
+            <svg width={size} height={size} className="-rotate-90">
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke="#F1F5F9"
+                strokeWidth={strokeWidth}
+              />
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke={tier.stroke}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={offset}
+                style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease' }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className={`text-3xl font-black ${tier.text}`}>{animatedScore}</span>
+              <span className="text-[10px] text-slate-400 font-medium">STRENGTH</span>
             </div>
           </div>
-          <span className={`text-xl font-bold ${tier.text} leading-tight`}>{displayLabel}</span>
-          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">{displayVerdict}</p>
-        </div>
-
-        {/* SEO Sniper Button â€” integrated top-right */}
-        {onSEOSniper && (
-          <div className="flex-shrink-0">
-            <button
-              onClick={onSEOSniper}
-              disabled={!!isSniperLoading}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200
-                ${isSniperLoading
-                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-                  : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-md shadow-sm'
-                }`}
-            >
-              {isSniperLoading === 'sniper' ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Generating keywords...</span>
-                </>
-              ) : isSniperLoading === 'insight' ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Generating Insights...</span>
-                </>
-              ) : (
-                <>
-                  <Target size={16} />
-                  <span>SEO Sniper</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Priority Banner */}
-      {improvementPriority && (
-        <div className="px-6 py-3.5 bg-amber-50/70 border-t border-amber-100 flex items-start gap-3">
-          <div className="p-1 bg-amber-100 rounded-lg flex-shrink-0 mt-0.5">
-            <AlertTriangle size={14} className="text-amber-600" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Priority Action</span>
-            <p className="text-sm text-amber-900 font-medium leading-relaxed mt-0.5">{improvementPriority}</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO, onSEOSniper, isSniperLoading, isInsightLoading,  onCompetitionAnalysis,
-  isCompetitionLoading,
-  onAddKeyword,
-  onSaveListingInfo,
-  children
-}) => {
-  const [displayedTitle, setDisplayedTitle] = useState("");
-  const [displayedDescription, setDisplayedDescription] = useState("");
-  const descriptionRef = useRef(null);
-
-  // --- Accordion State Management ---
-  const [isCompetitionOpen, setIsCompetitionOpen] = useState(false);
-
-  // Auto-open competition accordion when loading starts
-  useEffect(() => {
-    if (isCompetitionLoading) {
-        setIsCompetitionOpen(true);
-    }
-  }, [isCompetitionLoading]);
-
-  // Auto-resize description with robust handling
-  useLayoutEffect(() => {
-    if (descriptionRef.current) {
-        // Reset height to auto to correctly calculate scrollHeight
-        descriptionRef.current.style.height = 'auto';
-        // Set height to scrollHeight
-        descriptionRef.current.style.height = descriptionRef.current.scrollHeight + 'px';
-    }
-  }, [displayedDescription, isGeneratingDraft]); // Add isGeneratingDraft to trigger on mount/visible
   
-  // Sync local state when results change (e.g. after draft generation)
-  useEffect(() => {
-    if (results) {
-        setDisplayedTitle(results.title || "");
-        setDisplayedDescription(results.description || "");
-    }
-  }, [results]);
-
-  // Tag Selection State (must be declared before any early returns â€” Rules of Hooks)
-  const [selectedTags, setSelectedTags] = useState([]);
-
-  // Initialize selectedTags when results load
-  useEffect(() => {
-    if (results?.analytics) {
-        setSelectedTags(results.analytics.map(r => r.keyword));
-    }
-  }, [results]);
-
-  // Split analytics into primary and competition keywords
-  const primaryAnalytics = useMemo(() => {
-    if (!results?.analytics) return [];
-    return results.analytics.filter(k => !k.is_competition);
-  }, [results?.analytics]);
-
-  const competitionAnalytics = useMemo(() => {
-    if (!results?.analytics) return [];
-    return results.analytics.filter(k => k.is_competition);
-  }, [results?.analytics]);
-
-  // Sorting Logic
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
+          {/* Executive Summary */}
+          <div className="flex flex-col flex-1 min-w-0 text-center md:text-left">
+            <h2 className={`text-2xl font-bold ${tier.text} mb-2 uppercase tracking-tight`}>{displayLabel}</h2>
+            <p className="text-slate-600 leading-relaxed font-medium bg-white p-3 rounded-lg border border-slate-100 shadow-sm inline-block md:inline-block">
+                "{displayVerdict}"
+            </p>
+          </div>
   
-  const sortedAnalytics = useMemo(() => {
-    if (!primaryAnalytics.length) return [];
-    
-    let sortableItems = [...primaryAnalytics];
-    if (sortConfig.key !== null) {
-      sortableItems.sort((a, b) => {
-        let aValue, bValue;
+          {/* SEO Sniper Button (Integrated Top-Right) */}
+
+        </div>
         
-        switch (sortConfig.key) {
-            case 'volume':
-                aValue = a.volume;
-                bValue = b.volume;
-                break;
-            case 'trend':
-                const aFirst = a.volume_history?.[0] || 1;
-                const aLast = a.volume_history?.[a.volume_history.length - 1] || 0;
-                aValue = ((aLast - aFirst) / aFirst) * 100;
-                
-                const bFirst = b.volume_history?.[0] || 1;
-                const bLast = b.volume_history?.[b.volume_history.length - 1] || 0;
-                bValue = ((bLast - bFirst) / bFirst) * 100;
-                break;
-            case 'competition':
-                const getCompScore = (val) => {
-                    const numVal = parseFloat(val);
-                    if (!isNaN(numVal)) return numVal;
-                    if (val === 'Low') return 0.2;
-                    if (val === 'Medium') return 0.5;
-                    if (val === 'High') return 0.8;
-                    return 0.5;
-                };
-                aValue = getCompScore(a.competition);
-                bValue = getCompScore(b.competition);
-                break;
-            case 'score':
-                aValue = a.score;
-                bValue = b.score;
-                break;
-            default:
-                return 0;
-        }
-
-        if (aValue < bValue) {
-            return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (aValue > bValue) {
-            return sortConfig.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-    return sortableItems;
-  }, [results?.analytics, sortConfig]);
-
-  // --- ALL HOOKS ARE ABOVE THIS LINE --- Early returns below are safe ---
-
-
-
-  // Allow rendering even without results (for empty state tables)
-  // if (!results) return null; // REMOVED
-
-  const hasDraft = !!results?.title && results?.title !== "SEO Analysis Completed";
-
-  const toggleTag = (keyword) => {
-    setSelectedTags(prev => 
-        prev.includes(keyword) 
-            ? prev.filter(k => k !== keyword)
-            : [...prev, keyword]
+        {/* --- 2. DIAGNOSTIC GRID (The Three Pillars) --- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+            {/* Pillar 1: Visibility */}
+            <div className="p-6 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                       <TrendingUp size={14} /> Visibility
+                    </span>
+                    <span className="text-xl font-black text-slate-900">{listingVisibility || '-'}</span>
+                </div>
+                {/* Sub-metric */}
+                <div className="mb-3">
+                     <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                        Index: {listingRawVisibilityIndex || '-'}
+                     </span>
+                </div>
+                <p className="text-sm text-slate-500 leading-relaxed text-balance">
+                    {scoreJustificationVisibility || "Analysis pending..."}
+                </p>
+            </div>
+  
+            {/* Pillar 2: Relevance */}
+            <div className="p-6 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center justify-between mb-4">
+                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                       <Target size={14} /> Relevance
+                     </span>
+                     <span className="text-xl font-black text-slate-900">{listingRelevance || '-'}</span>
+                </div>
+                {/* Sub-metric */}
+                <div className="mb-3">
+                    {/* Simplified logic: <60 = Bottleneck, >80 = Strong */}
+                    {(listingRelevance && listingRelevance < 60) ? (
+                        <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-100 flex items-center gap-1 w-fit">
+                            <AlertTriangle size={10} /> Bottleneck
+                        </span>
+                    ) : (
+                        <span className="text-xs font-medium text-slate-400">Relevance Score</span>
+                    )}
+                </div>
+                <p className="text-sm text-slate-500 leading-relaxed text-balance">
+                    {scoreJustificationRelevance || "Analysis pending..."}
+                </p>
+            </div>
+  
+            {/* Pillar 3: Conversion */}
+            <div className="p-6 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center justify-between mb-4">
+                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                       <ShoppingCart size={14} /> Conversion
+                     </span>
+                     <span className="text-xl font-black text-slate-900">{listingConversion || '-'}</span>
+                </div>
+                {/* Sub-metric */}
+                <div className="mb-3">
+                     {(listingConversion && listingConversion > 85) ? (
+                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1 w-fit">
+                            <Sparkles size={10} /> Elite Status
+                        </span>
+                    ) : (
+                        <span className="text-xs font-medium text-slate-400">Intent Score</span>
+                    )}
+                </div>
+                <p className="text-sm text-slate-500 leading-relaxed text-balance">
+                    {scoreJustificationConversion || "Analysis pending..."}
+                </p>
+            </div>
+        </div>
+  
+        {/* --- 3. ACTION CENTER --- */}
+        <div className="bg-slate-50/50 border-t border-slate-100">
+             {/* Lists Row (Remove / Add) */}
+             <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 border-b border-slate-100">
+                  {/* Remove List */}
+                  {improvementPlanRemove && improvementPlanRemove.length > 0 && (
+                      <div className="p-5 flex items-start gap-4">
+                          <span className="text-xs font-bold text-rose-500 uppercase tracking-wider mt-1.5 min-w-[60px]">Remove:</span>
+                          <div className="flex flex-wrap gap-2">
+                              {improvementPlanRemove.map((tag, i) => (
+                                  <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white border border-slate-200 text-slate-400 text-xs decoration-slate-400">
+                                      {tag} <Minus size={10} className="text-rose-400" />
+                                  </span>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+  
+                  {/* Add List */}
+                  {improvementPlanAdd && improvementPlanAdd.length > 0 && (
+                      <div className="p-5 flex items-start gap-4">
+                           <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider mt-1.5 min-w-[60px]">Add:</span>
+                           <div className="flex flex-wrap gap-2">
+                              {improvementPlanAdd.map((tag, i) => (
+                                  <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white border border-emerald-100 text-emerald-700 font-medium text-xs shadow-sm">
+                                      {tag} <Plus size={10} className="text-emerald-500" />
+                                  </span>
+                              ))}
+                           </div>
+                      </div>
+                  )}
+             </div>
+  
+             {/* Primary Action Banner */}
+             {primaryAction && (
+                <div className="p-4 bg-indigo-600 text-white flex items-center justify-center gap-3 text-sm font-medium">
+                    <div className="p-1 bg-white/20 rounded-full">
+                        <Flame size={14} className="text-white" />
+                    </div>
+                    <span><span className="font-bold opacity-80 uppercase tracking-wider mr-2">Primary Action:</span> {primaryAction}</span>
+                </div>
+             )}
+        </div>
+      </div>
     );
   };
-
-  const handleMagicDraft = () => {
-    if (selectedTags.length === 0) {
-        alert("Please select at least one tag to craft your listing.");
-        return;
-    }
-    onGenerateDraft(selectedTags);
-  };
-
-  const requestSort = (key) => {
-    let direction = 'desc';
-    if (sortConfig.key === key && sortConfig.direction === 'desc') {
-      direction = 'asc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const SortIcon = ({ columnKey }) => {
-      if (sortConfig.key !== columnKey) return <ArrowUpDown size={14} className="text-slate-300 ml-1 inline-block opacity-0 group-hover:opacity-50 transition-opacity" />;
-      if (sortConfig.direction === 'asc') return <ArrowUp size={14} className="text-indigo-600 ml-1 inline-block" />;
-      return <ArrowDown size={14} className="text-indigo-600 ml-1 inline-block" />;
-  };
-
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+  
+  const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO, isInsightLoading,  onCompetitionAnalysis,
+    isCompetitionLoading,
+    onAddKeyword,
+    onSaveListingInfo,
+    children
+  }) => {
+    const [displayedTitle, setDisplayedTitle] = useState("");
+    const [displayedDescription, setDisplayedDescription] = useState("");
+    const descriptionRef = useRef(null);
+  
+    // --- Accordion State Management ---
+    const [isCompetitionOpen, setIsCompetitionOpen] = useState(false);
+  
+    // Auto-open competition accordion when loading starts
+    useEffect(() => {
+      if (isCompetitionLoading) {
+          setIsCompetitionOpen(true);
+      }
+    }, [isCompetitionLoading]);
+  
+    // Auto-resize description with robust handling
+    useLayoutEffect(() => {
+      if (descriptionRef.current) {
+          // Reset height to auto to correctly calculate scrollHeight
+          descriptionRef.current.style.height = 'auto';
+          // Set height to scrollHeight
+          descriptionRef.current.style.height = descriptionRef.current.scrollHeight + 'px';
+      }
+    }, [displayedDescription, isGeneratingDraft]); // Add isGeneratingDraft to trigger on mount/visible
+    
+    // Sync local state when results change (e.g. after draft generation)
+    useEffect(() => {
+      if (results) {
+          setDisplayedTitle(results.title || "");
+          setDisplayedDescription(results.description || "");
+      }
+    }, [results]);
+  
+    // Tag Selection State (must be declared before any early returns â€” Rules of Hooks)
+    const [selectedTags, setSelectedTags] = useState([]);
+  
+    // Initialize selectedTags when results load
+    useEffect(() => {
+      if (results?.analytics) {
+          setSelectedTags(results.analytics.map(r => r.keyword));
+      }
+    }, [results]);
+  
+    // Split analytics into primary and competition keywords
+    const primaryAnalytics = useMemo(() => {
+      if (!results?.analytics) return [];
+      return results.analytics.filter(k => !k.is_competition);
+    }, [results?.analytics]);
+  
+    const competitionAnalytics = useMemo(() => {
+      if (!results?.analytics) return [];
+      return results.analytics.filter(k => k.is_competition);
+    }, [results?.analytics]);
+  
+    // Sorting Logic
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
+    
+    const sortedAnalytics = useMemo(() => {
+      if (!primaryAnalytics.length) return [];
       
-      {/* Main + Sidebar Flex Layout */}
-      <div className="flex flex-col lg:flex-row gap-8 items-start">
+      let sortableItems = [...primaryAnalytics];
+      if (sortConfig.key !== null) {
+        sortableItems.sort((a, b) => {
+          let aValue, bValue;
+          
+          switch (sortConfig.key) {
+              case 'volume':
+                  aValue = a.volume;
+                  bValue = b.volume;
+                  break;
+              case 'trend':
+                  const aFirst = a.volume_history?.[0] || 1;
+                  const aLast = a.volume_history?.[a.volume_history.length - 1] || 0;
+                  aValue = ((aLast - aFirst) / aFirst) * 100;
+                  
+                  const bFirst = b.volume_history?.[0] || 1;
+                  const bLast = b.volume_history?.[b.volume_history.length - 1] || 0;
+                  bValue = ((bLast - bFirst) / bFirst) * 100;
+                  break;
+              case 'competition':
+                  const getCompScore = (val) => {
+                      const numVal = parseFloat(val);
+                      if (!isNaN(numVal)) return numVal;
+                      if (val === 'Low') return 0.2;
+                      if (val === 'Medium') return 0.5;
+                      if (val === 'High') return 0.8;
+                      return 0.5;
+                  };
+                  aValue = getCompScore(a.competition);
+                  bValue = getCompScore(b.competition);
+                  break;
+              case 'score':
+                  aValue = a.score;
+                  bValue = b.score;
+                  break;
+              default:
+                  return 0;
+          }
+  
+          if (aValue < bValue) {
+              return sortConfig.direction === 'asc' ? -1 : 1;
+          }
+          if (aValue > bValue) {
+              return sortConfig.direction === 'asc' ? 1 : -1;
+          }
+          return 0;
+        });
+      }
+      return sortableItems;
+    }, [results?.analytics, sortConfig]);
+  
+    // --- ALL HOOKS ARE ABOVE THIS LINE --- Early returns below are safe ---
+  
+  
+  
+    // Allow rendering even without results (for empty state tables)
+    // if (!results) return null; // REMOVED
+  
+    const hasDraft = !!results?.title && results?.title !== "SEO Analysis Completed";
+  
+    const toggleTag = (keyword) => {
+      setSelectedTags(prev => 
+          prev.includes(keyword) 
+              ? prev.filter(k => k !== keyword)
+              : [...prev, keyword]
+      );
+    };
+  
+    const handleMagicDraft = () => {
+      if (selectedTags.length === 0) {
+          alert("Please select at least one tag to craft your listing.");
+          return;
+      }
+      onGenerateDraft(selectedTags);
+    };
+  
+    const requestSort = (key) => {
+      let direction = 'desc';
+      if (sortConfig.key === key && sortConfig.direction === 'desc') {
+        direction = 'asc';
+      }
+      setSortConfig({ key, direction });
+    };
+  
+    const SortIcon = ({ columnKey }) => {
+        if (sortConfig.key !== columnKey) return <ArrowUpDown size={14} className="text-slate-300 ml-1 inline-block opacity-0 group-hover:opacity-50 transition-opacity" />;
+        if (sortConfig.direction === 'asc') return <ArrowUp size={14} className="text-indigo-600 ml-1 inline-block" />;
+        return <ArrowDown size={14} className="text-indigo-600 ml-1 inline-block" />;
+    };
+  
+    return (
+      <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
         
-        {/* --- MAIN CONTENT (Fluid width) --- */}
-        <div className="flex-1 min-w-0 space-y-8">
+        {/* Main + Sidebar Flex Layout */}
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          
+          {/* --- MAIN CONTENT (Fluid width) --- */}
+          <div className="flex-1 min-w-0 space-y-8">
+  
+              {/* Hero Audit Header with integrated SEO Sniper */}
+              {isInsightLoading ? (
+                  <AuditSkeleton />
+              ) : (results && (
+                  <AuditHeader 
+                      score={results.listing_strength ?? results.global_strength}
+                      statusLabel={results.status_label}
+                      strategicVerdict={results.strategic_verdict}
+                      improvementPriority={results.improvement_priority}
+                      scoreExplanation={results.score_explanation}
 
-            {/* Hero Audit Header with integrated SEO Sniper */}
-            {isInsightLoading ? (
-                <AuditSkeleton />
-            ) : (results && (
-                <AuditHeader 
-                    score={results.global_strength}
-                    statusLabel={results.status_label}
-                    strategicVerdict={results.strategic_verdict}
-                    improvementPriority={results.improvement_priority}
-                    scoreExplanation={results.score_explanation}
-                    onSEOSniper={onSEOSniper}
-                    isSniperLoading={isSniperLoading}
-                />
-            ))}
+                      // New Props
+                      scoreJustificationVisibility={results.score_justification_visibility}
+                      scoreJustificationRelevance={results.score_justification_relevance}
+                      scoreJustificationConversion={results.score_justification_conversion}
+                      listingVisibility={results.listing_visibility}
+                      listingRawVisibilityIndex={results.listing_raw_visibility_index}
+                      listingConversion={results.listing_conversion}
+                      listingRelevance={results.listing_relevance}
+                      improvementPlanRemove={results.improvement_plan_remove}
+                      improvementPlanAdd={results.improvement_plan_add}
+                      primaryAction={results.improvement_plan_primary_action}
+                  />
+              ))}
 
             {/* 1. Full Width Performance Table */}
             {isInsightLoading ? (
@@ -518,7 +603,6 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                              <span className="flex items-center gap-1" title="Trending"><Flame size={12} className="text-orange-500"/></span>
                              <span className="flex items-center gap-1" title="Evergreen"><Leaf size={12} className="text-emerald-500"/></span>
                              <span className="flex items-center gap-1" title="Opportunity"><Star size={12} className="text-amber-400"/></span>
-                             <span className="flex items-center gap-1" title="Sniper"><Target size={12} className="text-indigo-500"/></span>
                          </div>
                     </div>
                     )
@@ -545,40 +629,40 @@ const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunc
                                 </th>
                                 <th className="px-3 py-2 font-semibold text-left">Tag / Keyword</th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[10%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[9%]"
                                     onClick={() => requestSort('score')}
                                 >
                                     Score <SortIcon columnKey="score" />
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold w-[10%]">
+                                <th className="px-2 py-2 text-center font-semibold w-[9%]">
                                     Conv. Intent.
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold w-[10%]">
+                                <th className="px-2 py-2 text-center font-semibold w-[9%]">
                                     Relevance
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold w-[10%]">
+                                <th className="px-2 py-2 text-center font-semibold w-[9%]">
                                     Placement
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[12%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[11%]"
                                     onClick={() => requestSort('volume')}
                                 >
                                     Avg. Vol <SortIcon columnKey="volume" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[12%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[11%]"
                                     onClick={() => requestSort('trend')}
                                 >
                                     Trend <SortIcon columnKey="trend" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[12%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[11%]"
                                     onClick={() => requestSort('competition')}
                                 >
                                     Competition <SortIcon columnKey="competition" />
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[8%]">Status</th>
-                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[6%]"></th>
+                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[7%]">Status</th>
+                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[5%]"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">

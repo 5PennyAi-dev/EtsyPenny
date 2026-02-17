@@ -4,6 +4,7 @@ import { Sparkles, Package, Settings, ChevronRight, ChevronDown, Lock } from 'lu
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import ProductTypeCombobox from './ProductTypeCombobox';
+import SEOStrategySelector from './SEOStrategySelector';
 // import SmartNicheAutocomplete from './SmartNicheAutocomplete';
 
 const TONE_OPTIONS = [
@@ -25,6 +26,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
   // Selection State
   const [tone, setTone] = useState('auto');
   const [tagLimit, setTagLimit] = useState(MAX_TAGS_LIMIT);
+  const [seoMode, setSeoMode] = useState('balanced');
   
   // Niche Selection State
   const [themeName, setThemeName] = useState("");
@@ -85,6 +87,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
 
           setTone(initialValues.tone_name ? initialValues.tone_name.toLowerCase() : 'auto');
           setTagLimit(initialValues.tag_count ? Math.min(initialValues.tag_count, MAX_TAGS_LIMIT) : MAX_TAGS_LIMIT);
+          setSeoMode(initialValues.seo_mode || 'balanced');
           
           if (contextRef.current) {
               contextRef.current.value = initialValues.context || "";
@@ -149,6 +152,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
       
       ton_name: resolvedToneName, 
       tag_count: Math.min(tagLimit, MAX_TAGS_LIMIT),
+      seo_mode: seoMode,
       
       context: contextRef.current.value
     };
@@ -169,7 +173,9 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
               
               theme_name: themeName,
               niche_name: nicheName,
-              sub_niche_name: subNicheName
+              niche_name: nicheName,
+              sub_niche_name: subNicheName,
+              seo_mode: seoMode
           };
       }
   }));
@@ -187,16 +193,16 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-3">
       
       {/* PRODUCT DETAILS BOX */}
-      <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-100">
+      <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
         <div className="flex items-center gap-2 mb-4">
             <Package size={16} className="text-indigo-500" />
             <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Product Details</h3>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-3">
             {/* PRODUCT TYPE */}
             <div>
                 <ProductTypeCombobox
@@ -208,7 +214,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
             </div>
 
             {/* CATEGORIZATION (TEXT INPUTS) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {/* THEME */}
                 <div className="space-y-1">
                     <label htmlFor="theme" className="text-sm font-medium text-slate-700">Theme</label>
@@ -218,7 +224,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
                         value={themeName}
                         onChange={(e) => setThemeName(e.target.value)}
                         placeholder="e.g. Occasions"
-                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 text-sm"
                     />
                 </div>
 
@@ -231,7 +237,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
                         value={nicheName}
                         onChange={(e) => setNicheName(e.target.value)}
                         placeholder="e.g. Wedding"
-                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 text-sm"
                     />
                 </div>
 
@@ -244,7 +250,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
                         value={subNicheName}
                         onChange={(e) => setSubNicheName(e.target.value)}
                         placeholder="e.g. Bridesmaid Gift"
-                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 text-sm"
                     />
                 </div>
             </div>
@@ -257,7 +263,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
                     id="context"
                     rows="3"
                     placeholder="ex: Witty and modern tone, for cat lovers..."
-                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 resize-none"
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 resize-none text-sm"
                     defaultValue={initialValues?.context || ""}
                 />
             </div>
@@ -338,28 +344,19 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
           </div>
       </div>
 
+      <div className="bg-white rounded-2xl p-3 border border-slate-200">
+        <SEOStrategySelector value={seoMode} onChange={setSeoMode} />
+      </div>
+
       <div className="flex gap-4">
 
 
-          {onSaveDraft && (
-             <button
-                type="button"
-                onClick={handleSaveClick}
-                disabled={isLoading || !isImageSelected}
-                className={`px-6 py-4 rounded-xl font-bold transition-all border shadow-sm
-                    ${!isImageSelected || isLoading
-                        ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
-                        : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300'
-                    }`}
-             >
-                Save listing
-             </button>
-          )}
+
 
           <button
             type="submit"
             disabled={isLoading || !isImageSelected || !isImageAnalysed || !productTypeName}
-            className={`flex-1 py-4 rounded-xl font-bold shadow-lg transition-all transform flex items-center justify-center gap-2
+            className={`flex-1 py-3 rounded-xl font-bold shadow-lg transition-all transform flex items-center justify-center gap-2
             ${isLoading || !isImageSelected || !isImageAnalysed || !productTypeName
                 ? 'bg-indigo-400 cursor-not-allowed shadow-none translate-y-0 opacity-70' 
                 : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5'

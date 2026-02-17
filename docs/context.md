@@ -101,6 +101,11 @@
     - **Bug Fix**: Fixed issue where Product Type was erased after visual analysis by preventing unnecessary form remounting.
     - **Form Persistence**: Updated Visual Analysis to save manually entered Product Type and Instructions to the database alongside AI results.
     - **Insight Payload Update** (2026-02-16): Updated `generateInsight` to include `listing_strength`, `listing_visibility`, `listing_conversion`, `listing_relevance`, and `listing_raw_visibility_index` in both the outgoing `global_audit` payload (for n8n context) and the incoming response handling (saved to DB and local state).
+    - **Compact UI** (2026-02-16): Refined `ProductStudio` layout to fit within 1080px vertical height. Reduced padding/margins in `OptimizationForm`, compacted `SEOStrategySelector` (smaller icons, tight spacing), and organized Visual Analysis fields into a dense 2-column grid.
+    - **SEO Strategy Selector** (2026-02-16): Implemented new `SEOStrategySelector` component with "Broad", "Balanced", and "Sniper" modes. Visualized with icons and badges. State managed in `OptimizationForm` and passed to `generate_seo` payload.
+    - **Save Button Relocation** (2026-02-16): Moved "Save Listing" button from the bottom action bar to the `ProductStudio` header (top-right). Styled as a ghost button with `Save` icon. Removed old button from `OptimizationForm`. logic updated to use `ref` for form state access.
+    - **Global Strength Gauge Fix** (2026-02-16): Updated `ResultsDisplay` to use `listing_strength` from the database/response for the main circular gauge, falling back to `global_strength` only if missing. Ensures the gauge reflects the most accurate score.
+    - **Bug Fixes** (2026-02-16): Restored missing `Zap` and `ChevronRight` icons in `ProductStudio` imports. Fixed "Save" button visibility logic (now always visible for new listings) and `testRef` error.
 
 ## 5. Next Steps (Action Items)
 - Clean up debug `console.log` statements from `ProductStudio.jsx` and `ResultsDisplay.jsx`.
