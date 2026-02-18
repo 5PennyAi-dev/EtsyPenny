@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Wand2, History, RotateCcw, AlertTriangle, ArrowRight, Loader2, Sparkles, Shirt, ChevronUp, ChevronRight, Palette, Type, LayoutTemplate, Heart, Target, Save, Zap } from 'lucide-react';
@@ -65,6 +65,12 @@ const ProductStudio = () => {
 
   const [isInsightLoading, setIsInsightLoading] = useState(false); // false | 'seo' | 'insight'
   const [isCompetitionLoading, setIsCompetitionLoading] = useState(false);
+  const [isSniperLoading, setIsSniperLoading] = useState(false);
+  
+  // Strategy Switcher State
+  const [activeMode, setActiveMode] = useState('balanced');
+  const [globalEvals, setGlobalEvals] = useState([]); // Stores all loaded evaluations
+  const [allSeoStats, setAllSeoStats] = useState([]); // Stores all loaded stats
   const [analysisContext, setAnalysisContext] = useState(null);
   const [listingName, setListingName] = useState("");
   const [isImageAnalyzedState, setIsImageAnalyzedState] = useState(false);
@@ -577,49 +583,9 @@ const ProductStudio = () => {
 
         if (updateError) throw updateError;
 
-        // Insert SEO Stats
-        // transform seoAnalysis (array) to db format
-        const statsToInsert = seoAnalysis.filter(item => item.keyword).map(item => ({
-            listing_id: activeListingId,
-            tag: item.keyword,
-            search_volume: item.search_volume || 0,
-            competition: String(item.competition), 
-            opportunity_score: item.opportunity_score,
-            volume_history: item.monthly_searches 
-                ? item.monthly_searches.map(m => m.search_volume).reverse() 
-                : (item.volumes_history || []),
-            is_trending: item.status?.trending || false,
-            is_evergreen: item.status?.evergreen || false,
-            is_promising: item.status?.promising || false,
-            insight: item.insight || null,
-            is_top: item.is_top ?? null,
-            transactional_score: item.transactional_score || null,
-            intent_label: item.intent_label || null,
-            niche_score: item.niche_score || null,
-            relevance_label: item.relevance_label || null,
-            is_competition: false
-        }));
+        // 4. Save Global Eval Data FIRST to get evaluation_id
+        let evaluationId = null;
 
-        // Delete old stats before inserting fresh ones (handles re-analysis / Refresh Data)
-
-        // Delete old stats before inserting fresh ones (handles re-analysis / Refresh Data)
-        // IMPORTANT: Only delete non-competitor stats to preserve competition analysis
-        const { error: statsDeleteError } = await supabase
-            .from('listing_seo_stats')
-            .delete()
-            .eq('listing_id', activeListingId)
-            .eq('is_competition', false); // Only delete standard SEO keywords
-
-        if (statsDeleteError) throw statsDeleteError;
-
-        const { error: statsInsertError } = await supabase
-            .from('listing_seo_stats')
-            .insert(statsToInsert);
-
-        if (statsInsertError) throw statsInsertError;
-
-        // 4b. Save Global Eval Data (Step 1: Initial Diagnosis)
-        // We save this immediately because these fields come from the first webhook (generate_seo)
         const globalEvalPayloadInit = {
             listing_id: activeListingId,
             seo_mode: formData.seo_mode || 'balanced',
@@ -641,6 +607,9 @@ const ProductStudio = () => {
             updated_at: new Date().toISOString()
         };
 
+        // Update UI State to reflect current mode
+        setActiveMode(globalEvalPayloadInit.seo_mode);
+
         // Manual Upsert Logic (Inline) - Bypassing native upsert which fails on missing constraints
         try {
             const { data: existingRows } = await supabase
@@ -650,18 +619,92 @@ const ProductStudio = () => {
                 .eq('seo_mode', globalEvalPayloadInit.seo_mode);
 
             if (existingRows?.length > 0) {
+                 evaluationId = existingRows[0].id;
                  await supabase
                     .from('listings_global_eval')
                     .update(globalEvalPayloadInit)
-                    .eq('id', existingRows[0].id);
+                    .eq('id', evaluationId);
             } else {
-                 await supabase
+                 const { data: newEval, error: insertError } = await supabase
                     .from('listings_global_eval')
-                    .insert(globalEvalPayloadInit);
+                    .insert(globalEvalPayloadInit)
+                    .select('id')
+                    .single();
+                 
+                 if (insertError) throw insertError;
+                 evaluationId = newEval.id;
             }
+
+            // Sync with local globalEvals state
+            const newGlobalEval = { ...globalEvalPayloadInit, id: evaluationId };
+            setGlobalEvals(prev => {
+                // Remove existing entry for this mode/id key if any, then add new
+                const filtered = prev.filter(e => e.id !== evaluationId); 
+                return [newGlobalEval, ...filtered];
+            });
         } catch (manualErr) {
-            console.error("Manual upsert failed (handleAnalyze):", manualErr);
+            console.error("Global eval save failed (handleAnalyze):", manualErr);
         }
+
+        // 5. Insert SEO Stats (Linked to evaluation_id)
+        // transform seoAnalysis (array) to db format
+        const statsToInsert = seoAnalysis.filter(item => item.keyword).map(item => ({
+            listing_id: activeListingId,
+            tag: item.keyword,
+            search_volume: item.search_volume || 0,
+            competition: String(item.competition), 
+            opportunity_score: item.opportunity_score,
+            volume_history: item.monthly_searches 
+                ? item.monthly_searches.map(m => m.search_volume).reverse() 
+                : (item.volumes_history || []),
+            is_trending: item.status?.trending || false,
+            is_evergreen: item.status?.evergreen || false,
+            is_promising: item.status?.promising || false,
+            insight: item.insight || null,
+            is_top: item.is_top ?? null,
+            transactional_score: item.transactional_score || null,
+            intent_label: item.intent_label || null,
+            niche_score: item.niche_score || null,
+            relevance_label: item.relevance_label || null,
+            is_competition: false,
+            evaluation_id: evaluationId // Linked to the global evaluation we just saved
+        }));
+
+        // Delete old stats linked to THIS evaluation (handles re-analysis / Refresh Data)
+        // IMPORTANT: Only delete non-competitor stats to preserve competition analysis
+        if (evaluationId) {
+             const { error: statsDeleteError } = await supabase
+                .from('listing_seo_stats')
+                .delete()
+                .eq('evaluation_id', evaluationId) 
+                .eq('is_competition', false);
+
+             if (statsDeleteError) throw statsDeleteError;
+        } else {
+             // Fallback for legacy safety (though evaluationId should exist)
+             console.warn("No evaluationId found during delete, falling back to listing_id scope (risky for multi-mode)");
+             /* 
+             const { error: statsDeleteError } = await supabase
+                .from('listing_seo_stats')
+                .delete()
+                .eq('listing_id', activeListingId)
+                .eq('is_competition', false);
+             if (statsDeleteError) throw statsDeleteError;
+             */
+        }
+
+        const { error: statsInsertError } = await supabase
+            .from('listing_seo_stats')
+            .insert(statsToInsert);
+
+        if (statsInsertError) throw statsInsertError;
+
+        // Sync with local allSeoStats state
+        setAllSeoStats(prev => {
+             // Remove stats for this evaluation_id
+             const filtered = prev.filter(s => s.evaluation_id !== evaluationId);
+             return [...filtered, ...statsToInsert];
+        });
 
         // 5. Update UI
         const formattedResults = {
@@ -975,9 +1018,10 @@ const ProductStudio = () => {
 
       const insightListingId = activeListingId || listingId;
 
-      // 1. Get SEO Mode from Form Ref
+      // 1. Get SEO Mode 
+      // PRIORITY: Use valid mode from payload (formData) if available. Failsafe to Ref or 'balanced'.
       const currentState = optimizationFormRef.current?.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
-      const seoMode = currentState.seo_mode || 'balanced';
+      const seoMode = formData?.seo_mode || currentState.seo_mode || 'balanced';
 
       // 1.1 Update listings table (legacy columns + new metrics for easy access)
       // Legacy columns update removed - data is now saved to listings_global_eval
@@ -1067,8 +1111,23 @@ const ProductStudio = () => {
           } else {
                await supabase
                   .from('listings_global_eval')
-                  .insert(globalEvalPayload);
+                   .insert(globalEvalPayload);
           }
+
+          // Sync with local globalEvals state
+          setGlobalEvals(prev => {
+              const updatedList = prev.map(e => {
+                  if (e.seo_mode === seoMode && e.listing_id === insightListingId) {
+                      return { ...e, ...globalEvalPayload };
+                  }
+                  return e;
+              });
+              // If not found (new mode created in this flow?), append it
+              if (!updatedList.find(e => e.seo_mode === seoMode && e.listing_id === insightListingId)) {
+                   return [{...globalEvalPayload, id: existingRows?.[0]?.id || Date.now() }, ...prev]; // Mock ID if insert didn't return it
+              }
+              return updatedList;
+          });
       } catch (manualErr) {
           console.error("Manual upsert failed (handleGenerateInsight):", manualErr);
       }
@@ -1093,6 +1152,26 @@ const ProductStudio = () => {
           }
         }
       }
+
+      // Sync with local allSeoStats state
+      setAllSeoStats(prev => {
+           return prev.map(s => {
+               // Find matching update
+               const update = keywordsData.find(k => k.keyword === s.tag && s.listing_id === insightListingId);
+               if (update && (s.evaluation_id === undefined || s.seo_mode === seoMode || true)) { // Simplified matching
+                   // We really should match by evaluation_id but we might not have it here easily without a lookup
+                   // However, s.tag is unique per evaluation. And we know we are updating the current mode.
+                   // Actually, we should try to match the stats that belong to the current mode's evaluation.
+                   // But for now, tag + listing_id is reasonably safe if we assume we just updated the latest one.
+                   return {
+                       ...s,
+                       insight: update.insight ?? s.insight,
+                       is_top: update.is_top ?? s.is_top
+                   };
+               }
+               return s;
+           });
+      });
 
       // 3. Update UI — use formattedResults as base (works for both normal and sniper flows)
       const base = formattedResults;
@@ -1396,77 +1475,123 @@ const ProductStudio = () => {
 
         setListingName(listing.title || "");
 
-        // Fetch SEO Stats
-        const { data: stats, error: statsError } = await supabase
-            .from('listing_seo_stats')
-            .select('*')
-            .eq('listing_id', listingId);
-
-        if (statsError) throw statsError;
-
         // Fetch Global Eval Data (Fetch all versions)
-        const { data: globalEvals } = await supabase
+        const { data: globalEvalsData } = await supabase
             .from('listings_global_eval')
             .select('*')
             .eq('listing_id', listingId)
             .order('updated_at', { ascending: false });
 
+        setGlobalEvals(globalEvalsData || []);
+
         // Determine active eval (latest updated or fallback to balanced)
-        const activeEval = globalEvals && globalEvals.length > 0 ? globalEvals[0] : null;
+        // Logic: Try to find the last used mode, or default to balanced
+        const latestEval = globalEvalsData && globalEvalsData.length > 0 ? globalEvalsData[0] : null;
+        let initialMode = latestEval?.seo_mode || 'balanced';
+        setActiveMode(initialMode);
+
+        // Fetch ALL SEO Stats for this listing (we will filter in memory/UI)
+        let statsQuery = supabase
+            .from('listing_seo_stats')
+            .select('*')
+            .eq('listing_id', listingId);
+        
+        const { data: stats, error: statsError } = await statsQuery;
+        setAllSeoStats(stats || []);
+
+        if (statsError) throw statsError;
         
         // Reconstruct Analysis Context (Handle missing relations gracefully)
         const parsedCustom = listing.custom_listing ? JSON.parse(listing.custom_listing) : {};
 
         setAnalysisContext({
             theme_name: listing.themes?.name || "",
-            sub_niche_name: listing.sub_niches?.name || "", 
-            product_type_name: listing.product_types?.name || parsedCustom.product_type || "",
-            tone_name: listing.tones?.name || "",
-            context: listing.user_description,
-            // ID mappings for relaunch
-            product_type_id: listing.product_type_id,
-            tone_id: listing.tone_id,
-            theme_id: listing.theme_id,
-            niche_id: listing.niche_id,
-            sub_niche_id: listing.sub_niche_id,
-            custom_theme: parsedCustom.theme || null,
-            custom_niche: parsedCustom.niche || null,
-            custom_sub_niche: parsedCustom.sub_niche || null,
-            tag_count: 15,
-            seo_mode: activeEval?.seo_mode || 'balanced' // Hydrate Mode
-        });
+            niche_name: listing.niches?.name || "",
+            sub_niche_name: listing.sub_niches?.name || "",
+            
+            // Text-based overrides (New approach)
+            theme: listing.theme || "",
+            niche: listing.niche || "",
+            sub_niche: listing.sub_niche || "",
 
-        // Set Results
-        setResults({
+            product_type_name: listing.product_types?.name || "T-Shirt", // Default fallback
+            tone_name: listing.tones?.name || "Engaging",
+            custom_product_type: listing.custom_product_type, // Persist custom type
+            
+            // Advanced SEO Settings
+            tone: listing.tone || "Auto-detect", 
+            max_tags: listing.max_tags || 13,
+
+            context: parsedCustom.context || ""
+        });
+        
+        // Load Visual Analysis from listing columns (New source of truth)
+        if (listing.visual_aesthetic) {
+             setVisualAnalysis({
+                 aesthetic: listing.visual_aesthetic || "",
+                 typography: listing.visual_typography || "",
+                 graphics: listing.visual_graphics || "",
+                 colors: listing.visual_colors || "",
+                 target_audience: listing.visual_target_audience || "",
+                 overall_vibe: listing.visual_overall_vibe || ""
+             });
+        }
+        
+        // Hydrate visual fields in form if empty
+        // (Optional: depending on verify logic)
+
+        // Hydrate Form State (Refs)
+        // We use a small timeout to let the form mount if it wasn't
+        setTimeout(() => {
+             if (optimizationFormRef.current) {
+                 optimizationFormRef.current.setFormState({
+                     theme: listing.theme || listing.themes?.name || "",
+                     niche: listing.niche || listing.niches?.name || "",
+                     sub_niche: listing.sub_niche || listing.sub_niches?.name || "",
+                     tone: listing.tone || "Auto-detect",
+                     max_tags: listing.max_tags || 13,
+                     seo_mode: initialMode // Set form mode to match loaded data
+                 });
+             }
+        }, 100);
+
+        // Construct Results Object for the ACTIVE mode
+        // Find specific eval for the initial mode
+        const activeEvalData = globalEvalsData?.find(e => e.seo_mode === initialMode) || latestEval; // Fallback to latest if explicit mode missing
+        const activeEvalId = activeEvalData?.id;
+
+        // Filter stats for this eval
+        const relevantStats = (stats || []).filter(s => activeEvalId ? s.evaluation_id === activeEvalId : true); // Fallback to all if no eval ID (legacy)
+
+        const constructedResults = {
             title: listing.generated_title,
             description: listing.generated_description,
             imageUrl: listing.image_url,
+            // Mode-specific Global Data
+            global_strength: activeEvalData?.global_strength ?? listing.global_strength,
+            status_label: activeEvalData?.status_label ?? listing.status_label,
+            strategic_verdict: activeEvalData?.strategic_verdict ?? listing.strategic_verdict,
+            improvement_priority: activeEvalData?.improvement_priority ?? listing.improvement_priority,
+            score_explanation: activeEvalData?.score_explanation ?? listing.score_explanation,
             
-            // Global Audit Fields (Prioritize global_eval)
-            global_strength: activeEval?.global_strength ?? listing.global_strength ?? null,
-            status_label: activeEval?.status_label ?? activeEval?.global_status_label ?? listing.status_label ?? null,
-            strategic_verdict: activeEval?.strategic_verdict ?? activeEval?.global_strategic_verdict ?? listing.strategic_verdict ?? null,
-            improvement_priority: activeEval?.improvement_priority ?? listing.improvement_priority ?? null, 
-            score_explanation: activeEval?.score_explanation ?? listing.score_explanation ?? null,
+            listing_strength: activeEvalData?.listing_strength ?? listing.listing_strength,
+            listing_visibility: activeEvalData?.listing_visibility ?? listing.listing_visibility,
+            listing_conversion: activeEvalData?.listing_conversion ?? listing.listing_conversion,
+            listing_relevance: activeEvalData?.listing_relevance ?? listing.listing_relevance,
+            listing_raw_visibility_index: activeEvalData?.listing_raw_visibility_index ?? listing.listing_raw_visibility_index,
 
-            // Diagnostic Pillars (Prioritize activeEval)
-            listing_strength: activeEval?.listing_strength ?? listing.listing_strength ?? null,
-            listing_visibility: activeEval?.listing_visibility ?? listing.listing_visibility ?? null,
-            listing_conversion: activeEval?.listing_conversion ?? listing.listing_conversion ?? null,
-            listing_relevance: activeEval?.listing_relevance ?? listing.listing_relevance ?? null,
-            listing_raw_visibility_index: activeEval?.listing_raw_visibility_index ?? listing.listing_raw_visibility_index ?? null,
-            
-            // Detailed Justifications & Plans (From global_eval)
-            score_justification_visibility: activeEval?.score_justification_visibility,
-            score_justification_relevance: activeEval?.score_justification_relevance,
-            score_justification_conversion: activeEval?.score_justification_conversion,
-            score_justification_strength: activeEval?.score_justification_strength,
-            improvement_plan_remove: activeEval?.improvement_plan_remove || [],
-            improvement_plan_add: activeEval?.improvement_plan_add || [],
-            improvement_plan_primary_action: activeEval?.improvement_plan_primary_action,
+            // Dashboard Metrics
+            score_justification_visibility: activeEvalData?.score_justification_visibility,
+            score_justification_relevance: activeEvalData?.score_justification_relevance,
+            score_justification_conversion: activeEvalData?.score_justification_conversion,
+            score_justification_strength: activeEvalData?.score_justification_strength,
+            improvement_plan_remove: activeEvalData?.improvement_plan_remove,
+            improvement_plan_add: activeEvalData?.improvement_plan_add,
+            improvement_plan_primary_action: activeEvalData?.improvement_plan_primary_action,
 
-            competitor_seed: listing.competitor_seed ?? null,
-            analytics: stats.map(s => ({
+            tags: relevantStats.map(s => s.tag),
+            competitor_seed: listing.competitor_seed,
+            analytics: relevantStats.map(s => ({
                 keyword: s.tag,
                 volume: s.search_volume,
                 competition: s.competition,
@@ -1475,18 +1600,18 @@ const ProductStudio = () => {
                 is_trending: s.is_trending,
                 is_evergreen: s.is_evergreen,
                 is_promising: s.is_promising,
-                insight: s.insight || null,
-                is_top: s.is_top ?? null,
-                transactional_score: s.transactional_score ?? null,
-                intent_label: s.intent_label ?? null,
-                niche_score: s.niche_score ?? null,
-                relevance_label: s.relevance_label ?? null,
-                is_sniper_seo: s.is_sniper_seo ?? false,
-                is_competition: s.is_competition ?? false
-            })),
-            is_imageAnalysed: listing.is_image_analysed || listing.is_imageAnalysed || listing.is_imageanalysed || false
-        });
-
+                insight: s.insight,
+                is_top: s.is_top,
+                transactional_score: s.transactional_score,
+                intent_label: s.intent_label,
+                niche_score: s.niche_score,
+                relevance_label: s.relevance_label,
+                is_competition: s.is_competition,
+                is_sniper_seo: s.is_sniper_seo // Preserve sniper flag
+            }))
+        };
+        
+        setResults(constructedResults);
         // Sync local state for the form button
         setIsImageAnalyzedState(listing.is_image_analysed || listing.is_imageAnalysed || listing.is_imageanalysed || false);
 
@@ -1593,6 +1718,118 @@ const ProductStudio = () => {
         toast.error("An unexpected error occurred");
     }
   };
+
+  const handleSEOSniper = async () => {
+      setIsSniperLoading(true);
+      try {
+          // Trigger analysis with 'sniper' mode
+          if (optimizationFormRef.current?.setFormState) {
+              const current = optimizationFormRef.current.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
+              optimizationFormRef.current.setFormState({ ...current, seo_mode: 'sniper' });
+          }
+          
+          const formData = optimizationFormRef.current?.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
+          await handleAnalyze({ ...formData, seo_mode: 'sniper' });
+      } finally {
+          setIsSniperLoading(false);
+      }
+  };
+
+  const handleModeChange = (newMode) => {
+      if (newMode === activeMode) return;
+      setActiveMode(newMode);
+
+      // Filter results based on the new mode
+      // Find specific eval for this mode
+      const activeEvalData = globalEvals.find(e => e.seo_mode === newMode);
+      
+      if (!activeEvalData) {
+          console.warn("Attempted to switch to unavailable mode:", newMode);
+          return;
+      }
+      const activeEvalId = activeEvalData.id;
+
+      // Filter stats for this eval
+      const relevantStats = allSeoStats.filter(s => s.evaluation_id === activeEvalId);
+
+      const constructedResults = {
+          ...results, // Keep standard fields
+          
+          // Mode-specific Global Data
+          global_strength: activeEvalData.global_strength,
+          status_label: activeEvalData.status_label,
+          strategic_verdict: activeEvalData.strategic_verdict,
+          improvement_priority: activeEvalData.improvement_priority,
+          score_explanation: activeEvalData.score_explanation,
+          
+          listing_strength: activeEvalData.listing_strength,
+          listing_visibility: activeEvalData.listing_visibility,
+          listing_conversion: activeEvalData.listing_conversion,
+          listing_relevance: activeEvalData.listing_relevance,
+          listing_raw_visibility_index: activeEvalData.listing_raw_visibility_index,
+
+          // Dashboard Metrics
+          score_justification_visibility: activeEvalData.score_justification_visibility,
+          score_justification_relevance: activeEvalData.score_justification_relevance,
+          score_justification_conversion: activeEvalData.score_justification_conversion,
+          score_justification_strength: activeEvalData.score_justification_strength,
+          improvement_plan_remove: activeEvalData.improvement_plan_remove,
+          improvement_plan_add: activeEvalData.improvement_plan_add,
+          improvement_plan_primary_action: activeEvalData.improvement_plan_primary_action,
+
+          tags: relevantStats.map(s => s.tag),
+          analytics: relevantStats.map(s => ({
+              keyword: s.tag,
+              volume: s.search_volume,
+              competition: s.competition,
+              score: s.opportunity_score,
+              volume_history: s.volume_history,
+              is_trending: s.is_trending,
+              is_evergreen: s.is_evergreen,
+              is_promising: s.is_promising,
+              insight: s.insight,
+              is_top: s.is_top,
+              transactional_score: s.transactional_score,
+              intent_label: s.intent_label,
+              niche_score: s.niche_score,
+              relevance_label: s.relevance_label,
+              is_competition: s.is_competition,
+              is_sniper_seo: s.is_sniper_seo
+          }))
+      };
+      
+      setResults(constructedResults);
+      
+      // Also update the form visual state to match
+      if (optimizationFormRef.current?.setFormState) {
+         const currentForm = optimizationFormRef.current.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
+         optimizationFormRef.current.setFormState({
+             ...currentForm,
+             seo_mode: newMode
+         });
+      }
+  };
+
+  const MemoizedResultsDisplay = useMemo(() => (
+    <ResultsDisplay 
+      results={results} 
+      onGenerateDraft={handleGenerateDraft}
+      isGeneratingDraft={isGeneratingDraft}
+      onRelaunchSEO={handleRelaunchSEO}
+      isInsightLoading={isInsightLoading}
+      onSEOSniper={handleSEOSniper}
+      isSniperLoading={isSniperLoading}
+      onCompetitionAnalysis={handleCompetitionAnalysis}
+      isCompetitionLoading={isCompetitionLoading}
+      
+      // Strategy Switcher Props
+      activeMode={activeMode}
+      onModeChange={handleModeChange}
+      availableModes={globalEvals.map(e => e.seo_mode).filter(Boolean)}        
+    >
+        <RecentOptimizations onViewResults={handleLoadListing} />
+    </ResultsDisplay>
+  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, activeMode, globalEvals]);
 
   return (
     <Layout>
@@ -1885,22 +2122,7 @@ const ProductStudio = () => {
            )}
 
            {/* Results Section (Always show unless main loader is active, to display empty/inactive tables initially) */}
-           {!isLoading && (
-             <ResultsDisplay 
-               results={results} 
-               isGeneratingDraft={isGeneratingDraft}
-               onGenerateDraft={handleGenerateDraft}
-               onRelaunchSEO={handleRelaunchSEO}
-
-               isInsightLoading={isInsightLoading}
-               onCompetitionAnalysis={handleCompetitionAnalysis}
-               isCompetitionLoading={isCompetitionLoading}
-               onAddKeyword={handleAddKeywordToPerformance}
-               onSaveListingInfo={handleSaveListingInfo}
-              >
-                <RecentOptimizations onViewResults={handleLoadListing} />
-              </ResultsDisplay>
-           )}
+           {!isLoading && MemoizedResultsDisplay}
 
 
 

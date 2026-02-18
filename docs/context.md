@@ -108,7 +108,16 @@
     - **Bug Fixes** (2026-02-16): Restored missing `Zap` and `ChevronRight` icons in `ProductStudio` imports. Fixed "Save" button visibility logic (now always visible for new listings) and `testRef` error.
     - **Database Robustness** (2026-02-16): Implemented manual "check-then-write" upsert logic in `ProductStudio.jsx` to correctly save `listings_global_eval` data, bypassing unique index issues. double-writing legacy/new column names (`status_label`/`global_status_label`) for schema compatibility.
     - **Data Parsing Fix** (2026-02-16): Updated `handleAnalyze` and `handleGenerateInsight` to correctly parse nested JSON fields (`breakdown.visibility`, `stats.raw_visibility_index`) from n8n response, ensuring all metrics are saved.
-    - **Schema Migration** (2026-02-16): Added missing `listing_raw_visibility_index` column to `listings_global_eval` via migration `20250216_add_raw_visibility_index.sql`.
+    - **Schema Migration** (2026-02-16): Added missing `listing_raw_visibility_index` column    - **Config Fix**: Updated `.env` to use production webhook URL, resolving 404/CORS errors during insight generation.
+- **Strategy Switcher Implementation** (2026-02-17): Implemented a segmented control to toggle between "Broad", "Balanced", and "Sniper" SEO modes.
+    - **UI Component**: Created `StrategySwitcher.jsx` with Radar, Scale, and Target icons.
+    - **Logic Refactor**: Updated `ProductStudio.jsx` to fetch *all* global evaluations and seo stats upfront. Implemented `activeMode` state and `handleModeChange` to dynamically filter displayed results without re-fetching.
+    - **State Sync**: Enhanced `handleAnalyze` and `handleGenerateInsight` to keep local state arrays (`globalEvals`, `allSeoStats`) in sync with database writes, ensuring instant UI updates after analysis.
+    - **Critical Fixes**: 
+        - Resolved a syntax error in `ProductStudio.jsx` where helper functions were defined inside the JSX return block.
+        - Fixed `ReferenceError: useMemo is not defined` by adding the missing import.
+        - Added missing `isSniperLoading` state to prevent runtime errors during sniper analysis.
+        - Corrected JSX syntax for rendering `MemoizedResultsDisplay` to fix "Objects are not valid as a React child" error.
 
 ## 5. Next Steps (Action Items)
 - Clean up debug `console.log` statements from `ProductStudio.jsx` and `ResultsDisplay.jsx`.

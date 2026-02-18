@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } fr
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
 import Accordion from '../ui/Accordion';
+import StrategySwitcher from './StrategySwitcher';
 
 const Sparkline = ({ data }) => {
   if (!data || data.length === 0) return <div className="text-slate-300 text-xs">-</div>;
@@ -372,11 +373,19 @@ const AuditHeader = ({
     isCompetitionLoading,
     onAddKeyword,
     onSaveListingInfo,
-    children
+    children,
+    // Strategy Switcher Props
+    activeMode,
+    onModeChange,
+    availableModes
   }) => {
     const [displayedTitle, setDisplayedTitle] = useState("");
     const [displayedDescription, setDisplayedDescription] = useState("");
     const descriptionRef = useRef(null);
+
+    // Local state for sorting
+    const [sortConfig, setSortConfig] = useState({ key: 'score', direction: 'desc' });
+    const [selectedTags, setSelectedTags] = useState([]);
   
     // --- Accordion State Management ---
     const [isCompetitionOpen, setIsCompetitionOpen] = useState(false);
@@ -406,9 +415,6 @@ const AuditHeader = ({
       }
     }, [results]);
   
-    // Tag Selection State (must be declared before any early returns â€” Rules of Hooks)
-    const [selectedTags, setSelectedTags] = useState([]);
-  
     // Initialize selectedTags when results load
     useEffect(() => {
       if (results?.analytics) {
@@ -428,7 +434,6 @@ const AuditHeader = ({
     }, [results?.analytics]);
   
     // Sorting Logic
-    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
     
     const sortedAnalytics = useMemo(() => {
       if (!primaryAnalytics.length) return [];
@@ -532,6 +537,15 @@ const AuditHeader = ({
           {/* --- MAIN CONTENT (Fluid width) --- */}
           <div className="flex-1 min-w-0 space-y-8">
   
+              {/* Strategy Switcher */}
+              {!isInsightLoading && results && availableModes && availableModes.length > 1 && (
+                 <StrategySwitcher 
+                    activeMode={activeMode} 
+                    onModeChange={onModeChange} 
+                    availableModes={availableModes}
+                 />
+              )}
+
               {/* Hero Audit Header with integrated SEO Sniper */}
               {isInsightLoading ? (
                   <AuditSkeleton />
