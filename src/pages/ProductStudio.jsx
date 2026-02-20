@@ -534,41 +534,33 @@ const ProductStudio = () => {
         // Handle different response structures
         // N8N wraps the response in an array: [{global_listing_strength, keywords: [...]}]
         const unwrapped = Array.isArray(responseData) ? responseData[0] : responseData;
-        
-        // The keyword array can be under "keywords" or "seo_analysis"
+
+        // --- NEW: Multi-Mode Response Handling ---
+        const modes = ['broad', 'balanced', 'sniper'];
+        const isMultiMode = unwrapped && modes.some(m => unwrapped[m]);
+
         const keywordArray = unwrapped?.keywords || unwrapped?.seo_analysis;
         
-        if (keywordArray && Array.isArray(keywordArray)) {
-            seoAnalysis = keywordArray;
-            // Only update title/desc if explicitly returned by AI
-            if (unwrapped.title) generatedTitle = unwrapped.title;
-            if (unwrapped.description) generatedDescription = unwrapped.description;
-        } else if (Array.isArray(responseData) && responseData.length > 0 && responseData[0]?.keyword) {
-            // Case: Response is a flat array of keyword objects directly
-            seoAnalysis = responseData;
+        // Validation Logic: Only throw if NEITHER Multi-Mode NOR Legacy structure is found
+        if (!isMultiMode) {
+             if (keywordArray && Array.isArray(keywordArray)) {
+                 seoAnalysis = keywordArray;
+                 // Only update title/desc if explicitly returned by AI
+                 if (unwrapped.title) generatedTitle = unwrapped.title;
+                 if (unwrapped.description) generatedDescription = unwrapped.description;
+             } else if (Array.isArray(responseData) && responseData.length > 0 && responseData[0]?.keyword) {
+                 // Case: Response is a flat array of keyword objects directly
+                 seoAnalysis = responseData;
+             } else {
+                 console.warn("Unexpected response structure:", unwrapped);
+                 throw new Error("Invalid response structure from analysis service");
+             }
         } else {
-            console.warn("Unexpected response structure:", unwrapped);
-            throw new Error("Invalid response structure from analysis service");
+             // Multi-Mode specific title/desc handling (optional, if N8N provides them at top level)
+             if (unwrapped.title) generatedTitle = unwrapped.title;
+             if (unwrapped.description) generatedDescription = unwrapped.description;
         }
-
-        // Extract global audit fields from the unwrapped response
-        // Support both legacy (global_listing_strength) and direct (global_strength) keys
-        // User JSON structure: { listing_strength: 63, breakdown: { visibility, conversion, relevance }, stats: { raw_visibility_index } }
-        const globalStrength = unwrapped?.listing_strength ?? unwrapped?.global_listing_strength ?? unwrapped?.global_strength ?? null;
-        const statusLabel = unwrapped?.global_status_label ?? unwrapped?.status_label ?? null;
-        const strategicVerdict = unwrapped?.global_strategic_verdict ?? unwrapped?.strategic_verdict ?? null;
-        const improvementPriority = unwrapped?.improvement_priority ?? null;
-        const scoreExplanation = unwrapped?.score_explanation ?? null; 
-
-        // Extract new SEO metrics (handle nested breakdown/stats or flat structure)
-        const listingVisibility = unwrapped?.breakdown?.visibility ?? unwrapped?.listing_visibility ?? null;
-        const listingConversion = unwrapped?.breakdown?.conversion ?? unwrapped?.listing_conversion ?? null;
-        const listingRelevance = unwrapped?.breakdown?.relevance ?? unwrapped?.listing_relevance ?? null;
-        const listingRawVisibilityIndex = unwrapped?.stats?.raw_visibility_index ?? unwrapped?.listing_raw_visibility_index ?? null;
-
-
-        // 4. Save Results to Database (silently, skeleton stays visible)
-
+        
         // Update Listing with Title/Desc
         const { error: updateError } = await supabase
             .from('listings')
@@ -576,181 +568,352 @@ const ProductStudio = () => {
                 generated_title: generatedTitle,
                 generated_description: generatedDescription,
                 status_id: STATUS_IDS.SEO_DONE,
-                title: listingName || generatedTitle,
-                // Legacy columns update removed - data is now saved to listings_global_eval via handleGenerateInsight
+                title: listingName || generatedTitle, // Use generated title if listing had no name
             })
             .eq('id', activeListingId);
 
         if (updateError) throw updateError;
+        
+        let finalFormattedResults = null;
+        let newGlobalEvals = [];
+        let newSeoStats = [];
 
-        // 4. Save Global Eval Data FIRST to get evaluation_id
-        let evaluationId = null;
-
-        const globalEvalPayloadInit = {
-            listing_id: activeListingId,
-            seo_mode: formData.seo_mode || 'balanced',
-            global_strength: globalStrength,
-            // Double-write to legacy and new columns to ensure data sticks
-            status_label: statusLabel, 
-            global_status_label: statusLabel,
-            strategic_verdict: strategicVerdict,
-            global_strategic_verdict: strategicVerdict,
-            improvement_priority: improvementPriority,
-            score_explanation: scoreExplanation,
+        if (isMultiMode) {
+            console.log("Processing Internal Multi-Mode Response...");
             
-            listing_strength: globalStrength,
-            listing_visibility: listingVisibility,
-            listing_conversion: listingConversion,
-            listing_relevance: listingRelevance,
-            listing_raw_visibility_index: listingRawVisibilityIndex,
-            
-            updated_at: new Date().toISOString()
-        };
+            // Iterate through each mode and save data
+            for (const mode of modes) {
+                const modeData = unwrapped[mode];
+                if (!modeData) continue;
 
-        // Update UI State to reflect current mode
-        setActiveMode(globalEvalPayloadInit.seo_mode);
+                // Extract fields
+                const globalStrength = modeData.listing_strength ?? modeData.global_strength;
+                const breakdown = modeData.breakdown || {};
+                const stats = modeData.stats || {};
+                const keywords = modeData.keywords || [];
 
-        // Manual Upsert Logic (Inline) - Bypassing native upsert which fails on missing constraints
-        try {
-            const { data: existingRows } = await supabase
-                .from('listings_global_eval')
-                .select('id')
-                .eq('listing_id', globalEvalPayloadInit.listing_id)
-                .eq('seo_mode', globalEvalPayloadInit.seo_mode);
+                // 1. Upsert Global Eval Data
+                let evaluationId = null;
+                const globalEvalPayloadInit = {
+                    listing_id: activeListingId,
+                    seo_mode: mode,
+                    global_strength: globalStrength,
+                    listing_strength: globalStrength,
+                    listing_visibility: breakdown.visibility,
+                    listing_conversion: breakdown.conversion,
+                    listing_relevance: breakdown.relevance,
+                    listing_raw_visibility_index: stats.raw_visibility_index,
+                    status_label: modeData.status_label ?? null,
+                    strategic_verdict: modeData.strategic_verdict ?? null,
+                    updated_at: new Date().toISOString()
+                };
 
-            if (existingRows?.length > 0) {
-                 evaluationId = existingRows[0].id;
-                 await supabase
-                    .from('listings_global_eval')
-                    .update(globalEvalPayloadInit)
-                    .eq('id', evaluationId);
-            } else {
-                 const { data: newEval, error: insertError } = await supabase
-                    .from('listings_global_eval')
-                    .insert(globalEvalPayloadInit)
-                    .select('id')
-                    .single();
-                 
-                 if (insertError) throw insertError;
-                 evaluationId = newEval.id;
+                try {
+                    const { data: existingRows } = await supabase
+                        .from('listings_global_eval')
+                        .select('id')
+                        .eq('listing_id', globalEvalPayloadInit.listing_id)
+                        .eq('seo_mode', globalEvalPayloadInit.seo_mode);
+
+                    if (existingRows?.length > 0) {
+                         evaluationId = existingRows[0].id;
+                         await supabase
+                            .from('listings_global_eval')
+                            .update(globalEvalPayloadInit)
+                            .eq('id', evaluationId);
+                    } else {
+                         const { data: newEval, error: insertError } = await supabase
+                            .from('listings_global_eval')
+                            .insert(globalEvalPayloadInit)
+                            .select('id')
+                            .single();
+                         
+                         if (insertError) throw insertError;
+                         evaluationId = newEval.id;
+                    }
+                    
+                    // Track for local state update
+                    newGlobalEvals.push({ ...globalEvalPayloadInit, id: evaluationId });
+
+                } catch (manualErr) {
+                    console.error(`Global eval save failed for ${mode}:`, manualErr);
+                    continue; // Skip stats if eval failed
+                }
+
+                // 2. Insert SEO Stats
+                const statsToInsert = keywords.map(item => ({
+                    listing_id: activeListingId,
+                    tag: item.keyword,
+                    search_volume: item.search_volume || 0,
+                    competition: String(item.competition), 
+                    opportunity_score: item.opportunity_score,
+                    volume_history: item.monthly_searches 
+                        ? item.monthly_searches.map(m => m.search_volume).reverse() 
+                        : (item.volumes_history || []),
+                    is_trending: item.status?.trending || false,
+                    is_evergreen: item.status?.evergreen || false,
+                    is_promising: item.status?.promising || false,
+                    insight: item.insight || null,
+                    is_top: item.is_top ?? null,
+                    transactional_score: item.transactional_score || null,
+                    intent_label: item.intent_label || null,
+                    niche_score: item.niche_score || null,
+                    relevance_label: item.relevance_label || null,
+                    is_selection_ia: item.is_selection_ia || false,
+                    is_competition: false,
+                    evaluation_id: evaluationId
+                }));
+
+                try {
+                    // Delete old stats for this evaluation
+                    if (evaluationId) {
+                         await supabase
+                            .from('listing_seo_stats')
+                            .delete()
+                            .eq('evaluation_id', evaluationId) 
+                            .eq('is_competition', false);
+                    }
+
+                    // Insert new stats
+                    if (statsToInsert.length > 0) {
+                        const { error: statsInsertError } = await supabase
+                            .from('listing_seo_stats')
+                            .insert(statsToInsert);
+                        if (statsInsertError) throw statsInsertError;
+                    }
+
+                    // Track for local state
+                    newSeoStats.push(...statsToInsert);
+
+                } catch (statsErr) {
+                    console.error(`Stats save failed for ${mode}:`, statsErr);
+                }
+
+                // 3. Prepare Formatted Results (Only if Balanced)
+                if (mode === 'balanced') {
+                    finalFormattedResults = {
+                        title: generatedTitle,
+                        description: generatedDescription,
+                        imageUrl: publicUrl,
+                        global_strength: globalStrength,
+                        status_label: globalEvalPayloadInit.status_label,
+                        strategic_verdict: globalEvalPayloadInit.strategic_verdict,
+                        listing_strength: globalStrength,
+                        listing_visibility: breakdown.visibility,
+                        listing_conversion: breakdown.conversion,
+                        listing_relevance: breakdown.relevance,
+                        listing_raw_visibility_index: stats.raw_visibility_index,
+                        tags: statsToInsert.map(s => s.tag),
+                        analytics: [
+                            ...statsToInsert.map(s => ({
+                                keyword: s.tag,
+                                volume: s.search_volume,
+                                competition: s.competition,
+                                score: s.opportunity_score,
+                                volume_history: s.volume_history,
+                                is_trending: s.is_trending,
+                                is_evergreen: s.is_evergreen,
+                                is_promising: s.is_promising,
+                                insight: s.insight,
+                                is_top: s.is_top,
+                                transactional_score: s.transactional_score,
+                                intent_label: s.intent_label,
+                                niche_score: s.niche_score,
+                                relevance_label: s.relevance_label,
+                                is_selection_ia: s.is_selection_ia,
+                                is_competition: false
+                            })),
+                            ...preservedCompetitorAnalytics
+                        ]
+                    };
+                }
+            } // End Loop
+
+            // If "balanced" was missing for some reason, fallback to first available mode for formattedResults?
+            // Expectation is balanced always exists. If not, formattedResults stays null and UI might break.
+            // Let's ensure strict fallback if balanced is missing but others exist.
+            if (!finalFormattedResults && newGlobalEvals.length > 0) {
+                 // Fallback to the first processed mode (e.g. broad) simply to show *something*
+                 // Note: Ideally we want balanced. check warnings.
+                 console.warn("Balanced mode missing in response, falling back to available data.");
             }
 
-            // Sync with local globalEvals state
-            const newGlobalEval = { ...globalEvalPayloadInit, id: evaluationId };
-            setGlobalEvals(prev => {
-                // Remove existing entry for this mode/id key if any, then add new
-                const filtered = prev.filter(e => e.id !== evaluationId); 
-                return [newGlobalEval, ...filtered];
-            });
-        } catch (manualErr) {
-            console.error("Global eval save failed (handleAnalyze):", manualErr);
-        }
-
-        // 5. Insert SEO Stats (Linked to evaluation_id)
-        // transform seoAnalysis (array) to db format
-        const statsToInsert = seoAnalysis.filter(item => item.keyword).map(item => ({
-            listing_id: activeListingId,
-            tag: item.keyword,
-            search_volume: item.search_volume || 0,
-            competition: String(item.competition), 
-            opportunity_score: item.opportunity_score,
-            volume_history: item.monthly_searches 
-                ? item.monthly_searches.map(m => m.search_volume).reverse() 
-                : (item.volumes_history || []),
-            is_trending: item.status?.trending || false,
-            is_evergreen: item.status?.evergreen || false,
-            is_promising: item.status?.promising || false,
-            insight: item.insight || null,
-            is_top: item.is_top ?? null,
-            transactional_score: item.transactional_score || null,
-            intent_label: item.intent_label || null,
-            niche_score: item.niche_score || null,
-            relevance_label: item.relevance_label || null,
-            is_competition: false,
-            evaluation_id: evaluationId // Linked to the global evaluation we just saved
-        }));
-
-        // Delete old stats linked to THIS evaluation (handles re-analysis / Refresh Data)
-        // IMPORTANT: Only delete non-competitor stats to preserve competition analysis
-        if (evaluationId) {
-             const { error: statsDeleteError } = await supabase
-                .from('listing_seo_stats')
-                .delete()
-                .eq('evaluation_id', evaluationId) 
-                .eq('is_competition', false);
-
-             if (statsDeleteError) throw statsDeleteError;
         } else {
-             // Fallback for legacy safety (though evaluationId should exist)
-             console.warn("No evaluationId found during delete, falling back to listing_id scope (risky for multi-mode)");
-             /* 
-             const { error: statsDeleteError } = await supabase
+            // --- Legacy Single-Mode Handling ---
+            
+            // Extract global audit fields from the unwrapped response
+            const globalStrength = unwrapped?.listing_strength ?? unwrapped?.global_listing_strength ?? unwrapped?.global_strength ?? null;
+            const statusLabel = unwrapped?.global_status_label ?? unwrapped?.status_label ?? null;
+            const strategicVerdict = unwrapped?.global_strategic_verdict ?? unwrapped?.strategic_verdict ?? null;
+            const improvementPriority = unwrapped?.improvement_priority ?? null;
+            const scoreExplanation = unwrapped?.score_explanation ?? null; 
+
+            const listingVisibility = unwrapped?.breakdown?.visibility ?? unwrapped?.listing_visibility ?? null;
+            const listingConversion = unwrapped?.breakdown?.conversion ?? unwrapped?.listing_conversion ?? null;
+            const listingRelevance = unwrapped?.breakdown?.relevance ?? unwrapped?.listing_relevance ?? null;
+            const listingRawVisibilityIndex = unwrapped?.stats?.raw_visibility_index ?? unwrapped?.listing_raw_visibility_index ?? null;
+
+            let evaluationId = null;
+            const globalEvalPayloadInit = {
+                listing_id: activeListingId,
+                seo_mode: formData.seo_mode || 'balanced',
+                global_strength: globalStrength,
+                status_label: statusLabel, 
+                global_status_label: statusLabel,
+                strategic_verdict: strategicVerdict,
+                global_strategic_verdict: strategicVerdict,
+                improvement_priority: improvementPriority,
+                score_explanation: scoreExplanation,
+                listing_strength: globalStrength,
+                listing_visibility: listingVisibility,
+                listing_conversion: listingConversion,
+                listing_relevance: listingRelevance,
+                listing_raw_visibility_index: listingRawVisibilityIndex,
+                updated_at: new Date().toISOString()
+            };
+
+            // Manual Upsert
+            try {
+                const { data: existingRows } = await supabase
+                    .from('listings_global_eval')
+                    .select('id')
+                    .eq('listing_id', globalEvalPayloadInit.listing_id)
+                    .eq('seo_mode', globalEvalPayloadInit.seo_mode);
+
+                if (existingRows?.length > 0) {
+                     evaluationId = existingRows[0].id;
+                     await supabase
+                        .from('listings_global_eval')
+                        .update(globalEvalPayloadInit)
+                        .eq('id', evaluationId);
+                } else {
+                     const { data: newEval, error: insertError } = await supabase
+                        .from('listings_global_eval')
+                        .insert(globalEvalPayloadInit)
+                        .select('id')
+                        .single();
+                     if (insertError) throw insertError;
+                     evaluationId = newEval.id;
+                }
+                newGlobalEvals.push({ ...globalEvalPayloadInit, id: evaluationId });
+            } catch (manualErr) {
+                console.error("Global eval save failed (Legacy):", manualErr);
+            }
+
+            // Insert SEO Stats
+            const statsToInsert = seoAnalysis.filter(item => item.keyword).map(item => ({
+                listing_id: activeListingId,
+                tag: item.keyword,
+                search_volume: item.search_volume || 0,
+                competition: String(item.competition), 
+                opportunity_score: item.opportunity_score,
+                volume_history: item.monthly_searches 
+                    ? item.monthly_searches.map(m => m.search_volume).reverse() 
+                    : (item.volumes_history || []),
+                is_trending: item.status?.trending || false,
+                is_evergreen: item.status?.evergreen || false,
+                is_promising: item.status?.promising || false,
+                insight: item.insight || null,
+                is_top: item.is_top ?? null,
+                transactional_score: item.transactional_score || null,
+                intent_label: item.intent_label || null,
+                niche_score: item.niche_score || null,
+                relevance_label: item.relevance_label || null,
+                is_selection_ia: item.is_selection_ia || false,
+                is_competition: false,
+                evaluation_id: evaluationId
+            }));
+
+            if (evaluationId) {
+                 await supabase
+                    .from('listing_seo_stats')
+                    .delete()
+                    .eq('evaluation_id', evaluationId) 
+                    .eq('is_competition', false);
+            }
+
+            const { error: statsInsertError } = await supabase
                 .from('listing_seo_stats')
-                .delete()
-                .eq('listing_id', activeListingId)
-                .eq('is_competition', false);
-             if (statsDeleteError) throw statsDeleteError;
-             */
+                .insert(statsToInsert);
+
+            if (statsInsertError) throw statsInsertError;
+            
+            newSeoStats.push(...statsToInsert);
+
+            finalFormattedResults = {
+                title: generatedTitle,
+                description: generatedDescription,
+                imageUrl: publicUrl,
+                global_strength: globalStrength,
+                status_label: statusLabel,
+                strategic_verdict: strategicVerdict,
+                improvement_priority: improvementPriority,
+                score_explanation: scoreExplanation,
+                listing_strength: globalStrength,
+                listing_visibility: listingVisibility,
+                listing_conversion: listingConversion,
+                listing_relevance: listingRelevance,
+                listing_raw_visibility_index: listingRawVisibilityIndex,
+                tags: statsToInsert.map(s => s.tag),
+                analytics: [
+                    ...statsToInsert.map(s => ({
+                        keyword: s.tag,
+                        volume: s.search_volume,
+                        competition: s.competition,
+                        score: s.opportunity_score,
+                        volume_history: s.volume_history,
+                        is_trending: s.is_trending,
+                        is_evergreen: s.is_evergreen,
+                        is_promising: s.is_promising,
+                        insight: s.insight,
+                        is_top: s.is_top,
+                        transactional_score: s.transactional_score,
+                        intent_label: s.intent_label,
+                        niche_score: s.niche_score,
+                        relevance_label: s.relevance_label,
+                        is_selection_ia: s.is_selection_ia,
+                        is_competition: false
+                    })),
+                    ...preservedCompetitorAnalytics
+                ]
+            };
         }
 
-        const { error: statsInsertError } = await supabase
-            .from('listing_seo_stats')
-            .insert(statsToInsert);
+        // --- Common Post-Processing ---
 
-        if (statsInsertError) throw statsInsertError;
-
-        // Sync with local allSeoStats state
+        // Update Local State with accumulated changes
+        setGlobalEvals(prev => {
+            // Remove any evals that we just updated (by ID) to avoid duplicates, then prepend new ones
+            const updatedIds = newGlobalEvals.map(e => e.id);
+            const filtered = prev.filter(e => !updatedIds.includes(e.id));
+            return [...newGlobalEvals, ...filtered];
+        });
+        
         setAllSeoStats(prev => {
-             // Remove stats for this evaluation_id
-             const filtered = prev.filter(s => s.evaluation_id !== evaluationId);
-             return [...filtered, ...statsToInsert];
+            // We need to be careful with removal. 
+            // Better to remove based on the evaluation_ids we touched.
+            const touchedEvalIds = newGlobalEvals.map(e => e.id);
+            const filtered = prev.filter(s => !touchedEvalIds.includes(s.evaluation_id));
+            return [...filtered, ...newSeoStats];
         });
 
-        // 5. Update UI
-        const formattedResults = {
-            title: generatedTitle === "SEO Analysis Completed" ? null : generatedTitle, // Use null to trigger "Ready to Craft" state
-            description: generatedDescription === "Please review the competition analysis below." ? null : generatedDescription,
-            imageUrl: publicUrl,
-            global_strength: globalStrength,
-            status_label: statusLabel,
-            strategic_verdict: strategicVerdict,
-            improvement_priority: improvementPriority,
-            score_explanation: scoreExplanation, // Added to results
-            listing_strength: globalStrength,
-            listing_visibility: listingVisibility,
-            listing_conversion: listingConversion,
-            listing_relevance: listingRelevance,
-            listing_raw_visibility_index: listingRawVisibilityIndex,
-            tags: statsToInsert.map(s => s.tag),
-            analytics: [
-                ...statsToInsert.map(s => ({
-                    keyword: s.tag,
-                    volume: s.search_volume,
-                    competition: s.competition,
-                    score: s.opportunity_score,
-                    volume_history: s.volume_history,
-                    is_trending: s.is_trending,
-                    is_evergreen: s.is_evergreen,
-                    is_promising: s.is_promising,
-                    insight: s.insight,
-                    is_top: s.is_top,
-                    transactional_score: s.transactional_score,
-                    intent_label: s.intent_label,
-                    niche_score: s.niche_score,
-                    relevance_label: s.relevance_label,
-                    is_competition: false
-                })),
-                // Merge preserved competitor analytics back into the results
-                ...preservedCompetitorAnalytics
-            ]
-        };
+        // Force switch to Balanced mode if multi-mode, or just use whatever mode we processed
+        if (isMultiMode) {
+             setActiveMode('balanced');
+        } else {
+             setActiveMode(formData.seo_mode || 'balanced');
+        }
 
         // 6. Switch skeleton phase to 'insight' and set results
         setIsInsightLoading('insight');
-        setResults(formattedResults);
-
-        // Auto-trigger Insight generation
-        handleGenerateInsight(formattedResults, formData, activeListingId);
+        if (finalFormattedResults) {
+            setResults(finalFormattedResults);
+            // Auto-trigger Insight generation
+            handleGenerateInsight(finalFormattedResults, formData, activeListingId);
+        } else {
+            console.error("No formatted results generated.");
+            toast.error("Failed to process analysis results.");
+        }
 
     } catch (err) {
         console.error("Error in handleAnalyze:", err);

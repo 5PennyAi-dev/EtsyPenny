@@ -418,7 +418,18 @@ const AuditHeader = ({
     // Initialize selectedTags when results load
     useEffect(() => {
       if (results?.analytics) {
-          setSelectedTags(results.analytics.map(r => r.keyword));
+          // Check if explicit AI selections exist (new feature)
+          const iaSelections = results.analytics
+            .filter(r => r.is_selection_ia === true)
+            .map(r => r.keyword);
+          
+          if (iaSelections.length > 0) {
+             // Apply AI selection
+             setSelectedTags(iaSelections);
+          } else {
+             // Fallback: If no AI selection (or legacy data), select all by default
+             setSelectedTags(results.analytics.map(r => r.keyword));
+          }
       }
     }, [results]);
   
@@ -538,7 +549,7 @@ const AuditHeader = ({
           <div className="flex-1 min-w-0 space-y-8">
   
               {/* Strategy Switcher */}
-              {!isInsightLoading && results && availableModes && availableModes.length > 1 && (
+              {!isInsightLoading && results && availableModes && (
                  <StrategySwitcher 
                     activeMode={activeMode} 
                     onModeChange={onModeChange} 

@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (5PennyAi)
-*Dernière mise à jour : 2026-02-15 (Session 4)*
+*Dernière mise à jour : 2026-02-20 (Session 5)*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -119,11 +119,23 @@
         - Added missing `isSniperLoading` state to prevent runtime errors during sniper analysis.
         - Corrected JSX syntax for rendering `MemoizedResultsDisplay` to fix "Objects are not valid as a React child" error.
 
+- **Multi-Mode SEO Generation** (2026-02-19):
+    - **Response Format Change**: The n8n `generateSEO` webhook now returns three mode stacks in one response: `broad`, `balanced`, and `sniper` — each with their own `listing_strength`, `breakdown`, `stats`, and `keywords`.
+    - **Data Storage**: `handleAnalyze` loops through these modes and upserts into `listings_global_eval` (one row per mode) and inserts into `listing_seo_stats` (linked via `evaluation_id`). Both multi-mode and legacy single-mode formats are supported.
+    - **Bug Fix — Validation Gate**: The original validation block threw an error before the multi-mode check could execute (`Invalid response structure`). Refactored to detect multi-mode first, then apply legacy validation only as a fallback.
+    - **Default Mode**: UI and `handleGenerateInsight` default to `'balanced'` immediately after analysis.
+    - **Strategy Switcher**: Works correctly — local state (`globalEvals`, `allSeoStats`) holds all three mode's data; `handleModeChange` filters live without re-fetching.
+
+- **AI Keyword Selection** (2026-02-20):
+    - **New Field**: `is_selection_ia` (boolean) column in `listing_seo_stats` already existed in DB.
+    - **Parsing**: `handleAnalyze` now extracts `is_selection_ia` from each keyword and persists it to the DB in both multi-mode and legacy paths.
+    - **UI Behavior**: `ResultsDisplay.jsx` now reads `is_selection_ia` on load. If any keyword has `is_selection_ia: true`, only those are selected by default. Falls back to selecting all if none are flagged (legacy data).
+
 ## 5. Next Steps (Action Items)
+- Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
+- Validate Strategy Switcher toggles display correct per-mode data without refetch.
+- Verify `is_selection_ia` pre-selects correct keywords in Keyword Performance table after fresh analysis.
 - Clean up debug `console.log` statements from `ProductStudio.jsx` and `ResultsDisplay.jsx`.
 - Polish the Login/Signup UI.
 - Implement the comprehensive Landing Page.
 - Build the Stripe Payment Integration (Credits & Subscriptions).
-- Test full SEO Sniper → Insight pipeline end-to-end.
-- Test history reload with sniper keywords.
-- Verify `score_explanation` tooltip renders correctly.
