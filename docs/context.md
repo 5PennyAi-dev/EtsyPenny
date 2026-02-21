@@ -144,6 +144,14 @@
     - **Frontend**: `OptimizationForm.jsx` now outputs `product_type_text` in form data (set to typed name when custom, `null` when standard type). `ProductStudio.jsx` fetches sentinel "Custom type" ID at mount via `customTypeIdRef`. All save handlers (`handleAnalyze`, `handleSaveDraft`, `handleAnalyzeDesign`) use sentinel ID + `product_type_text`. `handleLoadListing` hydrates custom type name from `product_type_text` on reload.
     - **Webhook Payloads**: All 5 n8n webhook payloads (`generate_seo`, `drafting_seo`, `userKeyword`, `generateInsight`, `competitionAnalysis`) now use `product_type_text || product_type_name` for the `product_type` field, ensuring n8n always receives the actual typed name (e.g. "Leather Journal"), never the sentinel "Custom type" label.
 
+- **SEO Saving Backend Migration** (2026-02-21):
+    - **Problem**: Heavy database upserts and inserts for SEO multi-mode data were handled in the React frontend (`ProductStudio.jsx`). If a user closed the page during the n8n webhook process, data would be lost.
+    - **Architecture Decision**: Implemented a Supabase Edge Function (`save-seo`) to take over this logic asynchronously, as Next.js API routes are incompatible with the current Vite SPA structure.
+    - **Backend Action**: The edge function exposes an endpoint protected by an `x-api-key` header matching `N8N_WEBHOOK_SECRET`. It loops over the `broad`, `balanced`, and `sniper` results and performs atomic inserts/updates using the Supabase Service Role Key to bypass RLS, setting `status_id` to `SEO_DONE`.
+    - **Frontend Action**: Modified `handleAnalyze` and `handleSEOSniper` in `ProductStudio.jsx` to be "fire and forget". Replaced the heavy `axios.post` waiting and data parsing block with a realtime `supabase.channel` listener on the `listings` table. When `status_id` changes to `SEO_DONE`, it auto-reloads and notifies the user.
+    - **N8n Webhook Architecture Fix**: Ensured the global n8n Webhook node remains on "Using 'Respond to Webhook' Node". Only the `generate_seo` branch immediately returns a status using a local Respond node, preserving synchronous data return for other actions (`analyseImage`, etc.).
+    - **Resilience**: Users can now safely close the tab after pressing "Analyze". The workflow completes in n8n, which triggers the Edge Function, which writes to Supabase.
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.
