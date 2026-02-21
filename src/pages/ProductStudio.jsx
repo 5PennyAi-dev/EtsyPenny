@@ -108,6 +108,21 @@ const ProductStudio = () => {
   // Ref for OptimizationForm to access its state
   const optimizationFormRef = useRef(null);
 
+  // Ref holding the sentinel "Custom type" row ID from product_types
+  const customTypeIdRef = useRef(null);
+
+  useEffect(() => {
+    const fetchCustomTypeId = async () => {
+      const { data } = await supabase
+        .from('product_types')
+        .select('id')
+        .eq('name', 'Custom type')
+        .single();
+      if (data) customTypeIdRef.current = data.id;
+    };
+    fetchCustomTypeId();
+  }, []);
+
   const handleAnalyzeDesign = async () => {
       // 1. Check if image selected
       if (!selectedImage && !results?.imageUrl) {
@@ -210,12 +225,9 @@ const ProductStudio = () => {
                   sub_niche: aiSubNiche,
                   
                   // Save Manual Fields (User Priority)
-                  product_type_id: currentFormData.product_type_id,
-                  user_description: currentFormData.context, // Instructions/Details
-                  
-                  // We could also save product_type_name if we stored it, but ID is usually enough. 
-                  // If product_type_id is null/custom, maybe we need validation?
-                  // For now, save what we have. It might be null if not selected.
+                  product_type_id: currentFormData.product_type_id || customTypeIdRef.current,
+                  product_type_text: currentFormData.product_type_text || null,
+                  user_description: currentFormData.context,
                   
                   image_url: publicUrl
               };
@@ -308,7 +320,8 @@ const ProductStudio = () => {
           };
 
           const commonFields = {
-                product_type_id: formData.product_type_id,
+                product_type_id: formData.product_type_id || customTypeIdRef.current,
+                product_type_text: formData.product_type_text || null,
                 tone_id: formData.tone_id,
                 theme_id: formData.theme_id,
                 niche_id: formData.niche_id,
@@ -435,7 +448,8 @@ const ProductStudio = () => {
         };
 
         const commonFields = {
-            product_type_id: formData.product_type_id || null,
+            product_type_id: formData.product_type_id || customTypeIdRef.current,
+            product_type_text: formData.product_type_text || null,
             tone_id: formData.tone_id,
             theme_id: formData.theme_id,
             niche_id: formData.niche_id,
@@ -494,7 +508,7 @@ const ProductStudio = () => {
                 visual_overall_vibe: visualAnalysis.overall_vibe,
                 categorization: formatCategorizationPayload(formData),
                 product_details: {
-                    product_type: formData.product_type_name,
+                    product_type: formData.product_type_text || formData.product_type_name,
                     tone: formData.tone_name,
                     client_description: formData.context,
                     tag_count: formData.tag_count,
@@ -1024,7 +1038,7 @@ const ProductStudio = () => {
                 visual_overall_vibe: visualAnalysis.overall_vibe,
                 categorization: formatCategorizationPayload(analysisContext),
                 product_details: {
-                    product_type: analysisContext.product_type_name || "Product",
+                    product_type: analysisContext.product_type_text || analysisContext.product_type_name || "Product",
                     tone: analysisContext.tone_name || "Engaging",
                     client_description: analysisContext.context || ""
                 },
@@ -1141,7 +1155,7 @@ const ProductStudio = () => {
                   visual_overall_vibe: visualAnalysis.overall_vibe,
                   categorization: formatCategorizationPayload(formData),
                   product_details: {
-                      product_type: formData.product_type_name || "Product",
+                      product_type: formData.product_type_text || formData.product_type_name || "Product",
                       tone: formData.tone_name || "Engaging",
                       client_description: formData.context || "",
                       tag_count: formData.tag_count,
@@ -1325,7 +1339,7 @@ const ProductStudio = () => {
           visual_overall_vibe: visualAnalysis.overall_vibe,
           categorization: formatCategorizationPayload(formData),
           product_details: {
-            product_type: formData.product_type_name || "Product",
+            product_type: formData.product_type_text || formData.product_type_name || "Product",
             tone: formData.tone_name || "Engaging",
             client_description: formData.context || ""
           },
@@ -1617,7 +1631,7 @@ const ProductStudio = () => {
           visual_overall_vibe: visualAnalysis.overall_vibe,
           categorization: formatCategorizationPayload(analysisContext),
           product_details: {
-            product_type: analysisContext.product_type_name || "Product",
+            product_type: analysisContext.product_type_text || analysisContext.product_type_name || "Product",
             tone: analysisContext.tone_name || "Engaging",
             client_description: analysisContext.context || ""
           },
@@ -1855,9 +1869,11 @@ const ProductStudio = () => {
             niche: listing.niche || "",
             sub_niche: listing.sub_niche || "",
 
-            product_type_name: listing.product_types?.name || "T-Shirt", // Default fallback
+            // Product Type: prefer custom text, fall back to FK join name
+            product_type_name: listing.product_type_text || listing.product_types?.name || "",
+            product_type_text: listing.product_type_text || null,
+            product_type_id: listing.product_type_text ? null : listing.product_type_id,
             tone_name: listing.tones?.name || "Engaging",
-            custom_product_type: listing.custom_product_type, // Persist custom type
             
             // Advanced SEO Settings
             tone: listing.tone || "Auto-detect", 

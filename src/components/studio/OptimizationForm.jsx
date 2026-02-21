@@ -76,8 +76,12 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
           setNicheName(initialValues.niche_name || initialValues.niche || initialValues.custom_niche || "");
           setSubNicheName(initialValues.sub_niche_name || initialValues.sub_niche || initialValues.custom_sub_niche || "");
           
-          // Product Type: hydrate from ID (find name) or from name directly
-          if (initialValues.product_type_id) {
+          // Product Type: hydrate from ID (find name) or from custom text
+          if (initialValues.product_type_text) {
+            // Custom type — use the stored text
+            setProductTypeId(null);
+            setProductTypeName(initialValues.product_type_text);
+          } else if (initialValues.product_type_id) {
             setProductTypeId(initialValues.product_type_id);
             setProductTypeName(initialValues.product_type_name || "");
           } else if (initialValues.product_type_name) {
@@ -147,6 +151,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
       // Product Details
       product_type_id: productTypeId,
       product_type_name: productTypeName,
+      product_type_text: productTypeId ? null : productTypeName,
       tone_id: null,
       tone_name: resolvedToneName,
       
@@ -168,6 +173,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
           return {
               product_type_id: productTypeId,
               product_type_name: productTypeName,
+              product_type_text: productTypeId ? null : productTypeName,
               tone_name: resolvedToneName,
               context: contextRef.current?.value || "",
               

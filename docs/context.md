@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (5PennyAi)
-*Dernière mise à jour : 2026-02-20 (Session 6)*
+*Dernière mise à jour : 2026-02-21 (Session 7)*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -137,6 +137,12 @@
     - **Visuals**: Markers like the `User` icon (from `lucide-react`) distinguish these keywords.
     - **Hardening**: Implemented safety checks for sorting and numeric formatting (`toLocaleString`) to prevent crashes on null/undefined search data.
     - **Persistence**: Fixed hydration logic in `ProductStudio.jsx` to ensure `is_user_added` and `is_selection_ia` flags persist after page reloads and strategy swaps.
+
+- **Custom Product Type Persistence** (2026-02-21):
+    - **Problem**: Custom product types (entered via "Use as custom type" in combobox) were lost — `product_type_id` saved as `null`, no text stored.
+    - **DB Migration**: Added `product_type_text` TEXT column to `listings` table. Inserted sentinel "Custom type" row in `product_types` for FK integrity.
+    - **Frontend**: `OptimizationForm.jsx` now outputs `product_type_text` in form data (set to typed name when custom, `null` when standard type). `ProductStudio.jsx` fetches sentinel "Custom type" ID at mount via `customTypeIdRef`. All save handlers (`handleAnalyze`, `handleSaveDraft`, `handleAnalyzeDesign`) use sentinel ID + `product_type_text`. `handleLoadListing` hydrates custom type name from `product_type_text` on reload.
+    - **Webhook Payloads**: All 5 n8n webhook payloads (`generate_seo`, `drafting_seo`, `userKeyword`, `generateInsight`, `competitionAnalysis`) now use `product_type_text || product_type_name` for the `product_type` field, ensuring n8n always receives the actual typed name (e.g. "Leather Journal"), never the sentinel "Custom type" label.
 
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
