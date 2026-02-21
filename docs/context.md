@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (5PennyAi)
-*Dernière mise à jour : 2026-02-20 (Session 5)*
+*Dernière mise à jour : 2026-02-20 (Session 6)*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -130,6 +130,13 @@
     - **New Field**: `is_selection_ia` (boolean) column in `listing_seo_stats` already existed in DB.
     - **Parsing**: `handleAnalyze` now extracts `is_selection_ia` from each keyword and persists it to the DB in both multi-mode and legacy paths.
     - **UI Behavior**: `ResultsDisplay.jsx` now reads `is_selection_ia` on load. If any keyword has `is_selection_ia: true`, only those are selected by default. Falls back to selecting all if none are flagged (legacy data).
+- **Inline Custom Keyword** (2026-02-20):
+    - **Feature**: Users can now add custom keywords directly into the performance table via an inline input row, without modals.
+    - **UI**: Clicking "+ Add Custom Keyword" reveals a new row. Pressing Enter triggers an analysis.
+    - **Logic**: Calls `userKeyword` webhook with full listing context (matching `generate_seo`). Handles nested multi-mode response arrays.
+    - **Visuals**: Markers like the `User` icon (from `lucide-react`) distinguish these keywords.
+    - **Hardening**: Implemented safety checks for sorting and numeric formatting (`toLocaleString`) to prevent crashes on null/undefined search data.
+    - **Persistence**: Fixed hydration logic in `ProductStudio.jsx` to ensure `is_user_added` and `is_selection_ia` flags persist after page reloads and strategy swaps.
 
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.

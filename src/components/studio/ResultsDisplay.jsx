@@ -1,4 +1,4 @@
-﻿import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart, Pin, Tag } from 'lucide-react';
+﻿import { Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart, Pin, Tag, User } from 'lucide-react';
 import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
@@ -372,6 +372,8 @@ const AuditHeader = ({
   const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO, isInsightLoading,  onCompetitionAnalysis,
     isCompetitionLoading,
     onAddKeyword,
+    onAddCustomKeyword,
+    isAddingKeyword,
     onSaveListingInfo,
     children,
     // Strategy Switcher Props
@@ -389,6 +391,56 @@ const AuditHeader = ({
   
     // --- Accordion State Management ---
     const [isCompetitionOpen, setIsCompetitionOpen] = useState(false);
+  
+    // --- Inline Add Keyword State Management ---
+    const [isAddingRow, setIsAddingRow] = useState(false);
+    const [newKeywordInput, setNewKeywordInput] = useState('');
+    const addInputRef = useRef(null);
+
+    // Focus input when adding row is toggled
+    useEffect(() => {
+        if (isAddingRow && addInputRef.current) {
+            addInputRef.current.focus();
+        }
+    }, [isAddingRow]);
+
+    const handleAddSubmission = () => {
+        const trimmed = newKeywordInput.trim();
+        if (!trimmed) {
+            setIsAddingRow(false);
+            setNewKeywordInput('');
+            return;
+        }
+        
+        if (onAddCustomKeyword) {
+             onAddCustomKeyword(trimmed, () => {
+                 // Success callback: close the row and reset
+                 setIsAddingRow(false);
+                 setNewKeywordInput('');
+             });
+        }
+    };
+
+    const handleAddKeyDown = (e) => {
+        if (e.key === 'Enter' && !isAddingKeyword) {
+            e.preventDefault();
+            handleAddSubmission();
+        } else if (e.key === 'Escape') {
+            setIsAddingRow(false);
+            setNewKeywordInput('');
+        }
+    };
+
+    const handleAddBlur = () => {
+        // Only trigger submit/close on blur if we are not actively adding the keyword
+        if (!isAddingKeyword) {
+            if (newKeywordInput.trim() !== '') {
+                 handleAddSubmission();
+            } else {
+                 setIsAddingRow(false);
+            }
+        }
+    };
   
     // Auto-open competition accordion when loading starts
     useEffect(() => {
@@ -460,12 +512,14 @@ const AuditHeader = ({
                   bValue = b.volume;
                   break;
               case 'trend':
-                  const aFirst = a.volume_history?.[0] || 1;
-                  const aLast = a.volume_history?.[a.volume_history.length - 1] || 0;
+                  const aData = a.volume_history || [];
+                  const aFirst = aData[0] || 1;
+                  const aLast = aData[aData.length - 1] || 0;
                   aValue = ((aLast - aFirst) / aFirst) * 100;
                   
-                  const bFirst = b.volume_history?.[0] || 1;
-                  const bLast = b.volume_history?.[b.volume_history.length - 1] || 0;
+                  const bData = b.volume_history || [];
+                  const bFirst = bData[0] || 1;
+                  const bLast = bData[bData.length - 1] || 0;
                   bValue = ((bLast - bFirst) / bFirst) * 100;
                   break;
               case 'competition':
@@ -732,6 +786,9 @@ const AuditHeader = ({
                                             {row.is_sniper_seo && (
                                                 <Target size={14} className="text-indigo-500 shrink-0" />
                                             )}
+                                            {row.is_user_added && (
+                                                <User size={14} className="text-indigo-500 shrink-0" />
+                                            )}
                                         </div>
                                     </td>
                                     <td className="px-4 py-3 text-center">
@@ -801,7 +858,7 @@ const AuditHeader = ({
                                         })()}
                                     </td>
                                     <td className="px-4 py-3 text-center text-slate-600 font-mono text-xs">
-                                        {row.volume.toLocaleString()}
+                                        {(row.volume || 0).toLocaleString()}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex justify-center">
@@ -839,9 +896,58 @@ const AuditHeader = ({
                                     </td>
                                 </tr>
                             ))}
+                            {/* --- INLINE ADD ROW --- */}
+                            {isAddingRow && (
+                                <tr className="bg-indigo-50/30 border-t-2 border-indigo-100">
+                                    <td className="px-4 py-3 text-center">
+                                        <input 
+                                            type="checkbox" 
+                                            disabled
+                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 opacity-50"
+                                        />
+                                    </td>
+                                    <td className="px-3 py-3" colSpan="9">
+                                        <input
+                                            ref={addInputRef}
+                                            type="text"
+                                            value={newKeywordInput}
+                                            onChange={(e) => setNewKeywordInput(e.target.value)}
+                                            onKeyDown={handleAddKeyDown}
+                                            onBlur={handleAddBlur}
+                                            disabled={isAddingKeyword}
+                                            placeholder="Type a custom keyword and press Enter..."
+                                            className="w-full px-3 py-1.5 text-sm text-slate-700 bg-white border border-indigo-200 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 disabled:opacity-50"
+                                        />
+                                    </td>
+                                    <td className="px-2 py-3 text-center">
+                                        {isAddingKeyword ? (
+                                            <Loader2 size={16} className="mx-auto text-indigo-500 animate-spin" />
+                                        ) : (
+                                            <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap hidden sm:inline-block">Return ↵</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
+
+                {/* --- ADD CUSTOM KEYWORD BUTTON --- */}
+                {results && (
+                    <div className="bg-slate-50/50 border-t border-slate-100 p-3 flex justify-center rounded-b-xl">
+                        <button
+                            onClick={() => {
+                                setIsAddingRow(true);
+                                setNewKeywordInput('');
+                            }}
+                            disabled={isAddingRow || isAddingKeyword}
+                            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-200 hover:text-indigo-600 rounded-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Plus size={14} className={isAddingRow ? 'text-slate-400' : 'text-indigo-500'} />
+                            Add Custom Keyword
+                        </button>
+                    </div>
+                )}
             </Accordion>
             </div>
             )}
@@ -951,7 +1057,7 @@ const AuditHeader = ({
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-center text-slate-600 font-mono text-xs">
-                                            {row.volume.toLocaleString()}
+                                            {(row.volume || 0).toLocaleString()}
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex justify-center">
