@@ -152,6 +152,31 @@
     - **N8n Webhook Architecture Fix**: Ensured the global n8n Webhook node remains on "Using 'Respond to Webhook' Node". Only the `generate_seo` branch immediately returns a status using a local Respond node, preserving synchronous data return for other actions (`analyseImage`, etc.).
     - **Resilience**: Users can now safely close the tab after pressing "Analyze". The workflow completes in n8n, which triggers the Edge Function, which writes to Supabase.
 
+- **UI Redesign: Horizontal AuditHeader** (2026-02-21):
+    - **Problem**: The keyword evaluation results were too bulky and slow because of AI-generated text insights.
+    - **Solution**: Redesigned the `AuditHeader` component into a compact, horizontal dashboard strip.
+    - **UI Enhancements**: 
+        - Replaced text descriptions with a minimalist numeric layout (Listing Strength, Visibility, Relevance, Conversion).
+        - Added numeric micro-gauges for every metric to allow quick scanning.
+        - Applied conditional color coding (Green > 80, Amber 50-79, Rose < 50) using the styleguide.
+        - Removed action center UI and removed textual justification to prioritize layout compactness.
+
+- **Recalculate Scores Feature & CPC Integration** (2026-02-22):
+    - **Goal**: Allow users to dynamically recalculate their global listing scores based only on the keywords they have *selected* in the Keyword Performance table, and display standard CPC values.
+    - **Implementation**: 
+        - Added `cpc` float column to `listing_seo_stats` and mapped it through `handleAnalyze`, `handleLoadListing`, `handleRecalculateScores`, and `handleAddCustomKeyword`.
+        - Replaced "Placement" column with "CPC" in `ResultsDisplay.jsx` table, applying color logic (Green > $1.50, Amber $0.60-$1.49, Gray < $0.60).
+        - Added a `Recalculate Scores` button featuring a Zap icon adjacent to the `Refresh Data` button in the `ResultsDisplay` component header.
+        - `handleRecalculateScores` gathers an array of objects derived from `results.analytics` (filtered by `selectedTags`) and immediately handles the synchronous webhook response.
+        - Fixed a bug where adding a Custom Keyword failed to map the backend `cpc` value to the UI/DB.
+
+- **Global SEO Metrics Expansion** (2026-02-22):
+    - **Goal**: Display new Competition and Profitability metrics in the global Audit Header.
+    - **Implementation**: 
+        - Expanded the `AuditHeader` to 5 pillars: Listing Strength, Visibility, Relevance, Competition (`Swords` icon), and Profitability (`DollarSign` icon).
+        - Parsed `listing_competition` and `listing_profit` from incoming n8n analytics webhooks.
+        - Hydrated these values into internal DB payloads and `ProductStudio.jsx` local state, ensuring persistence across reloads.
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.

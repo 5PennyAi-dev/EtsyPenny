@@ -1,28 +1,37 @@
-# Task: Migrate SEO Saving Logic to Backend
+# Add Profitability Score to UI
 
-## Context
-The frontend `ProductStudio.jsx` currently processes a large JSON payload from n8n (containing 3 modes: broad, balanced, sniper) and saves everything to Supabase. If the user closes the page, the save is interrupted. We need to move this logic to a backend API.
+## Objective
+The user wants to display the new `listing_profit` field from `listings_global_eval` next to the COMPETITION score in the `AuditHeader` section. It should have the same color coding logic and an appropriate `$` icon.
 
-## Technical Issue: Vite vs. Next.js
-The current project is a **React SPA built with Vite** (`vite.config.js`, no Next.js).
-A Next.js API route (`/api/save-seo/route.ts`) requires a Next.js environment to run.
+## Proposed Changes
+1. **`ResultsDisplay.jsx`**
+   - [x] Import `DollarSign` from `lucide-react`.
+   - [x] Add `listingProfit` to the destructured props of `AuditHeader`.
+   - [x] Add a 5th pillar for "Profitability" next to Competition:
+     ```jsx
+     {/* Pillar 5: Profitability */}
+     <div className="flex-1 p-5 md:py-4 md:px-6 hover:bg-slate-50 transition-colors flex flex-col justify-center">
+         <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <DollarSign size={14} className="text-slate-400" /> Profitability
+              </span>
+              <span className={`text-2xl font-black ${profitTier.text}`}>{listingProfit || 0}</span>
+         </div>
+         <MiniGauge value={listingProfit} tier={profitTier} />
+     </div>
+     ```
+   - [x] Pass `listingProfit={results?.listing_profit}` to `<AuditHeader />`.
 
-### Options
-1. **Supabase Edge Function (Recommended)**: Since we already use Supabase, we can create a Supabase Edge Function (`supabase/functions/save-seo/index.ts`). n8n can call this function directly. It's built for this exact stack.
-2. **Standalone Next.js App**: If you are planning to host a separate Next.js server *just* for this API route, we can create it. However, it requires a separate deployment.
-
-## 1. Backend Implementation (Supabase Edge Function / API Route)
-- [x] **Create Function File**: Initialize the function/route file.
-- [x] **Security check**: Validate the `x-api-key` header to ensure only n8n can trigger this.
-- [x] **Data Parsing**: Parse the JSON payload containing the `listing_id` and the 3 modes (`broad`, `balanced`, `sniper`).
-- [x] **Database Connection**: Initialize the Supabase client using the `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS.
-- [x] **Atomic Save Sequence**:
-  - For each mode, extract `global_strength`, `breakdown`, `stats`, and `keywords`.
-  - **Upsert** to `listings_global_eval` to get the `evaluation_id`.
-  - **Delete** existing keywords in `listing_seo_stats` for this `evaluation_id` (where `is_competition = false`).
-  - **Insert** new keywords into `listing_seo_stats`.
-- [x] **Listing Update**: Update the `listings` table to set `status_id` to `SEO_DONE`. Also handle legacy extracted fields like `score_explanation`, `global_status_label`, etc. if provided at the top level.
-
-## 2. Frontend Updates (`ProductStudio.jsx`)
-- [x] **Remove DB Logic**: Strip the heavy Supabase insert/update logic for SEO analysis from `handleAnalyze()` and `handleSEOSniper()`.
-- [x] **Rely on Realtime (or Optimistic UI)**: The frontend should just trigger n8n and wait. 
+2. **`ProductStudio.jsx`**
+   - [x] Parse `listing_profit` from n8n webhooks in `handleGenerateInsight` and `handleRecalculateScores`.
+   - [x] Add `listing_profit` to the database payloads so it is saved locally.
+   - [x] Map `listing_profit` when hydrating the local UI state `results`:
+     ```javascript
+     listing_profit: activeEvalData?.listing_profit ?? listing.listing_profit,
+     ```
+   
+## Verification
+- [x] Test by loading a listing or recalculating scores. 
+- [x] Verify the Profitability pillar is displayed.
+- [x] Verify color coding is identical.
+- [x] Verify the `listing_profit` updates correctly locally and in the database.

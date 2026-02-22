@@ -66,6 +66,7 @@ const ProductStudio = () => {
   const [isInsightLoading, setIsInsightLoading] = useState(false); // false | 'seo' | 'insight'
   const [isCompetitionLoading, setIsCompetitionLoading] = useState(false);
   const [isSniperLoading, setIsSniperLoading] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
   
   // Strategy Switcher State
   const [activeMode, setActiveMode] = useState('balanced');
@@ -74,6 +75,7 @@ const ProductStudio = () => {
   const [analysisContext, setAnalysisContext] = useState(null);
   const [listingName, setListingName] = useState("");
   const [isImageAnalyzedState, setIsImageAnalyzedState] = useState(false);
+  const [resetSelectionKey, setResetSelectionKey] = useState(0);
   
   // Visual Analysis State
   const [isAnalyzingDesign, setIsAnalyzingDesign] = useState(false);
@@ -762,6 +764,148 @@ const ProductStudio = () => {
       }
   };
 
+  const handleRecalculateScores = async (selectedKeywordsData) => {
+      if (!user || !listingId) return;
+
+      setIsRecalculating(true);
+      toast.info("Sending request to recalculate scores...", { duration: 3000 });
+
+      try {
+          const payload = {
+              action: 'recalculateScore',
+              listing_id: listingId,
+              user_id: user.id,
+              selected_keywords: selectedKeywordsData.map(k => ({
+                  keyword: k.keyword,
+                  search_volume: k.volume, 
+                  intent_label: k.intent_label,
+                  transactional_score: k.transactional_score,
+                  niche_score: k.niche_score
+              }))
+          };
+
+          const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
+
+          const response = await axios.post(webhookUrl, payload);
+          
+          let rawData = response.data;
+          
+          // Fallback parsing just in case n8n returns stringified JSON
+          if (typeof rawData === 'string') {
+               try { rawData = JSON.parse(rawData); } catch (e) { console.error("Failed to parse recalculate response:", e); }
+          }
+          
+          const unwrapped = Array.isArray(rawData) ? rawData[0] : rawData;
+          
+          if (!unwrapped || !unwrapped.scores) {
+               throw new Error("Invalid response format from server");
+          }
+          
+          const newScores = unwrapped.scores;
+          
+          const updatePayload = {
+               listing_strength: newScores.listing_strength,
+               global_strength: newScores.listing_strength,
+               listing_visibility: newScores.breakdown?.visibility,
+               listing_conversion: newScores.breakdown?.conversion,
+               listing_relevance: newScores.breakdown?.relevance,
+               listing_competition: newScores.breakdown?.competition,
+               listing_profit: newScores.breakdown?.profitability || newScores.breakdown?.profit,
+               listing_raw_visibility_index: newScores.stats?.raw_visibility_index
+          };
+
+          // 1. Update Database (listings_global_eval for the activeMode)
+          const { data: existingRows } = await supabase
+              .from('listings_global_eval')
+              .select('id')
+              .eq('listing_id', listingId)
+              .eq('seo_mode', activeMode);
+
+          if (existingRows?.length > 0) {
+              const { error: updateError } = await supabase
+                  .from('listings_global_eval')
+                  .update(updatePayload)
+                  .eq('id', existingRows[0].id);
+              if (updateError) console.error("Failed to update recalculated scores in DB:", updateError);
+          } else {
+              // Extremely unlikely to happen if they generated SEO already, but just in case
+              const { error: insertError } = await supabase
+                  .from('listings_global_eval')
+                  .insert({
+                       listing_id: listingId,
+                       seo_mode: activeMode,
+                       ...updatePayload,
+                       updated_at: new Date().toISOString()
+                  });
+              if (insertError) console.error("Failed to insert recalculated scores in DB:", insertError);
+          }
+
+          // 2. Update Database (listing_seo_stats for activeMode)
+          const selectedTags = selectedKeywordsData.map(k => k.keyword);
+          
+          // Set all to false first
+          const { error: resetEvalError } = await supabase
+               .from('listing_seo_stats')
+               .update({ is_current_eval: false })
+               .eq('listing_id', listingId);
+               
+          if (resetEvalError) console.error("Failed to reset is_current_eval:", resetEvalError);
+          
+          // Set selected to true
+          if (selectedTags.length > 0) {
+               const { error: setEvalError } = await supabase
+                   .from('listing_seo_stats')
+                   .update({ is_current_eval: true })
+                   .eq('listing_id', listingId)
+                   .in('tag', selectedTags);
+                   
+               if (setEvalError) console.error("Failed to set is_current_eval:", setEvalError);
+          }
+
+          // 3. Update Local State (Results + Global Evals + Seo Stats)
+          setResults(prev => {
+              if (!prev || !prev.analytics) return prev;
+              
+              // Map the analytics array to update `is_current_eval`
+              const updatedAnalytics = prev.analytics.map(item => ({
+                  ...item,
+                  is_current_eval: selectedTags.includes(item.keyword)
+              }));
+              
+              return {
+                  ...prev,
+                  ...updatePayload,
+                  analytics: updatedAnalytics
+              };
+          });
+          
+          setAllSeoStats(prev => prev.map(s => {
+              if (s.listing_id === listingId) {
+                  return { ...s, is_current_eval: selectedTags.includes(s.tag) };
+              }
+              return s;
+          }));
+          
+          setGlobalEvals(prev => prev.map(e => {
+              if (e.seo_mode === activeMode && e.listing_id === listingId) {
+                  return { ...e, ...updatePayload };
+              }
+              return e;
+          }));
+
+          toast.success("Scores successfully recalculated!");
+      } catch (error) {
+          console.error("Recalculate Scores failed:", error);
+          if (error.response) {
+               toast.error(`Recalculation failed: Server returned ${error.response.status}`);
+          } else {
+               toast.error(error.message || "Failed to recalculate scores.");
+          }
+      } finally {
+          setIsRecalculating(false);
+      }
+  };
+
   // Inline "Add Keyword" Handler
   const [isAddingKeyword, setIsAddingKeyword] = useState(false);
 
@@ -870,7 +1014,8 @@ const ProductStudio = () => {
               is_selection_ia: responseData.is_selection_ia !== undefined ? responseData.is_selection_ia : true, // Map from response if present
               is_user_added: true,   // Flag as user added per requirement
               is_competition: false, // It's standard, not competitor
-              listing_id: currentListingId
+              listing_id: currentListingId,
+              cpc: responseData.cpc !== undefined ? responseData.cpc : null
           };
 
           // We need the current active evaluation_id to link it properly in the DB
@@ -912,7 +1057,8 @@ const ProductStudio = () => {
              relevance_label: newStat.relevance_label,
              is_selection_ia: newStat.is_selection_ia,
              is_competition: newStat.is_competition,
-             is_user_added: newStat.is_user_added
+             is_user_added: newStat.is_user_added,
+             cpc: newStat.cpc
           };
 
           setResults(prev => {
@@ -1045,6 +1191,8 @@ const ProductStudio = () => {
       const listingVisibility = formattedResults?.listing_visibility ?? unwrapped?.breakdown?.visibility ?? unwrapped.listing_visibility;
       const listingConversion = formattedResults?.listing_conversion ?? unwrapped?.breakdown?.conversion ?? unwrapped.listing_conversion;
       const listingRelevance = formattedResults?.listing_relevance ?? unwrapped?.breakdown?.relevance ?? unwrapped.listing_relevance;
+      const listingCompetition = formattedResults?.listing_competition ?? unwrapped?.breakdown?.competition ?? unwrapped.listing_competition;
+      const listingProfit = formattedResults?.listing_profit ?? unwrapped?.breakdown?.profitability ?? unwrapped?.breakdown?.profit ?? unwrapped.listing_profit;
       const listingRawVisibilityIndex = formattedResults?.listing_raw_visibility_index ?? unwrapped?.stats?.raw_visibility_index ?? unwrapped.listing_raw_visibility_index;
 
 
@@ -1085,6 +1233,8 @@ const ProductStudio = () => {
           listing_visibility: listingVisibility,
           listing_conversion: listingConversion,
           listing_relevance: listingRelevance,
+          listing_competition: listingCompetition,
+          listing_profit: listingProfit,
           listing_raw_visibility_index: listingRawVisibilityIndex,
 
           // Add the new fields from Step 2
@@ -1222,6 +1372,7 @@ const ProductStudio = () => {
 
       // Atomic swap — for sniper flow this is the first time results update
       setResults(mergedResults);
+      setResetSelectionKey(k => k + 1); // Reset Keyword Selection for fresh insights
       toast.success("Insights generated ✨");
 
     } catch (err) {
@@ -1584,6 +1735,8 @@ const ProductStudio = () => {
             listing_visibility: activeEvalData?.listing_visibility ?? listing.listing_visibility,
             listing_conversion: activeEvalData?.listing_conversion ?? listing.listing_conversion,
             listing_relevance: activeEvalData?.listing_relevance ?? listing.listing_relevance,
+            listing_competition: activeEvalData?.listing_competition ?? listing.listing_competition,
+            listing_profit: activeEvalData?.listing_profit ?? listing.listing_profit,
             listing_raw_visibility_index: activeEvalData?.listing_raw_visibility_index ?? listing.listing_raw_visibility_index,
 
             // Dashboard Metrics
@@ -1613,9 +1766,11 @@ const ProductStudio = () => {
                 niche_score: s.niche_score,
                 relevance_label: s.relevance_label,
                 is_competition: s.is_competition,
-                is_sniper_seo: s.is_sniper_seo, // Preserve sniper flag
+                is_sniper_seo: s.is_sniper_seo,
                 is_selection_ia: s.is_selection_ia,
-                is_user_added: s.is_user_added
+                is_user_added: s.is_user_added,
+                is_current_eval: s.is_current_eval,
+                cpc: s.cpc
             }))
         };
         
@@ -1774,6 +1929,8 @@ const ProductStudio = () => {
           listing_visibility: activeEvalData.listing_visibility,
           listing_conversion: activeEvalData.listing_conversion,
           listing_relevance: activeEvalData.listing_relevance,
+          listing_competition: activeEvalData.listing_competition,
+          listing_profit: activeEvalData.listing_profit,
           listing_raw_visibility_index: activeEvalData.listing_raw_visibility_index,
 
           // Dashboard Metrics
@@ -1804,11 +1961,14 @@ const ProductStudio = () => {
               is_competition: s.is_competition,
               is_sniper_seo: s.is_sniper_seo,
               is_selection_ia: s.is_selection_ia,
-              is_user_added: s.is_user_added
+              is_user_added: s.is_user_added,
+              is_current_eval: s.is_current_eval,
+              cpc: s.cpc
           }))
       };
       
       setResults(constructedResults);
+      setResetSelectionKey(k => k + 1); // Reset Keyword Selection
       
       // Also update the form visual state to match
       if (optimizationFormRef.current?.setFormState) {
@@ -1833,6 +1993,9 @@ const ProductStudio = () => {
       isCompetitionLoading={isCompetitionLoading}
       onAddCustomKeyword={handleAddCustomKeyword}
       isAddingKeyword={isAddingKeyword}
+      onRecalculateScores={handleRecalculateScores}
+      isRecalculating={isRecalculating}
+      resetSelectionKey={resetSelectionKey}
       
       // Strategy Switcher Props
       activeMode={activeMode}
@@ -1841,7 +2004,7 @@ const ProductStudio = () => {
     >
         <RecentOptimizations onViewResults={handleLoadListing} />
     </ResultsDisplay>
-  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, activeMode, globalEvals]);
+  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, resetSelectionKey, activeMode, globalEvals]);
 
   return (
     <Layout>
