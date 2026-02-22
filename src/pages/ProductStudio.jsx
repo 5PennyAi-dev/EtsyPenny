@@ -781,8 +781,8 @@ const ProductStudio = () => {
                   intent_label: k.intent_label,
                   transactional_score: k.transactional_score,
                   niche_score: k.niche_score,
-                  competition: k.competition,
-                  cpc: k.cpc
+                  competition: parseFloat(k.competition) || 0,
+                  cpc: parseFloat(k.cpc) || 0
               }))
           };
 
