@@ -780,7 +780,9 @@ const ProductStudio = () => {
                   search_volume: k.volume, 
                   intent_label: k.intent_label,
                   transactional_score: k.transactional_score,
-                  niche_score: k.niche_score
+                  niche_score: k.niche_score,
+                  competition: k.competition,
+                  cpc: k.cpc
               }))
           };
 
@@ -811,7 +813,9 @@ const ProductStudio = () => {
                listing_relevance: newScores.breakdown?.relevance,
                listing_competition: newScores.breakdown?.competition,
                listing_profit: newScores.breakdown?.profitability || newScores.breakdown?.profit,
-               listing_raw_visibility_index: newScores.stats?.raw_visibility_index
+               listing_raw_visibility_index: newScores.stats?.raw_visibility_index,
+               listing_avg_cpc: newScores.stats?.avg_cpc,
+               listing_avg_comp: newScores.stats?.best_opportunity_comp
           };
 
           // 1. Update Database (listings_global_eval for the activeMode)
@@ -1194,6 +1198,8 @@ const ProductStudio = () => {
       const listingCompetition = formattedResults?.listing_competition ?? unwrapped?.breakdown?.competition ?? unwrapped.listing_competition;
       const listingProfit = formattedResults?.listing_profit ?? unwrapped?.breakdown?.profitability ?? unwrapped?.breakdown?.profit ?? unwrapped.listing_profit;
       const listingRawVisibilityIndex = formattedResults?.listing_raw_visibility_index ?? unwrapped?.stats?.raw_visibility_index ?? unwrapped.listing_raw_visibility_index;
+      const listingAvgCpc = formattedResults?.listing_avg_cpc ?? unwrapped?.stats?.avg_cpc ?? unwrapped.listing_avg_cpc;
+      const listingAvgComp = formattedResults?.listing_avg_comp ?? unwrapped?.stats?.best_opportunity_comp ?? unwrapped.listing_avg_comp;
 
 
       // 1.2 Upsert to listings_global_eval with SEO Mode
@@ -1236,6 +1242,8 @@ const ProductStudio = () => {
           listing_competition: listingCompetition,
           listing_profit: listingProfit,
           listing_raw_visibility_index: listingRawVisibilityIndex,
+          listing_avg_cpc: listingAvgCpc,
+          listing_avg_comp: listingAvgComp,
 
           // Add the new fields from Step 2
           score_justification_visibility: scoreJustificationVisibility,
@@ -1738,6 +1746,8 @@ const ProductStudio = () => {
             listing_competition: activeEvalData?.listing_competition ?? listing.listing_competition,
             listing_profit: activeEvalData?.listing_profit ?? listing.listing_profit,
             listing_raw_visibility_index: activeEvalData?.listing_raw_visibility_index ?? listing.listing_raw_visibility_index,
+            listing_avg_cpc: activeEvalData?.listing_avg_cpc ?? listing.listing_avg_cpc,
+            listing_avg_comp: activeEvalData?.listing_avg_comp ?? listing.listing_avg_comp,
 
             // Dashboard Metrics
             score_justification_visibility: activeEvalData?.score_justification_visibility,
@@ -1928,10 +1938,11 @@ const ProductStudio = () => {
           listing_strength: activeEvalData.listing_strength,
           listing_visibility: activeEvalData.listing_visibility,
           listing_conversion: activeEvalData.listing_conversion,
-          listing_relevance: activeEvalData.listing_relevance,
           listing_competition: activeEvalData.listing_competition,
           listing_profit: activeEvalData.listing_profit,
           listing_raw_visibility_index: activeEvalData.listing_raw_visibility_index,
+          listing_avg_cpc: activeEvalData.listing_avg_cpc,
+          listing_avg_comp: activeEvalData.listing_avg_comp,
 
           // Dashboard Metrics
           score_justification_visibility: activeEvalData.score_justification_visibility,

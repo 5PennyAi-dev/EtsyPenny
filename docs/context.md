@@ -167,8 +167,9 @@
         - Added `cpc` float column to `listing_seo_stats` and mapped it through `handleAnalyze`, `handleLoadListing`, `handleRecalculateScores`, and `handleAddCustomKeyword`.
         - Replaced "Placement" column with "CPC" in `ResultsDisplay.jsx` table, applying color logic (Green > $1.50, Amber $0.60-$1.49, Gray < $0.60).
         - Added a `Recalculate Scores` button featuring a Zap icon adjacent to the `Refresh Data` button in the `ResultsDisplay` component header.
-        - `handleRecalculateScores` gathers an array of objects derived from `results.analytics` (filtered by `selectedTags`) and immediately handles the synchronous webhook response.
+        - `handleRecalculateScores` gathers an array of objects derived from `results.analytics` (filtered by `selectedTags`) and immediately handles the synchronous webhook response. The outgoing payload now explicitly includes the `competition` and `cpc` values.
         - Fixed a bug where adding a Custom Keyword failed to map the backend `cpc` value to the UI/DB.
+        - Parsed new JSON metrics (`avg_cpc` mapped to `listing_avg_cpc`, `best_opportunity_comp` mapped to `listing_avg_comp`) from the `recalculateScore` response, saving them to the UI state and Supabase DB.
 
 - **Global SEO Metrics Expansion** (2026-02-22):
     - **Goal**: Display new Competition and Profitability metrics in the global Audit Header.

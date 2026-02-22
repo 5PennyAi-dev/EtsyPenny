@@ -1,37 +1,54 @@
-# Add Profitability Score to UI
+# Add New Recalculate Score Stats
 
 ## Objective
-The user wants to display the new `listing_profit` field from `listings_global_eval` next to the COMPETITION score in the `AuditHeader` section. It should have the same color coding logic and an appropriate `$` icon.
+The user wants to handle the newly returned JSON format from the `recalculateScore` n8n webhook action. Specifically:
+1. Send the `cpc` field in the webhook request payload inside `selected_keywords`.
+2. Extract the newly returned fields `avg_cpc` and `best_opportunity_comp` from the response `stats` block.
+3. Save these to the `listings_global_eval` table as `listing_avg_cpc` and `listing_avg_comp`.
 
 ## Proposed Changes
-1. **`ResultsDisplay.jsx`**
-   - [x] Import `DollarSign` from `lucide-react`.
-   - [x] Add `listingProfit` to the destructured props of `AuditHeader`.
-   - [x] Add a 5th pillar for "Profitability" next to Competition:
-     ```jsx
-     {/* Pillar 5: Profitability */}
-     <div className="flex-1 p-5 md:py-4 md:px-6 hover:bg-slate-50 transition-colors flex flex-col justify-center">
-         <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <DollarSign size={14} className="text-slate-400" /> Profitability
-              </span>
-              <span className={`text-2xl font-black ${profitTier.text}`}>{listingProfit || 0}</span>
-         </div>
-         <MiniGauge value={listingProfit} tier={profitTier} />
-     </div>
-     ```
-   - [x] Pass `listingProfit={results?.listing_profit}` to `<AuditHeader />`.
 
-2. **`ProductStudio.jsx`**
-   - [x] Parse `listing_profit` from n8n webhooks in `handleGenerateInsight` and `handleRecalculateScores`.
-   - [x] Add `listing_profit` to the database payloads so it is saved locally.
-   - [x] Map `listing_profit` when hydrating the local UI state `results`:
-     ```javascript
-     listing_profit: activeEvalData?.listing_profit ?? listing.listing_profit,
-     ```
-   
+1. **`supabase/migrations/*_add_avg_cpc_and_comp.sql`**
+    - Create a new migration file to add these fields to `listings_global_eval`:
+      ```sql
+      ALTER TABLE public.listings_global_eval
+      ADD COLUMN listing_avg_cpc numeric,
+      ADD COLUMN listing_avg_comp numeric;
+      ```
+
+2. **`ProductStudio.jsx` (Webhook Payload)**
+    - [x] In `handleRecalculateScores`, modify the `selected_keywords` mapping to include `cpc: k.cpc`.
+      ```javascript
+      selected_keywords: selectedKeywordsData.map(k => ({
+          keyword: k.keyword,
+          search_volume: k.volume, 
+          intent_label: k.intent_label,
+          transactional_score: k.transactional_score,
+          niche_score: k.niche_score,
+          cpc: k.cpc // NEW
+      }))
+      ```
+
+3. **`ProductStudio.jsx` (Webhook Response Parsing)**
+    - [x] In `handleRecalculateScores`, add the mappings to `updatePayload`:
+      ```javascript
+      listing_avg_cpc: newScores.stats?.avg_cpc,
+      listing_avg_comp: newScores.stats?.best_opportunity_comp,
+      ```
+    - [x] In `handleGenerateInsight`, do the same for the initial analysis payload mapping (`globalEvalPayload`).
+      ```javascript
+      const listingAvgCpc = unwrapped?.stats?.avg_cpc;
+      const listingAvgComp = unwrapped?.stats?.best_opportunity_comp;
+      // ... Add to globalEvalPayload
+      ```
+    - [x] Map them to the UI local state in `handleLoadListing` and `handleModeChange`:
+      ```javascript
+      listing_avg_cpc: activeEvalData?.listing_avg_cpc ?? listing.listing_avg_cpc,
+      listing_avg_comp: activeEvalData?.listing_avg_comp ?? listing.listing_avg_comp,
+      ```
+
 ## Verification
-- [x] Test by loading a listing or recalculating scores. 
-- [x] Verify the Profitability pillar is displayed.
-- [x] Verify color coding is identical.
-- [x] Verify the `listing_profit` updates correctly locally and in the database.
+- [x] Run local Supabase migration using `npm run supabase db push` or notify user to apply SQL.
+- [x] Trigger "Recalculate Scores" with custom keywords.
+- [x] Verify `cpc` is passed in the n8n payload.
+- [x] Verify the successful processing of the response without DB insertion errors.
