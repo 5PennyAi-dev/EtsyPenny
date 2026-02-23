@@ -4,7 +4,6 @@ import { Sparkles, Package, Settings, ChevronRight, ChevronDown, Lock } from 'lu
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import ProductTypeCombobox from './ProductTypeCombobox';
-import SEOStrategySelector from './SEOStrategySelector';
 // import SmartNicheAutocomplete from './SmartNicheAutocomplete';
 
 const TONE_OPTIONS = [
@@ -350,9 +349,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
           </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-3 border border-slate-200">
-        <SEOStrategySelector value={seoMode} onChange={setSeoMode} />
-      </div>
+      {/* SEO Strategy Selector Removed per User Request */}
 
       <div className="flex gap-4">
 

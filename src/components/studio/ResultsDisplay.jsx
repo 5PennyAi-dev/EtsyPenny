@@ -8,7 +8,6 @@ import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } fr
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
 import Accordion from '../ui/Accordion';
-import StrategySwitcher from './StrategySwitcher';
 
 const Sparkline = ({ data }) => {
   if (!data || data.length === 0) return <div className="text-slate-300 text-xs">-</div>;
@@ -577,15 +576,7 @@ const SidebarSkeleton = ({ phase }) => (
           {/* --- MAIN CONTENT (Fluid width) --- */}
           <div className="flex-1 min-w-0 space-y-8">
   
-              {/* Strategy Switcher */}
-              {!isInsightLoading && results && availableModes && (
-                 <StrategySwitcher 
-                    activeMode={activeMode} 
-                    onModeChange={onModeChange} 
-                    availableModes={availableModes}
-                 />
-              )}
-
+              {/* Strategy Switcher Removed per User Request */}
               {/* Hero Audit Header with integrated SEO Sniper */}
               {isInsightLoading ? (
                   <AuditSkeleton />
