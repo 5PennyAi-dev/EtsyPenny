@@ -683,6 +683,18 @@ const SidebarSkeleton = ({ phase }) => (
                                 </th>
                                 <th className="px-3 py-2 font-semibold text-left">Tag / Keyword</th>
                                 <th 
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[9%]"
+                                    onClick={() => requestSort('score')}
+                                >
+                                    Score <SortIcon columnKey="score" />
+                                </th>
+                                <th className="px-2 py-2 text-center font-semibold w-[10%]">
+                                    Conv. Intent.
+                                </th>
+                                <th className="px-2 py-2 text-center font-semibold w-[9%]">
+                                    Relevance
+                                </th>
+                                <th 
                                     className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[11%]"
                                     onClick={() => requestSort('volume')}
                                 >
@@ -699,15 +711,6 @@ const SidebarSkeleton = ({ phase }) => (
                                     onClick={() => requestSort('competition')}
                                 >
                                     Competition <SortIcon columnKey="competition" />
-                                </th>
-                                <th className="px-2 py-2 text-center font-semibold w-[9%]">
-                                    Relevance
-                                </th>
-                                <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[9%]"
-                                    onClick={() => requestSort('score')}
-                                >
-                                    Score <SortIcon columnKey="score" />
                                 </th>
                                 <th 
                                     className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[9%]"
