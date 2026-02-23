@@ -171,12 +171,12 @@
         - Fixed a bug where adding a Custom Keyword failed to map the backend `cpc` value to the UI/DB.
         - Parsed new JSON metrics (`avg_cpc` mapped to `listing_avg_cpc`, `best_opportunity_comp` mapped to `listing_avg_comp`) from the `recalculateScore` response, saving them to the UI state and Supabase DB.
 
-- **Global SEO Metrics Expansion** (2026-02-22):
-    - **Goal**: Display new Competition and Profitability metrics in the global Audit Header.
+- **UI Redesign: Verdict + Proof Audit Header** (2026-02-23):
+    - **Goal**: Reorganize the top banner of the `ResultsDisplay` into three distinct sections to create visual hierarchy and present the global scores effectively.
     - **Implementation**: 
-        - Expanded the `AuditHeader` to 5 pillars: Listing Strength, Visibility, Relevance, Competition (`Swords` icon), and Profitability (`DollarSign` icon).
-        - Parsed `listing_competition` and `listing_profit` from incoming n8n analytics webhooks.
-        - Hydrated these values into internal DB payloads and `ProductStudio.jsx` local state, ensuring persistence across reloads.
+        - **Verdict (Left)**: Featured "Listing Strength" score using a new, oversized SVG `<RadialGauge />` to act as the primary KPI.
+        - **Technical Analysis (Center)**: Grouped "Visibility", "Relevance", "Conversion", and "Competition" into a compact 2x2 grid using slim horizontal progress micro-gauges as "Evidence".
+        - **Business Potential (Right)**: Isolated "Profitability" logic. Built a custom indicator system using five `DollarSign` icons (`lucide-react`) representing financial potential (1-5 filled based on 0-100 score).
 
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.

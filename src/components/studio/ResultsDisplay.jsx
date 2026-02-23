@@ -171,7 +171,7 @@ const SidebarSkeleton = ({ phase }) => (
     </div>
 );
 
-const AuditHeader = ({
+  const AuditHeader = ({
     score,
     listingVisibility,
     listingConversion,
@@ -181,9 +181,9 @@ const AuditHeader = ({
   }) => {
     const getMetricsColor = (val) => {
       const num = Number(val) || 0;
-      if (num >= 80) return { text: 'text-emerald-600', bg: 'bg-emerald-500' };
-      if (num >= 50) return { text: 'text-amber-600', bg: 'bg-amber-500' };
-      return { text: 'text-rose-600', bg: 'bg-rose-500' };
+      if (num >= 80) return { text: 'text-emerald-600', bg: 'bg-emerald-500', stroke: 'stroke-emerald-500', fill: 'fill-emerald-500' };
+      if (num >= 50) return { text: 'text-amber-600', bg: 'bg-amber-500', stroke: 'stroke-amber-500', fill: 'fill-amber-500' };
+      return { text: 'text-rose-600', bg: 'bg-rose-500', stroke: 'stroke-rose-500', fill: 'fill-rose-500' };
     };
 
     const mainTier = getMetricsColor(score);
@@ -191,10 +191,14 @@ const AuditHeader = ({
     const relTier = getMetricsColor(listingRelevance);
     const convTier = getMetricsColor(listingConversion);
     const compTier = getMetricsColor(listingCompetition);
-    const profitTier = getMetricsColor(listingProfit);
+    
+    // Profit score is 0-100. Let's map it to 0-5 stars/dollars for the visual
+    const profitScore = Number(listingProfit) || 0;
+    const profitTier = getMetricsColor(profitScore);
+    const filledDollars = Math.round((profitScore / 100) * 5); // 0 to 5
 
     const MiniGauge = ({ value, tier }) => (
-      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mt-2">
+      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1.5">
         <div 
           className={`h-full rounded-full ${tier.bg} transition-all duration-1000 ease-out`} 
           style={{ width: `${Math.min(100, Math.max(0, Number(value) || 0))}%` }} 
@@ -202,73 +206,130 @@ const AuditHeader = ({
       </div>
     );
 
+    const RadialGauge = ({ value, tier }) => {
+      const radius = 36;
+      const circumference = 2 * Math.PI * radius;
+      const strokeDashoffset = circumference - (Number(value) / 100) * circumference;
+      
+      return (
+        <div className="relative flex items-center justify-center">
+          {/* Background Circle */}
+          <svg className="transform -rotate-90 w-24 h-24">
+            <circle
+              className="text-slate-100"
+              strokeWidth="8"
+              stroke="currentColor"
+              fill="transparent"
+              r={radius}
+              cx="48"
+              cy="48"
+            />
+            {/* Foreground Circle */}
+            <circle
+              className={`${tier.text} drop-shadow-sm transition-all duration-1000 ease-out`}
+              strokeWidth="8"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              stroke="currentColor"
+              fill="transparent"
+              r={radius}
+              cx="48"
+              cy="48"
+            />
+          </svg>
+          {/* Inside Text */}
+          <div className="absolute flex flex-col items-center justify-center">
+            <span className={`text-3xl font-black tracking-tighter ${tier.text}`}>
+              {value || 0}
+            </span>
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100">
         
-        {/* Main Score: Listing Strength */}
-        <div className="flex-1 p-5 md:py-4 md:px-6 hover:bg-slate-50 transition-colors flex flex-col justify-center bg-slate-50/30">
-          <div className="flex items-center justify-between mb-1">
-             <span className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-               <Sparkles size={16} className="text-indigo-600" /> Listing Strength
-             </span>
-             <span className={`text-3xl font-black ${mainTier.text}`}>{score || 0}%</span>
-          </div>
-          <MiniGauge value={score} tier={mainTier} />
-        </div>
-
-        {/* Pillar 1: Visibility */}
-        <div className="flex-1 p-5 md:py-4 md:px-6 hover:bg-slate-50 transition-colors flex flex-col justify-center">
-            <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                   <TrendingUp size={14} className="text-slate-400" /> Visibility
-                </span>
-                <span className={`text-2xl font-black ${visTier.text}`}>{listingVisibility || 0}</span>
-            </div>
-            <MiniGauge value={listingVisibility} tier={visTier} />
-        </div>
-
-        {/* Pillar 2: Relevance */}
-        <div className="flex-1 p-5 md:py-4 md:px-6 hover:bg-slate-50 transition-colors flex flex-col justify-center">
-            <div className="flex items-center justify-between mb-1">
-                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                   <Target size={14} className="text-slate-400" /> Relevance
+        {/* SECTION A: The Verdict (Listing Strength) */}
+        <div className="md:w-1/3 p-6 md:p-8 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-row items-center justify-between xl:justify-center xl:gap-8">
+            <div className="flex flex-col gap-1">
+                 <span className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                   <Sparkles size={16} className="text-indigo-500" /> Verdict
                  </span>
-                 <span className={`text-2xl font-black ${relTier.text}`}>{listingRelevance || 0}</span>
+                 <h3 className="text-xl font-black text-slate-800 leading-tight">
+                    Listing<br/>Strength
+                 </h3>
             </div>
-            <MiniGauge value={listingRelevance} tier={relTier} />
+            <RadialGauge value={score} tier={mainTier} />
         </div>
 
-        {/* Pillar 3: Conversion */}
-        <div className="flex-1 p-5 md:py-4 md:px-6 hover:bg-slate-50 transition-colors flex flex-col justify-center">
-            <div className="flex items-center justify-between mb-1">
-                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                   <ShoppingCart size={14} className="text-slate-400" /> Conversion
-                 </span>
-                 <span className={`text-2xl font-black ${convTier.text}`}>{listingConversion || 0}</span>
+        {/* SECTION B: Technical Analysis (Proof Grid) */}
+        <div className="md:w-5/12 p-6 md:px-8 hover:bg-slate-50/30 transition-colors flex flex-col justify-center">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Technical Analysis</span>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-5">
+                {/* Visibility */}
+                <div>
+                    <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                           <TrendingUp size={14} className="text-slate-400" /> Visibility
+                        </span>
+                        <span className={`text-sm font-bold ${visTier.text}`}>{listingVisibility || 0}</span>
+                    </div>
+                    <MiniGauge value={listingVisibility} tier={visTier} />
+                </div>
+                {/* Relevance */}
+                <div>
+                    <div className="flex items-center justify-between mb-1">
+                         <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                           <Target size={14} className="text-slate-400" /> Relevance
+                         </span>
+                         <span className={`text-sm font-bold ${relTier.text}`}>{listingRelevance || 0}</span>
+                    </div>
+                    <MiniGauge value={listingRelevance} tier={relTier} />
+                </div>
+                {/* Conversion */}
+                <div>
+                    <div className="flex items-center justify-between mb-1">
+                         <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                           <ShoppingCart size={14} className="text-slate-400" /> Conversion
+                         </span>
+                         <span className={`text-sm font-bold ${convTier.text}`}>{listingConversion || 0}</span>
+                    </div>
+                    <MiniGauge value={listingConversion} tier={convTier} />
+                </div>
+                {/* Competition */}
+                <div>
+                    <div className="flex items-center justify-between mb-1">
+                         <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                           <Swords size={14} className="text-slate-400" /> Competition
+                         </span>
+                         <span className={`text-sm font-bold ${compTier.text}`}>{listingCompetition || 0}</span>
+                    </div>
+                    <MiniGauge value={listingCompetition} tier={compTier} />
+                </div>
             </div>
-            <MiniGauge value={listingConversion} tier={convTier} />
         </div>
 
-        {/* Pillar 4: Competition */}
-        <div className="flex-1 p-5 md:py-4 md:px-6 hover:bg-slate-50 transition-colors flex flex-col justify-center">
-            <div className="flex items-center justify-between mb-1">
-                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                   <Swords size={14} className="text-slate-400" /> Competition
-                 </span>
-                 <span className={`text-2xl font-black ${compTier.text}`}>{listingCompetition || 0}</span>
+        {/* SECTION C: Business Potential (Profitability) */}
+        <div className="md:w-1/4 p-6 md:p-8 hover:bg-slate-50/30 transition-colors flex flex-col items-center justify-center border-l border-slate-100">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Est. Value</span>
+            
+            <div className="flex items-center justify-center gap-1 mb-2">
+                {[1, 2, 3, 4, 5].map((index) => (
+                   <DollarSign 
+                      key={index} 
+                      size={24} 
+                      className={`transition-colors duration-500 ${index <= filledDollars ? profitTier.text : 'text-slate-200'}`} 
+                      strokeWidth={index <= filledDollars ? 3 : 2}
+                   />
+                ))}
             </div>
-            <MiniGauge value={listingCompetition} tier={compTier} />
-        </div>
-
-        {/* Pillar 5: Profitability */}
-        <div className="flex-1 p-5 md:py-4 md:px-6 hover:bg-slate-50 transition-colors flex flex-col justify-center">
-            <div className="flex items-center justify-between mb-1">
-                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                   <DollarSign size={14} className="text-slate-400" /> Profitability
-                 </span>
-                 <span className={`text-2xl font-black ${profitTier.text}`}>{listingProfit || 0}</span>
+            
+            <div className="flex items-baseline gap-1.5 mt-1">
+                 <span className={`text-3xl font-black ${profitTier.text}`}>{profitScore}</span>
+                 <span className="text-sm font-medium text-slate-400">/100</span>
             </div>
-            <MiniGauge value={listingProfit} tier={profitTier} />
         </div>
 
       </div>

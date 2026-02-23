@@ -1,54 +1,29 @@
-# Add New Recalculate Score Stats
+# Implementation Plan: Dashboard UI/UX Evolution
 
 ## Objective
-The user wants to handle the newly returned JSON format from the `recalculateScore` n8n webhook action. Specifically:
-1. Send the `cpc` field in the webhook request payload inside `selected_keywords`.
-2. Extract the newly returned fields `avg_cpc` and `best_opportunity_comp` from the response `stats` block.
-3. Save these to the `listings_global_eval` table as `listing_avg_cpc` and `listing_avg_comp`.
+The overarching goal is to transform the `AuditHeader` inside `ResultsDisplay.jsx` into a "Verdict + Proof" system. Wait, I'll write the detail.
 
 ## Proposed Changes
+1. **`ResultsDisplay.jsx` - Refactor `<AuditHeader />` Component:**
+   - [x] **Section A: The Verdict (Far Left)**
+     - Width: Make this section span approximately 1/3 of the width (`md:w-1/3`).
+     - Background: Subtle `bg-slate-50/50` to distinguish it.
+     - Element: Implement a new `<RadialGauge />` sub-component using SVG circles (`<circle>` for background, `<circle strokeDasharray="..." strokeDashoffset="...">` for the value).
+     - Focus: Display "Listing Strength" as a prominent, oversized gauge.
+   
+   - [x] **Section B: Technical Analysis (Center Grouping)**
+     - Width: Span approximately 5/12 of the width (`md:w-5/12`).
+     - Layout: Use `grid grid-cols-2 gap-x-6 gap-y-5` to create a compact 2x2 grid.
+     - Elements: Use the existing slim `MiniGauge` elements for Visibility, Relevance, Conversion, and Competition to serve as "Proof".
 
-1. **`supabase/migrations/*_add_avg_cpc_and_comp.sql`**
-    - Create a new migration file to add these fields to `listings_global_eval`:
-      ```sql
-      ALTER TABLE public.listings_global_eval
-      ADD COLUMN listing_avg_cpc numeric,
-      ADD COLUMN listing_avg_comp numeric;
-      ```
-
-2. **`ProductStudio.jsx` (Webhook Payload)**
-    - [x] In `handleRecalculateScores`, modify the `selected_keywords` mapping to include `cpc: k.cpc`.
-      ```javascript
-      selected_keywords: selectedKeywordsData.map(k => ({
-          keyword: k.keyword,
-          search_volume: k.volume, 
-          intent_label: k.intent_label,
-          transactional_score: k.transactional_score,
-          niche_score: k.niche_score,
-          cpc: k.cpc // NEW
-      }))
-      ```
-
-3. **`ProductStudio.jsx` (Webhook Response Parsing)**
-    - [x] In `handleRecalculateScores`, add the mappings to `updatePayload`:
-      ```javascript
-      listing_avg_cpc: newScores.stats?.avg_cpc,
-      listing_avg_comp: newScores.stats?.best_opportunity_comp,
-      ```
-    - [x] In `handleGenerateInsight`, do the same for the initial analysis payload mapping (`globalEvalPayload`).
-      ```javascript
-      const listingAvgCpc = unwrapped?.stats?.avg_cpc;
-      const listingAvgComp = unwrapped?.stats?.best_opportunity_comp;
-      // ... Add to globalEvalPayload
-      ```
-    - [x] Map them to the UI local state in `handleLoadListing` and `handleModeChange`:
-      ```javascript
-      listing_avg_cpc: activeEvalData?.listing_avg_cpc ?? listing.listing_avg_cpc,
-      listing_avg_comp: activeEvalData?.listing_avg_comp ?? listing.listing_avg_comp,
-      ```
+   - [x] **Section C: Business Potential (Far Right)**
+     - Width: Span remainder (`md:w-1/4`).
+     - Layout: Flex column, centered.
+     - Element: Instead of a `MiniGauge`, implement a `<ProfitabilityRating />` using 5 `DollarSign` icons, where the number of active/colored icons corresponds to the score (e.g., score/20). Display the numeric profit score underneath prominently.
 
 ## Verification
-- [x] Run local Supabase migration using `npm run supabase db push` or notify user to apply SQL.
-- [x] Trigger "Recalculate Scores" with custom keywords.
-- [x] Verify `cpc` is passed in the n8n payload.
-- [x] Verify the successful processing of the response without DB insertion errors.
+- [x] Load a listing that has SEO data.
+- [x] Verify that standard CSS rendering handles the 3 distinct columns correctly in Desktop mode.
+- [x] Verify mobile responsiveness (`flow-root` / `flex-col` handling).
+- [x] Verify the radial gauge mathematically represents the correct percentage.
+- [x] Review visual aesthetics against the overarching "Premium" requirement of this tool.
