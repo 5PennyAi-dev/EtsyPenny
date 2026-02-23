@@ -609,61 +609,58 @@ const SidebarSkeleton = ({ phase }) => (
                 />
              ) : (
                 <div className={!results ? "opacity-50 grayscale pointer-events-none" : ""}>
-                    <Accordion type="single" collapsible defaultValue="keyword-performance">
-                        <AccordionItem value="keyword-performance" className="border-none">
-                            {/* Accordion Header / Trigger Area */}
-                            <div className="flex items-center justify-between py-4">
-                                <AccordionTrigger className="hover:no-underline py-0 flex-1 justify-start gap-4">
-                                    <div className="flex items-center gap-2 text-left">
-                                        <TrendingUp size={16} className={`text-indigo-600 ${!results ? 'text-slate-400' : ''}`} />
-                                        <span className="text-sm font-bold text-slate-900">Keyword Performance</span>
-                                         {results && (
-                                            <div onClick={(e) => e.stopPropagation()}>
-                                                <CopyButton 
-                                                    text={selectedTags.join(', ')} 
-                                                    label="Copy selected keywords to clipboard." 
-                                                    className="mx-2 text-slate-400 hover:text-indigo-600" 
-                                                    tooltipSide="right" 
-                                                />
-                                            </div>
-                                         )}
-                                         {results && (
-                                            <span className="text-xs font-normal text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full ml-1">
-                                                {selectedTags.length} / {results.analytics?.length || 0} selected
-                                            </span>
-                                         )}
-                                    </div>
-                                </AccordionTrigger>
-
-                                {/* Header Actions (Outside of Trigger so they are clickable) */}
+                    <Accordion 
+                        className="border-none" 
+                        defaultOpen={true}
+                        title={
+                            <div className="flex items-center gap-2 text-left">
+                                <TrendingUp size={16} className={`text-indigo-600 ${!results ? 'text-slate-400' : ''}`} />
+                                <span className="text-sm font-bold text-slate-900">Keyword Performance</span>
                                 {results && (
-                                    <div className="flex items-center gap-2 pr-4">
-                                         <button 
-                                            onClick={(e) => { 
-                                                e.stopPropagation();
-                                                const selectedKeywordsData = primaryAnalytics.filter(k => selectedTags.includes(k.keyword));
-                                                onRecalculateScores?.(selectedKeywordsData); 
-                                            }}
-                                            disabled={isRecalculating}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 rounded-lg transition-colors border border-indigo-100 shadow-sm"
-                                            title="Recalculate Global Scores"
-                                         >
-                                            {isRecalculating ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
-                                            Recalculate Scores
-                                         </button>
-
-                                         <div className="flex items-center gap-3 text-xs text-slate-500 ml-2 hidden sm:flex border-l border-slate-200 pl-3">
-                                             <span className="flex items-center gap-1" title="Trending"><Flame size={12} className="text-orange-500"/></span>
-                                             <span className="flex items-center gap-1" title="Evergreen"><Leaf size={12} className="text-emerald-500"/></span>
-                                             <span className="flex items-center gap-1" title="Opportunity"><Star size={12} className="text-amber-400"/></span>
-                                         </div>
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                        <CopyButton 
+                                            text={selectedTags.join(', ')} 
+                                            label="Copy selected keywords to clipboard." 
+                                            className="mx-2 text-slate-400 hover:text-indigo-600" 
+                                            tooltipSide="right" 
+                                        />
                                     </div>
                                 )}
+                                {results && (
+                                    <span className="text-xs font-normal text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full ml-1">
+                                        {selectedTags.length} / {results.analytics?.length || 0} selected
+                                    </span>
+                                )}
                             </div>
+                        }
+                        headerActions={
+                            results ? (
+                                <div className="flex items-center gap-2 pr-4">
+                                     <button 
+                                        onClick={(e) => { 
+                                            e.stopPropagation();
+                                            const selectedKeywordsData = primaryAnalytics.filter(k => selectedTags.includes(k.keyword));
+                                            onRecalculateScores?.(selectedKeywordsData); 
+                                        }}
+                                        disabled={isRecalculating}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 rounded-lg transition-colors border border-indigo-100 shadow-sm"
+                                        title="Recalculate Global Scores"
+                                     >
+                                        {isRecalculating ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                                        Recalculate Scores
+                                     </button>
 
-                            <AccordionContent>
-                                <div className="border-t border-slate-100 pb-4">
-                                    <table className="w-full text-sm text-left">
+                                     <div className="flex items-center gap-3 text-xs text-slate-500 ml-2 hidden sm:flex border-l border-slate-200 pl-3">
+                                         <span className="flex items-center gap-1" title="Trending"><Flame size={12} className="text-orange-500"/></span>
+                                         <span className="flex items-center gap-1" title="Evergreen"><Leaf size={12} className="text-emerald-500"/></span>
+                                         <span className="flex items-center gap-1" title="Opportunity"><Star size={12} className="text-amber-400"/></span>
+                                     </div>
+                                </div>
+                            ) : null
+                        }
+                    >
+                        <div className="border-t border-slate-100 pb-4">
+                            <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                             <tr>
                                 <th className="px-4 py-2 w-10 text-center">
@@ -977,8 +974,6 @@ const SidebarSkeleton = ({ phase }) => (
                             </button>
                         </div>
                     )}
-                            </AccordionContent>
-                        </AccordionItem>
                     </Accordion>
                 </div> 
             )}
