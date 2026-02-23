@@ -177,6 +177,7 @@
         - **Verdict (Left)**: Featured "Listing Strength" score using a new, oversized SVG `<RadialGauge />` to act as the primary KPI.
         - **Technical Analysis (Center)**: Grouped "Visibility", "Relevance", "Conversion", and "Competition" into a compact 2x2 grid using slim horizontal progress micro-gauges as "Evidence".
         - **Business Potential (Right)**: Isolated "Profitability" logic. Built a custom indicator system using five `DollarSign` icons (`lucide-react`) representing financial potential (1-5 filled based on 0-100 score).
+        - **Cleanup**: Removed the unused "SEO Strategy" selector block from the form and the "Mode Switcher" from the evaluation results.
 
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
