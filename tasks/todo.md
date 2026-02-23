@@ -1,29 +1,31 @@
-# Implementation Plan: Dashboard UI/UX Evolution
+# Implementation Plan: Smart Sorting & Selection Logic
 
 ## Objective
-The overarching goal is to transform the `AuditHeader` inside `ResultsDisplay.jsx` into a "Verdict + Proof" system. Wait, I'll write the detail.
+Implement "Pin & Sort" logic for the keyword table so selected keywords are pinned to the top, adjusting the pagination to show automatically all selected ones or at least 13.
 
 ## Proposed Changes
-1. **`ResultsDisplay.jsx` - Refactor `<AuditHeader />` Component:**
-   - [x] **Section A: The Verdict (Far Left)**
-     - Width: Make this section span approximately 1/3 of the width (`md:w-1/3`).
-     - Background: Subtle `bg-slate-50/50` to distinguish it.
-     - Element: Implement a new `<RadialGauge />` sub-component using SVG circles (`<circle>` for background, `<circle strokeDasharray="..." strokeDashoffset="...">` for the value).
-     - Focus: Display "Listing Strength" as a prominent, oversized gauge.
-   
-   - [x] **Section B: Technical Analysis (Center Grouping)**
-     - Width: Span approximately 5/12 of the width (`md:w-5/12`).
-     - Layout: Use `grid grid-cols-2 gap-x-6 gap-y-5` to create a compact 2x2 grid.
-     - Elements: Use the existing slim `MiniGauge` elements for Visibility, Relevance, Conversion, and Competition to serve as "Proof".
+1. **Sorting Algorithm (`ResultsDisplay.jsx`)**:
+   - Update `sortedAnalytics` `useMemo`.
+   - First sort by whether the `keyword` is in `selectedTags`.
+   - Then sort by the current `sortConfig` (e.g., score, volume).
 
-   - [x] **Section C: Business Potential (Far Right)**
-     - Width: Span remainder (`md:w-1/4`).
-     - Layout: Flex column, centered.
-     - Element: Instead of a `MiniGauge`, implement a `<ProfitabilityRating />` using 5 `DollarSign` icons, where the number of active/colored icons corresponds to the score (e.g., score/20). Display the numeric profit score underneath prominently.
+2. **Expansion Management**:
+   - The collapsed view default count should be `Math.max(13, selectedTags.length)`.
+   - If `sortedAnalytics.length <= Math.max(13, selectedTags.length)`, the table is effectively fully expanded.
+
+3. **UI/UX Enhancements**:
+   - **Visual Distinction**: Improve the row styling. Currently unselected rows are `opacity-50 grayscale`. We might want to remove the harsh grayscale and instead give selected rows a subtle `bg-indigo-50/30` and unselected rows a normal background or slight dimming, providing a "Active Selection" vs "Discovery" feel.
+   - **Horizontal Dividers**: When rendering the rows, detect the boundary between selected and unselected items. If there is a transition from selected to unselected, insert a special `<tr>` or visual border that says "Suggestions" or "Discovery Pool".
+   - **Animations**: Will check if `framer-motion` is available to use `<motion.tr layout>` for smooth reordering. Otherwise, rely on immediate React rendering.
 
 ## Verification
-- [x] Load a listing that has SEO data.
-- [x] Verify that standard CSS rendering handles the 3 distinct columns correctly in Desktop mode.
-- [x] Verify mobile responsiveness (`flow-root` / `flex-col` handling).
-- [x] Verify the radial gauge mathematically represents the correct percentage.
-- [x] Review visual aesthetics against the overarching "Premium" requirement of this tool.
+- [x] Test selecting a keyword far down the list to see it pop to the top.
+- [x] Test unselecting a keyword to see it drop below the divider.
+- [x] Ensure the table shows all selected keywords even if > 13 when collapsed.
+
+## Review (2026-02-23)
+- Successfully deployed the `sortedAnalytics` dual-tier "Pin & Sort" hierarchy logic.
+- Implemented `framer-motion` layout animations across `<motion.tbody>` and nested `<motion.tr>`.
+- Deployed a dynamically positioned "Suggestions & Discovery" visualization boundary inside the mapping loops.
+- Overhauled and stabilized trailing syntax mapping `')' expected.` JSX parenthesis errors nested deep inside `ResultsDisplay.jsx` tree layout styling logic.
+- Verified successful module mapping via ` Vite ` Native Builds returning `0` syntactical failures.
