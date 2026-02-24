@@ -179,14 +179,20 @@
         - **Business Potential (Right)**: Isolated "Profitability" logic. Built a custom indicator system using five `DollarSign` icons (`lucide-react`) representing financial potential (1-5 filled based on 0-100 score).
         - **Cleanup**: Removed the unused "SEO Strategy" selector block from the form and the "Mode Switcher" from the evaluation results.
 
-- **Sticky & Sorted Keyword Table** (2026-02-23):
-    - **Goal**: Implement "Pin & Sort" logic in the Keyword Performance table so that user-selected keywords dynamically pin to the top, applying smooth movement transitions and visually distinct styling.
+- **Smart Sorting & Selection** (2026-02-23):
+    - **Goal**: "Pin & Sort" logic — selected keywords always pinned to top, smooth animations on toggle, expandable table.
     - **Implementation**:
-        - **Smart Sorting**: Refactored the `useMemo` for `sortedAnalytics` inside `ResultsDisplay.jsx` to apply a dual-level sort. Keywords now prioritize `isSelected` (pinning to the top), and fall back to the selected column sort header.
-        - **Visual Polish**: Selected rows use a premium `bg-indigo-50/40`. Unselected rows are dimmed `opacity-80`.
-        - **Divider Injection**: Dynamically mapping a visually distinct `<motion.tr>` "Suggestions & Discovery" row separating selected from unselected.
-        - **Animation**: Implemented `framer-motion` properties (`layout`, `initial/animate/exit`) alongside `<AnimatePresence>` to natively power smooth repositioning of checked rows.
-        - **Syntax Stabilization**: Rewrote the entire JSX nested conditional logic wrapping the mapping, expanding, and sidebar components within `ResultsDisplay.jsx` after trailing layout bracket mismatching caused build failures.
+        - **Dual-Level Sort**: `sortedAnalytics` useMemo applies primary sort by `isSelected` (checked items first), secondary sort by active column header (Score, Volume, etc.). `selectedTags` in dependency array triggers visual reorder only (no score recalculation).
+        - **Show More/Less Toggle**: `showAll` state + `visibleAnalytics` slice. Collapsed view shows `max(13, selectedCount)` rows — always shows all selected keywords. "Show All (N)" / "Show Less" button in footer next to "Add Custom Keyword".
+        - **Visual Divider**: "Suggestions & Discovery" horizontal label row injected between selected and unselected groups.
+        - **Row Styling**: Selected rows: `bg-indigo-50/40`, Unselected: `opacity-60`.
+        - **Animation**: `framer-motion` `motion.tr` with `layout` + `AnimatePresence` for smooth row repositioning on checkbox toggle.
+
+- **UI Cleanup: Refresh Data & Competitors Table** (2026-02-23):
+    - Removed "Refresh Data" button and entire "Competitors Keywords" table accordion from `ResultsDisplay.jsx`. Cleaned up related state, useMemo, useEffect, and props (~175 lines removed).
+
+- **Keyword Pool Filtering (`is_current_pool`)** (2026-02-24):
+    - Added `.eq('is_current_pool', true)` filter to keyword loading queries in `ProductStudio.jsx` (`handleLoadListing`) and `HistoryPage.jsx` (`handleExportPDF`). Only keywords flagged as current pool are now loaded into the Keyword Performance table and exported to PDF.
 
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.

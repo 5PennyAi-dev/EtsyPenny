@@ -1653,11 +1653,12 @@ const ProductStudio = () => {
         let initialMode = latestEval?.seo_mode || 'balanced';
         setActiveMode(initialMode);
 
-        // Fetch ALL SEO Stats for this listing (we will filter in memory/UI)
+        // Fetch SEO Stats for this listing (only current pool keywords)
         let statsQuery = supabase
             .from('listing_seo_stats')
             .select('*')
-            .eq('listing_id', listingId);
+            .eq('listing_id', listingId)
+            .eq('is_current_pool', true);
         
         const { data: stats, error: statsError } = await statsQuery;
         setAllSeoStats(stats || []);

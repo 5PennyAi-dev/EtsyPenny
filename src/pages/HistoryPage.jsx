@@ -68,11 +68,12 @@ const HistoryPage = () => {
             const listingId = item.listing_id || item.id;
             setExportingId(listingId);
             
-            // 1. Fetch SEO Stats (not in initial list query)
+            // 1. Fetch SEO Stats (only current pool keywords)
             const { data: stats, error: statsError } = await supabase
                 .from('listing_seo_stats')
                 .select('*')
-                .eq('listing_id', listingId);
+                .eq('listing_id', listingId)
+                .eq('is_current_pool', true);
 
             if (statsError) throw statsError;
 

@@ -4,7 +4,7 @@
   Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart, 
   Pin, Tag, User, Zap, Swords, DollarSign
 } from 'lucide-react';
-import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback, Fragment } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
@@ -249,7 +249,7 @@ const SidebarSkeleton = ({ phase }) => (
     };
 
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100 mb-8">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100">
         
         {/* SECTION A: The Verdict (Listing Strength) */}
         <div className="md:w-1/3 p-6 md:p-8 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-row items-center justify-between xl:justify-center xl:gap-8">
@@ -325,6 +325,7 @@ const SidebarSkeleton = ({ phase }) => (
                    />
                 ))}
             </div>
+            
             <div className="flex items-baseline gap-1.5 mt-1">
                  <span className={`text-3xl font-black ${profitTier.text}`}>{profitScore}</span>
                  <span className="text-sm font-medium text-slate-400">/100</span>
@@ -335,9 +336,7 @@ const SidebarSkeleton = ({ phase }) => (
     );
   };
   
-  const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, onRelaunchSEO, isInsightLoading,  onCompetitionAnalysis,
-    isCompetitionLoading,
-    onAddKeyword,
+  const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, isInsightLoading,
     onAddCustomKeyword,
     isAddingKeyword,
     onSaveListingInfo,
@@ -358,8 +357,7 @@ const SidebarSkeleton = ({ phase }) => (
     const [sortConfig, setSortConfig] = useState({ key: 'score', direction: 'desc' });
     const [selectedTags, setSelectedTags] = useState([]);
   
-    // --- Table State Management ---
-    const [isTableExpanded, setIsTableExpanded] = useState(false);
+    const [showAll, setShowAll] = useState(false);
   
     // --- Inline Add Keyword State Management ---
     const [isAddingRow, setIsAddingRow] = useState(false);
@@ -411,6 +409,8 @@ const SidebarSkeleton = ({ phase }) => (
         }
     };
   
+
+  
     // Auto-resize description with robust handling
     useLayoutEffect(() => {
       if (descriptionRef.current) {
@@ -454,82 +454,79 @@ const SidebarSkeleton = ({ phase }) => (
       return results.analytics.filter(k => !k.is_competition);
     }, [results?.analytics]);
   
-    const competitionAnalytics = useMemo(() => {
-      if (!results?.analytics) return [];
-      return results.analytics.filter(k => k.is_competition);
-    }, [results?.analytics]);
-  
-    // Sorting Logic
+    // Sorting Logic — dual-level: selected keywords pinned to top, then column sort
     
     const sortedAnalytics = useMemo(() => {
       if (!primaryAnalytics.length) return [];
       
+      // Secondary sort comparator (user's chosen column)
+      const secondaryCompare = (a, b) => {
+        if (sortConfig.key === null) return 0;
+        let aValue, bValue;
+        
+        switch (sortConfig.key) {
+            case 'volume':
+                aValue = a.volume;
+                bValue = b.volume;
+                break;
+            case 'trend':
+                const aData = a.volume_history || [];
+                const aFirst = aData[0] || 1;
+                const aLast = aData[aData.length - 1] || 0;
+                aValue = ((aLast - aFirst) / aFirst) * 100;
+                
+                const bData = b.volume_history || [];
+                const bFirst = bData[0] || 1;
+                const bLast = bData[bData.length - 1] || 0;
+                bValue = ((bLast - bFirst) / bFirst) * 100;
+                break;
+            case 'competition':
+                const getCompScore = (val) => {
+                    const numVal = parseFloat(val);
+                    if (!isNaN(numVal)) return numVal;
+                    if (val === 'Low') return 0.2;
+                    if (val === 'Medium') return 0.5;
+                    if (val === 'High') return 0.8;
+                    return 0.5;
+                };
+                aValue = getCompScore(a.competition);
+                bValue = getCompScore(b.competition);
+                break;
+            case 'score':
+                aValue = a.score;
+                bValue = b.score;
+                break;
+            case 'cpc':
+                aValue = parseFloat(a.cpc) || 0;
+                bValue = parseFloat(b.cpc) || 0;
+                break;
+            default:
+                return 0;
+        }
+    
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      };
+
       let sortableItems = [...primaryAnalytics];
-
-      // Primary Sort: selected items always on top
       sortableItems.sort((a, b) => {
-          const aSelected = selectedTags.includes(a.keyword);
-          const bSelected = selectedTags.includes(b.keyword);
-
-          if (aSelected && !bSelected) return -1;
-          if (!aSelected && bSelected) return 1;
-
-          // Secondary Sort: user-defined column sort
-          if (sortConfig.key !== null) {
-              let aValue, bValue;
-              
-              switch (sortConfig.key) {
-                  case 'volume':
-                      aValue = a.volume;
-                      bValue = b.volume;
-                      break;
-                  case 'trend':
-                      const aData = a.volume_history || [];
-                      const aFirst = aData[0] || 1;
-                      const aLast = aData[aData.length - 1] || 0;
-                      aValue = ((aLast - aFirst) / aFirst) * 100;
-                      
-                      const bData = b.volume_history || [];
-                      const bFirst = bData[0] || 1;
-                      const bLast = bData[bData.length - 1] || 0;
-                      bValue = ((bLast - bFirst) / bFirst) * 100;
-                      break;
-                  case 'competition':
-                      const getCompScore = (val) => {
-                          const numVal = parseFloat(val);
-                          if (!isNaN(numVal)) return numVal;
-                          if (val === 'Low') return 0.2;
-                          if (val === 'Medium') return 0.5;
-                          if (val === 'High') return 0.8;
-                          return 0.5;
-                      };
-                      aValue = getCompScore(a.competition);
-                      bValue = getCompScore(b.competition);
-                      break;
-                  case 'score':
-                      aValue = a.score;
-                      bValue = b.score;
-                      break;
-                  case 'cpc':
-                      aValue = parseFloat(a.cpc) || 0;
-                      bValue = parseFloat(b.cpc) || 0;
-                      break;
-                  default:
-                      return 0;
-              }
-
-              if (aValue < bValue) {
-                  return sortConfig.direction === 'asc' ? -1 : 1;
-              }
-              if (aValue > bValue) {
-                  return sortConfig.direction === 'asc' ? 1 : -1;
-              }
-          }
-          return 0;
+        // PRIMARY: selected items pinned to top
+        const aSelected = selectedTags.includes(a.keyword) ? 1 : 0;
+        const bSelected = selectedTags.includes(b.keyword) ? 1 : 0;
+        if (aSelected !== bSelected) return bSelected - aSelected;
+        // SECONDARY: column sort within each group
+        return secondaryCompare(a, b);
       });
-      
+
       return sortableItems;
     }, [results?.analytics, sortConfig, selectedTags]);
+
+    // Visibility slicing for Show More / Show All
+    const selectedCount = sortedAnalytics.filter(k => selectedTags.includes(k.keyword)).length;
+    const collapsedLimit = Math.max(13, selectedCount);
+    const visibleAnalytics = showAll ? sortedAnalytics : sortedAnalytics.slice(0, collapsedLimit);
+    const hasMore = sortedAnalytics.length > collapsedLimit;
   
     // --- ALL HOOKS ARE ABOVE THIS LINE --- Early returns below are safe ---
   
@@ -583,7 +580,7 @@ const SidebarSkeleton = ({ phase }) => (
               {/* Hero Audit Header with integrated SEO Sniper */}
               {isInsightLoading ? (
                   <AuditSkeleton />
-              ) : results ? (
+              ) : (results && (
                   <AuditHeader 
                       score={results.listing_strength ?? results.global_strength}
                       statusLabel={results.status_label}
@@ -599,7 +596,7 @@ const SidebarSkeleton = ({ phase }) => (
                       improvementPlanAdd={results.improvement_plan_add}
                       primaryAction={results.improvement_plan_primary_action}
                   />
-              ) : null}
+              ))}
 
             {/* 1. Full Width Performance Table */}
             {isInsightLoading ? (
@@ -607,60 +604,59 @@ const SidebarSkeleton = ({ phase }) => (
                     message={isInsightLoading === 'insight' ? "Insight generation" : "Generating SEO data"}
                     subMessage={isInsightLoading === 'insight' ? "Analyzing keywords and calculating your listing score." : "Analyzing search volume, competition, and trends."}
                 />
-             ) : (
+            ) : (
                 <div className={!results ? "opacity-50 grayscale pointer-events-none" : ""}>
-                    <Accordion 
-                        className="border-none" 
-                        defaultOpen={true}
-                        title={
-                            <div className="flex items-center gap-2 text-left">
-                                <TrendingUp size={16} className={`text-indigo-600 ${!results ? 'text-slate-400' : ''}`} />
-                                <span className="text-sm font-bold text-slate-900">Keyword Performance</span>
-                                {results && (
-                                    <div onClick={(e) => e.stopPropagation()}>
-                                        <CopyButton 
-                                            text={selectedTags.join(', ')} 
-                                            label="Copy selected keywords to clipboard." 
-                                            className="mx-2 text-slate-400 hover:text-indigo-600" 
-                                            tooltipSide="right" 
-                                        />
-                                    </div>
-                                )}
-                                {results && (
-                                    <span className="text-xs font-normal text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full ml-1">
-                                        {selectedTags.length} / {results.analytics?.length || 0} selected
-                                    </span>
-                                )}
-                            </div>
-                        }
-                        headerActions={
-                            results ? (
-                                <div className="flex items-center gap-2 pr-4">
-                                     <button 
-                                        onClick={(e) => { 
-                                            e.stopPropagation();
-                                            const selectedKeywordsData = primaryAnalytics.filter(k => selectedTags.includes(k.keyword));
-                                            onRecalculateScores?.(selectedKeywordsData); 
-                                        }}
-                                        disabled={isRecalculating}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 rounded-lg transition-colors border border-indigo-100 shadow-sm"
-                                        title="Recalculate Global Scores"
-                                     >
-                                        {isRecalculating ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
-                                        Recalculate Scores
-                                     </button>
+                <Accordion
+                    defaultOpen={!!results} // Collapsed if no results
+                title={
+                    <div className="flex items-center gap-2">
+                        <TrendingUp size={16} className={`text-indigo-600 ${!results ? 'text-slate-400' : ''}`} />
+                        <span className="text-sm font-bold text-slate-900">Keyword Performance</span>
+                         {results && (
+                            <CopyButton 
+                                text={selectedTags.join(', ')} 
+                                label="Copy selected keywords to clipboard." 
+                                className="mx-2 text-slate-400 hover:text-indigo-600" 
+                                tooltipSide="right" 
+                            />
+                         )}
+                         {results && (
+                            <span className="text-xs font-normal text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full ml-1">
+                                {selectedTags.length} / {results.analytics?.length || 0} selected
+                            </span>
+                         )}
+                    </div>
+                }
+                headerActions={
+                    results && (
+                    <div className="flex items-center gap-2">
+                         
 
-                                     <div className="flex items-center gap-3 text-xs text-slate-500 ml-2 hidden sm:flex border-l border-slate-200 pl-3">
-                                         <span className="flex items-center gap-1" title="Trending"><Flame size={12} className="text-orange-500"/></span>
-                                         <span className="flex items-center gap-1" title="Evergreen"><Leaf size={12} className="text-emerald-500"/></span>
-                                         <span className="flex items-center gap-1" title="Opportunity"><Star size={12} className="text-amber-400"/></span>
-                                     </div>
-                                </div>
-                            ) : null
-                        }
-                    >
-                        <div className="border-t border-slate-100 pb-4">
-                            <table className="w-full text-sm text-left">
+                         <button 
+                            onClick={(e) => { 
+                                e.stopPropagation();
+                                const selectedKeywordsData = primaryAnalytics.filter(k => selectedTags.includes(k.keyword));
+                                onRecalculateScores?.(selectedKeywordsData); 
+                            }}
+                            disabled={isRecalculating}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 rounded-lg transition-colors border border-indigo-100 shadow-sm"
+                            title="Recalculate Global Scores"
+                         >
+                            {isRecalculating ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                            Recalculate Scores
+                         </button>
+
+                         <div className="flex items-center gap-3 text-xs text-slate-500 ml-2 hidden sm:flex border-l border-slate-200 pl-3">
+                             <span className="flex items-center gap-1" title="Trending"><Flame size={12} className="text-orange-500"/></span>
+                             <span className="flex items-center gap-1" title="Evergreen"><Leaf size={12} className="text-emerald-500"/></span>
+                             <span className="flex items-center gap-1" title="Opportunity"><Star size={12} className="text-amber-400"/></span>
+                         </div>
+                    </div>
+                    )
+                }
+            >
+                <div className="border-t border-slate-100">
+                    <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                             <tr>
                                 <th className="px-4 py-2 w-10 text-center">
@@ -685,7 +681,7 @@ const SidebarSkeleton = ({ phase }) => (
                                 >
                                     Score <SortIcon columnKey="score" />
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold w-[10%]">
+                                <th className="px-2 py-2 text-center font-semibold w-[9%]">
                                     Conv. Intent.
                                 </th>
                                 <th className="px-2 py-2 text-center font-semibold w-[9%]">
@@ -719,197 +715,207 @@ const SidebarSkeleton = ({ phase }) => (
                                 <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[5%]"></th>
                             </tr>
                         </thead>
-                        <motion.tbody layout className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-slate-100">
                             {!results ? (
-                                <AnimatePresence initial={false}>
-                                    <motion.tr layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                                        <td colSpan="8" className="px-4 py-8 text-center text-slate-400 italic">
-                                            No analysis results yet. Start a new listing analysis.
-                                        </td>
-                                    </motion.tr>
-                                </AnimatePresence>
+                                <tr>
+                                    <td colSpan="11" className="px-4 py-8 text-center text-slate-400 italic">
+                                        No analysis results yet. Start a new listing analysis.
+                                    </td>
+                                </tr>
                             ) : (
-                                <AnimatePresence initial={false}>
-                                    {(isTableExpanded ? sortedAnalytics : sortedAnalytics.slice(0, Math.max(13, selectedTags.length))).map((row, i, arr) => {
-                                        const isSelected = selectedTags.includes(row.keyword);
-                                        // Detect if this is the first unselected row (the divider injection point)
-                                        const isFirstUnselected = !isSelected && (i === 0 || selectedTags.includes(arr[i - 1].keyword));
-                
-                                        return (
-                                            <Fragment key={`fragment-${row.keyword}`}>
-                                                {isFirstUnselected && (
-                                                    <motion.tr layout key="suggestions-divider" className="bg-slate-50/50 border-y border-slate-200 pointer-events-none mt-1">
-                                                        <td colSpan="8" className="px-4 py-2">
-                                                            <div className="flex items-center gap-2">
-                                                                <Lightbulb size={12} className="text-slate-400" />
-                                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Suggestions & Discovery</span>
-                                                            </div>
-                                                        </td>
-                                                    </motion.tr>
-                                                )}
-                                                <motion.tr 
-                                                    layout
-                                                    initial={{ opacity: 0, y: -10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0 }}
-                                                    transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-                                                    key={row.keyword} 
-                                                    className={`hover:bg-slate-50 transition-colors group ${isSelected ? 'bg-indigo-50/40 relative z-10' : 'opacity-80'}`}
-                                                >
-                                                    <td className="px-4 py-3 text-center">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={isSelected}
-                                                            onChange={() => toggleTag(row.keyword)}
-                                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 transition-transform hover:scale-110 cursor-pointer"
-                                                        />
-                                                    </td>
-                                                    <td className="px-3 py-3 font-medium relative">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${isSelected ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-100'}`}>
-                                                                {row.keyword}
-                                                            </span>
-                                                            {row.insight && (
-                                                                <div className="relative group/insight">
-                                                                    <Lightbulb
-                                                                        size={14}
-                                                                        className={`cursor-help shrink-0 ${
-                                                                            row.is_top === true ? "text-green-500" :
-                                                                            row.is_top === false ? "text-amber-500" :
-                                                                            "text-gray-400"
-                                                                        }`}
-                                                                    />
-                                                                    {/* Tooltip */}
-                                                                    <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-2 text-xs text-white bg-slate-800 rounded-lg shadow-xl opacity-0 invisible group-hover/insight:opacity-100 group-hover/insight:visible transition-all z-50 w-64 pointer-events-none leading-relaxed">
-                                                                        {row.insight}
-                                                                        <div className="absolute right-full top-1/2 -translate-y-1/2 border-[6px] border-r-slate-800 border-t-transparent border-b-transparent border-l-transparent"></div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                            {row.is_sniper_seo && (
-                                                                <Target size={14} className="text-indigo-500 shrink-0 cursor-help" title="Competitor Keyword" />
-                                                            )}
-                                                            {row.is_user_added && (
-                                                                <User size={14} className="text-slate-400 shrink-0 cursor-help" title="Manually Added Keyword" />
-                                                            )}
-                                                            {row.is_selection_ia && (
-                                                                <Sparkles size={14} className="text-indigo-400 shrink-0 cursor-help" title="AI Selected" />
-                                                            )}
-                                                            {!row.is_sniper_seo && !row.is_user_added && !row.is_selection_ia && (
-                                                                <Tag size={12} className="text-slate-300 shrink-0 hidden group-hover:block" />
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        {/* Relevance / Niche Score Column */}
-                                                        {(() => {
-                                                            const score = Number(row.niche_score);
-                                                            if (!isNaN(score)) {
-                                                                let colorClass = 'text-slate-300'; // Default: Light Grey (1-4)
-                                                                let Icon = null;
-                                                                let iconColorClass = '';
-                                                                
-                                                                if (score >= 8) {
-                                                                    colorClass = 'text-emerald-700 font-bold'; // Green (8-10)
-                                                                    Icon = Target;
-                                                                    iconColorClass = 'text-emerald-500';
-                                                                } else if (score >= 5) {
-                                                                    colorClass = 'text-slate-600 font-medium'; // Dark Grey (5-7)
-                                                                }
-                
-                                                                return (
-                                                                    <div className={`flex items-center justify-center gap-1.5 ${colorClass}`}>
-                                                                        {Icon && <Icon size={14} className={iconColorClass} />}
-                                                                        {score}
-                                                                    </div>
-                                                                );
-                                                            }
-                                                            return <span className="text-slate-300">-</span>;
-                                                        })()}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <div className={`font-bold ${isSelected ? 'text-indigo-900' : 'text-slate-600'}`}>{row.score}</div>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center text-slate-600 font-mono text-xs">
-                                                        {(row.volume || 0).toLocaleString()}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <div className="flex justify-center">
-                                                            <Sparkline data={row.volume_history} />
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        {(() => {
-                                                            const numVal = parseFloat(row.competition);
-                                                            const displayVal = !isNaN(numVal) ? numVal.toFixed(2) : row.competition;
-                                                            const colorClass = (!isNaN(numVal) ? numVal : 0.5) < 0.3 
-                                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                                                                : (!isNaN(numVal) ? numVal : 0.5) < 0.7 
-                                                                    ? 'bg-amber-50 text-amber-700 border-amber-100' 
-                                                                    : 'bg-rose-50 text-rose-700 border-rose-100';
-                                                            return (
-                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide border ${colorClass} ${!isSelected ? 'opacity-80' : ''}`}>
-                                                                    {displayVal}
-                                                                </span>
-                                                            );
-                                                        })()}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        {(() => {
-                                                            const numVal = parseFloat(row.cpc);
-                                                            if (isNaN(numVal) || numVal === 0 || row.cpc === null || row.cpc === undefined) {
-                                                                return <span className="text-slate-400 opacity-50 font-medium text-xs">N/A</span>;
-                                                            }
-                                                            
-                                                            let colorClass = 'bg-slate-50 text-slate-500 border-slate-100';
-                                                            if (numVal >= 1.5) {
-                                                                colorClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
-                                                            } else if (numVal >= 0.6) {
-                                                                colorClass = 'bg-amber-50 text-amber-700 border-amber-100';
-                                                            }
-                                                            
-                                                            return (
-                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide border ${colorClass} ${!isSelected ? 'opacity-80' : ''}`}>
-                                                                    ${numVal.toFixed(2)}
-                                                                </span>
-                                                            );
-                                                        })()}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            {row.is_trending && <Flame size={16} className={`text-orange-500 fill-orange-500/20 ${!isSelected ? 'opacity-70' : ''}`} />}
-                                                            {row.is_evergreen && <Leaf size={16} className={`text-emerald-500 fill-emerald-500/20 ${!isSelected ? 'opacity-70' : ''}`} />}
-                                                            {row.is_promising && <Star size={16} className={`text-amber-400 fill-amber-400/20 ${!isSelected ? 'opacity-70' : ''}`} />}
-                                                            {(!row.is_trending && !row.is_evergreen && !row.is_promising) && <span className="text-slate-300">-</span>}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-2 py-3 text-center">
-                                                         {/* Show X only if not a competitor keyword */}
-                                                         {!row.is_competition && (
-                                                             <button 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    // We use onAddKeyword here for REMOVAL if available
-                                                                    // It requires tracking this keyword as well - ideally we should pass a remove func
-                                                                    // For now, setting it to disabled until a remove handler is implemented
-                                                                }}
-                                                                disabled
-                                                                className="w-6 h-6 rounded-full flex items-center justify-center transition-colors border mx-auto bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed opacity-50 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200"
-                                                                title="Delete keyword (Coming soon)"
-                                                             >
-                                                                 <Minus size={14} />
-                                                             </button>
-                                                         )}
-                                                    </td>
-                                                </motion.tr>
-                                            </Fragment>
-                                        );
-                                    })}
-                                </AnimatePresence>
+                              <AnimatePresence initial={false}>
+                                {visibleAnalytics.map((row, i) => {
+                                    const isSelected = selectedTags.includes(row.keyword);
+                                    // Detect if this is the first unselected row to inject divider
+                                    const prevRow = i > 0 ? visibleAnalytics[i - 1] : null;
+                                    const showDivider = !isSelected && (i === 0 || (prevRow && selectedTags.includes(prevRow.keyword)));
+
+                                    return (
+                                      <React.Fragment key={row.keyword}>
+                                        {showDivider && (
+                                          <tr className="border-t-2 border-slate-200">
+                                            <td colSpan="11" className="px-4 py-1.5 bg-slate-50">
+                                              <div className="flex items-center gap-2">
+                                                <div className="h-px flex-1 bg-slate-200" />
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Suggestions & Discovery</span>
+                                                <div className="h-px flex-1 bg-slate-200" />
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        )}
+                                        <motion.tr
+                                            layout
+                                            layoutId={`kw-${row.keyword}`}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ layout: { duration: 0.3, ease: 'easeInOut' }, opacity: { duration: 0.2 } }}
+                                            className={`transition-colors group ${
+                                                isSelected
+                                                    ? 'bg-indigo-50/40 hover:bg-indigo-50/60'
+                                                    : 'opacity-60 hover:opacity-80 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                    <td className="px-4 py-3 text-center">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={isSelected}
+                                            onChange={() => toggleTag(row.keyword)}
+                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                    </td>
+                                    <td className="px-3 py-3 font-medium relative">
+                                        <div className="flex items-center gap-2">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                                {row.keyword}
+                                            </span>
+                                            {row.insight && (
+                                                <div className="relative group/insight">
+                                                    <Lightbulb
+                                                        size={14}
+                                                        className={`cursor-help shrink-0 ${
+                                                            row.is_top === true ? "text-green-500" :
+                                                            row.is_top === false ? "text-amber-500" :
+                                                            "text-gray-400"
+                                                        }`}
+                                                    />
+                                                    {/* Tooltip */}
+                                                    <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-2 text-xs text-white bg-slate-800 rounded-lg shadow-xl opacity-0 invisible group-hover/insight:opacity-100 group-hover/insight:visible transition-all z-50 w-64 pointer-events-none leading-relaxed">
+                                                        {row.insight}
+                                                        <div className="absolute right-full top-1/2 -translate-y-1/2 border-[6px] border-r-slate-800 border-t-transparent border-b-transparent border-l-transparent"></div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {row.is_sniper_seo && (
+                                                <Target size={14} className="text-indigo-500 shrink-0 cursor-help" title="Competitor Keyword" />
+                                            )}
+                                            {row.is_user_added && (
+                                                <User size={14} className="text-indigo-500 shrink-0 cursor-help" title="Custom Keyword" />
+                                            )}
+                                            {row.is_selection_ia && (
+                                                <Sparkles size={14} className="text-amber-500 shrink-0 cursor-help" title="AI Selected Keyword" />
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="font-bold text-slate-700">{row.score}</div>
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        {(() => {
+                                            const score = row.transactional_score;
+                                            if (!score) return <span className="text-slate-300">-</span>;
+                                            
+                                            let colorClass = "text-slate-400";
+                                            let showIcon = false;
+                                            
+                                            if (score >= 8) {
+                                                colorClass = "text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded";
+                                                showIcon = true;
+                                            } else if (score >= 5) {
+                                                colorClass = "text-slate-600 font-medium";
+                                            }
+                                            
+                                            return (
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    {showIcon && <ShoppingCart size={14} className="text-emerald-500" />}
+                                                    <span className={colorClass}>{score}/10</span>
+                                                </div>
+                                            );
+                                        })()}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        {(() => {
+                                            const score = row.niche_score;
+                                            if (!score) return <span className="text-slate-300">-</span>;
+                                            
+                                            let colorClass = "text-slate-400";
+                                            let showIcon = false;
+                                            
+                                            if (score >= 8) {
+                                                colorClass = "text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded";
+                                                showIcon = true;
+                                            } else if (score >= 5) {
+                                                colorClass = "text-slate-600 font-medium";
+                                            }
+                                            
+                                            return (
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    {showIcon && <Target size={14} className="text-emerald-500" />}
+                                                    <span className={colorClass}>{score}/10</span>
+                                                </div>
+                                            );
+                                        })()}
+                                    </td>
+                                    <td className="px-4 py-3 text-center text-slate-600 font-mono text-xs">
+                                        {(row.volume || 0).toLocaleString()}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex justify-center">
+                                            <Sparkline data={row.volume_history} />
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        {(() => {
+                                            const numVal = parseFloat(row.competition);
+                                            if (isNaN(numVal) || row.competition === null || row.competition === undefined) {
+                                                return <span className="text-slate-400 opacity-50 font-medium text-xs">N/A</span>;
+                                            }
+                                            const displayVal = numVal.toFixed(2);
+                                            const colorClass = numVal < 0.3 
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                                : numVal < 0.7 
+                                                    ? 'bg-amber-50 text-amber-700 border-amber-100' 
+                                                    : 'bg-rose-50 text-rose-700 border-rose-100';
+                                            return (
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide border ${colorClass}`}>
+                                                    {displayVal}
+                                                </span>
+                                            );
+                                        })()}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        {(() => {
+                                            const numVal = parseFloat(row.cpc);
+                                            if (isNaN(numVal) || numVal === 0 || row.cpc === null || row.cpc === undefined) {
+                                                return <span className="text-slate-400 opacity-50 font-medium text-xs">N/A</span>;
+                                            }
+                                            
+                                            let colorClass = 'bg-slate-50 text-slate-500 border-slate-100';
+                                            if (numVal >= 1.5) {
+                                                colorClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                                            } else if (numVal >= 0.6) {
+                                                colorClass = 'bg-amber-50 text-amber-700 border-amber-100';
+                                            }
+                                            
+                                            return (
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide border ${colorClass}`}>
+                                                    ${numVal.toFixed(2)}
+                                                </span>
+                                            );
+                                        })()}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                            {row.is_trending && <Flame size={16} className="text-orange-500 fill-orange-500/20" />}
+                                            {row.is_evergreen && <Leaf size={16} className="text-emerald-500 fill-emerald-500/20" />}
+                                            {row.is_promising && <Star size={16} className="text-amber-400 fill-amber-400/20" />}
+                                            {(!row.is_trending && !row.is_evergreen && !row.is_promising) && <span className="text-slate-300">-</span>}
+                                        </div>
+                                    </td>
+                                    <td className="px-2 py-3 text-center">
+                                        <button disabled className="w-6 h-6 rounded-full flex items-center justify-center transition-colors border mx-auto bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed opacity-50">
+                                            <Minus size={14} />
+                                        </button>
+                                    </td>
+                                        </motion.tr>
+                                      </React.Fragment>
+                                    );
+                                })}
+                              </AnimatePresence>
                             )}
                             {/* --- INLINE ADD ROW --- */}
                             {isAddingRow && (
-                                <motion.tr layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="bg-indigo-50/30 border-t-2 border-indigo-100">
+                                <tr className="bg-indigo-50/30 border-t-2 border-indigo-100">
                                     <td className="px-4 py-3 text-center">
                                         <input 
                                             type="checkbox" 
@@ -937,46 +943,44 @@ const SidebarSkeleton = ({ phase }) => (
                                             <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap hidden sm:inline-block">Return ↵</span>
                                         )}
                                     </td>
-                                </motion.tr>
+                                </tr>
                             )}
-                                </motion.tbody>
-                            </table>
-                        </div>
-                    {/* --- EXPAND / COLLAPSE BUTTON --- */}
-                    {results && sortedAnalytics.length > Math.max(13, selectedTags.length) && (
-                        <div className="bg-slate-50/50 border-t border-slate-100 p-2 flex justify-center">
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* --- FOOTER: Show More/Less + Add Custom Keyword --- */}
+                {results && (
+                    <div className="bg-slate-50/50 border-t border-slate-100 p-3 flex items-center justify-center gap-4 rounded-b-xl">
+                        {hasMore && (
                             <button
-                                onClick={() => setIsTableExpanded(!isTableExpanded)}
-                                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-indigo-50"
+                                onClick={() => setShowAll(prev => !prev)}
+                                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-slate-500 hover:text-indigo-600 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-200 rounded-lg shadow-sm transition-all"
                             >
-                                {isTableExpanded ? (
-                                    <><ArrowDownRight size={14} className="rotate-180" /> Show Less</>
+                                {showAll ? (
+                                    <><ArrowUp size={14} /> Show Less</>
                                 ) : (
-                                    <><ArrowDownRight size={14} /> Show All Results ({sortedAnalytics.length})</>
+                                    <><ArrowDown size={14} /> Show All ({sortedAnalytics.length})</>
                                 )}
                             </button>
-                        </div>
-                    )}
-
-                    {/* --- ADD CUSTOM KEYWORD BUTTON --- */}
-                    {results && (
-                        <div className="bg-slate-50/50 border-t border-slate-100 p-3 flex justify-center rounded-b-xl">
-                            <button
-                                onClick={() => {
-                                    setIsAddingRow(true);
-                                    setNewKeywordInput('');
-                                }}
-                                disabled={isAddingRow || isAddingKeyword}
-                                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-200 hover:text-indigo-600 rounded-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Plus size={14} className={isAddingRow ? 'text-slate-400' : 'text-indigo-500'} />
-                                Add Custom Keyword
-                            </button>
-                        </div>
-                    )}
-                    </Accordion>
-                </div> 
+                        )}
+                        <button
+                            onClick={() => {
+                                setIsAddingRow(true);
+                                setNewKeywordInput('');
+                            }}
+                            disabled={isAddingRow || isAddingKeyword}
+                            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-200 hover:text-indigo-600 rounded-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Plus size={14} className={isAddingRow ? 'text-slate-400' : 'text-indigo-500'} />
+                            Add Custom Keyword
+                        </button>
+                    </div>
+                )}
+            </Accordion>
+            </div>
             )}
+
 
         {/* Injected Content (e.g. Recent History) */}
         {children}
@@ -1056,20 +1060,20 @@ const SidebarSkeleton = ({ phase }) => (
 
                                 {/* Save Info & Export Buttons */}
                                 <div className="flex flex-col gap-2 pt-2">
-                                    {results ? (
-                                        <button
-                                            onClick={() => onSaveListingInfo(displayedTitle, displayedDescription)}
-                                            className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-lg border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center justify-center gap-2 shadow-sm"
-                                        >
-                                            <Save size={16} />
-                                            <span className="font-bold">Save Info</span>
-                                        </button>
-                                    ) : (
-                                        <button disabled className="w-full py-2.5 bg-slate-100 text-slate-400 text-sm font-medium rounded-lg border border-slate-200 cursor-not-allowed flex items-center justify-center gap-2">
-                                            <Save size={16} />
-                                            <span className="font-bold">Save Info</span>
-                                        </button>
-                                    )}
+                                {results ? (
+                                <button
+                                    onClick={() => onSaveListingInfo(displayedTitle, displayedDescription)}
+                                    className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-lg border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <Save size={16} />
+                                    <span className="font-bold">Save Info</span>
+                                </button>
+                                ) : (
+                                    <button disabled className="w-full py-2.5 bg-slate-100 text-slate-400 text-sm font-medium rounded-lg border border-slate-200 cursor-not-allowed flex items-center justify-center gap-2">
+                                        <Save size={16} />
+                                        <span className="font-bold">Save Info</span>
+                                    </button>
+                                )}
 
                                 {results && (
                                     <PDFDownloadLink
@@ -1131,7 +1135,7 @@ const SidebarSkeleton = ({ phase }) => (
              </div>
         </div>
       </div>
-      </div>
+    </div>
   );
 };
 
