@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
 import Accordion from '../ui/Accordion';
+import StrategyTuner from './StrategyTuner';
 
 const Sparkline = ({ data }) => {
   if (!data || data.length === 0) return <div className="text-slate-300 text-xs">-</div>;
@@ -344,6 +345,11 @@ const SidebarSkeleton = ({ phase }) => (
     isRecalculating,
     onResetPool,
     isResettingPool,
+    onApplyStrategy,
+    isApplyingStrategy,
+    listingId,
+    strategySelections,
+    onStrategySelectionsChange,
     resetSelectionKey,
     children,
     // Strategy Switcher Props
@@ -599,6 +605,17 @@ const SidebarSkeleton = ({ phase }) => (
                       primaryAction={results.improvement_plan_primary_action}
                   />
               ))}
+
+              {/* Strategy Tuner Accordion — between AuditHeader and Keyword Table */}
+              {results && (
+                  <StrategyTuner
+                      listingId={listingId}
+                      onApplyStrategy={onApplyStrategy}
+                      isApplyingStrategy={isApplyingStrategy}
+                      selections={strategySelections}
+                      onSelectionsChange={onStrategySelectionsChange}
+                  />
+              )}
 
             {/* 1. Full Width Performance Table */}
             {isInsightLoading ? (

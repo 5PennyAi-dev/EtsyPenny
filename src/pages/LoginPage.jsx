@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Loader2, Mail, Lock, AlertCircle, ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
+import pennyseoLogo from '../assets/pennyseo-logo.png';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -75,10 +76,7 @@ const LoginPage = () => {
 
         <div className="relative z-10">
             <div className="flex items-center gap-2 mb-12">
-                <div className="w-8 h-8 bg-white/10 backdrop-blur-md rounded-lg flex items-center justify-center border border-white/20">
-                    <span className="text-lg">🟣</span>
-                </div>
-                <span className="font-bold text-xl tracking-tight">EtsyPenny</span>
+                <img src={pennyseoLogo} alt="PennySEO" className="h-10 w-auto brightness-0 invert" />
             </div>
 
             <h1 className="text-5xl font-extrabold leading-tight mb-6">

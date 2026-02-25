@@ -1,6 +1,7 @@
 import { LayoutDashboard, LayoutGrid, LineChart, ShoppingBag, Settings, User, LogOut } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import pennyseoLogo from '../assets/pennyseo-logo.png';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -26,9 +27,7 @@ const Sidebar = () => {
     <div className="h-screen w-64 bg-white border-r border-slate-200 flex flex-col fixed left-0 top-0">
       {/* Logo */}
       <div className="p-6 border-b border-slate-100">
-        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          5PennyAi <span className="text-indigo-600">🟣</span>
-        </h1>
+        <img src={pennyseoLogo} alt="PennySEO" className="w-full h-auto" />
       </div>
 
       {/* Navigation */}

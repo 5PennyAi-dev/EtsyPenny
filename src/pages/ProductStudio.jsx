@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { DEFAULT_STRATEGY_SELECTIONS, getStrategyValues } from '../components/studio/StrategyTuner';
 import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Wand2, History, RotateCcw, AlertTriangle, ArrowRight, Loader2, Sparkles, Shirt, ChevronUp, ChevronRight, Palette, Type, LayoutTemplate, Heart, Target, Save, Zap } from 'lucide-react';
@@ -68,6 +69,8 @@ const ProductStudio = () => {
   const [isSniperLoading, setIsSniperLoading] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isResettingPool, setIsResettingPool] = useState(false);
+  const [isApplyingStrategy, setIsApplyingStrategy] = useState(false);
+  const [strategySelections, setStrategySelections] = useState(DEFAULT_STRATEGY_SELECTIONS);
   
   // Strategy Switcher State
   const [activeMode, setActiveMode] = useState('balanced');
@@ -533,6 +536,7 @@ const ProductStudio = () => {
             action: "generate_seo",
             listing_id: activeListingId,
             user_id: user.id,
+            parameters: getStrategyValues(strategySelections),
             payload: {
                 image_url: publicUrl,
                 // Visual analysis fields
@@ -942,6 +946,30 @@ const ProductStudio = () => {
       toast.error('Failed to reset keyword pool.');
     } finally {
       setIsResettingPool(false);
+    }
+  };
+
+  // Apply Strategy Tuner Handler
+  const handleApplyStrategy = async (parameters) => {
+    if (!listingId) {
+      toast.error('No listing loaded.');
+      return;
+    }
+    setIsApplyingStrategy(true);
+    try {
+      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
+      await axios.post(webhookUrl, {
+        action: 'resetPool',
+        listing_id: listingId,
+        parameters
+      });
+      toast.success('Strategy update triggered! Your results will refresh in a few seconds.');
+      await handleLoadListing(listingId);
+    } catch (err) {
+      console.error('handleApplyStrategy error:', err);
+      toast.error('Failed to apply new strategy.');
+    } finally {
+      setIsApplyingStrategy(false);
     }
   };
 
@@ -2045,6 +2073,11 @@ const ProductStudio = () => {
       isRecalculating={isRecalculating}
       onResetPool={handleResetPool}
       isResettingPool={isResettingPool}
+      onApplyStrategy={handleApplyStrategy}
+      isApplyingStrategy={isApplyingStrategy}
+      listingId={listingId}
+      strategySelections={strategySelections}
+      onStrategySelectionsChange={setStrategySelections}
       resetSelectionKey={resetSelectionKey}
       
       // Strategy Switcher Props
@@ -2054,7 +2087,7 @@ const ProductStudio = () => {
     >
         <RecentOptimizations onViewResults={handleLoadListing} />
     </ResultsDisplay>
-  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, isResettingPool, resetSelectionKey, activeMode, globalEvals]);
+  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, isResettingPool, isApplyingStrategy, strategySelections, resetSelectionKey, activeMode, globalEvals]);
 
   return (
     <Layout>

@@ -203,6 +203,20 @@
 - **Recalculate Scores DB Fix** (2026-02-24):
     - Fixed `handleRecalculateScores`: renamed `listing_avg_comp` → `listing_avg_competition` to match the actual DB column. Added `updated_at` timestamp, flat-key fallbacks for n8n response, and stripped `undefined` values from the update payload.
 
+- **Advanced SEO Strategy Tuner** (2026-02-24):
+    - New `StrategyTuner.jsx` component in `src/components/studio/`. Renders as a collapsible accordion between AuditHeader and Keyword Performance table in `ResultsDisplay.jsx`.
+    - 5 segmented range sliders (Market Reach, Ranking Ease, Buyer Intent, Niche Specificity, Market Value), each with 4 discrete levels (Low / Regular / High / Aggressive) mapped to numeric coefficients.
+    - Parameter keys in payload use readable names: `Volume`, `Competition`, `Transaction`, `Niche`, `CPC`.
+    - State lifted to `ProductStudio.jsx` — `StrategyTuner` is a controlled component via `selections`/`onSelectionsChange` props.
+    - "Apply New Strategy" button sends `{ action: 'resetPool', listing_id, parameters }` to n8n webhook.
+    - `generate_seo` payload also includes `parameters` at the top level so n8n receives strategy weights on initial analysis too.
+    - Exported helpers: `PARAMETERS`, `DEFAULT_STRATEGY_SELECTIONS`, `getStrategyValues()`.
+
+- **PennySEO Rebrand** (2026-02-24):
+    - Renamed app from "5PennyAi" / "EtsyPenny" to **PennySEO** across all surfaces.
+    - Logo image at `src/assets/pennyseo-logo.png`, rendered in `Sidebar.jsx` (full width) and `LoginPage.jsx` (inverted for dark background).
+    - Updated `index.html` page title and `ListingPDFDocument.jsx` PDF footer.
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.
