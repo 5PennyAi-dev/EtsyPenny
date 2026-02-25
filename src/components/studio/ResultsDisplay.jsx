@@ -342,6 +342,8 @@ const SidebarSkeleton = ({ phase }) => (
     onSaveListingInfo,
     onRecalculateScores,
     isRecalculating,
+    onResetPool,
+    isResettingPool,
     resetSelectionKey,
     children,
     // Strategy Switcher Props
@@ -644,6 +646,16 @@ const SidebarSkeleton = ({ phase }) => (
                          >
                             {isRecalculating ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
                             Recalculate Scores
+                         </button>
+
+                         <button 
+                            onClick={(e) => { e.stopPropagation(); onResetPool?.(); }}
+                            disabled={isResettingPool}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 rounded-lg transition-colors border border-amber-100 shadow-sm"
+                            title="Reset keyword pool from database"
+                         >
+                            {isResettingPool ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                            Reset Keywords
                          </button>
 
                          <div className="flex items-center gap-3 text-xs text-slate-500 ml-2 hidden sm:flex border-l border-slate-200 pl-3">

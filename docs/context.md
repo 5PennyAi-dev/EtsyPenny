@@ -194,6 +194,15 @@
 - **Keyword Pool Filtering (`is_current_pool`)** (2026-02-24):
     - Added `.eq('is_current_pool', true)` filter to keyword loading queries in `ProductStudio.jsx` (`handleLoadListing`) and `HistoryPage.jsx` (`handleExportPDF`). Only keywords flagged as current pool are now loaded into the Keyword Performance table and exported to PDF.
 
+- **Reset Keywords Button** (2026-02-24):
+    - Added "Reset Keywords" button (amber theme) next to "Recalculate Scores" in `ResultsDisplay.jsx`. Calls n8n webhook with `{ action: 'resetPool', listing_id }`, then reloads the listing.
+
+- **Custom Keyword `is_current_pool` Fix** (2026-02-24):
+    - `handleAddCustomKeyword` now saves `is_current_pool` from the n8n response (defaults to `true`), ensuring custom keywords persist after reload.
+
+- **Recalculate Scores DB Fix** (2026-02-24):
+    - Fixed `handleRecalculateScores`: renamed `listing_avg_comp` → `listing_avg_competition` to match the actual DB column. Added `updated_at` timestamp, flat-key fallbacks for n8n response, and stripped `undefined` values from the update payload.
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.

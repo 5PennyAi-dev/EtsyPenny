@@ -67,6 +67,7 @@ const ProductStudio = () => {
   const [isCompetitionLoading, setIsCompetitionLoading] = useState(false);
   const [isSniperLoading, setIsSniperLoading] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isResettingPool, setIsResettingPool] = useState(false);
   
   // Strategy Switcher State
   const [activeMode, setActiveMode] = useState('balanced');
@@ -804,44 +805,55 @@ const ProductStudio = () => {
           }
           
           const newScores = unwrapped.scores;
+          console.log("[Recalculate] Raw scores from n8n:", JSON.stringify(newScores, null, 2));
           
-          const updatePayload = {
+          // Build payload — strip undefined values so Supabase doesn't silently skip them
+          const rawPayload = {
                listing_strength: newScores.listing_strength,
                global_strength: newScores.listing_strength,
-               listing_visibility: newScores.breakdown?.visibility,
-               listing_conversion: newScores.breakdown?.conversion,
-               listing_relevance: newScores.breakdown?.relevance,
-               listing_competition: newScores.breakdown?.competition,
-               listing_profit: newScores.breakdown?.profitability || newScores.breakdown?.profit,
-               listing_raw_visibility_index: newScores.stats?.raw_visibility_index,
-               listing_avg_cpc: newScores.stats?.avg_cpc,
-               listing_avg_comp: newScores.stats?.best_opportunity_comp
+               listing_visibility: newScores.breakdown?.visibility ?? newScores.visibility,
+               listing_conversion: newScores.breakdown?.conversion ?? newScores.conversion,
+               listing_relevance: newScores.breakdown?.relevance ?? newScores.relevance,
+               listing_competition: newScores.breakdown?.competition ?? newScores.competition,
+               listing_profit: newScores.breakdown?.profitability ?? newScores.breakdown?.profit ?? newScores.profitability ?? newScores.profit,
+               listing_raw_visibility_index: newScores.stats?.raw_visibility_index ?? newScores.raw_visibility_index,
+               listing_avg_cpc: newScores.stats?.avg_cpc ?? newScores.avg_cpc,
+               listing_avg_competition: newScores.stats?.best_opportunity_comp ?? newScores.best_opportunity_comp,
+               updated_at: new Date().toISOString()
           };
+          // Remove keys with undefined values
+          const updatePayload = Object.fromEntries(
+              Object.entries(rawPayload).filter(([_, v]) => v !== undefined)
+          );
+          console.log("[Recalculate] DB updatePayload:", JSON.stringify(updatePayload, null, 2));
 
           // 1. Update Database (listings_global_eval for the activeMode)
-          const { data: existingRows } = await supabase
+          const { data: existingRows, error: fetchError } = await supabase
               .from('listings_global_eval')
               .select('id')
               .eq('listing_id', listingId)
               .eq('seo_mode', activeMode);
+
+          if (fetchError) console.error("[Recalculate] Failed to fetch existing eval row:", fetchError);
+          console.log("[Recalculate] Existing rows for mode", activeMode, ":", existingRows);
 
           if (existingRows?.length > 0) {
               const { error: updateError } = await supabase
                   .from('listings_global_eval')
                   .update(updatePayload)
                   .eq('id', existingRows[0].id);
-              if (updateError) console.error("Failed to update recalculated scores in DB:", updateError);
+              if (updateError) console.error("[Recalculate] Failed to update in DB:", updateError);
+              else console.log("[Recalculate] Successfully updated row", existingRows[0].id);
           } else {
-              // Extremely unlikely to happen if they generated SEO already, but just in case
               const { error: insertError } = await supabase
                   .from('listings_global_eval')
                   .insert({
                        listing_id: listingId,
                        seo_mode: activeMode,
-                       ...updatePayload,
-                       updated_at: new Date().toISOString()
+                       ...updatePayload
                   });
-              if (insertError) console.error("Failed to insert recalculated scores in DB:", insertError);
+              if (insertError) console.error("[Recalculate] Failed to insert in DB:", insertError);
+              else console.log("[Recalculate] Successfully inserted new row");
           }
 
           // 2. Update Database (listing_seo_stats for activeMode)
@@ -908,6 +920,29 @@ const ProductStudio = () => {
       } finally {
           setIsRecalculating(false);
       }
+  };
+
+  // Reset Keyword Pool Handler
+  const handleResetPool = async () => {
+    if (!listingId) {
+      toast.error('No listing loaded.');
+      return;
+    }
+    setIsResettingPool(true);
+    try {
+      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
+      await axios.post(webhookUrl, {
+        action: 'resetPool',
+        listing_id: listingId
+      });
+      toast.success('Keywords pool reset successfully!');
+      await handleLoadListing(listingId);
+    } catch (err) {
+      console.error('handleResetPool error:', err);
+      toast.error('Failed to reset keyword pool.');
+    } finally {
+      setIsResettingPool(false);
+    }
   };
 
   // Inline "Add Keyword" Handler
@@ -1019,7 +1054,8 @@ const ProductStudio = () => {
               is_user_added: true,   // Flag as user added per requirement
               is_competition: false, // It's standard, not competitor
               listing_id: currentListingId,
-              cpc: responseData.cpc !== undefined ? responseData.cpc : null
+              cpc: responseData.cpc !== undefined ? responseData.cpc : null,
+              is_current_pool: responseData.is_current_pool !== undefined ? responseData.is_current_pool : true
           };
 
           // We need the current active evaluation_id to link it properly in the DB
@@ -1199,7 +1235,7 @@ const ProductStudio = () => {
       const listingProfit = formattedResults?.listing_profit ?? unwrapped?.breakdown?.profitability ?? unwrapped?.breakdown?.profit ?? unwrapped.listing_profit;
       const listingRawVisibilityIndex = formattedResults?.listing_raw_visibility_index ?? unwrapped?.stats?.raw_visibility_index ?? unwrapped.listing_raw_visibility_index;
       const listingAvgCpc = formattedResults?.listing_avg_cpc ?? unwrapped?.stats?.avg_cpc ?? unwrapped.listing_avg_cpc;
-      const listingAvgComp = formattedResults?.listing_avg_comp ?? unwrapped?.stats?.best_opportunity_comp ?? unwrapped.listing_avg_comp;
+      const listingAvgComp = formattedResults?.listing_avg_competition ?? unwrapped?.stats?.best_opportunity_comp ?? unwrapped.listing_avg_competition;
 
 
       // 1.2 Upsert to listings_global_eval with SEO Mode
@@ -1243,7 +1279,7 @@ const ProductStudio = () => {
           listing_profit: listingProfit,
           listing_raw_visibility_index: listingRawVisibilityIndex,
           listing_avg_cpc: listingAvgCpc,
-          listing_avg_comp: listingAvgComp,
+          listing_avg_competition: listingAvgComp,
 
           // Add the new fields from Step 2
           score_justification_visibility: scoreJustificationVisibility,
@@ -1748,7 +1784,7 @@ const ProductStudio = () => {
             listing_profit: activeEvalData?.listing_profit ?? listing.listing_profit,
             listing_raw_visibility_index: activeEvalData?.listing_raw_visibility_index ?? listing.listing_raw_visibility_index,
             listing_avg_cpc: activeEvalData?.listing_avg_cpc ?? listing.listing_avg_cpc,
-            listing_avg_comp: activeEvalData?.listing_avg_comp ?? listing.listing_avg_comp,
+            listing_avg_competition: activeEvalData?.listing_avg_competition ?? listing.listing_avg_competition,
 
             // Dashboard Metrics
             score_justification_visibility: activeEvalData?.score_justification_visibility,
@@ -1943,7 +1979,7 @@ const ProductStudio = () => {
           listing_profit: activeEvalData.listing_profit,
           listing_raw_visibility_index: activeEvalData.listing_raw_visibility_index,
           listing_avg_cpc: activeEvalData.listing_avg_cpc,
-          listing_avg_comp: activeEvalData.listing_avg_comp,
+          listing_avg_competition: activeEvalData.listing_avg_competition,
 
           // Dashboard Metrics
           score_justification_visibility: activeEvalData.score_justification_visibility,
@@ -2007,6 +2043,8 @@ const ProductStudio = () => {
       isAddingKeyword={isAddingKeyword}
       onRecalculateScores={handleRecalculateScores}
       isRecalculating={isRecalculating}
+      onResetPool={handleResetPool}
+      isResettingPool={isResettingPool}
       resetSelectionKey={resetSelectionKey}
       
       // Strategy Switcher Props
@@ -2016,7 +2054,7 @@ const ProductStudio = () => {
     >
         <RecentOptimizations onViewResults={handleLoadListing} />
     </ResultsDisplay>
-  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, resetSelectionKey, activeMode, globalEvals]);
+  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, isResettingPool, resetSelectionKey, activeMode, globalEvals]);
 
   return (
     <Layout>
