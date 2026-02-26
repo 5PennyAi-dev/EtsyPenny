@@ -50,6 +50,30 @@ export const getStrategyValues = (selections) => {
   return parameters;
 };
 
+// Helper: reverse-map numeric DB values back to slider indices
+export const getSelectionsFromValues = (paramValues) => {
+  const selections = {};
+  for (const param of PARAMETERS) {
+    const dbValue = paramValues?.[param.key];
+    if (dbValue == null) {
+      selections[param.key] = 1; // Default to "Regular"
+      continue;
+    }
+    // Find closest matching index
+    let bestIndex = 1;
+    let bestDiff = Infinity;
+    param.values.forEach((v, i) => {
+      const diff = Math.abs(v - dbValue);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestIndex = i;
+      }
+    });
+    selections[param.key] = bestIndex;
+  }
+  return selections;
+};
+
 // Default selections (all "Regular" = index 1)
 export const DEFAULT_STRATEGY_SELECTIONS = Object.fromEntries(
   PARAMETERS.map(p => [p.key, 1])

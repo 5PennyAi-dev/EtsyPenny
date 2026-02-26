@@ -137,12 +137,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
       niche_name: nicheName,
       sub_niche_name: subNicheName,
       
-      // Legacy ID support (sending explicit nulls to avoid confusion)
-      theme_id: null,
-      niche_id: null,
-      sub_niche_id: null,
-
-      // Custom Inputs (legacy support - map directly to our new strings)
+      // Custom text aliases (for backwards compat in formatCategorizationPayload)
       custom_theme: themeName, 
       custom_niche: nicheName,
       custom_sub_niche: subNicheName,

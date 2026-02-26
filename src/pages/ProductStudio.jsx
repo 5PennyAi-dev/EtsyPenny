@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { DEFAULT_STRATEGY_SELECTIONS, getStrategyValues } from '../components/studio/StrategyTuner';
+import { DEFAULT_STRATEGY_SELECTIONS, getStrategyValues, getSelectionsFromValues } from '../components/studio/StrategyTuner';
 import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Wand2, History, RotateCcw, AlertTriangle, ArrowRight, Loader2, Sparkles, Shirt, ChevronUp, ChevronRight, Palette, Type, LayoutTemplate, Heart, Target, Save, Zap } from 'lucide-react';
@@ -44,13 +44,13 @@ const STATUS_IDS = {
  };
  
  const formatCategorizationPayload = (context) => {
-    // Simplified payload for text-based system
     return {
-        theme: context.theme_name || null,
-        niche: context.niche_name || null,
-        sub_niche: context.sub_niche_name || null,
+        theme: context.theme_name || context.theme || context.custom_theme || null,
+        niche: context.niche_name || context.niche || context.custom_niche || null,
+        sub_niche: context.sub_niche_name || context.sub_niche || context.custom_sub_niche || null,
         custom_niche: null, // Legacy field, keeping null for safety
-        custom_listing: context.custom_listing || null
+        custom_listing: context.custom_listing || null,
+        user_description: context.context || null
     };
 };
 
@@ -129,12 +129,34 @@ const ProductStudio = () => {
     fetchCustomTypeId();
   }, []);
 
-  // Listen for background SEO generation completion
+  // Refs to track background SEO completion (avoids stale closures)
+  const isWaitingForSeoRef = useRef(false);
+  const seoTriggeredAtRef = useRef(null); // ISO timestamp captured when analysis starts
+
+  // Listen for background SEO generation completion (Realtime + Polling fallback)
   useEffect(() => {
     if (!listingId) return;
 
+    // Shared handler — called by whichever mechanism detects completion first
+    const handleSeoDone = async () => {
+      if (!isWaitingForSeoRef.current) return; // Already handled
+      isWaitingForSeoRef.current = false;
+      seoTriggeredAtRef.current = null;
+      toast.success("SEO Analysis completed! Loading results...");
+      await handleLoadListing(listingId);
+      setIsInsightLoading(false);
+      setIsLoading(false);
+    };
+
+    // Helper: check if a row's updated_at is newer than when we triggered the analysis
+    const isNewerThanTrigger = (updatedAt) => {
+      if (!seoTriggeredAtRef.current || !updatedAt) return false;
+      return new Date(updatedAt) > new Date(seoTriggeredAtRef.current);
+    };
+
+    // 1. Realtime subscription (instant if it works)
     const channel = supabase
-      .channel(`listing-${listingId}-updates`)
+      .channel(`listing-${listingId}-seo-done`)
       .on(
         'postgres_changes',
         {
@@ -144,23 +166,35 @@ const ProductStudio = () => {
           filter: `id=eq.${listingId}`,
         },
         async (payload) => {
-          if (payload.new.status_id === STATUS_IDS.SEO_DONE && isInsightLoading === 'seo') {
-             toast.success("SEO Analysis completed! Generating insights...");
-             await handleLoadListing(listingId);
-             
-             // Optionally auto-trigger insight if they kept the browser open
-             // since handleLoadListing sets the results, we can trigger it in a separate effect
-             // or let the user click "Generate Insights".
-             // We'll let `handleLoadListing` update the UI. The user can then click the button.
+          if (payload.new.status_id === STATUS_IDS.SEO_DONE && isNewerThanTrigger(payload.new.updated_at)) {
+            await handleSeoDone();
           }
         }
       )
       .subscribe();
 
+    // 2. Polling fallback (every 5s) — catches it if Realtime misses the event
+    const pollInterval = setInterval(async () => {
+      if (!isWaitingForSeoRef.current) return; // Not waiting, skip
+      try {
+        const { data } = await supabase
+          .from('listings')
+          .select('status_id, updated_at')
+          .eq('id', listingId)
+          .single();
+        if (data?.status_id === STATUS_IDS.SEO_DONE && isNewerThanTrigger(data.updated_at)) {
+          await handleSeoDone();
+        }
+      } catch (e) {
+        // Silently ignore poll errors
+      }
+    }, 5000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
-  }, [listingId, isInsightLoading]);
+  }, [listingId]);
 
   const handleAnalyzeDesign = async () => {
       // 1. Check if image selected
@@ -362,9 +396,9 @@ const ProductStudio = () => {
                 product_type_id: formData.product_type_id || customTypeIdRef.current,
                 product_type_text: formData.product_type_text || null,
                 tone_id: formData.tone_id,
-                theme_id: formData.theme_id,
-                niche_id: formData.niche_id,
-                sub_niche_id: formData.sub_niche_id,
+                theme: formData.theme_name || null,
+                niche: formData.niche_name || null,
+                sub_niche: formData.sub_niche_name || null,
                 user_description: formData.context,
                 custom_listing: JSON.stringify(customData),
                 image_url: publicUrl,
@@ -490,9 +524,9 @@ const ProductStudio = () => {
             product_type_id: formData.product_type_id || customTypeIdRef.current,
             product_type_text: formData.product_type_text || null,
             tone_id: formData.tone_id,
-            theme_id: formData.theme_id,
-            niche_id: formData.niche_id,
-            sub_niche_id: formData.sub_niche_id,
+            theme: formData.theme_name || null,
+            niche: formData.niche_name || null,
+            sub_niche: formData.sub_niche_name || null,
             user_description: formData.context,
             custom_listing: JSON.stringify(customData),
             image_url: publicUrl,
@@ -578,12 +612,18 @@ const ProductStudio = () => {
         axios.post(webhookUrl, webhookPayload).catch(err => {
             console.error("Webhook trigger failed:", err);
             toast.error("Failed to start analysis. Check your connection.");
+            isWaitingForSeoRef.current = false;
+            setIsInsightLoading(false);
         });
+
+        // Signal the Realtime listener to watch for completion
+        seoTriggeredAtRef.current = new Date().toISOString();
+        isWaitingForSeoRef.current = true;
 
         toast.success("SEO Analysis started in the background! You can safely close this page.");
         
-        // We stay in the 'seo' loading state. The useEffect will catch the Realtime update
-        // when the Edge Function marks the listing status as SEO_DONE.
+        // We stay in the 'seo' loading state. The Realtime listener will catch the
+        // status_id change to SEO_DONE and call handleLoadListing to refresh the UI.
 
     } catch (err) {
         console.error("Error in handleAnalyze:", err);
@@ -667,6 +707,15 @@ const ProductStudio = () => {
           : results.analytics;
 
       try {
+        // Fetch categorization data fresh from DB to avoid stale state
+        const { data: listingMeta } = await supabase
+            .from('listings')
+            .select('theme, niche, sub_niche, user_description, custom_listing')
+            .eq('id', listingId)
+            .single();
+
+        const parsedCustom = listingMeta?.custom_listing ? JSON.parse(listingMeta.custom_listing) : {};
+
         const payload = {
             action: 'drafting_seo',
             keywords: statsToUse.map(k => ({
@@ -692,11 +741,16 @@ const ProductStudio = () => {
                 visual_colors: visualAnalysis.colors,
                 visual_target_audience: visualAnalysis.target_audience,
                 visual_overall_vibe: visualAnalysis.overall_vibe,
-                categorization: formatCategorizationPayload(analysisContext),
+                categorization: {
+                    theme: listingMeta?.theme || parsedCustom.theme || null,
+                    niche: listingMeta?.niche || parsedCustom.niche || null,
+                    sub_niche: listingMeta?.sub_niche || parsedCustom.sub_niche || null,
+                    user_description: listingMeta?.user_description || null
+                },
                 product_details: {
                     product_type: analysisContext.product_type_text || analysisContext.product_type_name || "Product",
                     tone: analysisContext.tone_name || "Engaging",
-                    client_description: analysisContext.context || ""
+                    client_description: listingMeta?.user_description || analysisContext.context || ""
                 },
                 shop_context: {
                     shop_name: profile?.shop_name,
@@ -1733,14 +1787,14 @@ const ProductStudio = () => {
         const parsedCustom = listing.custom_listing ? JSON.parse(listing.custom_listing) : {};
 
         setAnalysisContext({
-            theme_name: listing.themes?.name || "",
-            niche_name: listing.niches?.name || "",
-            sub_niche_name: listing.sub_niches?.name || "",
+            theme_name: listing.theme || listing.themes?.name || parsedCustom.theme || "",
+            niche_name: listing.niche || listing.niches?.name || parsedCustom.niche || "",
+            sub_niche_name: listing.sub_niche || listing.sub_niches?.name || parsedCustom.sub_niche || "",
             
-            // Text-based overrides (New approach)
-            theme: listing.theme || "",
-            niche: listing.niche || "",
-            sub_niche: listing.sub_niche || "",
+            // Text-based fields
+            theme: listing.theme || parsedCustom.theme || listing.themes?.name || "",
+            niche: listing.niche || parsedCustom.niche || listing.niches?.name || "",
+            sub_niche: listing.sub_niche || parsedCustom.sub_niche || listing.sub_niches?.name || "",
 
             // Product Type: prefer custom text, fall back to FK join name
             product_type_name: listing.product_type_text || listing.product_types?.name || "",
@@ -1752,7 +1806,7 @@ const ProductStudio = () => {
             tone: listing.tone || "Auto-detect", 
             max_tags: listing.max_tags || 13,
 
-            context: parsedCustom.context || ""
+            context: listing.user_description || parsedCustom.context || ""
         });
         
         // Load Visual Analysis from listing columns (New source of truth)
@@ -1850,6 +1904,20 @@ const ProductStudio = () => {
         };
         
         setResults(constructedResults);
+
+        // Hydrate Strategy Tuner sliders from saved param_* values
+        if (activeEvalData?.param_Volume != null || activeEvalData?.param_Competition != null || activeEvalData?.param_Transaction != null || activeEvalData?.param_Niche != null || activeEvalData?.param_cpc != null) {
+          setStrategySelections(getSelectionsFromValues({
+            Volume: activeEvalData.param_Volume,
+            Competition: activeEvalData.param_Competition,
+            Transaction: activeEvalData.param_Transaction,
+            Niche: activeEvalData.param_Niche,
+            CPC: activeEvalData.param_cpc,
+          }));
+        } else {
+          setStrategySelections(DEFAULT_STRATEGY_SELECTIONS);
+        }
+
         // Sync local state for the form button
         setIsImageAnalyzedState(listing.is_image_analysed || listing.is_imageAnalysed || listing.is_imageanalysed || false);
 
@@ -1882,11 +1950,25 @@ const ProductStudio = () => {
   useEffect(() => {
     if (location.state?.listingId) {
         handleLoadListing(location.state.listingId);
-        // Clear state to prevent reload loop (optional, but good practice)
         window.history.replaceState({}, document.title)
     } else if (location.state?.newListing) {
         handleNewAnalysis();
         window.history.replaceState({}, document.title);
+    } else if (user?.id) {
+        // No explicit navigation state — auto-load the most recent listing
+        const loadMostRecent = async () => {
+          const { data } = await supabase
+            .from('listings')
+            .select('id')
+            .eq('user_id', user.id)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single();
+          if (data?.id) {
+            handleLoadListing(data.id);
+          }
+        };
+        loadMostRecent();
     }
   }, [location.state]);
 
@@ -2044,6 +2126,20 @@ const ProductStudio = () => {
       };
       
       setResults(constructedResults);
+
+      // Hydrate Strategy Tuner sliders for the new mode
+      if (activeEvalData?.param_Volume != null || activeEvalData?.param_Competition != null || activeEvalData?.param_Transaction != null || activeEvalData?.param_Niche != null || activeEvalData?.param_cpc != null) {
+        setStrategySelections(getSelectionsFromValues({
+          Volume: activeEvalData.param_Volume,
+          Competition: activeEvalData.param_Competition,
+          Transaction: activeEvalData.param_Transaction,
+          Niche: activeEvalData.param_Niche,
+          CPC: activeEvalData.param_cpc,
+        }));
+      } else {
+        setStrategySelections(DEFAULT_STRATEGY_SELECTIONS);
+      }
+
       setResetSelectionKey(k => k + 1); // Reset Keyword Selection
       
       // Also update the form visual state to match

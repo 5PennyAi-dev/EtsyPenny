@@ -175,6 +175,7 @@ const SidebarSkeleton = ({ phase }) => (
   const AuditHeader = ({
     score,
     listingVisibility,
+    listingRawVisibilityIndex,
     listingConversion,
     listingRelevance,
     listingCompetition,
@@ -272,9 +273,17 @@ const SidebarSkeleton = ({ phase }) => (
                 {/* Visibility */}
                 <div>
                     <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                           <TrendingUp size={14} className="text-slate-400" /> Visibility
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                               <TrendingUp size={14} className="text-slate-400" /> Visibility
+                            </span>
+                            {listingRawVisibilityIndex != null && (
+                                <div className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md shadow-sm">
+                                    <span className="text-[9px] font-bold text-indigo-500 uppercase">Index</span>
+                                    <span className="text-[10px] font-black text-indigo-700">{Number(listingRawVisibilityIndex).toLocaleString()}</span>
+                                </div>
+                            )}
+                        </div>
                         <span className={`text-sm font-bold ${visTier.text}`}>{listingVisibility || 0}</span>
                     </div>
                     <MiniGauge value={listingVisibility} tier={visTier} />
@@ -434,6 +443,9 @@ const SidebarSkeleton = ({ phase }) => (
       if (results) {
           setDisplayedTitle(results.title || "");
           setDisplayedDescription(results.description || "");
+      } else {
+          setDisplayedTitle("");
+          setDisplayedDescription("");
       }
     }, [results]);
   
@@ -969,7 +981,13 @@ const SidebarSkeleton = ({ phase }) => (
                                         {isAddingKeyword ? (
                                             <Loader2 size={16} className="mx-auto text-indigo-500 animate-spin" />
                                         ) : (
-                                            <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap hidden sm:inline-block">Return ↵</span>
+                                            <button
+                                                onClick={handleAddSubmission}
+                                                disabled={!newKeywordInput.trim()}
+                                                className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-lg transition-colors shadow-sm whitespace-nowrap"
+                                            >
+                                                Add
+                                            </button>
                                         )}
                                     </td>
                                 </tr>

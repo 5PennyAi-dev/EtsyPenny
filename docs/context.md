@@ -217,6 +217,39 @@
     - Logo image at `src/assets/pennyseo-logo.png`, rendered in `Sidebar.jsx` (full width) and `LoginPage.jsx` (inverted for dark background).
     - Updated `index.html` page title and `ListingPDFDocument.jsx` PDF footer.
 
+- **Strategy Tuner Slider Hydration** (2026-02-25):
+    - **Problem**: After applying a custom SEO strategy (via the Advanced SEO Strategy Tuner), reloading the page reset all sliders back to "Regular" default, losing the user's chosen settings.
+    - **Solution**: Added `getSelectionsFromValues()` reverse-lookup helper in `StrategyTuner.jsx` — takes saved numeric `param_*` values from `listings_global_eval` and maps each back to the closest slider index using minimum-distance matching.
+    - **Hydration Points**: `handleLoadListing` and `handleModeChange` in `ProductStudio.jsx` now read `param_Volume`, `param_Competition`, `param_Transaction`, `param_Niche`, `param_cpc` from the active eval data and call `setStrategySelections()`. Falls back to `DEFAULT_STRATEGY_SELECTIONS` if no params are saved.
+
+- **Instructions/Details Field Hydration Fix** (2026-02-25):
+    - **Bug**: The "Instructions / Details" textarea was blank on page reload despite the value being saved in the `listings.user_description` column.
+    - **Root Cause**: `handleLoadListing` read the context from `listing.custom_listing` JSON (which never contained the `context` key — only theme/niche/sub_niche). The actual value was saved to `listings.user_description`.
+    - **Fix**: Changed hydration in `handleLoadListing` to `listing.user_description || parsedCustom.context || ""`, reading from the correct DB column first.
+
+- **Auto-Load Most Recent Listing** (2026-02-25):
+    - **Behavior**: When navigating to Product Studio via the sidebar (no `location.state`), it now auto-fetches the user's most recent listing (by `updated_at DESC`) and loads it via `handleLoadListing`. Falls back gracefully to empty form if no listings exist.
+
+- **Realtime SEO Completion Listener** (2026-02-25):
+    - **Problem**: The Supabase Realtime listener for `SEO_DONE` had stale-closure bugs and didn't stop the spinner on completion. Also, re-analysis on an existing listing (already `SEO_DONE`) caused immediate false-positive detection.
+    - **Solution**: Dual-mechanism approach: Realtime subscription + 5-second polling fallback. Uses `isWaitingForSeoRef` + `seoTriggeredAtRef` timestamp refs to avoid stale closures. Both mechanisms compare `listings.updated_at > seoTriggeredAtRef` to ensure only *new* completions are detected. Channel depends only on `[listingId]`.
+    - **Edge Function**: Added `updated_at: new Date().toISOString()` to the `save-seo` edge function's listing update payload (must be redeployed via Supabase dashboard).
+
+- **Listing Info Clearing on New Listing** (2026-02-25):
+    - **Bug**: Title and description text persisted in the sidebar when clicking "New Listing".
+    - **Fix**: Added `else` branch in `ResultsDisplay.jsx`'s `useEffect` for `results` — now clears `displayedTitle` and `displayedDescription` when `results` becomes `null`.
+
+- **Custom Keyword Add Button** (2026-02-25):
+    - Replaced passive "Return ↵" text with an actionable "Add" button in the custom keyword inline row (`ResultsDisplay.jsx`). Button calls `handleAddSubmission` on click, disabled when input is empty. Enter key still works.
+
+- **Visibility Index Badge** (2026-02-25):
+    - Added `listing_raw_visibility_index` as an inline indigo pill badge next to the Visibility label in the AuditHeader (`ResultsDisplay.jsx`). Uses `bg-indigo-50` / `border-indigo-100` / `text-indigo-700` design. Only renders when value is non-null.
+
+- **Drafting SEO Payload Fix & Theme/Niche Deprecation** (2026-02-25):
+    - **Problem**: `drafting_seo` payload sent null for theme, niche, sub_niche, and user_description. Root causes: (1) `analysisContext` state was stale after `handleLoadListing` overwrites, (2) text columns `listings.theme`/`niche`/`sub_niche` were never saved — only FK IDs were persisted.
+    - **Fix**: `handleGenerateDraft` now fetches categorization data fresh from the DB at draft time (no dependency on `analysisContext`). Both save paths in `handleAnalyze` and `handleSaveDraft` now write `theme`, `niche`, `sub_niche` text columns directly.
+    - **Deprecation**: Removed `theme_id`, `niche_id`, `sub_niche_id` FK columns from all save paths and from `OptimizationForm.jsx` return object. These FK columns are no longer used.
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.

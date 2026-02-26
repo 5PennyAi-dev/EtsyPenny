@@ -41,7 +41,7 @@ const RecentOptimizations = ({ onViewResults }) => {
     return (
         <div className="mt-8">
             <Accordion
-                defaultOpen={true}
+                defaultOpen={false}
                 title={
                     <div className="flex items-center gap-2">
                         <History size={16} className="text-indigo-600" />

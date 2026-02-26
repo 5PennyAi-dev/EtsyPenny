@@ -172,6 +172,7 @@ serve(async (req) => {
     // Only update title/desc if they were included
     const updatePayload: any = {
         status_id: STATUS_IDS.SEO_DONE,
+        updated_at: new Date().toISOString(),
     };
     
     if (generatedTitle) updatePayload.generated_title = generatedTitle;
