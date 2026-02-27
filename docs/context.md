@@ -250,6 +250,21 @@
     - **Fix**: `handleGenerateDraft` now fetches categorization data fresh from the DB at draft time (no dependency on `analysisContext`). Both save paths in `handleAnalyze` and `handleSaveDraft` now write `theme`, `niche`, `sub_niche` text columns directly.
     - **Deprecation**: Removed `theme_id`, `niche_id`, `sub_niche_id` FK columns from all save paths and from `OptimizationForm.jsx` return object. These FK columns are no longer used.
 
+- **Dashboard Shop Health & Market Insights** (2026-02-26):
+    - **Dashboard Redesign**: Replaced old disparate metric cards with a unified, data-driven view powered by the `view_user_performance_stats` SQL view.
+    - **RadialGauge Component**: Created `src/components/dashboard/RadialGauge.jsx` — a standalone, animated SVG circular progress gauge supporting dual color-tier logic (`getTier` for standard 0-100 metrics, `getTierInverted` for competition where lower is better).
+    - **PerformanceCard (Shop Health)**: Displays a hero gauge for "Global Strength" separated from 4 secondary gauges (Visibility, Relevance, Conversion, Competition). Includes a conditional amber warning banner if any listings require immediate SEO optimization (`listings_needing_fix > 0`).
+    - **MarketInsights**: Added a 3-card horizontal grid below Shop Health displaying external market data:
+        1. **Market Reach**: Raw visibility index.
+        2. **Market Value Index**: Hero card merging Avg CPC and Profit Potential into a single 0-100 score, with the raw `$Avg CPC` displayed as supporting data. Includes an info tooltip explaining the benchmark methodology.
+        3. **Market Strategy**: A split-layout card comparing global "Market Saturation" (% saturation, visually red if >80%) versus targeted "Entry Barrier" (difficulty ratio, visually green if <0.5) using dual horizontal progress bars.
+    - **Data Fetching optimization**: `Dashboard.jsx` fetches the `view_user_performance_stats` record once and passes it down as props to both `PerformanceCard` and `MarketInsights` to avoid duplicate network requests.
+
+### March X Xth, 2026 - Image Analysis Payload Enrichment & Auto-Save
+- **Bug Fix / Feature**: The `analyseImage` webhook trigger in `ProductStudio.jsx` now correctly includes the user's selected `product_type` and `user_description` form data in its payload, nested under `product_details` for backend compatibility. 
+- **Auto-Save**: Clicking "Analyse Design" now automatically saves the current form state (product type, instructions, theme, etc.) to the `listings` table *before* triggering the AI. This ensures the visual analysis is firmly attached to the user's intended product context even if they haven't explicitly clicked "Save".
+- **State Preservation Fix**: Resolved a React state hydration bug in `ProductStudio.jsx` where the AI's response would overwrite the active `analysisContext`, erasing the `user_description` textarea immediately after analysis completed. The state update now explicitly preserves the user's manual inputs alongside the newly fetched AI categories.
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.

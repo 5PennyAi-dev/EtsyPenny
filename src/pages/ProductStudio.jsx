@@ -226,6 +226,51 @@ const ProductStudio = () => {
                setResults(prev => ({ ...(prev || {}), imageUrl: newUrl }));
           }
 
+          // Capture current form state (Product Type, Instructions) to send in payload and save later
+          const currentFormData = optimizationFormRef.current?.getCurrentState() || {};
+
+          // Auto-save form data before analyzing image
+          let currentListingId = listingId;
+          const savePayload = {
+              theme: currentFormData.theme_name || null,
+              niche: currentFormData.niche_name || null,
+              sub_niche: currentFormData.sub_niche_name || null,
+              product_type_id: currentFormData.product_type_id || customTypeIdRef.current,
+              product_type_text: currentFormData.product_type_text || null,
+              user_description: currentFormData.context || null,
+              seo_mode: currentFormData.seo_mode || 'balanced',
+              image_url: publicUrl // Save the image URL immediately
+          };
+
+          if (currentListingId) {
+               // Update existing
+               const { error: updateError } = await supabase
+                  .from('listings')
+                  .update({ ...savePayload, updated_at: new Date().toISOString() })
+                  .eq('id', currentListingId);
+               if (updateError) console.error("Auto-save before analysis failed:", updateError);
+          } else {
+               // Insert new
+               const { data: newListing, error: insertError } = await supabase
+                  .from('listings')
+                  .insert({
+                      ...savePayload,
+                      user_id: user.id,
+                      status_id: STATUS_IDS.NEW,
+                      title: "Draft SEO Analysis"
+                  })
+                  .select()
+                  .single();
+                  
+               if (insertError) {
+                   console.error("Auto-save insert failed:", insertError);
+               } else {
+                   currentListingId = newListing.id;
+                   setListingId(newListing.id);
+                   setIsNewListingActive(false); // No longer purely new
+               }
+          }
+
           // Trigger n8n webhook
           const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
           
@@ -233,7 +278,11 @@ const ProductStudio = () => {
               action: "analyseImage", // As requested
               user_id: user.id,
               payload: {
-                  image_url: publicUrl
+                  image_url: publicUrl,
+                  product_details: {
+                      product_type: currentFormData.product_type_text || currentFormData.product_type_name || null,
+                      client_description: currentFormData.context || null
+                  }
               }
           };
 
@@ -250,9 +299,6 @@ const ProductStudio = () => {
               const aiTheme = data.theme || "";
               const aiNiche = data.niche || "";
               const aiSubNiche = data["sub-niche"] || data.sub_niche || "";
-
-              // Capture current form state (Product Type, Instructions) to preserve/save
-              const currentFormData = optimizationFormRef.current?.getCurrentState() || {};
 
               setVisualAnalysis({
                   aesthetic: data.aesthetic_style || "",
@@ -274,7 +320,12 @@ const ProductStudio = () => {
                     theme_name: aiTheme,
                     niche_name: aiNiche,
                     sub_niche_name: aiSubNiche,
-                    // Ensure other fields are preserved if they exist
+                    // Preserve all current form state typed by user so we don't wipe it out on re-render!
+                    context: currentFormData.context,
+                    product_type_id: currentFormData.product_type_id,
+                    product_type_name: currentFormData.product_type_name,
+                    product_type_text: currentFormData.product_type_text,
+                    seo_mode: currentFormData.seo_mode || 'balanced'
               }));
               
               // Also update formKey to force re-initialization of OptimizationForm with new values
@@ -292,35 +343,38 @@ const ProductStudio = () => {
                   visual_target_audience: data.target_audience,
                   visual_overall_vibe: data.overall_vibe,
                   
-                  // Save categorization (AI Priority)
-                  theme: aiTheme,
-                  niche: aiNiche,
-                  sub_niche: aiSubNiche,
+                  // Save categorization (AI Priority overrides form if AI found something, else keep form)
+                  theme: aiTheme || currentFormData.theme_name || null,
+                  niche: aiNiche || currentFormData.niche_name || null,
+                  sub_niche: aiSubNiche || currentFormData.sub_niche_name || null,
                   
-                  // Save Manual Fields (User Priority)
+                  // Product info already saved, but update just in case
                   product_type_id: currentFormData.product_type_id || customTypeIdRef.current,
                   product_type_text: currentFormData.product_type_text || null,
-                  user_description: currentFormData.context,
+                  user_description: currentFormData.context || null,
                   
-                  image_url: publicUrl
+                  image_url: publicUrl,
+                  updated_at: new Date().toISOString()
               };
 
-              if (listingId) {
+              // Note: currentListingId was established BEFORE the webhook call
+              if (currentListingId) {
                   const { error: updateError } = await supabase
                       .from('listings')
                       .update(dbPayload)
-                      .eq('id', listingId);
+                      .eq('id', currentListingId);
                   
                   if (updateError) console.error("Failed to update visual analysis stats:", updateError);
               } else {
-                  // INSERT new listing if none exists
+                  // Fallback in case earlier auto-save failed entirely
                    const { data: newListing, error: insertError } = await supabase
                       .from('listings')
                       .insert({
                           ...dbPayload,
                           user_id: user.id,
                           status_id: STATUS_IDS.NEW,
-                          title: "New Visual Analysis"
+                          title: "New Visual Analysis",
+                          seo_mode: currentFormData.seo_mode || 'balanced'
                       })
                       .select()
                       .single();
