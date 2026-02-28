@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import HistoryPage from './pages/HistoryPage';
 import Dashboard from './pages/Dashboard';
 import BrandProfilePage from './pages/BrandProfilePage';
+import SEOLab from './pages/SEOLab';
 
 import { Toaster } from 'sonner';
 
@@ -37,6 +38,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <BrandProfilePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/lab" 
+            element={
+              <ProtectedRoute>
+                <SEOLab />
               </ProtectedRoute>
             } 
           />

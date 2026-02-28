@@ -10,6 +10,9 @@ import { PDFDownloadLink } from '@react-pdf/renderer';
 import ListingPDFDocument from '../pdf/ListingPDFDocument';
 import Accordion from '../ui/Accordion';
 import StrategyTuner from './StrategyTuner';
+import FavoritesPickerModal from './FavoritesPickerModal';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 const Sparkline = ({ data }) => {
   if (!data || data.length === 0) return <div className="text-slate-300 text-xs">-</div>;
@@ -174,6 +177,7 @@ const SidebarSkeleton = ({ phase }) => (
 
   const AuditHeader = ({
     score,
+    imageUrl,
     listingVisibility,
     listingRawVisibilityIndex,
     listingConversion,
@@ -253,21 +257,27 @@ const SidebarSkeleton = ({ phase }) => (
     return (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100">
         
-        {/* SECTION A: The Verdict (Listing Strength) */}
-        <div className="md:w-1/3 p-6 md:p-8 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-row items-center justify-between xl:justify-center xl:gap-8">
-            <div className="flex flex-col gap-1">
-                 <span className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                   <Sparkles size={16} className="text-indigo-500" /> Verdict
-                 </span>
-                 <h3 className="text-xl font-black text-slate-800 leading-tight">
-                    Listing<br/>Strength
-                 </h3>
+        {/* SECTION A: Thumbnail | Label + Gauge */}
+        <div className="md:w-1/4 py-3 px-4 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-row items-center gap-3">
+            {/* Thumbnail — takes up left space */}
+            {imageUrl && (
+                <div className="h-24 w-24 rounded-2xl border border-slate-200 bg-slate-100 overflow-hidden flex-shrink-0 shadow-sm flex-1 max-w-[6rem]">
+                    <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                </div>
+            )}
+            {/* Label + Gauge grouped together on the right */}
+            <div className="flex items-center gap-4 ml-auto">
+                <h3 className="text-2xl font-black text-slate-800 leading-tight">
+                    Listing<br/>overall score
+                </h3>
+                <div className="flex-shrink-0">
+                    <RadialGauge value={score} tier={mainTier} />
+                </div>
             </div>
-            <RadialGauge value={score} tier={mainTier} />
         </div>
 
         {/* SECTION B: Technical Analysis (Proof Grid) */}
-        <div className="md:w-5/12 p-6 md:px-8 hover:bg-slate-50/30 transition-colors flex flex-col justify-center">
+        <div className="md:w-1/2 p-6 md:px-8 hover:bg-slate-50/30 transition-colors flex flex-col justify-center">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Technical Analysis</span>
             <div className="grid grid-cols-2 gap-x-8 gap-y-5">
                 {/* Visibility */}
@@ -348,7 +358,9 @@ const SidebarSkeleton = ({ phase }) => (
   
   const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, isInsightLoading,
     onAddCustomKeyword,
+    onAddBatchKeywords,
     isAddingKeyword,
+    isAddingBatchKeywords,
     onSaveListingInfo,
     onRecalculateScores,
     isRecalculating,
@@ -364,7 +376,10 @@ const SidebarSkeleton = ({ phase }) => (
     // Strategy Switcher Props
     activeMode,
     onModeChange,
-    availableModes
+    availableModes,
+    // Favorite Keyword Bank Props
+    user,
+    currentListing
   }) => {
     const [displayedTitle, setDisplayedTitle] = useState("");
     const [displayedDescription, setDisplayedDescription] = useState("");
@@ -547,7 +562,91 @@ const SidebarSkeleton = ({ phase }) => (
     const collapsedLimit = Math.max(13, selectedCount);
     const visibleAnalytics = showAll ? sortedAnalytics : sortedAnalytics.slice(0, collapsedLimit);
     const hasMore = sortedAnalytics.length > collapsedLimit;
-  
+
+    // --- Favorite Keyword Bank State ---
+    const [favoriteTags, setFavoriteTags] = useState(new Set());
+
+    // Fetch user's keyword bank on mount / when user changes
+    useEffect(() => {
+        if (!user?.id) return;
+        const fetchFavorites = async () => {
+            const { data, error } = await supabase
+                .from('user_keyword_bank')
+                .select('tag')
+                .eq('user_id', user.id);
+            if (error) {
+                console.error('Failed to fetch keyword bank:', error);
+                return;
+            }
+            setFavoriteTags(new Set((data || []).map(row => row.tag)));
+        };
+        fetchFavorites();
+    }, [user?.id]);
+
+    const handleToggleFavorite = useCallback(async (keywordData) => {
+        if (!user?.id) {
+            toast.error('You must be logged in to save favorites.');
+            return;
+        }
+        const tag = keywordData.keyword;
+        try {
+            if (favoriteTags.has(tag)) {
+                // Remove from bank
+                const { data: existing, error: fetchErr } = await supabase
+                    .from('user_keyword_bank')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('tag', tag)
+                    .single();
+                if (fetchErr) throw fetchErr;
+                if (existing) {
+                    const { error: delErr } = await supabase
+                        .from('user_keyword_bank')
+                        .delete()
+                        .eq('id', existing.id);
+                    if (delErr) throw delErr;
+                }
+                setFavoriteTags(prev => {
+                    const next = new Set(prev);
+                    next.delete(tag);
+                    return next;
+                });
+                toast.success('Removed from Keyword Bank');
+            } else {
+                // Add to bank
+                const { error: insErr } = await supabase
+                    .from('user_keyword_bank')
+                    .insert([{
+                        user_id: user.id,
+                        tag: tag,
+                        product_type: currentListing?.product_type_text || null,
+                        theme: currentListing?.theme || null,
+                        niche: currentListing?.niche || null,
+                        sub_niche: currentListing?.sub_niche || null,
+                        last_volume: keywordData.volume ?? null,
+                        last_competition: keywordData.competition != null ? parseFloat(keywordData.competition) : null,
+                        last_cpc: keywordData.cpc != null ? parseFloat(keywordData.cpc) : null,
+                        volume_history: keywordData.volume_history || []
+                    }]);
+                if (insErr) throw insErr;
+                setFavoriteTags(prev => new Set(prev).add(tag));
+                toast.success('Saved to Keyword Bank!');
+            }
+        } catch (error) {
+            console.error('Favorite Error:', error);
+            toast.error('Failed to update Keyword Bank.');
+        }
+    }, [user?.id, favoriteTags, currentListing]);
+
+    // --- Favorites Picker Modal State ---
+    const [showFavoritesPicker, setShowFavoritesPicker] = useState(false);
+
+    // Existing keywords set for duplicate detection
+    const existingKeywordsSet = useMemo(() => {
+        if (!results?.analytics) return new Set();
+        return new Set(results.analytics.map(a => a.keyword.toLowerCase()));
+    }, [results?.analytics]);
+
     // --- ALL HOOKS ARE ABOVE THIS LINE --- Early returns below are safe ---
   
   
@@ -601,8 +700,9 @@ const SidebarSkeleton = ({ phase }) => (
               {isInsightLoading ? (
                   <AuditSkeleton />
               ) : (results && (
-                  <AuditHeader 
+                  <AuditHeader
                       score={results.listing_strength ?? results.global_strength}
+                      imageUrl={results.imageUrl}
                       statusLabel={results.status_label}
                       strategicVerdict={results.strategic_verdict}
                       improvementPriority={results.improvement_priority}
@@ -700,6 +800,9 @@ const SidebarSkeleton = ({ phase }) => (
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                             <tr>
+                                <th className="pl-3 pr-1 py-2 w-8 text-center">
+                                    <Star size={14} className="text-slate-300 mx-auto" />
+                                </th>
                                 <th className="px-4 py-2 w-10 text-center">
                                     <input 
                                         type="checkbox" 
@@ -759,7 +862,7 @@ const SidebarSkeleton = ({ phase }) => (
                         <tbody className="divide-y divide-slate-100">
                             {!results ? (
                                 <tr>
-                                    <td colSpan="11" className="px-4 py-8 text-center text-slate-400 italic">
+                                    <td colSpan="12" className="px-4 py-8 text-center text-slate-400 italic">
                                         No analysis results yet. Start a new listing analysis.
                                     </td>
                                 </tr>
@@ -775,7 +878,7 @@ const SidebarSkeleton = ({ phase }) => (
                                       <React.Fragment key={row.keyword}>
                                         {showDivider && (
                                           <tr className="border-t-2 border-slate-200">
-                                            <td colSpan="11" className="px-4 py-1.5 bg-slate-50">
+                                            <td colSpan="12" className="px-4 py-1.5 bg-slate-50">
                                               <div className="flex items-center gap-2">
                                                 <div className="h-px flex-1 bg-slate-200" />
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Suggestions & Discovery</span>
@@ -797,6 +900,22 @@ const SidebarSkeleton = ({ phase }) => (
                                                     : 'opacity-60 hover:opacity-80 hover:bg-slate-50'
                                             }`}
                                         >
+                                    <td className="pl-3 pr-1 py-3 text-center">
+                                        <button
+                                            onClick={() => handleToggleFavorite(row)}
+                                            className="p-0.5 rounded transition-all duration-200 hover:scale-110"
+                                            title={favoriteTags.has(row.keyword) ? 'Remove from Keyword Bank' : 'Save to Keyword Bank'}
+                                        >
+                                            <Star
+                                                size={16}
+                                                className={`transition-colors duration-200 ${
+                                                    favoriteTags.has(row.keyword)
+                                                        ? 'fill-amber-400 text-amber-400'
+                                                        : 'text-slate-300 hover:text-amber-400'
+                                                }`}
+                                            />
+                                        </button>
+                                    </td>
                                     <td className="px-4 py-3 text-center">
                                         <input 
                                             type="checkbox" 
@@ -957,6 +1076,7 @@ const SidebarSkeleton = ({ phase }) => (
                             {/* --- INLINE ADD ROW --- */}
                             {isAddingRow && (
                                 <tr className="bg-indigo-50/30 border-t-2 border-indigo-100">
+                                    <td className="pl-3 pr-1 py-3"></td>
                                     <td className="px-4 py-3 text-center">
                                         <input 
                                             type="checkbox" 
@@ -1021,6 +1141,14 @@ const SidebarSkeleton = ({ phase }) => (
                         >
                             <Plus size={14} className={isAddingRow ? 'text-slate-400' : 'text-indigo-500'} />
                             Add Custom Keyword
+                        </button>
+                        <button
+                            onClick={() => setShowFavoritesPicker(true)}
+                            disabled={isAddingKeyword}
+                            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 rounded-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Star size={14} className="fill-amber-400 text-amber-400" />
+                            Add from Favorites
                         </button>
                     </div>
                 )}
@@ -1182,6 +1310,17 @@ const SidebarSkeleton = ({ phase }) => (
              </div>
         </div>
       </div>
+
+      {/* Favorites Picker Modal */}
+      <FavoritesPickerModal
+          isOpen={showFavoritesPicker}
+          onClose={() => setShowFavoritesPicker(false)}
+          onAddBatchKeywords={onAddBatchKeywords}
+          isAddingBatch={isAddingBatchKeywords}
+          user={user}
+          currentListing={currentListing}
+          existingKeywords={existingKeywordsSet}
+      />
     </div>
   );
 };

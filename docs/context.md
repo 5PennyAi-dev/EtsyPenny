@@ -265,6 +265,29 @@
 - **Auto-Save**: Clicking "Analyse Design" now automatically saves the current form state (product type, instructions, theme, etc.) to the `listings` table *before* triggering the AI. This ensures the visual analysis is firmly attached to the user's intended product context even if they haven't explicitly clicked "Save".
 - **State Preservation Fix**: Resolved a React state hydration bug in `ProductStudio.jsx` where the AI's response would overwrite the active `analysisContext`, erasing the `user_description` textarea immediately after analysis completed. The state update now explicitly preserves the user's manual inputs alongside the newly fetched AI categories.
 
+- **History Page Data Source Migration** (2026-02-27):
+    - **Problem**: `HistoryPage.jsx` fetched from the old `view_listing_scores` view which used legacy FK-joined niche names and `listing_score`/`performance_score` fields.
+    - **Solution**: Migrated to the new `listings_global_info` Supabase view which joins `listings`, `listing_statuses`, and `listings_global_eval` directly.
+    - **Column Changes**:
+        - "Niche" column renamed to **"Theme"** — now displays `theme > niche` from the `listings` text columns.
+        - **Score** column now shows `listing_strength` from `listings_global_eval` (was `listing_score`/`performance_score`).
+        - **Status** uses `status_name` from `listing_statuses` (was raw `status` field).
+        - **Title** uses `original_title` (was `display_title`).
+        - **Date** uses `listing_created_at`.
+    - **Cleanup**: Removed 5 unused icon imports. Updated search/filter logic and PDF export to match new field names.
+
+- **History Page Metric Columns & Layout** (2026-02-27):
+    - Added 6 new columns to the History table: **Visibility** (`listing_visibility`), **Visibility Index** (`listing_raw_visibility_index`), **Relevance** (`listing_relevance`), **Conversion** (`listing_conversion`), **Competition** (`listing_competition`, inverted color logic), **Market Index** (`listing_profit`).
+    - Created reusable `MetricCell` component with color-coded numeric display (green ≥80, amber 50-79, gray <50; inverted for competition where lower is better).
+    - Table now has 13 columns with compact spacing. Page is full-width (removed `max-w-7xl`). Default pagination increased to 20 rows.
+
+- **Keyword Bank & Favorites System** (2026-02-28):
+    - **Keyword Bank (Star Toggle)**: Each keyword row in the Performance table now has a Star (★) icon button. Clicking it toggles the keyword in/out of the user's personal `user_keyword_bank` Supabase table. Starred keywords are visually highlighted with a filled amber star. Cached metrics (volume, competition, CPC, volume_history) and listing context (product_type, theme, niche, sub_niche) are saved alongside each bank entry.
+    - **Favorites Picker Modal** (`FavoritesPickerModal.jsx`): New modal accessible via "★ Add from Favorites" button in the keyword table footer. Features: real-time text search, filter pills ("All", "Suggested" for theme/niche match, "Gems" for user-defined quality thresholds), multi-select checkboxes, duplicate detection (grayed out "Added" badge for keywords already in listing), compact volume/competition metrics display.
+    - **Gem Thresholds**: Gem filter reads user-configurable thresholds from `user_settings` table (`gem_min_volume`, `gem_max_competition`, `gem_min_cpc`). Defaults: volume ≥ 1000, competition ≤ 0.40, CPC ≥ $1.00.
+    - **Batch Keyword Addition**: When adding multiple keywords from favorites, all are sent in a **single webhook call** with `keywords: ["kw1", "kw2", ...]` (array) instead of one call per keyword. The `handleAddBatchKeywords` handler in `ProductStudio.jsx` processes the array response, batch-inserts all results to `listing_seo_stats`, and updates local state atomically.
+    - **n8n Impact**: The `userKeyword` action now receives either `keyword` (string, single) or `keywords` (array, batch). The n8n workflow should handle both formats — iterate over the array and return results for all keywords in one response.
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.

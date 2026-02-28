@@ -1,4 +1,4 @@
-import { LayoutDashboard, LayoutGrid, LineChart, ShoppingBag, Settings, User, LogOut } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, LineChart, FlaskConical, ShoppingBag, Settings, User, LogOut } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import pennyseoLogo from '../assets/pennyseo-logo.png';
@@ -11,6 +11,7 @@ const Sidebar = () => {
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { name: 'Product Studio', icon: LayoutGrid, path: '/studio' },
     { name: 'SEO History', icon: LineChart, path: '/history' },
+    { name: 'SEO Lab', icon: FlaskConical, path: '/lab' },
     { name: 'My Shop', icon: ShoppingBag, path: '/shop' },
     { name: 'Settings', icon: Settings, path: '/settings' },
   ];

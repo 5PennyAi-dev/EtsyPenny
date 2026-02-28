@@ -1262,6 +1262,180 @@ const ProductStudio = () => {
       }
   };
 
+  // Batch "Add Keywords" Handler — sends all keywords in one webhook call
+  const [isAddingBatchKeywords, setIsAddingBatchKeywords] = useState(false);
+
+  const handleAddBatchKeywords = async (keywordsArray, onProgress) => {
+      if (!keywordsArray?.length || !results || !results.analytics) return;
+      
+      const currentListingId = listingId || results?.listing_id;
+      if (!currentListingId) {
+          toast.error("Error: Missing listing ID");
+          return;
+      }
+
+      // Filter out duplicates
+      const existingSet = new Set(results.analytics.map(a => a.keyword.toLowerCase()));
+      const newKeywords = keywordsArray.filter(kw => !existingSet.has(kw.toLowerCase()));
+      if (newKeywords.length === 0) {
+          toast.info("All selected keywords are already in the performance table.");
+          return;
+      }
+
+      setIsAddingBatchKeywords(true);
+      try {
+          const formData = optimizationFormRef.current?.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
+          
+          const payload = {
+              action: 'userKeyword',
+              keywords: newKeywords,
+              listing_id: currentListingId,
+              user_id: user?.id,
+              payload: {
+                  image_url: results?.imageUrl,
+                  visual_aesthetic: visualAnalysis.aesthetic,
+                  visual_typography: visualAnalysis.typography,
+                  visual_graphics: visualAnalysis.graphics,
+                  visual_colors: visualAnalysis.colors,
+                  visual_target_audience: visualAnalysis.target_audience,
+                  visual_overall_vibe: visualAnalysis.overall_vibe,
+                  categorization: formatCategorizationPayload(formData),
+                  product_details: {
+                      product_type: formData.product_type_text || formData.product_type_name || "Product",
+                      tone: formData.tone_name || "Engaging",
+                      client_description: formData.context || "",
+                      tag_count: formData.tag_count,
+                      seo_mode: formData.seo_mode || activeMode || 'balanced'
+                  },
+                  shop_context: {
+                      shop_name: profile?.shop_name,
+                      shop_bio: profile?.shop_bio,
+                      target_audience: profile?.target_audience,
+                      brand_tone: profile?.brand_tone,
+                      brand_keywords: profile?.brand_keywords,
+                      signature_text: profile?.signature_text
+                  }
+              },
+              metadata: {
+                  app_version: "1.0.0",
+                  timestamp: new Date().toISOString()
+              }
+          };
+          
+          const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
+          const response = await axios.post(webhookUrl, payload);
+          
+          // Response should be an array of keyword results (or nested under activeMode)
+          let rawData = Array.isArray(response.data) ? response.data : [response.data];
+          
+          // Handle n8n wrapping: [{balanced: [{...}, {...}]}]
+          const defaultMode = activeMode || 'balanced';
+          if (rawData.length === 1 && rawData[0][defaultMode]) {
+              rawData = Array.isArray(rawData[0][defaultMode]) ? rawData[0][defaultMode] : [rawData[0][defaultMode]];
+          }
+          // Handle single-object wrapper: [{ keyword1data, keyword2data }] where keys are mode names
+          if (rawData.length === 1 && typeof rawData[0] === 'object' && !rawData[0].keyword) {
+              const firstVal = Object.values(rawData[0])[0];
+              if (Array.isArray(firstVal)) rawData = firstVal;
+          }
+
+          // Get current eval ID
+          let currentEvalId = null;
+          if (globalEvals?.length > 0) {
+              const activeEval = globalEvals.find(e => e.seo_mode === activeMode) || globalEvals[0];
+              currentEvalId = activeEval.id;
+          }
+
+          const newStats = [];
+          const formattedStats = [];
+
+          for (const responseData of rawData) {
+              if (!responseData || (responseData.volume === undefined && responseData.search_volume === undefined)) continue;
+              
+              const newStat = {
+                  tag: responseData.keyword,
+                  search_volume: responseData.search_volume ?? (responseData.volume || 0),
+                  competition: responseData.competition !== undefined ? String(responseData.competition) : "0",
+                  opportunity_score: responseData.opportunity_score ?? (responseData.score || 0),
+                  volume_history: Array.isArray(responseData.monthly_searches)
+                      ? responseData.monthly_searches.map(m => m.search_volume || 0)
+                      : (responseData.volume_history || []),
+                  is_trending: responseData.status?.trending || false,
+                  is_evergreen: responseData.status?.evergreen || false,
+                  is_promising: responseData.status?.promising || false,
+                  insight: responseData.insight || null,
+                  is_top: responseData.is_top || null,
+                  transactional_score: responseData.transactional_score || null,
+                  intent_label: responseData.intent_label || null,
+                  niche_score: responseData.niche_score || null,
+                  relevance_label: responseData.relevance_label || null,
+                  is_selection_ia: responseData.is_selection_ia ?? true,
+                  is_user_added: true,
+                  is_competition: false,
+                  listing_id: currentListingId,
+                  cpc: responseData.cpc ?? null,
+                  is_current_pool: responseData.is_current_pool ?? true,
+                  ...(currentEvalId ? { evaluation_id: currentEvalId } : {})
+              };
+              newStats.push(newStat);
+              formattedStats.push({
+                  keyword: newStat.tag,
+                  volume: newStat.search_volume,
+                  competition: newStat.competition,
+                  score: newStat.opportunity_score,
+                  volume_history: newStat.volume_history,
+                  is_trending: newStat.is_trending,
+                  is_evergreen: newStat.is_evergreen,
+                  is_promising: newStat.is_promising,
+                  insight: newStat.insight,
+                  is_top: newStat.is_top,
+                  transactional_score: newStat.transactional_score,
+                  intent_label: newStat.intent_label,
+                  niche_score: newStat.niche_score,
+                  relevance_label: newStat.relevance_label,
+                  is_selection_ia: newStat.is_selection_ia,
+                  is_competition: newStat.is_competition,
+                  is_user_added: newStat.is_user_added,
+                  cpc: newStat.cpc
+              });
+          }
+
+          if (newStats.length > 0) {
+              // Batch insert to DB
+              const { error: insertError } = await supabase
+                  .from('listing_seo_stats')
+                  .insert(newStats);
+              if (insertError) {
+                  console.error("Batch insert error:", insertError);
+                  throw new Error("Failed to save keywords to database.");
+              }
+
+              // Update local states
+              setAllSeoStats(prev => [...prev, ...newStats]);
+              setResults(prev => {
+                  if (!prev) return prev;
+                  const newAnalytics = [...(prev.analytics || [])];
+                  const firstCompIndex = newAnalytics.findIndex(k => k.is_competition);
+                  for (const stat of formattedStats) {
+                      if (firstCompIndex !== -1) {
+                          newAnalytics.splice(firstCompIndex, 0, stat);
+                      } else {
+                          newAnalytics.push(stat);
+                      }
+                  }
+                  return { ...prev, analytics: newAnalytics };
+              });
+
+              toast.success(`${newStats.length} keyword${newStats.length > 1 ? 's' : ''} added successfully!`);
+          }
+      } catch (err) {
+          console.error("Error adding batch keywords:", err);
+          toast.error(err.message || "Failed to add keywords.");
+      } finally {
+          setIsAddingBatchKeywords(false);
+      }
+  };
+
   // Generate Insight Handler (auto-triggered after generate_seo or seo_sniper)
   const handleGenerateInsight = async (formattedResults, formData, activeListingId, fromSniper = false) => {
     try {
@@ -2206,6 +2380,13 @@ const ProductStudio = () => {
       }
   };
 
+  const currentListingContext = useMemo(() => ({
+    product_type_text: analysisContext?.product_type_text || analysisContext?.product_type_name || '',
+    theme: analysisContext?.theme_name || analysisContext?.theme || '',
+    niche: analysisContext?.niche_name || analysisContext?.niche || '',
+    sub_niche: analysisContext?.sub_niche_name || analysisContext?.sub_niche || ''
+  }), [analysisContext]);
+
   const MemoizedResultsDisplay = useMemo(() => (
     <ResultsDisplay 
       results={results} 
@@ -2218,7 +2399,9 @@ const ProductStudio = () => {
       onCompetitionAnalysis={handleCompetitionAnalysis}
       isCompetitionLoading={isCompetitionLoading}
       onAddCustomKeyword={handleAddCustomKeyword}
+      onAddBatchKeywords={handleAddBatchKeywords}
       isAddingKeyword={isAddingKeyword}
+      isAddingBatchKeywords={isAddingBatchKeywords}
       onRecalculateScores={handleRecalculateScores}
       isRecalculating={isRecalculating}
       onResetPool={handleResetPool}
@@ -2229,15 +2412,20 @@ const ProductStudio = () => {
       strategySelections={strategySelections}
       onStrategySelectionsChange={setStrategySelections}
       resetSelectionKey={resetSelectionKey}
+      onSaveListingInfo={handleSaveListingInfo}
       
       // Strategy Switcher Props
       activeMode={activeMode}
       onModeChange={handleModeChange}
-      availableModes={globalEvals.map(e => e.seo_mode).filter(Boolean)}        
+      availableModes={globalEvals.map(e => e.seo_mode).filter(Boolean)}
+
+      // Favorite Keyword Bank Props
+      user={user}
+      currentListing={currentListingContext}
     >
         <RecentOptimizations onViewResults={handleLoadListing} />
     </ResultsDisplay>
-  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, isResettingPool, isApplyingStrategy, strategySelections, resetSelectionKey, activeMode, globalEvals]);
+  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, isResettingPool, isApplyingStrategy, strategySelections, resetSelectionKey, activeMode, globalEvals, user, currentListingContext]);
 
   return (
     <Layout>
