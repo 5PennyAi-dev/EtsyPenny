@@ -1175,9 +1175,9 @@ const ProductStudio = () => {
           // 3. Shape the data
           const newStat = {
               tag: responseData.keyword || newKeyword,
-              search_volume: responseData.search_volume !== undefined ? responseData.search_volume : (responseData.volume || 0),
-              competition: responseData.competition !== undefined ? String(responseData.competition) : "0",
-              opportunity_score: responseData.opportunity_score !== undefined ? responseData.opportunity_score : (responseData.score || 0),
+              search_volume: responseData.search_volume ?? (responseData.volume || 0),
+              competition: responseData.competition != null ? String(responseData.competition) : "0",
+              opportunity_score: responseData.opportunity_score ?? (responseData.score || 0),
               volume_history: Array.isArray(responseData.monthly_searches) 
                   ? responseData.monthly_searches.map(m => m.search_volume || 0)
                   : (responseData.volume_history || []),
@@ -1359,7 +1359,7 @@ const ProductStudio = () => {
               const newStat = {
                   tag: responseData.keyword,
                   search_volume: responseData.search_volume ?? (responseData.volume || 0),
-                  competition: responseData.competition !== undefined ? String(responseData.competition) : "0",
+                  competition: responseData.competition != null ? String(responseData.competition) : "0",
                   opportunity_score: responseData.opportunity_score ?? (responseData.score || 0),
                   volume_history: Array.isArray(responseData.monthly_searches)
                       ? responseData.monthly_searches.map(m => m.search_volume || 0)
