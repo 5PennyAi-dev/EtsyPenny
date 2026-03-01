@@ -1,8 +1,24 @@
-# Tasks
+# Tasks: Create Supabase Edge Function `check-keyword-cache`
 
-[x] Add a Pin icon next to the Favorite icon in `ResultsDisplay.jsx` table rows.
-[x] Toggle `is_pinned` locally in `results.analytics` and in the Supabase database `listing_seo_stats` when clicked.
-[x] Ensure pinned keywords always appear at the top of the selected 13 list (ordered by highest score if multiple are pinned).
-[x] Update the `is_pinned` property in the `ResultsDisplay.jsx` props.
-[x] Ensure that selecting/recalculating scores respects the pinned list (i.e., you can't manually un-select pinned properties unless you unpin them first).
-[x] Update Context and commit.
+[x] 1. **Setup Edge Function Directory**
+    - Create directory `supabase/functions/check-keyword-cache/`.
+    - Create `index.ts` in the new directory.
+
+[x] 2. **Implement Edge Function Logic (`index.ts`)**
+    - Set up Deno HTTP server using `serve` from `std/http/server.ts`.
+    - Implement standard CORS headers (allowing GET/POST/OPTIONS).
+    - Parse JSON request body to extract the `keywords` array.
+    - Initialize Supabase Admin Client using `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+
+[x] 3. **Implement Database Query & Filtering**
+    - Query `public.keyword_cache` using `.in('tag', keywords)`.
+    - Filter results to ensure `last_sync_at` is greater than `NOW() - 30 days` (freshness check).
+    - Handle query errors and missing data gracefully.
+
+[x] 4. **Return Results & Error Handling**
+    - Return a JSON object with `{ "cachedKeywords": [...] }`.
+    - Wrap the entire logic in a `try...catch` block.
+    - Return appropriate HTTP status codes (200 for success, 400 for bad request, 500 for internal error).
+
+[x] 5. **Documentation Update**
+    - Update `docs/context.md` at the end of the session to reflect the new caching architecture and edge function.

@@ -40,6 +40,7 @@ npm run preview   # Preview production build
 - `src/context/AuthContext.jsx` — Auth provider wrapping the app (provides user, profile, signOut, loading)
 - `src/lib/supabase.js` — Supabase client singleton
 - `supabase/functions/save-seo/` — Deno edge function called by n8n to persist SEO results
+- `supabase/functions/check-keyword-cache/` — Deno edge function to check for cached keyword data before calling external APIs
 - `supabase/migrations/` — SQL migration files
 - `tasks/` — Task tracking and migration scripts
 - `docs/styleguide.md` — Visual design spec (in French)

@@ -319,6 +319,13 @@
         - *Trending (Flame)*: "Rising star: Significant growth detected! Search volume in the last 3 months is at least 50% higher than the yearly average."
         - *Evergreen (Leaf)*: "Consistent demand: This keyword shows stable search volume throughout the year, indicating a non-seasonal safe bet."
         - *Promising (Award)*: "High efficiency: This keyword offers an exceptional volume-to-competition ratio compared to current market standards."
+    - **Optimized Column Widths**: Reduced the rigid percentage widths of the metric columns (Score, Volume, Competition, etc.) to give the Tag/Keyword column approximately 15% more horizontal space, preventing awkward text wrapping and creating a more equilibrated layout.
+
+- **Keyword Optimization Caching Edge Function** (2026-03-01):
+    - **Goal**: Optimize DataForSEO API costs by filtering keywords against a local database cache before analysis.
+    - **Implementation**: Created the `check-keyword-cache` Supabase Edge Function using Deno.
+    - **Logic**: Accepts a POST request with an array of `keywords`. Queries the `public.keyword_cache` table using the Supabase Service Role Key (bypassing RLS) and filters out stale entries (`last_sync_at < NOW() - 30 days`).
+    - **Output**: Returns a JSON array (`cachedKeywords`) of fresh, matching keywords containing `search_volume`, `competition`, `cpc`, and `volume_history`. n8n will use this response to skip fetching live data for these cached terms.
 
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.

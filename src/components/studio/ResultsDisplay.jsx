@@ -845,37 +845,37 @@ const SidebarSkeleton = ({ phase }) => (
                                 </th>
                                 <th className="px-3 py-2 font-semibold text-left">Tag / Keyword</th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[9%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[8%]"
                                     onClick={() => requestSort('score')}
                                 >
                                     Score <SortIcon columnKey="score" />
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold w-[9%]">
+                                <th className="px-2 py-2 text-center font-semibold w-[8%]">
                                     Conv. Intent.
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold w-[9%]">
+                                <th className="px-2 py-2 text-center font-semibold w-[8%]">
                                     Relevance
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[11%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[10%]"
                                     onClick={() => requestSort('volume')}
                                 >
                                     Avg. Vol <SortIcon columnKey="volume" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[11%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[10%]"
                                     onClick={() => requestSort('trend')}
                                 >
                                     Trend <SortIcon columnKey="trend" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[11%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[10%]"
                                     onClick={() => requestSort('competition')}
                                 >
                                     Competition <SortIcon columnKey="competition" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[9%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[8%]"
                                     onClick={() => requestSort('cpc')}
                                 >
                                     CPC <SortIcon columnKey="cpc" />
@@ -1049,7 +1049,7 @@ const SidebarSkeleton = ({ phase }) => (
                                             );
                                         })()}
                                     </td>
-                                    <td className="px-4 py-3 text-center text-slate-600 font-mono text-xs">
+                                    <td className="px-4 py-3 text-center text-slate-700">
                                         {(row.volume || 0).toLocaleString()}
                                     </td>
                                     <td className="px-4 py-3">
