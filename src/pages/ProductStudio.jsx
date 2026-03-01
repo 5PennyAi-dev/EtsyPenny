@@ -1063,12 +1063,16 @@ const ProductStudio = () => {
       toast.error('No listing loaded.');
       return;
     }
+
+    const pinnedCount = results?.analytics?.filter(k => k.is_pinned).length || 0;
+
     setIsApplyingStrategy(true);
     try {
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
       await axios.post(webhookUrl, {
         action: 'resetPool',
         listing_id: listingId,
+        pinned_count: pinnedCount,
         parameters
       });
       toast.success('Strategy update triggered! Your results will refresh in a few seconds.');
@@ -2127,6 +2131,7 @@ const ProductStudio = () => {
                 is_selection_ia: s.is_selection_ia,
                 is_user_added: s.is_user_added,
                 is_current_eval: s.is_current_eval,
+                is_pinned: s.is_pinned,
                 cpc: s.cpc
             }))
         };
@@ -2205,16 +2210,36 @@ const ProductStudio = () => {
   // Helper for Breadcrumbs
   const getContextString = () => {
     if (!analysisContext) return "Analysis";
-    const { theme_name, niche_name, product_type_name, tone_name } = analysisContext;
+    const { theme_name, niche_name, sub_niche_name, product_type_name } = analysisContext;
     return (
-        <div className="flex items-center gap-1 text-sm text-slate-600">
-            <span className="font-semibold text-indigo-700">{theme_name}</span>
-            <ChevronRight size={14} className="text-slate-400" />
-            <span>{niche_name}</span>
-            <span className="text-slate-300 mx-2">|</span>
-            <span>{product_type_name}</span>
-            <span className="text-slate-300 mx-2">|</span>
-            <span className="italic">{tone_name}</span>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            {/* Hierarchy */}
+            <div className="flex items-center gap-1">
+                <span className="font-semibold text-indigo-700 max-w-[120px] sm:max-w-none truncate" title={theme_name}>
+                    {theme_name || "Theme"}
+                </span>
+                
+                {niche_name && (
+                    <>
+                        <ChevronRight size={14} className="text-slate-400 shrink-0" />
+                        <span className="max-w-[120px] sm:max-w-none truncate" title={niche_name}>{niche_name}</span>
+                    </>
+                )}
+                
+                {sub_niche_name && (
+                    <>
+                        <ChevronRight size={14} className="text-slate-400 shrink-0" />
+                        <span className="max-w-[120px] sm:max-w-none truncate" title={sub_niche_name}>{sub_niche_name}</span>
+                    </>
+                )}
+            </div>
+
+            {/* Product Type Badge */}
+            {product_type_name && (
+                <span className="px-2 py-0.5 ml-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-md text-xs font-medium whitespace-nowrap shadow-sm">
+                    {product_type_name}
+                </span>
+            )}
         </div>
     );
   };
@@ -2265,6 +2290,97 @@ const ProductStudio = () => {
         console.error("Unexpected error in handleAddKeywordToPerformance:", err);
         toast.error("An unexpected error occurred");
     }
+  };
+
+  // --- DELETE KEYWORD FROM PERFORMANCE POOL ---
+  const handleDeleteKeyword = async (keywordToRemove) => {
+      const currentListingId = listingId || results?.listing_id;
+      
+      if (!currentListingId) {
+          toast.error("Error: Missing listing ID for deletion.");
+          return;
+      }
+
+      try {
+          // Update DB to soft delete (set is_current_pool = false)
+          const { error } = await supabase
+              .from('listing_seo_stats')
+              .update({ is_current_pool: false })
+              .eq('listing_id', currentListingId)
+              .eq('tag', keywordToRemove);
+
+          if (error) {
+              console.error("Supabase update error:", error);
+              toast.error(`Failed to remove keyword: ${error.message}`);
+              return;
+          }
+
+          // Instantly update local UI state so we don't need a full refetch
+          setResults(prev => {
+              if (!prev || !prev.analytics) return prev;
+              return {
+                  ...prev,
+                  analytics: prev.analytics.filter(item => item.keyword !== keywordToRemove)
+              };
+          });
+
+          // Also remove it from allSeoStats cache if present
+          setAllSeoStats(prev => prev.filter(item => item.tag !== keywordToRemove));
+
+          toast.success(`Removed "${keywordToRemove}" from current pool`);
+      } catch (err) {
+          console.error("Unexpected error in handleDeleteKeyword:", err);
+          toast.error("Failed to remove keyword");
+      }
+  };
+
+  // --- TOGGLE PIN STATUS ---
+  const handleTogglePin = async (keyword, newPinStatus) => {
+      const currentListingId = listingId || results?.listing_id;
+      
+      if (!currentListingId) {
+          toast.error("Error: Missing listing ID to pin keyword.");
+          return;
+      }
+
+      try {
+          // Update DB (is_pinned)
+          const { error } = await supabase
+              .from('listing_seo_stats')
+              .update({ is_pinned: newPinStatus })
+              .eq('listing_id', currentListingId)
+              .eq('tag', keyword);
+
+          if (error) {
+              console.error("Supabase pin error:", error);
+              toast.error(`Failed to pin keyword: ${error.message}`);
+              return;
+          }
+
+          // Update local UI state
+          setResults(prev => {
+              if (!prev || !prev.analytics) return prev;
+              return {
+                  ...prev,
+                  analytics: prev.analytics.map(item => 
+                      item.keyword === keyword ? { ...item, is_pinned: newPinStatus } : item
+                  )
+              };
+          });
+
+          // Also update allSeoStats cache
+          setAllSeoStats(prev => prev.map(item => 
+              item.tag === keyword ? { ...item, is_pinned: newPinStatus } : item
+          ));
+          
+          if (newPinStatus) {
+               toast.success(`Pinned "${keyword}"`);
+          }
+
+      } catch (err) {
+          console.error("Unexpected error in handleTogglePin:", err);
+          toast.error("Failed to pin keyword");
+      }
   };
 
   const handleSEOSniper = async () => {
@@ -2349,6 +2465,7 @@ const ProductStudio = () => {
               is_selection_ia: s.is_selection_ia,
               is_user_added: s.is_user_added,
               is_current_eval: s.is_current_eval,
+              is_pinned: s.is_pinned,
               cpc: s.cpc
           }))
       };
@@ -2402,10 +2519,10 @@ const ProductStudio = () => {
       onAddBatchKeywords={handleAddBatchKeywords}
       isAddingKeyword={isAddingKeyword}
       isAddingBatchKeywords={isAddingBatchKeywords}
+      onDeleteKeyword={handleDeleteKeyword}
+      onTogglePin={handleTogglePin}
       onRecalculateScores={handleRecalculateScores}
       isRecalculating={isRecalculating}
-      onResetPool={handleResetPool}
-      isResettingPool={isResettingPool}
       onApplyStrategy={handleApplyStrategy}
       isApplyingStrategy={isApplyingStrategy}
       listingId={listingId}
@@ -2425,7 +2542,7 @@ const ProductStudio = () => {
     >
         <RecentOptimizations onViewResults={handleLoadListing} />
     </ResultsDisplay>
-  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, isResettingPool, isApplyingStrategy, strategySelections, resetSelectionKey, activeMode, globalEvals, user, currentListingContext]);
+  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, isApplyingStrategy, strategySelections, resetSelectionKey, activeMode, globalEvals, user, currentListingContext, handleDeleteKeyword, handleTogglePin]);
 
   return (
     <Layout>

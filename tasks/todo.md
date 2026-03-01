@@ -1,24 +1,8 @@
-# History Page: Add Metric Columns
+# Tasks
 
-## Implementation
-- [x] Add 6 new metric columns: Visibility, Visibility Index, Relevance, Conversion, Competition, Market Index
-- [x] Create `MetricCell` helper component with color-coded display (green ≥80, amber 50-79, gray <50; inverted for Competition)
-- [x] Update table header with compact column widths
-- [x] Update colSpan from 7 to 13
-- [x] Verify build compiles
-
-## Review
-- [x] Update `docs/context.md`
-
-# History Page: Layout & Sorting Polish (2026-02-27)
-
-## Implementation
-- [x] Fixed double scrollbar: outer wrapper is now `h-screen flex flex-col overflow-hidden` — no browser-level scroll
-- [x] Pagination footer always visible (anchored at card bottom, never hidden off-screen)
-- [x] Sticky `<thead>` so column headers stay visible when scrolling through rows
-- [x] Column sorting: `SortableHeader` component with `ChevronUp/Down/ChevronsUpDown` icons
-- [x] Atomic sort state (`{ column, direction }`) via single `setSort(prev => ...)` — eliminates stale-closure race condition
-- [x] Smart sort defaults: numeric columns default desc (highest first), text/date default asc
-- [x] Deduplicate listings by `listing_id` after fetch (view returns one row per SEO mode)
-- [x] Width constrained to 85% of available area (`w-[85%] mx-auto`)
-- [x] Default page size reduced to 15 rows to avoid table scrolling at typical viewport heights
+[x] Add a Pin icon next to the Favorite icon in `ResultsDisplay.jsx` table rows.
+[x] Toggle `is_pinned` locally in `results.analytics` and in the Supabase database `listing_seo_stats` when clicked.
+[x] Ensure pinned keywords always appear at the top of the selected 13 list (ordered by highest score if multiple are pinned).
+[x] Update the `is_pinned` property in the `ResultsDisplay.jsx` props.
+[x] Ensure that selecting/recalculating scores respects the pinned list (i.e., you can't manually un-select pinned properties unless you unpin them first).
+[x] Update Context and commit.

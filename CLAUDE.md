@@ -85,7 +85,7 @@ VITE_N8N_WEBHOOK_URL_TEST # n8n webhook endpoint
 - **Primary color**: Indigo 600 (`#4f46e5`)
 - **Background**: Slate 50 (`#f8fafc`), cards are white with `border-slate-200`
 - **SEO color coding**: Green (low competition), Amber (medium), Rose (high)
-- **Icons**: Lucide React only, `stroke-width={2}`, default color `text-slate-500`
+- **Icons**: Lucide React only, `stroke-width={2}`, default color `text-slate-500`. (e.g., Star for Favorite, Pin for pinning, Award for Promising, Flame for Trending, Leaf for Evergreen)
 - **Spacing**: Generous padding (`p-8`, `gap-6`), SaaS premium feel
 - **Buttons**: `rounded-lg` or `rounded-xl`
 - **Inputs**: `bg-white` with `ring-2 ring-indigo-500` on focus

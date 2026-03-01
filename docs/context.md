@@ -288,6 +288,38 @@
     - **Batch Keyword Addition**: When adding multiple keywords from favorites, all are sent in a **single webhook call** with `keywords: ["kw1", "kw2", ...]` (array) instead of one call per keyword. The `handleAddBatchKeywords` handler in `ProductStudio.jsx` processes the array response, batch-inserts all results to `listing_seo_stats`, and updates local state atomically.
     - **n8n Impact**: The `userKeyword` action now receives either `keyword` (string, single) or `keywords` (array, batch). The n8n workflow should handle both formats — iterate over the array and return results for all keywords in one response.
 
+- **Collapsed Form Header UI Update** (2026-02-28):
+    - **UI Redesign**: Refactored `getContextString` in `ProductStudio.jsx` to display a cleaner hierarchy (`Theme > Niche > Sub-niche`) using `ChevronRight` icons.
+    - **Badges**: Emphasized the `product_type_name` by extracting it into a styled Indigo pill badge (`#e0e7ff` bg, `#4338ca` text).
+    - **Cleanup**: Removed the unused "Tone" property from the breadcrumbs to reduce clutter and maintain a streamlined hierarchy path, per user request.
+
+- **Keyword Performance Delete Feature** (2026-02-28):
+    - **UI Activation**: Enabled the previously inactive "Minus" (delete) button in the `ResultsDisplay.jsx` keyword table, adding hover states (`text-rose-600`, `bg-rose-50`) to indicate a destructive action.
+    - **Database Soft Delete**: Created `handleDeleteKeyword` in `ProductStudio.jsx` which updates the database to set `is_current_pool = false` in `listing_seo_stats` for the specified keyword.
+    - **Optimistic UI**: Implemented immediate local state filtering for `results.analytics` and `allSeoStats` to immediately remove the deleted keyword from the table without requiring a server refetch, ensuring a snappy user experience.
+    - **Selection Bugfix**: Ensured the selected keyword counter decrements accurately by auto-unselecting deleted tags from the `selectedTags` array locally.
+
+- **Removed Obsolete UI** (2026-02-28):
+    - Pruned the "Reset Keywords" functionality from `ResultsDisplay.jsx` and its accompanying handler logic (`handleResetPool`, `isResettingPool`) from `ProductStudio.jsx` per user request to simplify the interface.
+
+- **13 Keyword Selection Enforcement** (2026-02-28):
+    - **Visual Feedback**: The selected keywords counter in the `ResultsDisplay.jsx` table header now dynamically turns red (`text-rose-600`, `bg-rose-50`) if the selected count is not exactly 13, guiding the user to select the optimal number.
+    - **Action Guard**: The "Recalculate Scores" button is now disabled unless exactly 13 keywords are selected, enforcing the required calculation criteria. A tooltip is displayed when disabled to explain the requirement ("You must have 13 keywords selected to calculate the score").
+
+- **Keyword Pinning** (2026-03-01):
+    - **UI Toggle**: Added a "Pin" icon (`Pin` from `lucide-react`) to the left side of the table header, between the Favorite (Star) icon and the Checkbox, in `ResultsDisplay.jsx`. Clicking it toggles the `is_pinned` property for that keyword row visually.
+    - **Database Sync**: Hooked up `handleTogglePin` in `ProductStudio.jsx` to perform real-time `is_pinned` status updates directly to the `listing_seo_stats` table in Supabase.
+    - **Prioritization Logic**: Pinned keywords bypass standard AI selection logic and are always inserted at the top of the initial 13 selected tags, ordered by their score implicitly (if multiple are pinned).
+    - **Constraint Enforcement**: Pinned keywords cannot be manually deselected by the user via the UI checkbox. The checkbox disables with `opacity-50` and `cursor-not-allowed` styles, and the `toggleTag` function includes an early return and warning toast (`Pinned keywords cannot be deselected. Unpin it first.`).
+    - **Webhook Payload**: The `resetPool` webhook action inside `handleApplyStrategy` now includes a `pinned_count` integer payload, indicating to the n8n backend how many pinned keywords currently exist.
+
+- **Keyword Performance Table UI Polish** (2026-03-01):
+    - **Iconography Update**: Replaced the Star icon with the `Award` icon for `is_promising` keywords across the table to prevent visual confusion with the new Favorite (Star) keyword feature.
+    - **Detailed Tooltips**: Added rich, descriptive tooltips to the top headers for the performance indicators:
+        - *Trending (Flame)*: "Rising star: Significant growth detected! Search volume in the last 3 months is at least 50% higher than the yearly average."
+        - *Evergreen (Leaf)*: "Consistent demand: This keyword shows stable search volume throughout the year, indicating a non-seasonal safe bet."
+        - *Promising (Award)*: "High efficiency: This keyword offers an exceptional volume-to-competition ratio compared to current market standards."
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.

@@ -2,7 +2,7 @@
   Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, 
   ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, 
   Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart, 
-  Pin, Tag, User, Zap, Swords, DollarSign
+  Pin, Tag, User, Zap, Swords, DollarSign, Award
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -364,10 +364,10 @@ const SidebarSkeleton = ({ phase }) => (
     onSaveListingInfo,
     onRecalculateScores,
     isRecalculating,
-    onResetPool,
-    isResettingPool,
     onApplyStrategy,
     isApplyingStrategy,
+    onDeleteKeyword,
+    onTogglePin,
     listingId,
     strategySelections,
     onStrategySelectionsChange,
@@ -468,18 +468,34 @@ const SidebarSkeleton = ({ phase }) => (
     // (e.g., initial load, mode switch, or fresh insights generated)
     useEffect(() => {
       if (results?.analytics) {
-          // Check if explicit AI selections exist (new feature)
+          // 1. Always prioritize Pinned tags
+          const pinnedTags = results.analytics
+            .filter(r => r.is_pinned === true)
+            .sort((a, b) => (b.score || 0) - (a.score || 0))
+            .map(r => r.keyword);
+
+          // 2. Check if explicit AI selections exist (new feature)
           const currentEvalSelections = results.analytics
-            .filter(r => r.is_current_eval === true)
+            .filter(r => r.is_current_eval === true && !r.is_pinned)
+            .sort((a, b) => (b.score || 0) - (a.score || 0))
             .map(r => r.keyword);
           
-          if (currentEvalSelections.length > 0) {
-             // Apply AI selection
-             setSelectedTags(currentEvalSelections);
+          let initialSelections = [];
+
+          if (currentEvalSelections.length > 0 || pinnedTags.length > 0) {
+              // Combine pinned and AI selections, ensuring uniqueness
+              initialSelections = Array.from(new Set([...pinnedTags, ...currentEvalSelections]));
           } else {
-             // Fallback: If no AI selection (or legacy data), select all by default
-             setSelectedTags(results.analytics.map(r => r.keyword));
+             // Fallback: If no AI selection (or legacy data), select top scoring ones
+             const fallbackSelections = results.analytics
+               .filter(r => !r.is_pinned)
+               .sort((a, b) => (b.score || 0) - (a.score || 0))
+               .map(r => r.keyword);
+             initialSelections = Array.from(new Set([...pinnedTags, ...fallbackSelections]));
           }
+          
+          // Enforce 13 tag limit (prioritizing pinned items implicitly because they were added first)
+          setSelectedTags(initialSelections.slice(0, 13));
       }
     }, [resetSelectionKey]);
   
@@ -546,11 +562,16 @@ const SidebarSkeleton = ({ phase }) => (
 
       let sortableItems = [...primaryAnalytics];
       sortableItems.sort((a, b) => {
-        // PRIMARY: selected items pinned to top
+        // PRIMARY: pinned items ALWAYS at the very top
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
+
+        // SECONDARY: selected items pinned to top (under pinned)
         const aSelected = selectedTags.includes(a.keyword) ? 1 : 0;
         const bSelected = selectedTags.includes(b.keyword) ? 1 : 0;
         if (aSelected !== bSelected) return bSelected - aSelected;
-        // SECONDARY: column sort within each group
+        
+        // TERTIARY: column sort within each group
         return secondaryCompare(a, b);
       });
 
@@ -657,6 +678,13 @@ const SidebarSkeleton = ({ phase }) => (
     const hasDraft = !!results?.title && results?.title !== "SEO Analysis Completed";
   
     const toggleTag = (keyword) => {
+      // Prevent manual unselection if keyword is pinned
+      const tagData = primaryAnalytics.find(k => k.keyword === keyword);
+      if (tagData?.is_pinned) {
+          toast.error("Pinned keywords cannot be deselected. Unpin it first.");
+          return;
+      }
+      
       setSelectedTags(prev => 
           prev.includes(keyword) 
               ? prev.filter(k => k !== keyword)
@@ -752,7 +780,11 @@ const SidebarSkeleton = ({ phase }) => (
                             />
                          )}
                          {results && (
-                            <span className="text-xs font-normal text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full ml-1">
+                            <span className={`text-xs font-normal px-2 py-0.5 rounded-full ml-1 border transition-colors ${
+                                selectedTags.length === 13 
+                                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200 font-medium' 
+                                    : 'text-rose-600 bg-rose-50 border-rose-200 font-semibold shadow-sm'
+                            }`}>
                                 {selectedTags.length} / {results.analytics?.length || 0} selected
                             </span>
                          )}
@@ -769,28 +801,18 @@ const SidebarSkeleton = ({ phase }) => (
                                 const selectedKeywordsData = primaryAnalytics.filter(k => selectedTags.includes(k.keyword));
                                 onRecalculateScores?.(selectedKeywordsData); 
                             }}
-                            disabled={isRecalculating}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 rounded-lg transition-colors border border-indigo-100 shadow-sm"
-                            title="Recalculate Global Scores"
+                            disabled={isRecalculating || selectedTags.length !== 13}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors border border-indigo-100 shadow-sm"
+                            title={selectedTags.length !== 13 ? "You must have 13 keywords selected to calculate the score" : "Recalculate Global Scores"}
                          >
                             {isRecalculating ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
                             Recalculate Scores
                          </button>
 
-                         <button 
-                            onClick={(e) => { e.stopPropagation(); onResetPool?.(); }}
-                            disabled={isResettingPool}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 rounded-lg transition-colors border border-amber-100 shadow-sm"
-                            title="Reset keyword pool from database"
-                         >
-                            {isResettingPool ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                            Reset Keywords
-                         </button>
-
                          <div className="flex items-center gap-3 text-xs text-slate-500 ml-2 hidden sm:flex border-l border-slate-200 pl-3">
-                             <span className="flex items-center gap-1" title="Trending"><Flame size={12} className="text-orange-500"/></span>
-                             <span className="flex items-center gap-1" title="Evergreen"><Leaf size={12} className="text-emerald-500"/></span>
-                             <span className="flex items-center gap-1" title="Opportunity"><Star size={12} className="text-amber-400"/></span>
+                             <span className="flex items-center gap-1" title="Rising star: Significant growth detected! Search volume in the last 3 months is at least 50% higher than the yearly average."><Flame size={12} className="text-orange-500"/></span>
+                             <span className="flex items-center gap-1" title="Consistent demand: This keyword shows stable search volume throughout the year, indicating a non-seasonal safe bet."><Leaf size={12} className="text-emerald-500"/></span>
+                             <span className="flex items-center gap-1" title="High efficiency: This keyword offers an exceptional volume-to-competition ratio compared to current market standards."><Award size={12} className="text-amber-400"/></span>
                          </div>
                     </div>
                     )
@@ -800,8 +822,11 @@ const SidebarSkeleton = ({ phase }) => (
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                             <tr>
-                                <th className="pl-3 pr-1 py-2 w-8 text-center">
+                                <th className="pl-3 pr-1 py-2 w-8 text-center" title="Favorite">
                                     <Star size={14} className="text-slate-300 mx-auto" />
+                                </th>
+                                <th className="px-1 py-2 w-8 text-center" title="Pin Keyword">
+                                    <Pin size={14} className="text-slate-300 mx-auto" />
                                 </th>
                                 <th className="px-4 py-2 w-10 text-center">
                                     <input 
@@ -862,7 +887,7 @@ const SidebarSkeleton = ({ phase }) => (
                         <tbody className="divide-y divide-slate-100">
                             {!results ? (
                                 <tr>
-                                    <td colSpan="12" className="px-4 py-8 text-center text-slate-400 italic">
+                                    <td colSpan="13" className="px-4 py-8 text-center text-slate-400 italic">
                                         No analysis results yet. Start a new listing analysis.
                                     </td>
                                 </tr>
@@ -878,7 +903,7 @@ const SidebarSkeleton = ({ phase }) => (
                                       <React.Fragment key={row.keyword}>
                                         {showDivider && (
                                           <tr className="border-t-2 border-slate-200">
-                                            <td colSpan="12" className="px-4 py-1.5 bg-slate-50">
+                                            <td colSpan="13" className="px-4 py-1.5 bg-slate-50">
                                               <div className="flex items-center gap-2">
                                                 <div className="h-px flex-1 bg-slate-200" />
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Suggestions & Discovery</span>
@@ -916,12 +941,30 @@ const SidebarSkeleton = ({ phase }) => (
                                             />
                                         </button>
                                     </td>
+                                    <td className="px-1 py-3 text-center">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (onTogglePin) onTogglePin(row.keyword, !row.is_pinned);
+                                            }}
+                                            className={`p-0.5 rounded transition-all duration-200 hover:scale-110 ${
+                                                row.is_pinned 
+                                                    ? 'text-indigo-600' 
+                                                    : 'text-slate-300 hover:text-indigo-600'
+                                            }`}
+                                            title={row.is_pinned ? "Unpin keyword" : "Pin keyword (forces selection)"}
+                                        >
+                                            <Pin size={16} className={row.is_pinned ? "fill-indigo-600" : ""} />
+                                        </button>
+                                    </td>
                                     <td className="px-4 py-3 text-center">
                                         <input 
                                             type="checkbox" 
-                                            checked={isSelected}
+                                            checked={isSelected || row.is_pinned}
                                             onChange={() => toggleTag(row.keyword)}
-                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            disabled={row.is_pinned}
+                                            className={`rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 ${row.is_pinned ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            title={row.is_pinned ? "Pinned keywords are always selected" : undefined}
                                         />
                                     </td>
                                     <td className="px-3 py-3 font-medium relative">
@@ -1055,15 +1098,26 @@ const SidebarSkeleton = ({ phase }) => (
                                         })()}
                                     </td>
                                     <td className="px-4 py-3 text-center">
-                                        <div className="flex items-center justify-center gap-2">
-                                            {row.is_trending && <Flame size={16} className="text-orange-500 fill-orange-500/20" />}
-                                            {row.is_evergreen && <Leaf size={16} className="text-emerald-500 fill-emerald-500/20" />}
-                                            {row.is_promising && <Star size={16} className="text-amber-400 fill-amber-400/20" />}
+                                        <div className="flex items-center justify-center gap-1.5">
+                                            {row.is_trending && <Flame size={16} className="text-orange-500 fill-orange-500/20" title="Trending" />}
+                                            {row.is_evergreen && <Leaf size={16} className="text-emerald-500 fill-emerald-500/20" title="Evergreen" />}
+                                            {row.is_promising && <Award size={16} className="text-amber-400 fill-amber-400/20" title="Promising" />}
                                             {(!row.is_trending && !row.is_evergreen && !row.is_promising) && <span className="text-slate-300">-</span>}
                                         </div>
                                     </td>
                                     <td className="px-2 py-3 text-center">
-                                        <button disabled className="w-6 h-6 rounded-full flex items-center justify-center transition-colors border mx-auto bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed opacity-50">
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (onDeleteKeyword) {
+                                                    // Ensure we deselect the keyword if it was selected
+                                                    setSelectedTags(prev => prev.filter(k => k !== row.keyword));
+                                                    onDeleteKeyword(row.keyword);
+                                                }
+                                            }}
+                                            className="w-6 h-6 rounded-full flex items-center justify-center transition-colors border mx-auto bg-slate-50 text-slate-400 border-slate-200 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200"
+                                            title="Delete Keyword"
+                                        >
                                             <Minus size={14} />
                                         </button>
                                     </td>
@@ -1077,6 +1131,7 @@ const SidebarSkeleton = ({ phase }) => (
                             {isAddingRow && (
                                 <tr className="bg-indigo-50/30 border-t-2 border-indigo-100">
                                     <td className="pl-3 pr-1 py-3"></td>
+                                    <td className="px-1 py-3"></td>
                                     <td className="px-4 py-3 text-center">
                                         <input 
                                             type="checkbox" 
@@ -1084,7 +1139,7 @@ const SidebarSkeleton = ({ phase }) => (
                                             className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 opacity-50"
                                         />
                                     </td>
-                                    <td className="px-3 py-3" colSpan="9">
+                                    <td className="px-3 py-3" colSpan="10">
                                         <input
                                             ref={addInputRef}
                                             type="text"
