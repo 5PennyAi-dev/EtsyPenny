@@ -416,6 +416,14 @@ const SidebarSkeleton = ({ phase }) => (
                  // Success callback: close the row and reset
                  setIsAddingRow(false);
                  setNewKeywordInput('');
+                 
+                 // Auto-select the newly added keyword
+                 setSelectedTags(prev => {
+                     if (!prev.includes(trimmed)) {
+                         return [trimmed, ...prev].slice(0, 13);
+                     }
+                     return prev;
+                 });
              });
         }
     };
@@ -1370,7 +1378,17 @@ const SidebarSkeleton = ({ phase }) => (
       <FavoritesPickerModal
           isOpen={showFavoritesPicker}
           onClose={() => setShowFavoritesPicker(false)}
-          onAddBatchKeywords={onAddBatchKeywords}
+          onAddBatchKeywords={async (keywordsArray) => {
+              if (onAddBatchKeywords) {
+                  const success = await onAddBatchKeywords(keywordsArray);
+                  if (success !== false) { // Handle undefined in older versions just in case
+                      setSelectedTags(prev => {
+                          const toAdd = keywordsArray.filter(k => !prev.includes(k));
+                          return [...toAdd, ...prev].slice(0, 13);
+                      });
+                  }
+              }
+          }}
           isAddingBatch={isAddingBatchKeywords}
           user={user}
           currentListing={currentListing}

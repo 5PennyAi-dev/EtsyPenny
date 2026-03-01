@@ -1431,10 +1431,13 @@ const ProductStudio = () => {
               });
 
               toast.success(`${newStats.length} keyword${newStats.length > 1 ? 's' : ''} added successfully!`);
+              return true;
           }
+          return false;
       } catch (err) {
           console.error("Error adding batch keywords:", err);
           toast.error(err.message || "Failed to add keywords.");
+          return false;
       } finally {
           setIsAddingBatchKeywords(false);
       }

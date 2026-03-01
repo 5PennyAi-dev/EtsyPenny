@@ -319,6 +319,7 @@
     - **Optimized Column Widths**: Reduced the rigid percentage widths of the metric columns to give the Tag/Keyword column approximately 15% more horizontal space.
     - **Typography Fix**: Removed the monospaced font from the `Avg. Vol` column to match the `Score` column.
     - **Webhook Payload Alignment**: Fixed an issue where adding a single custom keyword passed `keyword: "..."` as a string instead of `keywords: ["..."]`, aligning the payload schema with the batch addition logic for the n8n `userKeyword` webhook.
+    - **Custom Keyword Auto-Selection**: Keywords added manually or via the Favorites Bank are now automatically added to the `selectedTags` state, ensuring they immediately float to the top section of the Keyword Performance table.
 
 - **Keyword Optimization Caching Edge Function** (2026-03-01):
     - **Goal**: Optimize DataForSEO API costs by filtering keywords against a local database cache before analysis.
