@@ -22,3 +22,9 @@
 
 [x] 5. **Documentation Update**
     - Update `docs/context.md` at the end of the session to reflect the new caching architecture and edge function.
+
+# Additional Task: UI Refinement
+
+[x] 1. **Keyword Performance Table Styling**
+    - Changed percentage widths for metric columns to allocate more room (approx 15% to 25% adjusted) to the `Tag / Keyword` col.
+    - Updated typography for `Avg. Vol` column to match the rest of the table but un-bolded.

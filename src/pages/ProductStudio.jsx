@@ -1113,7 +1113,7 @@ const ProductStudio = () => {
           // 2. N8N Webhook Call - using same payload structure as generate_seo plus the custom keyword
           const payload = {
               action: 'userKeyword',
-              keyword: newKeyword,
+              keywords: [newKeyword],
               listing_id: currentListingId,
               user_id: user?.id,
               payload: {

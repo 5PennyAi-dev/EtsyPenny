@@ -313,13 +313,12 @@
     - **Constraint Enforcement**: Pinned keywords cannot be manually deselected by the user via the UI checkbox. The checkbox disables with `opacity-50` and `cursor-not-allowed` styles, and the `toggleTag` function includes an early return and warning toast (`Pinned keywords cannot be deselected. Unpin it first.`).
     - **Webhook Payload**: The `resetPool` webhook action inside `handleApplyStrategy` now includes a `pinned_count` integer payload, indicating to the n8n backend how many pinned keywords currently exist.
 
-- **Keyword Performance Table UI Polish** (2026-03-01):
-    - **Iconography Update**: Replaced the Star icon with the `Award` icon for `is_promising` keywords across the table to prevent visual confusion with the new Favorite (Star) keyword feature.
-    - **Detailed Tooltips**: Added rich, descriptive tooltips to the top headers for the performance indicators:
-        - *Trending (Flame)*: "Rising star: Significant growth detected! Search volume in the last 3 months is at least 50% higher than the yearly average."
-        - *Evergreen (Leaf)*: "Consistent demand: This keyword shows stable search volume throughout the year, indicating a non-seasonal safe bet."
-        - *Promising (Award)*: "High efficiency: This keyword offers an exceptional volume-to-competition ratio compared to current market standards."
-    - **Optimized Column Widths**: Reduced the rigid percentage widths of the metric columns (Score, Volume, Competition, etc.) to give the Tag/Keyword column approximately 15% more horizontal space, preventing awkward text wrapping and creating a more equilibrated layout.
+- **Keyword Performance Table UI Polish & Fixes** (2026-03-01):
+    - **Iconography Update**: Replaced the Star icon with the `Award` icon for `is_promising` keywords across the table.
+    - **Detailed Tooltips**: Added rich, descriptive tooltips to the top headers for the performance indicators.
+    - **Optimized Column Widths**: Reduced the rigid percentage widths of the metric columns to give the Tag/Keyword column approximately 15% more horizontal space.
+    - **Typography Fix**: Removed the monospaced font from the `Avg. Vol` column to match the `Score` column.
+    - **Webhook Payload Alignment**: Fixed an issue where adding a single custom keyword passed `keyword: "..."` as a string instead of `keywords: ["..."]`, aligning the payload schema with the batch addition logic for the n8n `userKeyword` webhook.
 
 - **Keyword Optimization Caching Edge Function** (2026-03-01):
     - **Goal**: Optimize DataForSEO API costs by filtering keywords against a local database cache before analysis.
