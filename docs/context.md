@@ -351,6 +351,17 @@
     - **Inline Editing**: Administrators can click "Edit" on any parameter to toggle a numeric input field. Clicking "Save" instantly performs an atomic update to Supabase (`.update({ value: X }).eq('id', id)`) and updates the local UI optimistically without requiring a full page reload.
     - **Navigation**: Inserted an "Admin" link with a `Settings` icon directly into the main `Sidebar` navigation menu.
     - **Security Placeholder**: Added a `// TODO` note reminding to wrap the layout with an Admin-only Role check in the future.
+- **Personal SEO Optimizer (User Settings)** (2026-03-02):
+    - **Feature**: Created `/settings` route and `UserSettings.jsx` allowing users to tune their AI algorithms.
+    - **Data Source**: Reconciles the `system_seo_constants` catalog with the user's saved relationships in `user_settings`.
+    - **UI Layout**: Segmented controls for Strategy Weights (Volume, Competition, Transactional, Niche, CPC) and Smart Badge Sensitivity (Evergreen, Trending, Promising).
+    - **Premium Section**: Added numeric bounds controls for AI Selection Count, Working Pool Size, and Concept Diversity.
+    - **Live Values Preview**: Implemented a sticky right-hand sidebar that queries `v_user_seo_active_settings` to immediately display the resolved mathematical values (floats/integers) behind the user's label choices.
+
+- **Navigation & Branding Polish** (2026-03-02):
+    - **Sidebar Update**: Renamed "Product Studio" to "SEO Listings" and changed its icon to a `Shirt`.
+    - **Admin Isolation**: Moved the "Admin" link to the bottom of the sidebar, separated from primary user tools, and assigned it the `ShieldAlert` icon.
+    - **Logo Scaling**: Replaced Tailwind padding classes with explicit CSS pixel widths and negative margins (`w-[240px]`) to force the PennySEO logo to properly fill the sidebar header, overcoming intrinsic transparent padding in the PNG file.
 
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.

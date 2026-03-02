@@ -32,8 +32,8 @@ npm run preview   # Preview production build
 `@` maps to `./src` (configured in vite.config.js)
 
 ### Key Directories
-- `src/pages/` — Full page components (ProductStudio, Dashboard, HistoryPage, BrandProfilePage, LoginPage)
-- `src/components/studio/` — Product Studio sub-components (OptimizationForm, ResultsDisplay, ImageUpload, StrategyTuner, FavoritesPickerModal, etc.)
+- `src/pages/` — Full page components (ProductStudio (SEO Listings), Dashboard, HistoryPage, BrandProfilePage, LoginPage)
+- `src/components/studio/` — SEO Listings sub-components (OptimizationForm, ResultsDisplay, ImageUpload, StrategyTuner, FavoritesPickerModal, etc.)
 - `src/components/dashboard/` — Dashboard widgets (PerformanceCard, MarketInsights, RadialGauge)
 - `src/components/ui/` — Reusable UI primitives (Accordion, ConfirmationModal, SearchableSelect)
 - `src/components/pdf/` — PDF export (ListingPDFDocument using @react-pdf/renderer)

@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import BrandProfilePage from './pages/BrandProfilePage';
 import SEOLab from './pages/SEOLab';
 import AdminSystemPage from './pages/AdminSystemPage';
+import UserSettings from './pages/UserSettings';
 
 import { Toaster } from 'sonner';
 
@@ -55,6 +56,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AdminSystemPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/settings" 
+            element={
+              <ProtectedRoute>
+                <UserSettings />
               </ProtectedRoute>
             } 
           />

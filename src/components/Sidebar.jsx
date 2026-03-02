@@ -1,4 +1,4 @@
-import { LayoutDashboard, LayoutGrid, LineChart, FlaskConical, ShoppingBag, Settings, User, LogOut } from 'lucide-react';
+import { LayoutDashboard, Shirt, LineChart, FlaskConical, ShoppingBag, Settings, User, LogOut, ShieldAlert } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import pennyseoLogo from '../assets/pennyseo-logo.png';
@@ -9,12 +9,11 @@ const Sidebar = () => {
   
   const navItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-    { name: 'Product Studio', icon: LayoutGrid, path: '/studio' },
+    { name: 'SEO Listings', icon: Shirt, path: '/studio' },
     { name: 'SEO History', icon: LineChart, path: '/history' },
     { name: 'SEO Lab', icon: FlaskConical, path: '/lab' },
     { name: 'My Shop', icon: ShoppingBag, path: '/shop' },
     { name: 'Settings', icon: Settings, path: '/settings' },
-    { name: 'Admin', icon: Settings, path: '/admin/system' },
   ];
 
   const handleLogout = async () => {
@@ -28,8 +27,13 @@ const Sidebar = () => {
   return (
     <div className="h-screen w-64 bg-white border-r border-slate-200 flex flex-col fixed left-0 top-0">
       {/* Logo */}
-      <div className="p-6 border-b border-slate-100">
-        <img src={pennyseoLogo} alt="PennySEO" className="w-full h-auto" />
+      <div className="flex items-center justify-center p-0 border-b border-slate-100 h-24 overflow-hidden">
+        <img 
+          src={pennyseoLogo} 
+          alt="PennySEO" 
+          style={{ width: '240px', maxWidth: 'none', marginLeft: '-10px' }} 
+          className="object-cover"
+        />
       </div>
 
       {/* Navigation */}
@@ -55,6 +59,21 @@ const Sidebar = () => {
           );
         })}
       </nav>
+
+      {/* Admin Section (Bottom) */}
+      <div className="p-4 border-t border-slate-100 space-y-1">
+        <Link
+          to="/admin/system"
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+            location.pathname === '/admin/system'
+              ? 'bg-rose-50 text-rose-600'
+              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          }`}
+        >
+          <ShieldAlert size={20} className={location.pathname === '/admin/system' ? 'text-rose-600' : 'text-slate-400'} />
+          Admin
+        </Link>
+      </div>
 
       {/* User Profile */}
       <div className="p-4 border-t border-slate-100">
