@@ -14,6 +14,7 @@ const Sidebar = () => {
     { name: 'SEO Lab', icon: FlaskConical, path: '/lab' },
     { name: 'My Shop', icon: ShoppingBag, path: '/shop' },
     { name: 'Settings', icon: Settings, path: '/settings' },
+    { name: 'Admin', icon: Settings, path: '/admin/system' },
   ];
 
   const handleLogout = async () => {

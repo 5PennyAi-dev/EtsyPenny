@@ -343,6 +343,15 @@
     - **Replication Lag Fix**: Implemented strict chronological bounding in `handleLoadListing` and `handleAnalyzeDesign`. We now store the exact server `updated_at` time when starting analysis (`imageAnalysisTriggeredAtRef`). The real-time listener and poller will strictly ignore any `is_image_analysed: true` responses unless their `updated_at` is strictly newer than the trigger time.
     - **Silent Database Error Fix**: During form auto-save, the `handleAnalyzeDesign` and `handleSaveDraft` functions were attempting to push `seo_mode` into the `listings` table update payload. Since `seo_mode` was removed from the schema, this caused a silent `PGRST204` failure that prevented `is_image_analysed: false` from saving to the DB. Removed all `seo_mode` references from the listings update payloads, restoring resilient auto-resume capabilities.
 
+- **SEO System Admin Dashboard** (2026-03-02):
+    - **Feature**: Created an internal `/admin/system` route and `AdminSystemPage.jsx` for managing core mathematical constants.
+    - **Data Source**: Fetches live configuration values from the `public.system_seo_constants` table.
+    - **UI Layout**: Uses a clean, data-heavy dashboard aesthetic. Constants are visually separated into two distinct cards: "SEO Strategy Weights" (tunable multipliers) and "Intelligence Thresholds" (hard limits for badge assignment).
+    - **Collapsible Elements**: Wrapped the "SEO Strategy Weights" and "Intelligence Thresholds" tables using the existing `Accordion.jsx` component to allow users to easily expand or collapse the sections, minimizing visual clutter.
+    - **Inline Editing**: Administrators can click "Edit" on any parameter to toggle a numeric input field. Clicking "Save" instantly performs an atomic update to Supabase (`.update({ value: X }).eq('id', id)`) and updates the local UI optimistically without requiring a full page reload.
+    - **Navigation**: Inserted an "Admin" link with a `Settings` icon directly into the main `Sidebar` navigation menu.
+    - **Security Placeholder**: Added a `// TODO` note reminding to wrap the layout with an Admin-only Role check in the future.
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.

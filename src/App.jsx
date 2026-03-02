@@ -7,6 +7,7 @@ import HistoryPage from './pages/HistoryPage';
 import Dashboard from './pages/Dashboard';
 import BrandProfilePage from './pages/BrandProfilePage';
 import SEOLab from './pages/SEOLab';
+import AdminSystemPage from './pages/AdminSystemPage';
 
 import { Toaster } from 'sonner';
 
@@ -46,6 +47,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <SEOLab />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/system" 
+            element={
+              <ProtectedRoute>
+                <AdminSystemPage />
               </ProtectedRoute>
             } 
           />
