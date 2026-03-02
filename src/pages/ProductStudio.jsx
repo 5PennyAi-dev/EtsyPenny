@@ -132,6 +132,10 @@ const ProductStudio = () => {
   // Refs to track background SEO completion (avoids stale closures)
   const isWaitingForSeoRef = useRef(false);
   const seoTriggeredAtRef = useRef(null); // ISO timestamp captured when analysis starts
+  
+  // Refs to track background Image Analysis
+  const isWaitingForImageAnalysisRef = useRef(false);
+  const imageAnalysisTriggeredAtRef = useRef(null);
 
   // Listen for background SEO generation completion (Realtime + Polling fallback)
   useEffect(() => {
@@ -148,11 +152,8 @@ const ProductStudio = () => {
       setIsLoading(false);
     };
 
-    // Helper: check if a row's updated_at is newer than when we triggered the analysis
-    const isNewerThanTrigger = (updatedAt) => {
-      if (!seoTriggeredAtRef.current || !updatedAt) return false;
-      return new Date(updatedAt) > new Date(seoTriggeredAtRef.current);
-    };
+    // Helper: We now rely on database state resets instead of timestamps to avoid clock skew bugs.
+    const isNewerThanTrigger = (updatedAt) => true;
 
     // 1. Realtime subscription (instant if it works)
     const channel = supabase
@@ -169,26 +170,76 @@ const ProductStudio = () => {
           if (payload.new.status_id === STATUS_IDS.SEO_DONE && isNewerThanTrigger(payload.new.updated_at)) {
             await handleSeoDone();
           }
+          if (payload.new.is_image_analysed === true && isImageNewerThanTrigger(payload.new.updated_at)) {
+            await handleImageAnalysisDone(payload.new);
+          }
         }
       )
       .subscribe();
 
     // 2. Polling fallback (every 5s) — catches it if Realtime misses the event
     const pollInterval = setInterval(async () => {
-      if (!isWaitingForSeoRef.current) return; // Not waiting, skip
+      if (!isWaitingForSeoRef.current && !isWaitingForImageAnalysisRef.current) return; // Not waiting for anything, skip
       try {
         const { data } = await supabase
           .from('listings')
-          .select('status_id, updated_at')
+          .select('status_id, updated_at, is_image_analysed, visual_aesthetic, visual_typography, visual_graphics, visual_colors, visual_target_audience, visual_overall_vibe, theme, niche, sub_niche')
           .eq('id', listingId)
           .single();
-        if (data?.status_id === STATUS_IDS.SEO_DONE && isNewerThanTrigger(data.updated_at)) {
+          
+        if (isWaitingForSeoRef.current && data?.status_id === STATUS_IDS.SEO_DONE && isNewerThanTrigger(data.updated_at)) {
           await handleSeoDone();
+        }
+        if (isWaitingForImageAnalysisRef.current && data?.is_image_analysed === true && isImageNewerThanTrigger(data.updated_at)) {
+          await handleImageAnalysisDone(data);
         }
       } catch (e) {
         // Silently ignore poll errors
       }
     }, 5000);
+
+    // Shared handler for Image Analysis completion
+    const handleImageAnalysisDone = async (data) => {
+        if (!isWaitingForImageAnalysisRef.current) return;
+        isWaitingForImageAnalysisRef.current = false;
+        imageAnalysisTriggeredAtRef.current = null;
+        
+        // Update visual fields
+        const aiTheme = data.theme || "";
+        const aiNiche = data.niche || "";
+        const aiSubNiche = data.sub_niche || "";
+
+        setVisualAnalysis({
+            aesthetic: data.visual_aesthetic || "",
+            typography: data.visual_typography || "",
+            graphics: data.visual_graphics || "",
+            colors: data.visual_colors || "",
+            target_audience: data.visual_target_audience || "",
+            overall_vibe: data.visual_overall_vibe || "",
+            theme: aiTheme,
+            niche: aiNiche,
+            sub_niche: aiSubNiche
+        });
+
+        // Update form context while preserving user description/type
+        setAnalysisContext(prev => ({
+            ...(prev || {}),
+            theme_name: aiTheme,
+            niche_name: aiNiche,
+            sub_niche_name: aiSubNiche
+        }));
+
+        setIsImageAnalyzedState(true);
+        setIsAnalyzingDesign(false);
+        toast.success("Visual analysis complete! ✨");
+    };
+
+    // Helper: Compare database 'updated_at' against when we started the analysis to ignore stale read-replicas
+    const isImageNewerThanTrigger = (updatedAt) => {
+        if (!imageAnalysisTriggeredAtRef.current || !updatedAt) return true;
+        // We capture the server's updated_at when we launch the analysis. The final n8n save will definitely be strictly newer.
+        return new Date(updatedAt).getTime() > new Date(imageAnalysisTriggeredAtRef.current).getTime();
+    };
 
     return () => {
       supabase.removeChannel(channel);
@@ -238,17 +289,22 @@ const ProductStudio = () => {
               product_type_id: currentFormData.product_type_id || customTypeIdRef.current,
               product_type_text: currentFormData.product_type_text || null,
               user_description: currentFormData.context || null,
-              seo_mode: currentFormData.seo_mode || 'balanced',
-              image_url: publicUrl // Save the image URL immediately
+              image_url: publicUrl, // Save the image URL immediately
+              is_image_analysed: false // Reset flag to prevent instant polling hit on re-runs
           };
+
+          let serverTriggerTime = new Date().toISOString();
 
           if (currentListingId) {
                // Update existing
-               const { error: updateError } = await supabase
+               const { data: updatedListing, error: updateError } = await supabase
                   .from('listings')
                   .update({ ...savePayload, updated_at: new Date().toISOString() })
-                  .eq('id', currentListingId);
+                  .eq('id', currentListingId)
+                  .select('updated_at, is_image_analysed')
+                  .single();
                if (updateError) console.error("Auto-save before analysis failed:", updateError);
+               if (updatedListing?.updated_at) serverTriggerTime = updatedListing.updated_at;
           } else {
                // Insert new
                const { data: newListing, error: insertError } = await supabase
@@ -259,7 +315,7 @@ const ProductStudio = () => {
                       status_id: STATUS_IDS.NEW,
                       title: "Draft SEO Analysis"
                   })
-                  .select()
+                  .select('id, updated_at')
                   .single();
                   
                if (insertError) {
@@ -268,6 +324,7 @@ const ProductStudio = () => {
                    currentListingId = newListing.id;
                    setListingId(newListing.id);
                    setIsNewListingActive(false); // No longer purely new
+                   serverTriggerTime = newListing.updated_at;
                }
           }
 
@@ -277,6 +334,7 @@ const ProductStudio = () => {
           const payload = {
               action: "analyseImage", // As requested
               user_id: user.id,
+              listing_id: currentListingId,
               payload: {
                   image_url: publicUrl,
                   product_details: {
@@ -286,114 +344,26 @@ const ProductStudio = () => {
               }
           };
 
-          const response = await axios.post(webhookUrl, payload);
+          // Fire and forget webhook
+          axios.post(webhookUrl, payload).catch(err => {
+              console.error("Webhook trigger failed:", err);
+              toast.error("Failed to start analysis. Check your connection.");
+              isWaitingForImageAnalysisRef.current = false;
+              setIsAnalyzingDesign(false);
+          });
 
+          // Signal the Realtime listener to watch for completion
+          imageAnalysisTriggeredAtRef.current = serverTriggerTime;
+          isWaitingForImageAnalysisRef.current = true;
+
+          toast.success("Design analysis started! This takes about a minute.");
           
-          // Handle n8n array structure: [{ output: { visual_analysis: { ... } } }]
-          // Or direct object if changed later
-          const responseData = Array.isArray(response.data) ? response.data[0] : response.data;
-          const data = responseData?.output?.visual_analysis || responseData?.visual_analysis || responseData;
-
-          if (data) {
-              // Extract new categorization fields from AI response
-              const aiTheme = data.theme || "";
-              const aiNiche = data.niche || "";
-              const aiSubNiche = data["sub-niche"] || data.sub_niche || "";
-
-              setVisualAnalysis({
-                  aesthetic: data.aesthetic_style || "",
-                  typography: data.typography_details || "",
-                  graphics: data.graphic_elements || "",
-                  colors: data.color_palette || "",
-                  target_audience: data.target_audience || "",
-                  overall_vibe: data.overall_vibe || "",
-                  // Add these to state so we can pass them to form via a prop or context update
-                  theme: aiTheme,
-                  niche: aiNiche,
-                  sub_niche: aiSubNiche
-              });
-
-              // Force update form initialValues by updating analysisContext or a specific state
-              // We'll use a new state or force re-render by updating key
-              setAnalysisContext(prev => ({
-                    ...prev,
-                    theme_name: aiTheme,
-                    niche_name: aiNiche,
-                    sub_niche_name: aiSubNiche,
-                    // Preserve all current form state typed by user so we don't wipe it out on re-render!
-                    context: currentFormData.context,
-                    product_type_id: currentFormData.product_type_id,
-                    product_type_name: currentFormData.product_type_name,
-                    product_type_text: currentFormData.product_type_text,
-                    seo_mode: currentFormData.seo_mode || 'balanced'
-              }));
-              
-              // Also update formKey to force re-initialization of OptimizationForm with new values
-              // setFormKey(prev => prev + 1); // REMOVED: Prevent form reset (keeps Product Type)
-
-
-              setIsImageAnalyzedState(true);
-
-              const dbPayload = {
-                  is_image_analysed: true,
-                  visual_aesthetic: data.aesthetic_style,
-                  visual_typography: data.typography_details,
-                  visual_graphics: data.graphic_elements,
-                  visual_colors: data.color_palette,
-                  visual_target_audience: data.target_audience,
-                  visual_overall_vibe: data.overall_vibe,
-                  
-                  // Save categorization (AI Priority overrides form if AI found something, else keep form)
-                  theme: aiTheme || currentFormData.theme_name || null,
-                  niche: aiNiche || currentFormData.niche_name || null,
-                  sub_niche: aiSubNiche || currentFormData.sub_niche_name || null,
-                  
-                  // Product info already saved, but update just in case
-                  product_type_id: currentFormData.product_type_id || customTypeIdRef.current,
-                  product_type_text: currentFormData.product_type_text || null,
-                  user_description: currentFormData.context || null,
-                  
-                  image_url: publicUrl,
-                  updated_at: new Date().toISOString()
-              };
-
-              // Note: currentListingId was established BEFORE the webhook call
-              if (currentListingId) {
-                  const { error: updateError } = await supabase
-                      .from('listings')
-                      .update(dbPayload)
-                      .eq('id', currentListingId);
-                  
-                  if (updateError) console.error("Failed to update visual analysis stats:", updateError);
-              } else {
-                  // Fallback in case earlier auto-save failed entirely
-                   const { data: newListing, error: insertError } = await supabase
-                      .from('listings')
-                      .insert({
-                          ...dbPayload,
-                          user_id: user.id,
-                          status_id: STATUS_IDS.NEW,
-                          title: "New Visual Analysis",
-                          seo_mode: currentFormData.seo_mode || 'balanced'
-                      })
-                      .select()
-                      .single();
-
-                   if (insertError) {
-                       console.error("Failed to insert new listing for visual analysis:", insertError);
-                       toast.error("Failed to save analysis results.");
-                   } else {
-                       setListingId(newListing.id);
-                   }
-              }
-
-              toast.success("Visual analysis complete! ✨");
-          }
+          // We intentionally DO NOT set setIsAnalyzingDesign(false) here. 
+          // The realtime listener will disable the spinner once the database is updated.
 
       } catch (error) {
           console.error("Visual Analysis Error:", error);
           toast.error("Failed to analyze design.");
-      } finally {
           setIsAnalyzingDesign(false);
       }
   };
@@ -585,6 +555,8 @@ const ProductStudio = () => {
             custom_listing: JSON.stringify(customData),
             image_url: publicUrl,
             title: listingName || "Pending Analysis...",
+            status_id: STATUS_IDS.NEW, // Reset status to NEW so polling doesn't immediately succeed
+            is_generating_seo: true, // Flag that n8n is actively working on SEO
              // Visual Fields
             visual_aesthetic: visualAnalysis.aesthetic,
             visual_typography: visualAnalysis.typography,
@@ -2154,11 +2126,12 @@ const ProductStudio = () => {
           setStrategySelections(DEFAULT_STRATEGY_SELECTIONS);
         }
 
-        // Sync local state for the form button
-        setIsImageAnalyzedState(listing.is_image_analysed || listing.is_imageAnalysed || listing.is_imageanalysed || false);
+      // Sync local state for the form button
+      const isAnalysed = listing.is_image_analysed || false;
+      setIsImageAnalyzedState(isAnalysed);
 
-        setListingId(listingId);
-      
+      setListingId(listingId);
+    
       // Hydrate Visual Analysis fields
       setVisualAnalysis({
           aesthetic: listing.visual_aesthetic || "",
@@ -2170,8 +2143,29 @@ const ProductStudio = () => {
       });
 
       setShowResults(true);
-        setIsFormCollapsed(true);
-        setIsLoading(false);
+      setIsFormCollapsed(true);
+      setIsLoading(false);
+
+      // Check for pending Image Analysis to resume polling and spinner
+      if (listing.image_url && !isAnalysed) {
+          isWaitingForImageAnalysisRef.current = true;
+          // Set to a past date so the > trigger check bypasses safely, or rely on our new 'true' override
+          imageAnalysisTriggeredAtRef.current = new Date(Date.now() - 60000).toISOString(); 
+          setIsAnalyzingDesign(true);
+      } else {
+          isWaitingForImageAnalysisRef.current = false;
+          setIsAnalyzingDesign(false);
+      }
+
+      // Check for pending SEO Analysis to resume polling and skeleton
+      if (listing.is_generating_seo) {
+          isWaitingForSeoRef.current = true;
+          seoTriggeredAtRef.current = new Date(Date.now() - 60000).toISOString();
+          setIsInsightLoading('seo');
+      } else {
+          isWaitingForSeoRef.current = false;
+          setIsInsightLoading(false);
+      }
 
         // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -328,6 +328,21 @@
     - **Logic**: Accepts a POST request with an array of `keywords`. Queries the `public.keyword_cache` table using the Supabase Service Role Key (bypassing RLS) and filters out stale entries (`last_sync_at < NOW() - 30 days`).
     - **Output**: Returns a JSON array (`cachedKeywords`) of fresh, matching keywords containing `search_volume`, `competition`, `cpc`, and `volume_history`. n8n will use this response to skip fetching live data for these cached terms.
 
+- **Async Image Analysis Edge Function** (2026-03-01):
+    - **Goal**: Move image analysis from a synchronous frontend block to a "fire and forget" model to prevent UI timeouts during the 1-minute AI vision generation step.
+    - **Implementation**: Created the `save-image-analysis` Supabase Edge Function in Deno.
+    - **Logic**: Secured by `x-api-key` header matching `N8N_WEBHOOK_SECRET`. Parses complex n8n payload arrays, extracting `listing_id` and `visual_analysis` objects. Maps parsed fields (`aesthetic_style`, `typography_details`, etc.) to the respective `public.listings` columns (`visual_aesthetic`, `visual_typography`, etc.) and sets `is_image_analysed: true`. Uses Supabase Service Role Key to execute the `.update()`.
+
+- **Realtime UI Updates for Image Analysis** (2026-03-01):
+    - **Goal**: Automatically stop the spinner and render results when the new `save-image-analysis` edge function completes, without requiring the user to manually refresh `#ProductStudio`.
+    - **Implementation**: Refactored `handleAnalyzeDesign` in `ProductStudio.jsx` to be strictly asynchronous/fire-and-forget, maintaining `isAnalyzingDesign(true)`. Added a dual-mechanism realtime listener (Supabase Channel + 5s polling fallback) targeting `is_image_analysed === true` to detect completion.
+    - **Result**: `handleImageAnalysisDone` populates `visualAnalysis` state and stops the spinner automatically.
+
+- **Image Analysis Auto-Resume & Sync Fixes** (2026-03-01):
+    - **Bug**: The image analysis spinner would either instantly complete on re-runs (due to Supabase read-replica replication lag on the `is_image_analysed` flag) or would completely fail to resume when reloading the page.
+    - **Replication Lag Fix**: Implemented strict chronological bounding in `handleLoadListing` and `handleAnalyzeDesign`. We now store the exact server `updated_at` time when starting analysis (`imageAnalysisTriggeredAtRef`). The real-time listener and poller will strictly ignore any `is_image_analysed: true` responses unless their `updated_at` is strictly newer than the trigger time.
+    - **Silent Database Error Fix**: During form auto-save, the `handleAnalyzeDesign` and `handleSaveDraft` functions were attempting to push `seo_mode` into the `listings` table update payload. Since `seo_mode` was removed from the schema, this caused a silent `PGRST204` failure that prevented `is_image_analysed: false` from saving to the DB. Removed all `seo_mode` references from the listings update payloads, restoring resilient auto-resume capabilities.
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.
