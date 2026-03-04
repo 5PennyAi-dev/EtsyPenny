@@ -374,6 +374,20 @@
     - Added an explicit `[...data].reverse()` inside `ResultsDisplay.jsx` and `SEOLab.jsx`'s `Sparkline` component, as well as `ListingPDFDocument.jsx`'s `SparklineSVG`, to force chronological left-to-right drawing and fix the `percentChange` bounds calculating math visually.
     - Cleaned up percentage math `const first = / const last =` inside `HistoryPage.jsx` and PDF payloads for the same reason.
 
+- **UI Polish: REACH Tooltip** (2026-03-04):
+    - Updated the tooltip text for the Reach index in the Audit Header (`ResultsDisplay.jsx`) to explicitly describe the AI-weighted probability based on niche relevance and buyer intent, instead of raw volume.
+
+- **UI Fix: Audit Header Thumbnail** (2026-03-04):
+    - Removed `flex-1` from the thumbnail image container in the Audit Header (`ResultsDisplay.jsx`) to prevent the image from being deformed (squished into a tall rectangle) on narrower screen sizes, ensuring it remains a fixed 24x24 square.
+
+- **UI Fix: Audit Header Breakpoints & Overlap** (2026-03-04):
+    - Shifted the horizontal layout of the Audit Header from `md:` (768px) to `lg:` (1024px) breakpoints. The 3 sections (Overall Score, Technical Analysis, Est. Value) now stack vertically on tablets and smaller screens to entirely eliminate text/gauge overlapping.
+    - Updated flexbox assignments on desktop sizes: changed rigid percentage widths (`w-1/4`, `w-1/2`) to fully dynamic layout logic (`lg:w-auto lg:flex-shrink-0` on sides, `lg:flex-1 min-w-0` in middle) to allow section boundaries to adapt fluidly to their contents. Removed all `xl:w-1/4` classes that were artificially squeezing content.
+    - Added `min-w-max` to the Listing Overall Score inner container to ensure the SVG `RadialGauge` and its label respect intrinsic width.
+- **Bug Fix: Missing Reach Index** (2026-03-04):
+    - Fixed an issue where the Reach index (`est_market_reach`) would disappear from the Audit Header after generating a new analysis or applying a new Custom Strategy. 
+    - The root cause was that `handleLoadListing` in `ProductStudio.jsx` was successfully fetching the value from `listings_global_eval`, but was failing to map it into the `constructedResults` state object passed down to `<ResultsDisplay />`. Added `listing_est_market_reach` to the hydration mapping.
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.

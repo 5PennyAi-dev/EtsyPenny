@@ -263,29 +263,29 @@ const SidebarSkeleton = ({ phase }) => (
     };
 
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
         
         {/* SECTION A: Thumbnail | Label + Gauge */}
-        <div className="md:w-1/4 py-3 px-4 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-row items-center gap-3">
+        <div className="lg:w-auto lg:flex-shrink-0 py-3 px-4 xl:px-6 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-row items-center justify-center gap-4 xl:gap-8">
             {/* Thumbnail — takes up left space */}
             {imageUrl && (
-                <div className="h-24 w-24 rounded-2xl border border-slate-200 bg-slate-100 overflow-hidden flex-shrink-0 shadow-sm flex-1 max-w-[6rem]">
+                <div className="h-24 w-24 rounded-2xl border border-slate-200 bg-slate-100 overflow-hidden flex-shrink-0 shadow-sm max-w-[6rem]">
                     <img src={imageUrl} alt="" className="w-full h-full object-cover" />
                 </div>
             )}
             {/* Label + Gauge grouped together on the right */}
-            <div className="flex items-center gap-4 ml-auto">
-                <h3 className="text-2xl font-black text-slate-800 leading-tight">
-                    Listing<br/>overall score
+            <div className="flex flex-col items-center justify-center gap-1.5 ml-auto text-center min-w-max">
+                <h3 className="text-base font-black text-slate-800 leading-tight">
+                    Listing overall<br/>score
                 </h3>
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 mt-0.5">
                     <RadialGauge value={score} tier={mainTier} />
                 </div>
             </div>
         </div>
 
         {/* SECTION B: Technical Analysis (Proof Grid) */}
-        <div className="md:w-1/2 p-6 md:px-8 hover:bg-slate-50/30 transition-colors flex flex-col justify-center">
+        <div className="lg:flex-1 p-6 md:px-8 hover:bg-slate-50/30 transition-colors flex flex-col justify-center min-w-0">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Technical Analysis</span>
             <div className="grid grid-cols-2 gap-x-8 gap-y-5">
                 {/* Visibility */}
@@ -302,7 +302,7 @@ const SidebarSkeleton = ({ phase }) => (
                                         <span className="text-[10px] font-black text-indigo-700">{formatReach(Number(listingEstMarketReach))}</span>
                                     </div>
                                     <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-64 p-2 bg-slate-800 text-white text-[11px] font-normal leading-tight rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all pointer-events-none z-50 whitespace-normal">
-                                        Est. Market Reach: This represents the total potential monthly impressions your product could receive on Etsy. It is calculated by combining the search volume of your selected keywords, weighted by their specific ranking probability and relevance to your item.
+                                        The estimated total of monthly search impressions available for your listing. Unlike raw volume, this score is weighted by AI to reflect your actual ranking potential based on niche relevance and buyer intent.
                                         <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-r-slate-800 border-y-transparent border-l-transparent"></div>
                                     </div>
                                 </div>
@@ -346,7 +346,7 @@ const SidebarSkeleton = ({ phase }) => (
         </div>
 
         {/* SECTION C: Business Potential (Profitability) */}
-        <div className="md:w-1/4 p-6 md:p-8 hover:bg-slate-50/30 transition-colors flex flex-col items-center justify-center border-l border-slate-100">
+        <div className="lg:w-auto lg:flex-shrink-0 p-6 xl:px-10 lg:p-8 hover:bg-slate-50/30 transition-colors flex flex-col items-center justify-center border-l border-slate-100">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Est. Value</span>
             
             <div className="flex items-center justify-center gap-1 mb-2">

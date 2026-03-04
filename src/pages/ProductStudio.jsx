@@ -2093,6 +2093,7 @@ const ProductStudio = () => {
             listing_raw_visibility_index: activeEvalData?.listing_raw_visibility_index ?? listing.listing_raw_visibility_index,
             listing_avg_cpc: activeEvalData?.listing_avg_cpc ?? listing.listing_avg_cpc,
             listing_avg_competition: activeEvalData?.listing_avg_competition ?? listing.listing_avg_competition,
+            listing_est_market_reach: activeEvalData?.listing_est_market_reach ?? listing.listing_est_market_reach,
 
             // Dashboard Metrics
             score_justification_visibility: activeEvalData?.score_justification_visibility,
