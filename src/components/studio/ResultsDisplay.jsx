@@ -17,20 +17,21 @@ import { toast } from 'sonner';
 const Sparkline = ({ data }) => {
   if (!data || data.length === 0) return <div className="text-slate-300 text-xs">-</div>;
 
+  const reversedData = [...data].reverse();
   const width = 60;
   const height = 20;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  const min = Math.min(...reversedData);
+  const max = Math.max(...reversedData);
   const range = max - min || 1;
 
-  const points = data.map((val, i) => {
-    const x = (i / (data.length - 1)) * width;
+  const points = reversedData.map((val, i) => {
+    const x = (i / (reversedData.length - 1)) * width;
     const y = height - ((val - min) / range) * height;
     return `${x},${y}`;
   }).join(' ');
 
-  const first = data[0] || 1;
-  const last = data[data.length - 1] || 0;
+  const first = reversedData[0] || 1;
+  const last = reversedData[reversedData.length - 1] || 0;
   const percentChange = ((last - first) / first) * 100;
   const isPositive = percentChange >= 0;
 
@@ -179,7 +180,7 @@ const SidebarSkeleton = ({ phase }) => (
     score,
     imageUrl,
     listingVisibility,
-    listingRawVisibilityIndex,
+    listingEstMarketReach,
     listingConversion,
     listingRelevance,
     listingCompetition,
@@ -190,6 +191,13 @@ const SidebarSkeleton = ({ phase }) => (
       if (num >= 80) return { text: 'text-emerald-600', bg: 'bg-emerald-500', stroke: 'stroke-emerald-500', fill: 'fill-emerald-500' };
       if (num >= 50) return { text: 'text-amber-600', bg: 'bg-amber-500', stroke: 'stroke-amber-500', fill: 'fill-amber-500' };
       return { text: 'text-rose-600', bg: 'bg-rose-500', stroke: 'stroke-rose-500', fill: 'fill-rose-500' };
+    };
+
+    const formatReach = (num) => {
+      if (!num) return 0;
+      if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+      return num.toString();
     };
 
     const mainTier = getMetricsColor(score);
@@ -287,10 +295,16 @@ const SidebarSkeleton = ({ phase }) => (
                             <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
                                <TrendingUp size={14} className="text-slate-400" /> Visibility
                             </span>
-                            {listingRawVisibilityIndex != null && (
-                                <div className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md shadow-sm">
-                                    <span className="text-[9px] font-bold text-indigo-500 uppercase">Index</span>
-                                    <span className="text-[10px] font-black text-indigo-700">{Number(listingRawVisibilityIndex).toLocaleString()}</span>
+                            {listingEstMarketReach != null && (
+                                <div className="group relative whitespace-nowrap">
+                                    <div className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md shadow-sm w-max cursor-help">
+                                        <span className="text-[9px] font-bold text-indigo-500 uppercase">Reach</span>
+                                        <span className="text-[10px] font-black text-indigo-700">{formatReach(Number(listingEstMarketReach))}</span>
+                                    </div>
+                                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-64 p-2 bg-slate-800 text-white text-[11px] font-normal leading-tight rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all pointer-events-none z-50 whitespace-normal">
+                                        Est. Market Reach: This represents the total potential monthly impressions your product could receive on Etsy. It is calculated by combining the search volume of your selected keywords, weighted by their specific ranking probability and relevance to your item.
+                                        <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-r-slate-800 border-y-transparent border-l-transparent"></div>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -420,7 +434,7 @@ const SidebarSkeleton = ({ phase }) => (
                  // Auto-select the newly added keyword
                  setSelectedTags(prev => {
                      if (!prev.includes(trimmed)) {
-                         return [trimmed, ...prev].slice(0, 13);
+                         return [trimmed, ...prev];
                      }
                      return prev;
                  });
@@ -502,8 +516,8 @@ const SidebarSkeleton = ({ phase }) => (
              initialSelections = Array.from(new Set([...pinnedTags, ...fallbackSelections]));
           }
           
-          // Enforce 13 tag limit (prioritizing pinned items implicitly because they were added first)
-          setSelectedTags(initialSelections.slice(0, 13));
+          // Enforce tag limit (legacy comments preserved, but limit removed per User Request)
+          setSelectedTags(initialSelections);
       }
     }, [resetSelectionKey]);
   
@@ -587,10 +601,9 @@ const SidebarSkeleton = ({ phase }) => (
     }, [results?.analytics, sortConfig, selectedTags]);
 
     // Visibility slicing for Show More / Show All
-    const selectedCount = sortedAnalytics.filter(k => selectedTags.includes(k.keyword)).length;
-    const collapsedLimit = Math.max(13, selectedCount);
-    const visibleAnalytics = showAll ? sortedAnalytics : sortedAnalytics.slice(0, collapsedLimit);
-    const hasMore = sortedAnalytics.length > collapsedLimit;
+    const collapsedLimit = 13;
+    const visibleAnalytics = showAll ? sortedAnalytics : sortedAnalytics.slice(0, Math.max(collapsedLimit, selectedTags.length));
+    const hasMore = sortedAnalytics.length > Math.max(collapsedLimit, selectedTags.length);
 
     // --- Favorite Keyword Bank State ---
     const [favoriteTags, setFavoriteTags] = useState(new Set());
@@ -743,7 +756,7 @@ const SidebarSkeleton = ({ phase }) => (
                       strategicVerdict={results.strategic_verdict}
                       improvementPriority={results.improvement_priority}
                       listingVisibility={results.listing_visibility}
-                      listingRawVisibilityIndex={results.listing_raw_visibility_index}
+                      listingEstMarketReach={results.listing_est_market_reach}
                       listingConversion={results.listing_conversion}
                       listingRelevance={results.listing_relevance}
                       listingCompetition={results.listing_competition}
@@ -809,9 +822,13 @@ const SidebarSkeleton = ({ phase }) => (
                                 const selectedKeywordsData = primaryAnalytics.filter(k => selectedTags.includes(k.keyword));
                                 onRecalculateScores?.(selectedKeywordsData); 
                             }}
-                            disabled={isRecalculating || selectedTags.length !== 13}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors border border-indigo-100 shadow-sm"
-                            title={selectedTags.length !== 13 ? "You must have 13 keywords selected to calculate the score" : "Recalculate Global Scores"}
+                            disabled={isRecalculating || selectedTags.length > 13 || selectedTags.length === 0}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors border shadow-sm ${
+                                selectedTags.length > 13 || selectedTags.length === 0
+                                    ? 'bg-slate-50 text-slate-400 border-slate-200 opacity-50 cursor-not-allowed'
+                                    : 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+                            }`}
+                            title={selectedTags.length > 13 ? "You can select a maximum of 13 keywords to recalculate" : selectedTags.length === 0 ? "You must select at least 1 keyword to recalculate" : "Recalculate Global Scores"}
                          >
                             {isRecalculating ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
                             Recalculate Scores
@@ -903,12 +920,36 @@ const SidebarSkeleton = ({ phase }) => (
                               <AnimatePresence initial={false}>
                                 {visibleAnalytics.map((row, i) => {
                                     const isSelected = selectedTags.includes(row.keyword);
+                                    
+                                    // Count how many selected rows appear BEFORE this row in the currently sorted view
+                                    let selectedIndexInView = -1;
+                                    if (isSelected) {
+                                        selectedIndexInView = visibleAnalytics.slice(0, i + 1).filter(r => selectedTags.includes(r.keyword)).length - 1;
+                                    }
+
                                     // Detect if this is the first unselected row to inject divider
                                     const prevRow = i > 0 ? visibleAnalytics[i - 1] : null;
                                     const showDivider = !isSelected && (i === 0 || (prevRow && selectedTags.includes(prevRow.keyword)));
+                                    
+                                    const isExceeding13 = selectedIndexInView >= 13;
+                                    const showLimitDivider = isSelected && selectedIndexInView === 13;
 
                                     return (
                                       <React.Fragment key={row.keyword}>
+                                        {showLimitDivider && (
+                                          <tr className="bg-rose-50/50 border-y border-rose-200">
+                                            <td colSpan="13" className="px-4 py-2">
+                                              <div className="flex items-center gap-3">
+                                                <div className="h-px flex-1 bg-rose-200" />
+                                                <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-700 rounded-full shadow-sm border border-rose-200">
+                                                    <AlertTriangle size={12} className="text-rose-600" />
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Maximum 13 keywords per calculation limit</span>
+                                                </div>
+                                                <div className="h-px flex-1 bg-rose-200" />
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        )}
                                         {showDivider && (
                                           <tr className="border-t-2 border-slate-200">
                                             <td colSpan="13" className="px-4 py-1.5 bg-slate-50">
@@ -929,7 +970,7 @@ const SidebarSkeleton = ({ phase }) => (
                                             transition={{ layout: { duration: 0.3, ease: 'easeInOut' }, opacity: { duration: 0.2 } }}
                                             className={`transition-colors group ${
                                                 isSelected
-                                                    ? 'bg-indigo-50/40 hover:bg-indigo-50/60'
+                                                    ? isExceeding13 ? 'bg-rose-50/40 hover:bg-rose-50/70 border-l-2 border-l-rose-400' : 'bg-indigo-50/40 hover:bg-indigo-50/60'
                                                     : 'opacity-60 hover:opacity-80 hover:bg-slate-50'
                                             }`}
                                         >
@@ -1331,9 +1372,11 @@ const SidebarSkeleton = ({ phase }) => (
                                                         .map(k => {
                                                             // Calculate Trend %
                                                             let trend = 0;
-                                                            const first = k.volume_history?.[0] || 1;
-                                                            const last = k.volume_history?.[k.volume_history.length - 1] || 0;
-                                                            trend = Math.round(((last - first) / first) * 100);
+                                                            if (k.volume_history?.length > 0) {
+                                                                const first = k.volume_history[k.volume_history.length - 1] || 1;
+                                                                const last = k.volume_history[0] || 0;
+                                                                trend = Math.round(((last - first) / first) * 100);
+                                                            }
                                                             
                                                             return {
                                                                 keyword: k.keyword,
@@ -1384,7 +1427,7 @@ const SidebarSkeleton = ({ phase }) => (
                   if (success !== false) { // Handle undefined in older versions just in case
                       setSelectedTags(prev => {
                           const toAdd = keywordsArray.filter(k => !prev.includes(k));
-                          return [...toAdd, ...prev].slice(0, 13);
+                          return [...toAdd, ...prev];
                       });
                   }
               }

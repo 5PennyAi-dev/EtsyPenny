@@ -293,15 +293,16 @@ const SparklineSVG = ({ data, width = 55, height = 18 }) => {
     );
   }
 
+  const reversedData = [...data].reverse();
   const padding = 2;
   const chartWidth = width - padding * 2;
   const chartHeight = height - padding * 2;
-  const max = Math.max(...data);
-  const min = Math.min(...data);
+  const max = Math.max(...reversedData);
+  const min = Math.min(...reversedData);
   const range = max - min || 1;
 
-  const points = data.map((val, i) => {
-    const x = padding + (i / (data.length - 1)) * chartWidth;
+  const points = reversedData.map((val, i) => {
+    const x = padding + (i / (reversedData.length - 1)) * chartWidth;
     const y = padding + chartHeight - ((val - min) / range) * chartHeight;
     return { x: x.toFixed(1), y: y.toFixed(1) };
   });
@@ -309,7 +310,7 @@ const SparklineSVG = ({ data, width = 55, height = 18 }) => {
   const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 
   // Determine color based on trend direction
-  const isPositive = data[data.length - 1] >= data[0];
+  const isPositive = reversedData[reversedData.length - 1] >= reversedData[0];
   const strokeColor = isPositive ? '#16A34A' : '#EF4444';
 
   return (

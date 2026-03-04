@@ -363,6 +363,17 @@
     - **Admin Isolation**: Moved the "Admin" link to the bottom of the sidebar, separated from primary user tools, and assigned it the `ShieldAlert` icon.
     - **Logo Scaling**: Replaced Tailwind padding classes with explicit CSS pixel widths and negative margins (`w-[240px]`) to force the PennySEO logo to properly fill the sidebar header, overcoming intrinsic transparent padding in the PNG file.
 
+- **Expanded Keyword Limits and UI Guards** (2026-03-03):
+    - Removed the strict `[...tags].slice(0, 13)` enforcement across `ResultsDisplay.jsx` when explicitly adding a keyword (from Favorites picker, or "Add Keyword" text input), enabling users to select > 13 tags simultaneously.
+    - Implemented a dynamic visual cutoff divider (rendered in `bg-rose-50/50`) underneath the 13th selected keyword natively inside the interactive Keyword Performance table.
+    - Disabled the "Recalculate Scores" button when `selectedTags.length > 13` or `selectedTags.length === 0`.
+    - Added a `text-rose-600` styling boundary warning directly within the Accordion title component counting `x / y selected` words.
+
+- **Chronological Sparkline Volume Bug Fix** (2026-03-03):
+    - The `volume_history` API from n8n passes data from most recent (index 0) to least recent, causing the `<Sparkline>` and Math logic across the app to display trend lines backward.
+    - Added an explicit `[...data].reverse()` inside `ResultsDisplay.jsx` and `SEOLab.jsx`'s `Sparkline` component, as well as `ListingPDFDocument.jsx`'s `SparklineSVG`, to force chronological left-to-right drawing and fix the `percentChange` bounds calculating math visually.
+    - Cleaned up percentage math `const first = / const last =` inside `HistoryPage.jsx` and PDF payloads for the same reason.
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.

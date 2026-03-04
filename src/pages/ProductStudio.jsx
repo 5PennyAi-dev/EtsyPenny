@@ -882,13 +882,31 @@ const ProductStudio = () => {
                try { rawData = JSON.parse(rawData); } catch (e) { console.error("Failed to parse recalculate response:", e); }
           }
           
-          const unwrapped = Array.isArray(rawData) ? rawData[0] : rawData;
+          let unwrapped = Array.isArray(rawData) ? rawData[0] : rawData;
           
-          if (!unwrapped || !unwrapped.scores) {
-               throw new Error("Invalid response format from server");
+          const currentMode = activeMode || 'balanced';
+          let newScores = null;
+
+          if (unwrapped && typeof unwrapped === 'object') {
+              if (unwrapped[currentMode]) {
+                  newScores = unwrapped[currentMode];
+              } else if (unwrapped.scores) {
+                  newScores = unwrapped.scores;
+              } else {
+                  // Fallback cases
+                  const firstVal = Object.values(unwrapped)[0];
+                  if (firstVal && (firstVal.listing_strength !== undefined || firstVal.breakdown)) {
+                      newScores = firstVal;
+                  } else if (unwrapped.listing_strength !== undefined || unwrapped.breakdown) {
+                      newScores = unwrapped;
+                  }
+              }
           }
           
-          const newScores = unwrapped.scores;
+          if (!newScores) {
+               console.error("Invalid response format from server:", JSON.stringify(rawData));
+               throw new Error("Invalid response format from server");
+          }
           console.log("[Recalculate] Raw scores from n8n:", JSON.stringify(newScores, null, 2));
           
           // Build payload — strip undefined values so Supabase doesn't silently skip them
@@ -903,6 +921,7 @@ const ProductStudio = () => {
                listing_raw_visibility_index: newScores.stats?.raw_visibility_index ?? newScores.raw_visibility_index,
                listing_avg_cpc: newScores.stats?.avg_cpc ?? newScores.avg_cpc,
                listing_avg_competition: newScores.stats?.best_opportunity_comp ?? newScores.best_opportunity_comp,
+               listing_est_market_reach: newScores.stats?.est_market_reach ?? newScores.est_market_reach,
                updated_at: new Date().toISOString()
           };
           // Remove keys with undefined values

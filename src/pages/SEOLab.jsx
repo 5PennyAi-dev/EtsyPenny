@@ -8,24 +8,34 @@ import { toast } from 'sonner';
 // --- Sparkline (copied from ResultsDisplay for self-containment) ---
 const Sparkline = ({ data }) => {
   if (!data || data.length === 0) return <div className="text-slate-300 text-xs">-</div>;
+  
+  const reversedData = [...data].reverse();
   const width = 60;
   const height = 20;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  const min = Math.min(...reversedData);
+  const max = Math.max(...reversedData);
   const range = max - min || 1;
-  const points = data.map((val, i) => {
-    const x = (i / (data.length - 1)) * width;
+  
+  const points = reversedData.map((val, i) => {
+    const x = (i / (reversedData.length - 1)) * width;
     const y = height - ((val - min) / range) * height;
     return `${x},${y}`;
   }).join(' ');
-  const first = data[0] || 1;
-  const last = data[data.length - 1] || 0;
+  
+  const first = reversedData[0] || 1;
+  const last = reversedData[reversedData.length - 1] || 0;
   const percentChange = ((last - first) / first) * 100;
   const isPositive = percentChange >= 0;
+  
   return (
     <div className="flex flex-col items-center">
       <svg width={width} height={height} className="overflow-visible">
-        <polyline fill="none" stroke={isPositive ? "#10b981" : "#f43f5e"} strokeWidth="1.5" points={points} />
+        <polyline
+          fill="none"
+          stroke={isPositive ? "#10b981" : "#f43f5e"}
+          strokeWidth="1.5"
+          points={points}
+        />
       </svg>
       <span className={`text-[10px] font-bold mt-1 flex items-center gap-0.5 ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
         {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />} {Math.abs(percentChange).toFixed(0)}%

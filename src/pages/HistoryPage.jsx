@@ -143,8 +143,8 @@ const HistoryPage = () => {
                 tags: stats.map(s => {
                     let trend = 0;
                     if (s.volume_history?.length > 0) {
-                        const first = s.volume_history[0] || 1;
-                        const last  = s.volume_history[s.volume_history.length - 1] || 0;
+                        const first = s.volume_history[s.volume_history.length - 1] || 1;
+                        const last  = s.volume_history[0] || 0;
                         trend = Math.round(((last - first) / first) * 100);
                     }
                     return {
