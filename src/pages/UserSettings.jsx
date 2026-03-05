@@ -41,6 +41,15 @@ export default function UserSettings() {
     threshold_trending_id: null,
     threshold_promising_id: null,
     
+    // Sub-parameters for Smart Badges
+    evergreen_stability_ratio_id: null,
+    evergreen_min_id: null,
+    evergreen_avg_volume_id: null,
+    promising_min_score_id: null,
+    promising_competition_id: null,
+    trending_dropping_id: null,
+    trending_current_month_min_id: null,
+    
     ai_selection_count: 13,
     working_pool_count: 40,
     concept_diversity_limit: 3
@@ -143,6 +152,52 @@ export default function UserSettings() {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleMultiSettingChange = (paramKey, mainSettingKey, opt) => {
+    const cleanLabel = (opt.label || '').trim();
+    
+    // Reverse lookup: map the subkey used for UI rendering back to its master category key
+    const reverseCategoryMap = {
+      'evergreen_stability_ratio': 'evergreen',
+      'promising_min_score': 'promising',
+      'trending_dropping': 'trending'
+    };
+    
+    const masterKey = reverseCategoryMap[paramKey] || paramKey;
+
+    // Define the sub-keys required for each master parameter
+    const subKeyMap = {
+      'evergreen': ['evergreen_stability_ratio', 'evergreen_min', 'evergreen_avg_volume'],
+      'promising': ['promising_min_score', 'promising_competition'],
+      'trending': ['trending_dropping', 'trending_current_month_min']
+    };
+
+    const subKeys = subKeyMap[masterKey];
+
+    if (!subKeys) {
+      // Fallback for simple 1:1 settings (e.g. Strategy Weights) if this is called
+      handleSettingChange(mainSettingKey, opt.id);
+      return;
+    }
+
+    // Find the corresponding constants for this badge sensitivity
+    const updates = { [mainSettingKey]: opt.id };
+    
+    subKeys.forEach(subKey => {
+      // Find constant where param_key matches the subKey AND the label matches the selected label
+      const matchedConstant = constants.find(c => 
+        c.param_key === subKey && (c.label || '').trim() === cleanLabel
+      );
+      
+      if (matchedConstant) {
+        updates[`${subKey}_id`] = matchedConstant.id;
+      } else {
+        console.warn(`Could not find matching constant for sub-key: ${subKey} with label: ${cleanLabel}`);
+      }
+    });
+
+    setSettings(prev => ({ ...prev, ...updates }));
+  };
+
   // Helper to render Segmented Controls
   const renderSegmentedControl = (paramKey, settingKey, Icon, label, description) => {
     const options = constants.filter(c => c.param_key === paramKey);
@@ -169,7 +224,13 @@ export default function UserSettings() {
             return (
               <button
                 key={opt.id}
-                onClick={() => handleSettingChange(settingKey, opt.id)}
+                onClick={() => {
+                  if (['evergreen_stability_ratio', 'trending_dropping', 'promising_min_score'].includes(paramKey)) {
+                    handleMultiSettingChange(paramKey, settingKey, opt);
+                  } else {
+                    handleSettingChange(settingKey, opt.id);
+                  }
+                }}
                 className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all ${
                   isActive
                     ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/60'
@@ -250,9 +311,9 @@ export default function UserSettings() {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
-                  {renderSegmentedControl('evergreen', 'threshold_evergreen_id', Leaf, 'Evergreen Stability', 'Threshold for granting the Evergreen badge.')}
-                  {renderSegmentedControl('trending', 'threshold_trending_id', Flame, 'Trending Growth', 'Threshold for detecting rapid, recent growth.')}
-                  {renderSegmentedControl('promising', 'threshold_promising_id', Award, 'Promising Ratio', 'Threshold for high-opportunity, low-competition tags.')}
+                  {renderSegmentedControl('evergreen_stability_ratio', 'threshold_evergreen_id', Leaf, 'Evergreen Stability', 'Threshold for granting the Evergreen badge.')}
+                  {renderSegmentedControl('trending_dropping', 'threshold_trending_id', Flame, 'Trending Growth', 'Threshold for detecting rapid, recent growth.')}
+                  {renderSegmentedControl('promising_min_score', 'threshold_promising_id', Award, 'Promising Ratio', 'Threshold for high-opportunity, low-competition tags.')}
                 </div>
               </section>
 

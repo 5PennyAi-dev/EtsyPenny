@@ -48,24 +48,27 @@ npm run preview   # Preview production build
 
 ### Data Flow
 1. **Image Upload**: User uploads mockup -> stored in Supabase `mockups_bucket` -> listing row created in `listings` table
-2. **AI Analysis**: Frontend POSTs to n8n webhook (`VITE_N8N_WEBHOOK_URL_TEST`) with listing_id + context -> n8n runs AI pipeline
+2. **AI Analysis**: Frontend POSTs to n8n webhook (`VITE_N8N_WEBHOOK_URL_TEST`) with listing_id + context. The payload includes Smart Badge thresholds mapped from `v_user_seo_active_settings` -> n8n runs AI pipeline
 3. **Results Persistence**: n8n calls Supabase edge function `save-seo` (secured via `x-api-key` header) -> upserts into `listings_global_eval` and `listing_seo_stats`
 4. **Data Hydration**: Initial data hydration occurs in `handleLoadListing` when a listing is selected.
 5. **Manual Overrides**: Manual user overrides for Conv. Intent and Relevance are handled via the interactive `SeoBadge` dropdowns, which trigger `handleScoreUpdate` to immediately sync with the `listing_seo_stats` database table and update local component state.
 6. **Component Communication**: `ProductStudio.jsx` passes state and callbacks to `ResultsDisplay.jsx` as props.
 7. **Realtime Updates**: ProductStudio subscribes to Supabase realtime on the `listings` table to detect when n8n processing completes
 8. **Display**: ResultsDisplay shows SEO scores, keywords, and strategy comparisons across broad/balanced/sniper modes
+9. **Smart Badges**: Users update global settings in `UserSettings.jsx` which multi-saves related IDs from `system_seo_constants` to `user_settings`. These settings feed the n8n webhook via `v_user_seo_active_settings`.
 
 ### Supabase Tables & Views
 - **`listings`** — Core table: image_url, generated_title, generated_description, visual analysis fields, status_id, product categorization
 - **`listings_global_eval`** — Per-mode SEO evaluation scores (visibility, relevance, conversion, strength) keyed by listing_id + seo_mode
 - **`listing_seo_stats`** — Individual keyword/tag metrics (search_volume, competition, opportunity_score, trending/evergreen flags)
 - **`user_keyword_bank`** — User's saved favorite keywords with cached metrics (tag, last_volume, last_competition, last_cpc, theme, niche)
-- **`user_settings`** — User preferences including gem threshold settings (gem_min_volume, gem_max_competition, gem_min_cpc)
+- **`user_settings`** — User preferences including Smart Badge thresholds and gem settings (gem_min_volume, etc.)
+- **`system_seo_constants`** — System-wide SEO constants and labels used for rendering UI dropdowns and calculating thresholds
 - **`profiles`** — User profiles (fetched in AuthContext)
 - **`product_types`** — Product categorization lookup
 - **`view_listing_scores`** — Aggregated view joining listings with their scores
 - **`view_user_performance_stats`** — Aggregated user-level performance metrics
+- **`v_user_seo_active_settings`** — View returning active user settings mapped to specific target variable names for webhooks
 
 ### SEO Modes
 The app operates with three strategy modes, each producing its own set of keywords and global evaluation:

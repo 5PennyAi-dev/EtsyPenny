@@ -160,6 +160,20 @@ const ProductStudio = () => {
     fetchUserDefaults();
   }, [user]);
 
+  // Helper to extract Smart Badge thresholds for payloads
+  const getSmartBadgePayload = () => {
+    if (!userDefaults) return {};
+    return {
+      evergreen_stability_ratio: userDefaults.evergreen_stability_ratio,
+      evergreen_minimum_volume: userDefaults.evergreen_minimum_volume,
+      evergreen_avg_volume: userDefaults.evergreen_avg_volume,
+      trending_dropping_threshold: userDefaults.trending_dropping_threshold,
+      trending_current_month_min_volume: userDefaults.trending_current_month_min_volume,
+      promising_min_score: userDefaults.promising_min_score,
+      promising_competition: userDefaults.promosing_competition || userDefaults.promising_competition
+    };
+  };
+
   // Refs to track background SEO completion (avoids stale closures)
   const isWaitingForSeoRef = useRef(false);
   const seoTriggeredAtRef = useRef(null); // ISO timestamp captured when analysis starts
@@ -627,13 +641,16 @@ const ProductStudio = () => {
             action: "generate_seo",
             listing_id: activeListingId,
             user_id: user.id,
-            parameters: userDefaults ? {
-                Volume: userDefaults.param_volume,
-                Competition: userDefaults.param_competition,
-                Transaction: userDefaults.param_transaction,
-                Niche: userDefaults.param_niche,
-                CPC: userDefaults.param_cpc
-            } : getStrategyValues(strategySelections),
+            parameters: {
+                ...(userDefaults ? {
+                    Volume: userDefaults.param_volume,
+                    Competition: userDefaults.param_competition,
+                    Transaction: userDefaults.param_transaction,
+                    Niche: userDefaults.param_niche,
+                    CPC: userDefaults.param_cpc
+                } : getStrategyValues(strategySelections)),
+                ...getSmartBadgePayload()
+            },
             payload: {
                 image_url: publicUrl,
                 // Visual analysis fields
@@ -1074,7 +1091,10 @@ const ProductStudio = () => {
       await axios.post(webhookUrl, {
         action: 'resetPool',
         listing_id: listingId,
-        parameters: getStrategyValues(strategySelections)
+        parameters: {
+            ...getStrategyValues(strategySelections),
+            ...getSmartBadgePayload()
+        }
       });
       toast.success('Keywords pool reset successfully!');
       await handleLoadListing(listingId);
@@ -1102,7 +1122,10 @@ const ProductStudio = () => {
         action: 'resetPool',
         listing_id: listingId,
         pinned_count: pinnedCount,
-        parameters: parameters // Ensure we use the parameters passed from StrategyTuner
+        parameters: {
+            ...parameters, 
+            ...getSmartBadgePayload()
+        }
       });
       toast.success('Strategy update triggered! Your results will refresh in a few seconds.');
       await handleLoadListing(listingId);

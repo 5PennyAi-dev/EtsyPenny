@@ -405,6 +405,9 @@
 - **SEO Parameter Sync**: Unified the flow for SEO parameters. `generate_seo` now pulls from user defaults (`v_user_seo_active_settings`), while `resetPool` respects listing-specific strategic overrides.
 - **Admin System Power-Up**: Transformed the Admin page into a full-featured management console with CRUD (Add/Edit Keywords/Delete) and multi-column sorting.
 - **Bug Squashing**: Resolved a casing mismatch in `UserSettings.jsx` that was preventing "Current Live Values" from rendering correctly.
+- **Smart Badge Settings Integrity**: Updated `UserSettings.jsx` to support multi-parameter grouped saves. Selecting a master threshold (e.g. Evergreen Stability) now automatically resolves and batch-saves all related sub-parameters (`evergreen_stability_ratio_id`, etc.) to the `user_settings` table by parsing identical label keys within the constants catalog.
+- **Smart Badge Render Fix**: Modified `UserSettings.jsx` to render the segmented controls based on active child parameters (e.g. `evergreen_stability_ratio`) rather than legacy master keys, restoring the UI options that disappeared after database schema pruning.
+- **n8n Webhook Payload Sync**: Updated `ProductStudio.jsx` to extract 7 Smart Badge threshold parameters from the user's `v_user_seo_active_settings` view and bundle them into the `parameters` payload sent during both `generate_seo` and `resetPool` actions, ensuring the backend AI respects user sensitivity configurations.
 
 ### Immediate Next Steps
 1.  Verify the n8n webhook's handling of the newly structured `parameters` payload for `resetPool`.
