@@ -266,9 +266,13 @@ const ProductStudio = () => {
             sub_niche: aiSubNiche
         });
 
+        // Capture current form state to avoid overwriting typed input
+        const currentFormData = optimizationFormRef.current?.getCurrentState() || {};
+
         // Update form context while preserving user description/type
         setAnalysisContext(prev => ({
             ...(prev || {}),
+            ...currentFormData,
             theme_name: aiTheme,
             niche_name: aiNiche,
             sub_niche_name: aiSubNiche

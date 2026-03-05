@@ -289,6 +289,7 @@ const SEOLab = () => {
         case 'last_competition': return parseFloat(kw.last_competition) || 0;
         case 'last_cpc': return parseFloat(kw.last_cpc) || 0;
         case 'last_sync_at': return kw.last_sync_at ? new Date(kw.last_sync_at).getTime() : 0;
+        case 'updated_at': return kw.updated_at ? new Date(kw.updated_at).getTime() : 0;
         default: return '';
       }
     };
@@ -459,7 +460,7 @@ const SEOLab = () => {
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3 font-semibold">
+                  <th className="px-4 py-3 font-semibold w-[20%]">
                     <button onClick={() => toggleSort('tag')} className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors">
                       Tag <SortIcon field="tag" />
                     </button>
@@ -498,6 +499,11 @@ const SEOLab = () => {
                   <th className="px-3 py-3 text-center font-semibold w-[8%]">
                     <button onClick={() => toggleSort('last_sync_at')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-700 transition-colors">
                       Freshness <SortIcon field="last_sync_at" />
+                    </button>
+                  </th>
+                  <th className="px-3 py-3 text-center font-semibold w-[10%]">
+                    <button onClick={() => toggleSort('updated_at')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-700 transition-colors">
+                      Last Updated <SortIcon field="updated_at" />
                     </button>
                   </th>
                   <th className="px-3 py-3 text-center font-semibold w-[8%]">Actions</th>
@@ -539,7 +545,9 @@ const SEOLab = () => {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <Star size={14} className="fill-amber-400 text-amber-400 shrink-0" />
-                            <span className="font-semibold text-slate-800">{kw.tag}</span>
+                            <span className="font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors px-3 py-1 rounded-full text-xs cursor-default truncate max-w-[200px]" title={kw.tag}>
+                                {kw.tag}
+                            </span>
                             {isGem(kw) && (
                               <span title="Meets your High Potential criteria">
                                 <Gem size={14} className="text-indigo-500 shrink-0" />
@@ -625,6 +633,11 @@ const SEOLab = () => {
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${freshness.color}`}>
                             {freshness.label}
                           </span>
+                        </td>
+
+                        {/* Last Updated */}
+                        <td className="px-3 py-3 text-center text-slate-500 text-xs">
+                          {kw.updated_at ? new Date(kw.updated_at).toISOString().split('T')[0] : '—'}
                         </td>
 
                         {/* Actions */}

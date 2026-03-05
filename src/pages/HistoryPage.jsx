@@ -12,6 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { pdf } from '@react-pdf/renderer';
 import ListingPDFDocument from '../components/pdf/ListingPDFDocument';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 
 // Numeric metric columns that default to descending (highest first)
 const NUMERIC_COLS = [
@@ -60,6 +61,7 @@ const HistoryPage = () => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [currentPage, setCurrentPage] = useState(1);
     const [exportingId, setExportingId] = useState(null);
+    const [deleteConfirmId, setDeleteConfirmId] = useState(null);
     // Single atomic sort state — avoids two-setState race conditions
     const [sort, setSort] = useState({ column: 'listing_created_at', direction: 'desc' });
     const ITEMS_PER_PAGE = 20;
@@ -103,15 +105,17 @@ const HistoryPage = () => {
         setCurrentPage(1);
     };
 
-    const handleDelete = async (id) => {
-        if (!confirm('Are you sure you want to delete this optimization?')) return;
+    const handleDelete = async () => {
+        if (!deleteConfirmId) return;
         try {
-            const { error } = await supabase.from('listings').delete().eq('id', id);
+            const { error } = await supabase.from('listings').delete().eq('id', deleteConfirmId);
             if (error) throw error;
-            setListings(prev => prev.filter(l => (l.listing_id || l.id) !== id));
+            setListings(prev => prev.filter(l => (l.listing_id || l.id) !== deleteConfirmId));
         } catch (err) {
             console.error('Error deleting listing:', err);
             alert('Failed to delete listing.');
+        } finally {
+            setDeleteConfirmId(null);
         }
     };
 
@@ -370,11 +374,11 @@ const HistoryPage = () => {
                                                                 Export PDF
                                                             </button>
                                                             <button
-                                                                onClick={() => handleDelete(listingId)}
+                                                                onClick={() => setDeleteConfirmId(listingId)}
                                                                 className="w-full text-left px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded flex items-center gap-2"
                                                             >
                                                                 <Trash2 size={12} />
-                                                                Supprimer
+                                                                Delete
                                                             </button>
                                                         </div>
                                                     </div>
@@ -427,6 +431,17 @@ const HistoryPage = () => {
                         )}
                     </div>
                 </div>
+
+                <ConfirmationModal 
+                    isOpen={!!deleteConfirmId}
+                    onClose={() => setDeleteConfirmId(null)}
+                    onConfirm={handleDelete}
+                    title="Delete Optimization"
+                    message="Are you sure you want to permanently delete this optimization? This action cannot be undone and all associated SEO data will be lost."
+                    confirmText="Delete Permanently"
+                    type="warning"
+                />
+
             </div>
         </Layout>
     );

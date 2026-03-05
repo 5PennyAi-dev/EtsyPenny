@@ -408,6 +408,9 @@
 - **Smart Badge Settings Integrity**: Updated `UserSettings.jsx` to support multi-parameter grouped saves. Selecting a master threshold (e.g. Evergreen Stability) now automatically resolves and batch-saves all related sub-parameters (`evergreen_stability_ratio_id`, etc.) to the `user_settings` table by parsing identical label keys within the constants catalog.
 - **Smart Badge Render Fix**: Modified `UserSettings.jsx` to render the segmented controls based on active child parameters (e.g. `evergreen_stability_ratio`) rather than legacy master keys, restoring the UI options that disappeared after database schema pruning.
 - **n8n Webhook Payload Sync**: Updated `ProductStudio.jsx` to extract 7 Smart Badge threshold parameters from the user's `v_user_seo_active_settings` view and bundle them into the `parameters` payload sent during both `generate_seo` and `resetPool` actions, ensuring the backend AI respects user sensitivity configurations.
+- **Form State Preservation**: Updated `ProductStudio.jsx` to capture the current state of the 'Description/Info' textarea using a ref before updating the `analysisContext` with new AI data, preventing user-typed instructions from disappearing when image analysis completes.
+- **History Page Delete Flow**: Replaced the native browser `confirm()` dialogue in `HistoryPage.jsx` with the custom `<ConfirmationModal>` component for a more premium feel, and renamed the 'Supprimer' button to 'Delete'.
+- **SEO Lab UI Enhancements**: Added a sortable "Last Updated" column to `SEOLab.jsx` (formatted as YYYY-MM-DD). Widened the "Tag" column and styled the keywords as clean, rounded pills with hover effects to match the main Keyword Performance table aesthetic.
 
 ### Immediate Next Steps
 1.  Verify the n8n webhook's handling of the newly structured `parameters` payload for `resetPool`.

@@ -257,7 +257,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
 
             {/* DETAILS SECTION */}
             <div className="space-y-1">
-                <label htmlFor="context" className="text-sm font-medium text-slate-700">Instructions / Details</label>
+                <label htmlFor="context" className="text-sm font-medium text-slate-700">Description/Info</label>
                 <textarea
                     ref={contextRef}
                     id="context"
