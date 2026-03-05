@@ -327,11 +327,11 @@ export default function UserSettings() {
                       <div className="space-y-2">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Weights</h4>
                         {[
-                          { label: 'volume', key: 'vol_val' },
-                          { label: 'competition', key: 'comp_val' },
-                          { label: 'transaction', key: 'tx_val' },
-                          { label: 'niche', key: 'niche_val' },
-                          { label: 'cpc', key: 'cpc_val' }
+                          { label: 'volume', key: 'param_volume' },
+                          { label: 'competition', key: 'param_competition' },
+                          { label: 'transaction', key: 'param_transaction' },
+                          { label: 'niche', key: 'param_niche' },
+                          { label: 'cpc', key: 'param_cpc' }
                         ].map(({ label, key }) => (
                           <div key={key} className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-lg">
                             <span className="text-xs text-slate-600 capitalize">{label}</span>

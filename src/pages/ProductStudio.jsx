@@ -80,6 +80,7 @@ const ProductStudio = () => {
   const [listingName, setListingName] = useState("");
   const [isImageAnalyzedState, setIsImageAnalyzedState] = useState(false);
   const [resetSelectionKey, setResetSelectionKey] = useState(0);
+  const [userDefaults, setUserDefaults] = useState(null);
   
   // Visual Analysis State
   const [isAnalyzingDesign, setIsAnalyzingDesign] = useState(false);
@@ -126,8 +127,38 @@ const ProductStudio = () => {
         .single();
       if (data) customTypeIdRef.current = data.id;
     };
+    
+    const fetchUserDefaults = async () => {
+        if (!user) return;
+        try {
+            const { data, error } = await supabase
+                .from('v_user_seo_active_settings')
+                .select('*')
+                .eq('user_id', user.id)
+                .single();
+                
+            if (error && error.code !== 'PGRST116') throw error;
+            if (data) {
+                setUserDefaults(data);
+                // If no listing is loaded, initialize strategy selections with user defaults
+                if (!listingId) {
+                  setStrategySelections(getSelectionsFromValues({
+                    Volume: data.param_volume,
+                    Competition: data.param_competition,
+                    Transaction: data.param_transaction,
+                    Niche: data.param_niche,
+                    CPC: data.param_cpc,
+                  }));
+                }
+            }
+        } catch (err) {
+            console.error("Error fetching user defaults:", err);
+        }
+    };
+
     fetchCustomTypeId();
-  }, []);
+    fetchUserDefaults();
+  }, [user]);
 
   // Refs to track background SEO completion (avoids stale closures)
   const isWaitingForSeoRef = useRef(false);
@@ -596,7 +627,13 @@ const ProductStudio = () => {
             action: "generate_seo",
             listing_id: activeListingId,
             user_id: user.id,
-            parameters: getStrategyValues(strategySelections),
+            parameters: userDefaults ? {
+                Volume: userDefaults.param_volume,
+                Competition: userDefaults.param_competition,
+                Transaction: userDefaults.param_transaction,
+                Niche: userDefaults.param_niche,
+                CPC: userDefaults.param_cpc
+            } : getStrategyValues(strategySelections),
             payload: {
                 image_url: publicUrl,
                 // Visual analysis fields
@@ -1036,7 +1073,8 @@ const ProductStudio = () => {
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
       await axios.post(webhookUrl, {
         action: 'resetPool',
-        listing_id: listingId
+        listing_id: listingId,
+        parameters: getStrategyValues(strategySelections)
       });
       toast.success('Keywords pool reset successfully!');
       await handleLoadListing(listingId);
@@ -1064,7 +1102,7 @@ const ProductStudio = () => {
         action: 'resetPool',
         listing_id: listingId,
         pinned_count: pinnedCount,
-        parameters
+        parameters: parameters // Ensure we use the parameters passed from StrategyTuner
       });
       toast.success('Strategy update triggered! Your results will refresh in a few seconds.');
       await handleLoadListing(listingId);
