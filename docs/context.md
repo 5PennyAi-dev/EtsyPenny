@@ -388,6 +388,12 @@
     - Fixed an issue where the Reach index (`est_market_reach`) would disappear from the Audit Header after generating a new analysis or applying a new Custom Strategy. 
     - The root cause was that `handleLoadListing` in `ProductStudio.jsx` was successfully fetching the value from `listings_global_eval`, but was failing to map it into the `constructedResults` state object passed down to `<ResultsDisplay />`. Added `listing_est_market_reach` to the hydration mapping.
 
+- **UI Polish: Conv. Intent & Relevance Badges** (2026-03-04):
+    - Replaced the raw numeric scores (e.g., "7/10") for "Conv. Intent" and "Relevance" in the Keyword Performance table (`ResultsDisplay.jsx`) with visual badges (`SeoBadge.jsx`).
+    - Implemented a 4-tier discrete scale (10, 7, 4, 1) mapping to unified professional labels (Very High, High, Moderate, Low).
+    - Added color-coded Tailwind pills (**Indigo** for Very High, **Emerald** for High, **Amber** for Moderate, **Slate** for Low) and specific educational tooltips tailored for Relevance or Intent on hover to explain the "Why" behind each score, reducing cognitive load.
+    - **Interactive Score Editing**: Developed a custom single-click dropdown menu for the `SeoBadge` component, replacing the native `<select>`. Users can manually override AI-generated scores. Changes immediately reflect in the UI and are synced to Supabase (`listing_seo_stats` table).
+
 ## 5. Next Steps (Action Items)
 - Test Multi-Mode end-to-end: verify all 3 modes save correctly to `listings_global_eval` and `listing_seo_stats`.
 - Validate Strategy Switcher toggles display correct per-mode data without refetch.

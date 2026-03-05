@@ -50,8 +50,11 @@ npm run preview   # Preview production build
 1. **Image Upload**: User uploads mockup -> stored in Supabase `mockups_bucket` -> listing row created in `listings` table
 2. **AI Analysis**: Frontend POSTs to n8n webhook (`VITE_N8N_WEBHOOK_URL_TEST`) with listing_id + context -> n8n runs AI pipeline
 3. **Results Persistence**: n8n calls Supabase edge function `save-seo` (secured via `x-api-key` header) -> upserts into `listings_global_eval` and `listing_seo_stats`
-4. **Realtime Updates**: ProductStudio subscribes to Supabase realtime on the `listings` table to detect when n8n processing completes
-5. **Display**: ResultsDisplay shows SEO scores, keywords, and strategy comparisons across broad/balanced/sniper modes
+4. **Data Hydration**: Initial data hydration occurs in `handleLoadListing` when a listing is selected.
+5. **Manual Overrides**: Manual user overrides for Conv. Intent and Relevance are handled via the interactive `SeoBadge` dropdowns, which trigger `handleScoreUpdate` to immediately sync with the `listing_seo_stats` database table and update local component state.
+6. **Component Communication**: `ProductStudio.jsx` passes state and callbacks to `ResultsDisplay.jsx` as props.
+7. **Realtime Updates**: ProductStudio subscribes to Supabase realtime on the `listings` table to detect when n8n processing completes
+8. **Display**: ResultsDisplay shows SEO scores, keywords, and strategy comparisons across broad/balanced/sniper modes
 
 ### Supabase Tables & Views
 - **`listings`** — Core table: image_url, generated_title, generated_description, visual analysis fields, status_id, product categorization

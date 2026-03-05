@@ -2,7 +2,7 @@
   Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, 
   ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, 
   Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart, 
-  Pin, Tag, User, Zap, Swords, DollarSign, Award
+  Pin, Tag, User, Zap, Swords, DollarSign, Award, ChevronRight, X, UserSearch, FileText, Share2, Printer, Hash, PlayCircle, BarChart3, AlertCircle, Clock, Activity, ArrowRight, LayoutTemplate, Layers, CheckCircle, ListPlus, EyeOff, LayoutPanelLeft, MousePointerClick, History 
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +13,7 @@ import StrategyTuner from './StrategyTuner';
 import FavoritesPickerModal from './FavoritesPickerModal';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import SeoBadge from './SeoBadge';
 
 const Sparkline = ({ data }) => {
   if (!data || data.length === 0) return <div className="text-slate-300 text-xs">-</div>;
@@ -382,6 +383,7 @@ const SidebarSkeleton = ({ phase }) => (
     isApplyingStrategy,
     onDeleteKeyword,
     onTogglePin,
+    onUpdateScore,
     listingId,
     strategySelections,
     onStrategySelectionsChange,
@@ -1053,50 +1055,18 @@ const SidebarSkeleton = ({ phase }) => (
                                         <div className="font-bold text-slate-700">{row.score}</div>
                                     </td>
                                     <td className="px-4 py-3 text-center">
-                                        {(() => {
-                                            const score = row.transactional_score;
-                                            if (!score) return <span className="text-slate-300">-</span>;
-                                            
-                                            let colorClass = "text-slate-400";
-                                            let showIcon = false;
-                                            
-                                            if (score >= 8) {
-                                                colorClass = "text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded";
-                                                showIcon = true;
-                                            } else if (score >= 5) {
-                                                colorClass = "text-slate-600 font-medium";
-                                            }
-                                            
-                                            return (
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    {showIcon && <ShoppingCart size={14} className="text-emerald-500" />}
-                                                    <span className={colorClass}>{score}/10</span>
-                                                </div>
-                                            );
-                                        })()}
+                                        <SeoBadge 
+                                            score={row.transactional_score} 
+                                            type="intent" 
+                                            onUpdate={(newScore) => onUpdateScore && onUpdateScore(row.keyword, 'intent', newScore)}
+                                        />
                                     </td>
                                     <td className="px-4 py-3 text-center">
-                                        {(() => {
-                                            const score = row.niche_score;
-                                            if (!score) return <span className="text-slate-300">-</span>;
-                                            
-                                            let colorClass = "text-slate-400";
-                                            let showIcon = false;
-                                            
-                                            if (score >= 8) {
-                                                colorClass = "text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded";
-                                                showIcon = true;
-                                            } else if (score >= 5) {
-                                                colorClass = "text-slate-600 font-medium";
-                                            }
-                                            
-                                            return (
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    {showIcon && <Target size={14} className="text-emerald-500" />}
-                                                    <span className={colorClass}>{score}/10</span>
-                                                </div>
-                                            );
-                                        })()}
+                                        <SeoBadge 
+                                            score={row.niche_score} 
+                                            type="relevance" 
+                                            onUpdate={(newScore) => onUpdateScore && onUpdateScore(row.keyword, 'relevance', newScore)} 
+                                        />
                                     </td>
                                     <td className="px-4 py-3 text-center text-slate-700">
                                         {(row.volume || 0).toLocaleString()}

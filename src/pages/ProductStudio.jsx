@@ -2400,6 +2400,54 @@ const ProductStudio = () => {
       }
   };
 
+  // --- UPDATE SEO SCORE (Intent or Relevance) ---
+  const handleScoreUpdate = async (keyword, type, newScore) => {
+      const currentListingId = listingId || results?.listing_id;
+      
+      if (!currentListingId) {
+          toast.error("Error: Missing listing ID to update score.");
+          return;
+      }
+
+      // Determine the column name in the database
+      const dbColumn = type === 'intent' ? 'transactional_score' : 'niche_score';
+
+      try {
+          // Update DB natively for this listing and keyword. 
+          const { error } = await supabase
+              .from('listing_seo_stats')
+              .update({ [dbColumn]: newScore })
+              .eq('listing_id', currentListingId)
+              .eq('tag', keyword);
+
+          if (error) {
+              console.error("Supabase score update error:", error);
+              toast.error(`Failed to update score: ${error.message}`);
+              return;
+          }
+
+          // Update local UI state
+          setResults(prev => {
+              if (!prev || !prev.analytics) return prev;
+              return {
+                  ...prev,
+                  analytics: prev.analytics.map(item => 
+                      item.keyword === keyword ? { ...item, [dbColumn]: newScore } : item
+                  )
+              };
+          });
+
+          // Also update allSeoStats cache
+          setAllSeoStats(prev => prev.map(item => 
+              item.tag === keyword ? { ...item, [dbColumn]: newScore } : item
+          ));
+          
+      } catch (err) {
+          console.error("Unexpected error in handleScoreUpdate:", err);
+          toast.error("Failed to update score");
+      }
+  };
+
   const handleSEOSniper = async () => {
       setIsSniperLoading(true);
       try {
@@ -2538,6 +2586,7 @@ const ProductStudio = () => {
       isAddingBatchKeywords={isAddingBatchKeywords}
       onDeleteKeyword={handleDeleteKeyword}
       onTogglePin={handleTogglePin}
+      onUpdateScore={handleScoreUpdate}
       onRecalculateScores={handleRecalculateScores}
       isRecalculating={isRecalculating}
       onApplyStrategy={handleApplyStrategy}
@@ -2559,7 +2608,7 @@ const ProductStudio = () => {
     >
         <RecentOptimizations onViewResults={handleLoadListing} />
     </ResultsDisplay>
-  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, isApplyingStrategy, strategySelections, resetSelectionKey, activeMode, globalEvals, user, currentListingContext, handleDeleteKeyword, handleTogglePin]);
+  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, isApplyingStrategy, strategySelections, resetSelectionKey, activeMode, globalEvals, user, currentListingContext, handleDeleteKeyword, handleTogglePin, handleScoreUpdate]);
 
   return (
     <Layout>
