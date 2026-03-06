@@ -1,18 +1,16 @@
-# Tasks: Add Keywords to Existing Presets
+# Tasks: SEOLab Keyword Pagination
 
-## 1. UI updates: `PresetRow` Toolbar
-- [x] Add a `Plus` icon next to the preset's `Trash2` (Delete) button inside the `PresetRow` component.
-- [x] Ensure it has a tooltip "Add Keywords to Preset" and distinct hover styling (perhaps Indigo).
-- [x] When clicked, this button should fire an `onEditKeywords(preset)` callback.
+## 1. Setup Pagination State
+- [x] Add `currentPage` (default 1) and `pageSize` (default 10) state in `SEOLab.jsx`.
+- [x] Add options for user to select 10, 25, or 50 items per page.
 
-## 2. Modal Component: `EditPresetKeywordsModal`
-- [x] Create a new modal component focused strictly on keyword selection (reusing the search/grid logic from `CreatePresetModal` but without the Title/Theme text inputs).
-- [x] Provide it with the `initialSelectedIds` from the target preset.
-- [x] Enforce the same 10-keyword maximum limit.
-- [x] Include "Cancel" and "Save Changes" buttons.
+## 2. Implement Data Slicing
+- [x] Apply slicing to the `filtered` keywords array (which is already filtered by search and sorted) before rendering.
+- [x] Ensure that when `searchQuery` or `sortField` or `sortDirection` changes, `currentPage` is reset to 1 to prevent empty page states.
 
-## 3. Logic & State Integration in `SEOLab.jsx`
-- [x] Add state: `[editingPresetKeywords, setEditingPresetKeywords] = useState(null)` to track which preset is currently having its keywords edited.
-- [x] Create `handleSavePresetKeywords(presetId, newKeywordIds)` to `.update()` the `keyword_presets` row in Supabase.
-- [x] Optimistically update the UI upon success, close the modal, and trigger a success toast.
-- [x] Pass the necessary props down and render `<EditPresetKeywordsModal />` at the page root.
+## 3. UI: Pagination Controls
+- [x] Modify the table footer for "Individual Keywords" to include:
+  - "Row per page" dropdown (10, 25, 50).
+  - Page navigation controls (Previous / Next buttons or `<` and `>`).
+  - Text indicating "Showing X to Y of Z keywords".
+- [x] Ensure the controls follow the existing UI aesthetic (slate/indigo accents, crisp typography).

@@ -410,7 +410,10 @@
 - **n8n Webhook Payload Sync**: Updated `ProductStudio.jsx` to extract 7 Smart Badge threshold parameters from the user's `v_user_seo_active_settings` view and bundle them into the `parameters` payload sent during both `generate_seo` and `resetPool` actions, ensuring the backend AI respects user sensitivity configurations.
 - **Form State Preservation**: Updated `ProductStudio.jsx` to capture the current state of the 'Description/Info' textarea using a ref before updating the `analysisContext` with new AI data, preventing user-typed instructions from disappearing when image analysis completes.
 - **History Page Delete Flow**: Replaced the native browser `confirm()` dialogue in `HistoryPage.jsx` with the custom `<ConfirmationModal>` component for a more premium feel, and renamed the 'Supprimer' button to 'Delete'.
-- **SEO Lab UI Enhancements**: Added a sortable "Last Updated" column to `SEOLab.jsx` (formatted as YYYY-MM-DD). Widened the "Tag" column and styled the keywords as clean, rounded pills with hover effects to match the main Keyword Performance table aesthetic.
+- **SEO Lab UI Enhancements** (2026-03-06): 
+    - Added a sortable "Last Updated" column to `SEOLab.jsx` (formatted as YYYY-MM-DD). Widened the "Tag" column and styled the keywords as clean, rounded pills with hover effects to match the main Keyword Performance table aesthetic.
+    - Adjusted the `Context` column width in the Presets table to prevent text truncation.
+    - Implemented a fully interactive Pagination footer for the Individual Keywords bank, allowing users to select 10 (default), 25, or 50 rows per page. Includes dynamic `Chevron` page hopping and automatic page reset on search or sort.
 - **Feature: Keyword Presets** (2026-03-06):
     - Added "Keyword Presets" to the SEO Lab, allowing users to bundle up to 10 keywords into one-click strategies.
     - Implemented client-side aggregate calculations for Total Volume, Avg Competition, and Avg CPC without writing complex backend RPCs.

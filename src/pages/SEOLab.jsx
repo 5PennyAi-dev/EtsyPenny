@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { FlaskConical, Star, Search, RefreshCw, Trash2, Pencil, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Gem, Settings2, X, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, Folder, Plus } from 'lucide-react';
+import { FlaskConical, Star, Search, RefreshCw, Trash2, Pencil, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Gem, Settings2, X, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, ChevronLeft, Folder, Plus } from 'lucide-react';
 import Layout from '../components/Layout';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -543,6 +543,11 @@ const SEOLab = () => {
   const [editingPresetForKeywords, setEditingPresetForKeywords] = useState(null); // stores the full preset object when editing
   const [sortField, setSortField] = useState(null); // null = no sort (default order)
   const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  
   const gemSettingsRef = useRef(null);
 
   // Gem thresholds with Supabase persistence
@@ -786,16 +791,30 @@ const SEOLab = () => {
 
   // Sort toggle: null → asc → desc → null
   const toggleSort = (field) => {
-    if (sortField !== field) {
-      setSortField(field);
-      setSortDirection('asc');
-    } else if (sortDirection === 'asc') {
-      setSortDirection('desc');
-    } else {
-      setSortField(null);
-      setSortDirection('asc');
+    let nextSortField;
+    let nextSortDirection;
+
+    if (sortField === field) { // If clicking the same field
+      if (sortDirection === 'asc') {
+        nextSortDirection = 'desc';
+      } else { // Currently 'desc', so reset
+        nextSortField = null;
+        nextSortDirection = 'asc'; // Default for next sort
+      }
+    } else { // Clicking a new field
+      nextSortField = field;
+      nextSortDirection = 'asc';
     }
+    
+    setSortField(nextSortField);
+    setSortDirection(nextSortDirection);
+    setCurrentPage(1); // Reset to page 1 on sort change
   };
+
+  // Reset pagination on search or sort change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortField, sortDirection, view]);
 
   // Sort icon helper
   const SortIcon = ({ field }) => {
@@ -825,11 +844,20 @@ const SEOLab = () => {
     return [...filtered].sort((a, b) => {
       const aVal = getValue(a);
       const bVal = getValue(b);
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
+      let comparison = 0;
+      if (aVal < bVal) comparison = -1;
+      if (aVal > bVal) comparison = 1;
+      
+      if (sortDirection === 'desc') return comparison * -1;
+      return comparison;
     });
   })();
+
+  // Pagination Logic
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedKeywords = sorted.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(sorted.length / pageSize) || 1;
 
   // Stats
   const totalCount = keywords.length;
@@ -1102,7 +1130,7 @@ const SEOLab = () => {
                     </td>
                   </tr>
                 ) : (
-                  sorted.map((kw) => {
+                  paginatedKeywords.map((kw) => {
                     const freshness = getFreshnessStatus(kw.last_sync_at);
                     const comp = parseFloat(kw.last_competition);
                     const cpc = parseFloat(kw.last_cpc);
@@ -1242,8 +1270,46 @@ const SEOLab = () => {
 
           {/* Footer */}
           {!isLoading && filtered.length > 0 && (
-            <div className="bg-slate-50/50 border-t border-slate-100 px-4 py-3 text-xs text-slate-400 text-center">
-              Showing {filtered.length} of {totalCount} keywords
+            <div className="bg-slate-50/50 border-t border-slate-100 px-4 py-3 flex items-center justify-between text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <span>Rows per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="bg-white border border-slate-200 rounded px-2 py-1 outline-none text-slate-700 focus:ring-2 focus:ring-indigo-500/20"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+              
+              <div className="text-center font-medium">
+                {startIndex + 1}-{Math.min(endIndex, sorted.length)} of {sorted.length} keywords
+              </div>
+              
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                   <ChevronLeft size={16} />
+                </button>
+                <div className="px-2 font-medium">
+                  {currentPage} / {totalPages}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-1 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                   <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           )}
         </div>
