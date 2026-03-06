@@ -290,11 +290,47 @@ const CreatePresetModal = ({ isOpen, onClose, user, userKeywordBank, onSuccess }
   const [search, setSearch] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Advanced Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({ theme: '', niche: '', subNiche: '' });
+
+  const uniqueThemes = useMemo(() => {
+    return [...new Set(userKeywordBank.map(k => k.theme).filter(Boolean))].sort();
+  }, [userKeywordBank]);
+
+  const uniqueNiches = useMemo(() => {
+    return [...new Set(userKeywordBank
+      .filter(k => !filters.theme || k.theme === filters.theme)
+      .map(k => k.niche)
+      .filter(Boolean))].sort();
+  }, [userKeywordBank, filters.theme]);
+
+  const uniqueSubNiches = useMemo(() => {
+    return [...new Set(userKeywordBank
+      .filter(k => (!filters.theme || k.theme === filters.theme) && (!filters.niche || k.niche === filters.niche))
+      .map(k => k.sub_niche)
+      .filter(Boolean))].sort();
+  }, [userKeywordBank, filters.theme, filters.niche]);
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+  
+  const handleClearFilters = () => {
+    setFilters({ theme: '', niche: '', subNiche: '' });
+  };
+
   if (!isOpen) return null;
 
-  const filteredBank = search.trim() 
-    ? userKeywordBank.filter(k => k.tag.toLowerCase().includes(search.toLowerCase()))
-    : userKeywordBank;
+  const filteredBank = useMemo(() => {
+    return userKeywordBank.filter(kw => {
+      const matchesSearch = !search.trim() || kw.tag.toLowerCase().includes(search.toLowerCase());
+      const matchesTheme = !filters.theme || kw.theme === filters.theme;
+      const matchesNiche = !filters.niche || kw.niche === filters.niche;
+      const matchesSubNiche = !filters.subNiche || kw.sub_niche === filters.subNiche;
+      return matchesSearch && matchesTheme && matchesNiche && matchesSubNiche;
+    });
+  }, [userKeywordBank, search, filters]);
 
   const handleToggle = (id) => {
     if (selectedIds.includes(id)) {
@@ -372,14 +408,63 @@ const CreatePresetModal = ({ isOpen, onClose, user, userKeywordBank, onSuccess }
            </div>
 
            <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col flex-1 min-h-[300px]">
-              <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                 <div className="relative flex-1 max-w-sm">
-                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                   <input type="text" placeholder="Search your bank..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white outline-none" />
+              <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-col gap-3">
+                 <div className="flex items-center justify-between">
+                   <div className="flex gap-2 w-full max-w-sm">
+                     <div className="relative flex-1">
+                       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                       <input type="text" placeholder="Search your bank..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white outline-none transition-all" />
+                     </div>
+                     <button
+                        onClick={() => setShowFilters(prev => !prev)}
+                        className={`relative flex-shrink-0 p-1.5 rounded-md border transition-all focus:outline-none flex items-center justify-center ${
+                          showFilters || Object.values(filters).some(Boolean)
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                            : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                        }`}
+                        title="Filter Keywords"
+                      >
+                        <Filter size={14} />
+                        {Object.values(filters).filter(Boolean).length > 0 && (
+                          <span className="absolute top-0.5 right-0.5 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                          </span>
+                        )}
+                      </button>
+                   </div>
+                   <div className={`text-xs font-bold px-2.5 py-1 rounded-md ml-3 ${selectedIds.length === 10 ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                     {selectedIds.length} / 10 Selected
+                   </div>
                  </div>
-                 <div className={`text-xs font-bold px-2.5 py-1 rounded-md ml-3 ${selectedIds.length === 10 ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                   {selectedIds.length} / 10 Selected
-                 </div>
+
+                 {showFilters && (
+                    <div className="flex flex-wrap items-end gap-2 animate-in fade-in slide-in-from-top-1">
+                      <div className="flex-1 min-w-[120px]">
+                        <select value={filters.theme} onChange={(e) => handleFilterChange('theme', e.target.value)} className="w-full bg-white border border-slate-200 rounded py-1.5 px-2 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                          <option value="">All Themes</option>
+                          {uniqueThemes.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1 min-w-[120px]">
+                        <select value={filters.niche} onChange={(e) => handleFilterChange('niche', e.target.value)} className="w-full bg-white border border-slate-200 rounded py-1.5 px-2 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                          <option value="">All Niches</option>
+                          {uniqueNiches.map(n => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1 min-w-[120px]">
+                        <select value={filters.subNiche} onChange={(e) => handleFilterChange('subNiche', e.target.value)} className="w-full bg-white border border-slate-200 rounded py-1.5 px-2 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                          <option value="">All Sub-niches</option>
+                          {uniqueSubNiches.map(sn => <option key={sn} value={sn}>{sn}</option>)}
+                        </select>
+                      </div>
+                      {Object.values(filters).some(Boolean) && (
+                        <button onClick={handleClearFilters} className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors h-[28px]">
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                 )}
               </div>
               <div className="flex-1 overflow-y-auto p-3 bg-slate-50/30">
                  {filteredBank.length === 0 ? (
@@ -429,19 +514,57 @@ const EditPresetKeywordsModal = ({ preset, isOpen, onClose, userKeywordBank, onS
   const [search, setSearch] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Advanced Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({ theme: '', niche: '', subNiche: '' });
+
+  const uniqueThemes = useMemo(() => {
+    return [...new Set(userKeywordBank.map(k => k.theme).filter(Boolean))].sort();
+  }, [userKeywordBank]);
+
+  const uniqueNiches = useMemo(() => {
+    return [...new Set(userKeywordBank
+      .filter(k => !filters.theme || k.theme === filters.theme)
+      .map(k => k.niche)
+      .filter(Boolean))].sort();
+  }, [userKeywordBank, filters.theme]);
+
+  const uniqueSubNiches = useMemo(() => {
+    return [...new Set(userKeywordBank
+      .filter(k => (!filters.theme || k.theme === filters.theme) && (!filters.niche || k.niche === filters.niche))
+      .map(k => k.sub_niche)
+      .filter(Boolean))].sort();
+  }, [userKeywordBank, filters.theme, filters.niche]);
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+  
+  const handleClearFilters = () => {
+    setFilters({ theme: '', niche: '', subNiche: '' });
+  };
+
   // Initialize selected IDs when the modal opens with a valid preset
   useEffect(() => {
     if (isOpen && preset) {
       setSelectedIds(preset.keyword_ids || []);
       setSearch('');
+      setFilters({ theme: '', niche: '', subNiche: '' });
+      setShowFilters(false);
     }
   }, [isOpen, preset]);
 
   if (!isOpen || !preset) return null;
 
-  const filteredBank = search.trim() 
-    ? userKeywordBank.filter(k => k.tag.toLowerCase().includes(search.toLowerCase()))
-    : userKeywordBank;
+  const filteredBank = useMemo(() => {
+    return userKeywordBank.filter(kw => {
+      const matchesSearch = !search.trim() || kw.tag.toLowerCase().includes(search.toLowerCase());
+      const matchesTheme = !filters.theme || kw.theme === filters.theme;
+      const matchesNiche = !filters.niche || kw.niche === filters.niche;
+      const matchesSubNiche = !filters.subNiche || kw.sub_niche === filters.subNiche;
+      return matchesSearch && matchesTheme && matchesNiche && matchesSubNiche;
+    });
+  }, [userKeywordBank, search, filters]);
 
   const handleToggle = (id) => {
     if (selectedIds.includes(id)) {
@@ -476,14 +599,63 @@ const EditPresetKeywordsModal = ({ preset, isOpen, onClose, userKeywordBank, onS
 
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
            <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col flex-1 min-h-[300px]">
-              <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                 <div className="relative flex-1 max-w-sm">
-                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                   <input type="text" placeholder="Search your bank..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white outline-none" />
+              <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-col gap-3">
+                 <div className="flex items-center justify-between">
+                   <div className="flex gap-2 w-full max-w-sm">
+                     <div className="relative flex-1">
+                       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                       <input type="text" placeholder="Search your bank..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white outline-none transition-all" />
+                     </div>
+                     <button
+                        onClick={() => setShowFilters(prev => !prev)}
+                        className={`relative flex-shrink-0 p-1.5 rounded-md border transition-all focus:outline-none flex items-center justify-center ${
+                          showFilters || Object.values(filters).some(Boolean)
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                            : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                        }`}
+                        title="Filter Keywords"
+                      >
+                        <Filter size={14} />
+                        {Object.values(filters).filter(Boolean).length > 0 && (
+                          <span className="absolute top-0.5 right-0.5 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                          </span>
+                        )}
+                      </button>
+                   </div>
+                   <div className={`text-xs font-bold px-2.5 py-1 rounded-md ml-3 ${selectedIds.length === 10 ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                     {selectedIds.length} / 10 Selected
+                   </div>
                  </div>
-                 <div className={`text-xs font-bold px-2.5 py-1 rounded-md ml-3 ${selectedIds.length === 10 ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                   {selectedIds.length} / 10 Selected
-                 </div>
+
+                 {showFilters && (
+                    <div className="flex flex-wrap items-end gap-2 animate-in fade-in slide-in-from-top-1">
+                      <div className="flex-1 min-w-[120px]">
+                        <select value={filters.theme} onChange={(e) => handleFilterChange('theme', e.target.value)} className="w-full bg-white border border-slate-200 rounded py-1.5 px-2 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                          <option value="">All Themes</option>
+                          {uniqueThemes.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1 min-w-[120px]">
+                        <select value={filters.niche} onChange={(e) => handleFilterChange('niche', e.target.value)} className="w-full bg-white border border-slate-200 rounded py-1.5 px-2 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                          <option value="">All Niches</option>
+                          {uniqueNiches.map(n => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1 min-w-[120px]">
+                        <select value={filters.subNiche} onChange={(e) => handleFilterChange('subNiche', e.target.value)} className="w-full bg-white border border-slate-200 rounded py-1.5 px-2 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                          <option value="">All Sub-niches</option>
+                          {uniqueSubNiches.map(sn => <option key={sn} value={sn}>{sn}</option>)}
+                        </select>
+                      </div>
+                      {Object.values(filters).some(Boolean) && (
+                        <button onClick={handleClearFilters} className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors h-[28px]">
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                 )}
               </div>
               <div className="flex-1 overflow-y-auto p-3 bg-slate-50/30">
                  {filteredBank.length === 0 ? (

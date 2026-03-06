@@ -1,16 +1,17 @@
-# Tasks: Advanced Keyword Filtering (Theme, Niche, Sub-niche)
+# Tasks: Preset Modal Advanced Filtering
 
-## 1. UI/UX Design: Filter Controls
-- [x] Add a `Filter` button next to the Search bar in the "Individual Keywords" tab.
-- [x] When clicked, toggle an inline panel below the search bar containing three `select` dropdowns for Theme, Niche, and Sub-niche.
-- [x] Ensure the panel has a clean, subtle background (e.g., `bg-slate-50/50`) and animation to slide/fade in.
-- [x] Include a "Clear Filters" button to easily reset selections.
+## 1. Create a Reusable Filter Component / Logic
+- [x] Since the exact same Filtering logic is needed in `CreatePresetModal` and `EditPresetKeywordsModal`, we should ideally extract the filter state and unique options logic. 
+- [x] Update `CreatePresetModal` and `EditPresetKeywordsModal` to include `filters` state (`{ theme: '', niche: '', subNiche: '' }`) and `showFilters` boolean.
 
-## 2. Dynamic Option Generation
-- [x] Create derived state/memos to extract unique, non-empty values for Theme, Niche, and Sub-niche directly from the active `keywords` array.
-- [x] (Optional UX Polish) If Theme is selected, dynamically narrow down the available Niche options to only those that appear under that Theme. Same for Sub-niche.
+## 2. Update Modals UI
+- [x] Add the `Filter` button next to the search input in the modals, similar to the main SEO Lab page.
+- [x] Add the filter dropdowns (Theme, Niche, Sub-niche) inside the modal content area when `showFilters` is true.
 
-## 3. State Management & Filtering Logic
-- [x] Add state `filters`: `{ theme: 'All', niche: 'All', subNiche: 'All' }`.
-- [x] Modify the existing `filtered` memo (which handles search and Gemini settings) to also apply these three exact-match filters (when a value other than 'All' is selected).
-- [x] Ensure changing a filter resets the `currentPage` to 1.
+## 3. Filtering Logic
+- [x] Update `filteredBank` in both modals to check: `search`, `theme`, `niche`, and `sub_niche`.
+- [x] Compute `uniqueThemes`, `uniqueNiches`, and `uniqueSubNiches` dynamically based on `userKeywordBank` and the local modal `filters`.
+
+## 4. UI Polish & Tidy Up
+- [x] Ensure the Filter UI looks good constrained inside the modals (might need slightly tighter paddings).
+- [x] Update `context.md` with the new features.
