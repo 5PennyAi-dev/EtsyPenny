@@ -428,6 +428,9 @@
     - The dropdowns cascade dynamically (e.g., selecting a Theme narrows down the available Niches to only those associated with that Theme).
     - Includes a subtle "active filter" ping indicator on the main button and a "Clear Filters" mechanism.
     - Cloned the exact same rigorous filtering capability directly inside the `Create Preset` and `Edit Keywords` modals, permitting users to surgically sift their banks when assembling presets.
+- **SEO Lab UI Polish** (2026-03-06):
+    - Renamed the "Individual Keywords" tab to **"Favorite Tags"** across the tab label and pagination footer for clearer branding.
+    - Applied pill-style rendering (`rounded-full`, `bg-slate-100/80`, hover effect) to keyword tags inside the Preset expanded sub-tables, matching the style already used in the main Favorite Tags table.
 
 ### Immediate Next Steps
 1.  Verify the n8n webhook's handling of the newly structured `parameters` payload for `resetPool`.
