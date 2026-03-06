@@ -320,9 +320,8 @@ const CreatePresetModal = ({ isOpen, onClose, user, userKeywordBank, onSuccess }
     setFilters({ theme: '', niche: '', subNiche: '' });
   };
 
-  if (!isOpen) return null;
-
   const filteredBank = useMemo(() => {
+    if (!isOpen) return [];
     return userKeywordBank.filter(kw => {
       const matchesSearch = !search.trim() || kw.tag.toLowerCase().includes(search.toLowerCase());
       const matchesTheme = !filters.theme || kw.theme === filters.theme;
@@ -330,7 +329,9 @@ const CreatePresetModal = ({ isOpen, onClose, user, userKeywordBank, onSuccess }
       const matchesSubNiche = !filters.subNiche || kw.sub_niche === filters.subNiche;
       return matchesSearch && matchesTheme && matchesNiche && matchesSubNiche;
     });
-  }, [userKeywordBank, search, filters]);
+  }, [userKeywordBank, search, filters, isOpen]);
+
+  if (!isOpen) return null;
 
   const handleToggle = (id) => {
     if (selectedIds.includes(id)) {
@@ -554,9 +555,8 @@ const EditPresetKeywordsModal = ({ preset, isOpen, onClose, userKeywordBank, onS
     }
   }, [isOpen, preset]);
 
-  if (!isOpen || !preset) return null;
-
   const filteredBank = useMemo(() => {
+    if (!isOpen || !preset) return [];
     return userKeywordBank.filter(kw => {
       const matchesSearch = !search.trim() || kw.tag.toLowerCase().includes(search.toLowerCase());
       const matchesTheme = !filters.theme || kw.theme === filters.theme;
@@ -564,7 +564,9 @@ const EditPresetKeywordsModal = ({ preset, isOpen, onClose, userKeywordBank, onS
       const matchesSubNiche = !filters.subNiche || kw.sub_niche === filters.subNiche;
       return matchesSearch && matchesTheme && matchesNiche && matchesSubNiche;
     });
-  }, [userKeywordBank, search, filters]);
+  }, [userKeywordBank, search, filters, isOpen, preset]);
+
+  if (!isOpen || !preset) return null;
 
   const handleToggle = (id) => {
     if (selectedIds.includes(id)) {
