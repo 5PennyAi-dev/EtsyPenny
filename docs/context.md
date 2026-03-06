@@ -411,6 +411,13 @@
 - **Form State Preservation**: Updated `ProductStudio.jsx` to capture the current state of the 'Description/Info' textarea using a ref before updating the `analysisContext` with new AI data, preventing user-typed instructions from disappearing when image analysis completes.
 - **History Page Delete Flow**: Replaced the native browser `confirm()` dialogue in `HistoryPage.jsx` with the custom `<ConfirmationModal>` component for a more premium feel, and renamed the 'Supprimer' button to 'Delete'.
 - **SEO Lab UI Enhancements**: Added a sortable "Last Updated" column to `SEOLab.jsx` (formatted as YYYY-MM-DD). Widened the "Tag" column and styled the keywords as clean, rounded pills with hover effects to match the main Keyword Performance table aesthetic.
+- **Feature: Keyword Presets** (2026-03-06):
+    - Added "Keyword Presets" to the SEO Lab, allowing users to bundle up to 10 keywords into one-click strategies.
+    - Implemented client-side aggregate calculations for Total Volume, Avg Competition, and Avg CPC without writing complex backend RPCs.
+    - Added a `CreatePresetModal` component with dynamic keyword searching and selection limits.
+    - Reused the existing `<EditableCell />` component to allow users to inline-edit a preset's Title, Theme, Niche, and Sub-niche directly from the table.
+    - Added a "Trash" icon to individual keywords inside a preset's expanded sub-table, allowing users to remove keywords from a preset dynamically (instantly recalculating the preset's aggregate stats).
+    - Added a `Plus` button on the main preset row to launch an `EditPresetKeywordsModal`, enabling users to seamlessly search and append new keywords from their bank to a pre-existing preset.
 
 ### Immediate Next Steps
 1.  Verify the n8n webhook's handling of the newly structured `parameters` payload for `resetPool`.

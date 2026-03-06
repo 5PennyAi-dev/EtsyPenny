@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { FlaskConical, Star, Search, RefreshCw, Trash2, Pencil, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Gem, Settings2, X, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { FlaskConical, Star, Search, RefreshCw, Trash2, Pencil, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Gem, Settings2, X, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, Folder, Plus } from 'lucide-react';
 import Layout from '../components/Layout';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -110,14 +110,437 @@ const EditableCell = ({ value, onSave, placeholder = "—" }) => {
   );
 };
 
+// --- Preset Components ---
+const PresetRow = ({ preset, bankKeywords, onDelete, onUpdate, onRemoveKeyword, onEditKeywords }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Resolve keywords from the IDs
+  const linkedKeywords = (preset.keyword_ids || [])
+    .map(id => bankKeywords.find(k => k.id === id))
+    .filter(Boolean);
+    
+  // Calculate Aggregates
+  const tagsCount = linkedKeywords.length;
+  const totalVolume = linkedKeywords.reduce((sum, kw) => sum + (kw.last_volume || 0), 0);
+  
+  // Filter out invalid/NaN for averages
+  const validComp = linkedKeywords.filter(k => !isNaN(parseFloat(k.last_competition)));
+  const avgComp = validComp.length > 0 
+    ? validComp.reduce((sum, kw) => sum + parseFloat(kw.last_competition), 0) / validComp.length 
+    : 0;
+    
+  const validCpc = linkedKeywords.filter(k => !isNaN(parseFloat(k.last_cpc)));
+  const avgCpc = validCpc.length > 0
+    ? validCpc.reduce((sum, kw) => sum + parseFloat(kw.last_cpc), 0) / validCpc.length
+    : 0;
+
+  return (
+    <>
+      {/* Main Preset Row */}
+      <tr className="group hover:bg-slate-50 border-b border-slate-100 transition-colors">
+        <td className="py-4 px-4 flex items-center gap-3 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+          <span className="text-slate-400">
+            {isExpanded ? <ChevronUp size={18} /> : <Folder size={18} className="text-indigo-500 fill-indigo-100" />}
+          </span>
+          <div>
+            <div className="font-bold text-slate-800 flex items-center gap-2">
+              <div onClick={(e) => e.stopPropagation()}>
+                <EditableCell
+                   value={preset.title}
+                   onSave={(val) => onUpdate(preset.id, 'title', val)}
+                   placeholder="Preset Title"
+                />
+              </div>
+              <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full uppercase tracking-widest font-bold">Preset</span>
+            </div>
+          </div>
+        </td>
+        <td className="px-3 text-sm text-slate-500">
+          <div className="flex items-center gap-1.5 text-xs truncate max-w-[200px]" onClick={(e) => e.stopPropagation()}>
+             <EditableCell
+                value={preset.theme}
+                onSave={(val) => onUpdate(preset.id, 'theme', val)}
+                placeholder="Theme"
+             />
+             <ChevronRight size={10} className="text-slate-300 shrink-0" />
+             <EditableCell
+                value={preset.niche}
+                onSave={(val) => onUpdate(preset.id, 'niche', val)}
+                placeholder="Niche"
+             />
+             <ChevronRight size={10} className="text-slate-300 shrink-0" />
+             <EditableCell
+                value={preset.sub_niche}
+                onSave={(val) => onUpdate(preset.id, 'sub_niche', val)}
+                placeholder="Sub-niche"
+             />
+          </div>
+        </td>
+        <td className="px-3">
+          <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-semibold whitespace-nowrap">
+            {tagsCount} / 10 tags
+          </span>
+        </td>
+        <td className="px-3 font-mono text-sm text-slate-600 text-center">{totalVolume.toLocaleString()}</td>
+        <td className="px-3 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-12 bg-slate-200 h-1.5 rounded-full overflow-hidden shrink-0">
+              <div 
+                className={`h-full ${avgComp < 0.3 ? 'bg-emerald-500' : avgComp < 0.7 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                style={{ width: `${Math.min(avgComp * 100, 100)}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium text-slate-600">{avgComp.toFixed(2)}</span>
+          </div>
+        </td>
+        <td className="px-3 text-center text-emerald-600 font-semibold text-xs">
+          ${avgCpc.toFixed(2)}
+        </td>
+        <td className="px-3 text-right">
+          <div className="flex items-center justify-end gap-1.5">
+            <button onClick={(e) => { e.stopPropagation(); onEditKeywords(preset); }} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Add Keywords to Preset">
+              <Plus size={14} />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(preset.id); }} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="Delete Preset">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </td>
+      </tr>
+
+      {/* Expanded Sub-Table */}
+      {isExpanded && (
+        <tr>
+          <td colSpan="7" className="bg-slate-50/50 p-6 shadow-inner border-b border-slate-200">
+            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+              <table className="w-full text-left">
+                <thead className="bg-slate-100/80 text-[10px] uppercase text-slate-500 font-bold tracking-wider">
+                  <tr>
+                    <th className="py-2.5 px-4 w-[35%] border-b border-slate-200">Tag</th>
+                    <th className="py-2.5 px-3 text-center border-b border-slate-200">Volume</th>
+                    <th className="py-2.5 px-3 text-center border-b border-slate-200">Trend</th>
+                    <th className="py-2.5 px-3 text-center border-b border-slate-200">Comp.</th>
+                    <th className="py-2.5 px-3 text-center border-b border-slate-200">CPC</th>
+                    <th className="py-2.5 px-3 text-center border-b border-slate-200">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {linkedKeywords.length === 0 ? (
+                     <tr><td colSpan="6" className="py-6 text-center text-xs text-slate-400">No keywords found. They may have been removed from your bank.</td></tr>
+                  ) : linkedKeywords.map((kw) => {
+                    const comp = parseFloat(kw.last_competition);
+                    const cpc = parseFloat(kw.last_cpc);
+                    return (
+                    <tr key={kw.id} className="text-xs hover:bg-slate-50 transition-colors">
+                      <td className="py-2.5 px-4 font-semibold text-slate-700">
+                         <div className="flex items-center gap-2">
+                           <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
+                           {kw.tag}
+                         </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono text-slate-600">{(kw.last_volume || 0).toLocaleString()}</td>
+                      <td className="py-2.5 px-3">
+                         <div className="flex justify-center scale-90">
+                           <Sparkline data={kw.volume_history} />
+                         </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        {isNaN(comp) ? <span className="text-slate-300">-</span> : (
+                          <span className={`${comp < 0.3 ? 'text-emerald-700' : comp < 0.7 ? 'text-amber-700' : 'text-rose-700'} font-medium`}>
+                            {comp.toFixed(2)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-medium text-emerald-600">
+                         {isNaN(cpc) ? <span className="text-slate-300">-</span> : `$${cpc.toFixed(2)}`}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <button
+                          onClick={() => onRemoveKeyword(preset.id, kw.id)}
+                          className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition"
+                          title="Remove from preset"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </td>
+                    </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+                 <button className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors mr-2 opacity-50 cursor-not-allowed">
+                   Apply to Listing →
+                 </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+};
+
+const CreatePresetModal = ({ isOpen, onClose, user, userKeywordBank, onSuccess }) => {
+  const [title, setTitle] = useState('');
+  const [theme, setTheme] = useState('');
+  const [niche, setNiche] = useState('');
+  const [subNiche, setSubNiche] = useState('');
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [search, setSearch] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen) return null;
+
+  const filteredBank = search.trim() 
+    ? userKeywordBank.filter(k => k.tag.toLowerCase().includes(search.toLowerCase()))
+    : userKeywordBank;
+
+  const handleToggle = (id) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(prev => prev.filter(k => k !== id));
+    } else {
+      if (selectedIds.length >= 10) return; // Hard limit
+      setSelectedIds(prev => [...prev, id]);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!title.trim()) return toast.error('Title is required');
+    setIsSubmitting(true);
+    
+    const { data, error } = await supabase
+      .from('keyword_presets')
+      .insert({
+        user_id: user.id,
+        title: title.trim(),
+        theme: theme.trim() || null,
+        niche: niche.trim() || null,
+        sub_niche: subNiche.trim() || null,
+        keyword_ids: selectedIds
+      })
+      .select()
+      .single();
+
+    setIsSubmitting(false);
+    if (error) {
+       console.error(error);
+       toast.error('Failed to create preset');
+    } else {
+       toast.success('Preset created');
+       onSuccess(data);
+       onClose();
+       setTitle(''); setTheme(''); setNiche(''); setSubNiche(''); setSelectedIds([]); setSearch('');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+               <Folder size={18} className="text-indigo-600 fill-indigo-100" /> Create Keyword Preset
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">Group up to 10 keywords for one-click application.</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+           <div className="space-y-4">
+              <div>
+                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Preset Title <span className="text-rose-500">*</span></label>
+                 <input type="text" placeholder="e.g., Summer T-Shirts Broad Audience" value={title} onChange={e => setTitle(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                 <div>
+                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Theme</label>
+                   <input type="text" placeholder="Apparel" value={theme} onChange={e => setTheme(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+                 </div>
+                 <div>
+                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Niche</label>
+                   <input type="text" placeholder="Graphic Tees" value={niche} onChange={e => setNiche(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+                 </div>
+                 <div>
+                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Sub-niche</label>
+                   <input type="text" placeholder="Minimalist" value={subNiche} onChange={e => setSubNiche(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+                 </div>
+              </div>
+           </div>
+
+           <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col flex-1 min-h-[300px]">
+              <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                 <div className="relative flex-1 max-w-sm">
+                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                   <input type="text" placeholder="Search your bank..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white outline-none" />
+                 </div>
+                 <div className={`text-xs font-bold px-2.5 py-1 rounded-md ml-3 ${selectedIds.length === 10 ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                   {selectedIds.length} / 10 Selected
+                 </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 bg-slate-50/30">
+                 {filteredBank.length === 0 ? (
+                    <div className="text-center text-xs text-slate-400 py-8">No keywords match your search.</div>
+                 ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                       {filteredBank.map(kw => {
+                          const isSelected = selectedIds.includes(kw.id);
+                          const isDisabled = !isSelected && selectedIds.length >= 10;
+                          return (
+                             <div 
+                               key={kw.id} 
+                               onClick={() => !isDisabled && handleToggle(kw.id)}
+                               className={`p-2 border rounded-lg text-xs flex items-center justify-between transition-all ${
+                                 isSelected 
+                                   ? 'border-indigo-500 bg-indigo-50 shadow-sm cursor-pointer' 
+                                   : isDisabled 
+                                     ? 'border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed' 
+                                     : 'border-slate-200 hover:border-indigo-300 bg-white cursor-pointer'
+                               }`}
+                             >
+                               <span className={`font-medium truncate mr-2 ${isSelected ? 'text-indigo-700' : 'text-slate-700'}`} title={kw.tag}>{kw.tag}</span>
+                               <span className={`text-[10px] font-mono ${isSelected ? 'text-indigo-500' : 'text-slate-400'}`}>{(kw.last_volume || 0).toLocaleString()}</span>
+                             </div>
+                          );
+                       })}
+                    </div>
+                 )}
+              </div>
+           </div>
+        </div>
+
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+           <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 transition-colors">Cancel</button>
+           <button onClick={handleSubmit} disabled={isSubmitting || selectedIds.length === 0} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition shadow-sm disabled:opacity-50 flex items-center gap-2">
+              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+              Save Preset
+           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EditPresetKeywordsModal = ({ preset, isOpen, onClose, userKeywordBank, onSave }) => {
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [search, setSearch] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Initialize selected IDs when the modal opens with a valid preset
+  useEffect(() => {
+    if (isOpen && preset) {
+      setSelectedIds(preset.keyword_ids || []);
+      setSearch('');
+    }
+  }, [isOpen, preset]);
+
+  if (!isOpen || !preset) return null;
+
+  const filteredBank = search.trim() 
+    ? userKeywordBank.filter(k => k.tag.toLowerCase().includes(search.toLowerCase()))
+    : userKeywordBank;
+
+  const handleToggle = (id) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(prev => prev.filter(k => k !== id));
+    } else {
+      if (selectedIds.length >= 10) return; // Hard limit
+      setSelectedIds(prev => [...prev, id]);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    await onSave(preset.id, selectedIds);
+    setIsSubmitting(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+               <Folder size={18} className="text-indigo-600 fill-indigo-100" /> Manage Keywords: {preset.title}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">Add or remove keywords from this preset (max 10).</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+           <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col flex-1 min-h-[300px]">
+              <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                 <div className="relative flex-1 max-w-sm">
+                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                   <input type="text" placeholder="Search your bank..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white outline-none" />
+                 </div>
+                 <div className={`text-xs font-bold px-2.5 py-1 rounded-md ml-3 ${selectedIds.length === 10 ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                   {selectedIds.length} / 10 Selected
+                 </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 bg-slate-50/30">
+                 {filteredBank.length === 0 ? (
+                    <div className="text-center text-xs text-slate-400 py-8">No keywords match your search.</div>
+                 ) : (
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                       {filteredBank.map(kw => {
+                          const isSelected = selectedIds.includes(kw.id);
+                          const isDisabled = !isSelected && selectedIds.length >= 10;
+                          return (
+                             <div 
+                               key={kw.id} 
+                               onClick={() => !isDisabled && handleToggle(kw.id)}
+                               className={`p-2 border rounded-lg text-xs flex items-center justify-between transition-all ${
+                                 isSelected 
+                                   ? 'border-indigo-500 bg-indigo-50 shadow-sm cursor-pointer' 
+                                   : isDisabled 
+                                     ? 'border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed' 
+                                     : 'border-slate-200 hover:border-indigo-300 bg-white cursor-pointer'
+                               }`}
+                             >
+                               <span className={`font-medium truncate mr-2 ${isSelected ? 'text-indigo-700' : 'text-slate-700'}`} title={kw.tag}>{kw.tag}</span>
+                               <span className={`text-[10px] font-mono ${isSelected ? 'text-indigo-500' : 'text-slate-400'}`}>{(kw.last_volume || 0).toLocaleString()}</span>
+                             </div>
+                          );
+                       })}
+                    </div>
+                 )}
+              </div>
+           </div>
+        </div>
+
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+           <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 transition-colors">Cancel</button>
+           <button onClick={handleSubmit} disabled={isSubmitting || selectedIds.length === 0} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition shadow-sm disabled:opacity-50 flex items-center gap-2">
+              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+              Save Changes
+           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main Page ---
 const SEOLab = () => {
   const { user } = useAuth();
   const [keywords, setKeywords] = useState([]);
+  const [presets, setPresets] = useState([]);
+  const [view, setView] = useState('keywords'); // 'keywords' | 'presets'
   const [isLoading, setIsLoading] = useState(true);
+  const [isPresetsLoading, setIsPresetsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState(null);
   const [showGemSettings, setShowGemSettings] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingPresetForKeywords, setEditingPresetForKeywords] = useState(null); // stores the full preset object when editing
   const [sortField, setSortField] = useState(null); // null = no sort (default order)
   const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
   const gemSettingsRef = useRef(null);
@@ -199,21 +622,33 @@ const SEOLab = () => {
   // Fetch keyword bank
   useEffect(() => {
     if (!user?.id) return;
-    const fetchBank = async () => {
+    const fetchBankAndPresets = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('user_keyword_bank')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      if (error) {
-        console.error('Failed to fetch keyword bank:', error);
+      setIsPresetsLoading(true);
+      
+      const [bankRes, presetsRes] = await Promise.all([
+        supabase.from('user_keyword_bank').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('keyword_presets').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+      ]);
+
+      if (bankRes.error) {
+        console.error('Failed to fetch keyword bank:', bankRes.error);
         toast.error('Failed to load keyword bank.');
+      } else if (bankRes.data) {
+        setKeywords(bankRes.data);
       }
-      if (data) setKeywords(data);
+      
+      if (presetsRes.error) {
+        console.error('Failed to fetch presets:', presetsRes.error);
+        toast.error('Failed to load presets.');
+      } else if (presetsRes.data) {
+        setPresets(presetsRes.data);
+      }
+      
       setIsLoading(false);
+      setIsPresetsLoading(false);
     };
-    fetchBank();
+    fetchBankAndPresets();
   }, [user?.id]);
 
   // Inline update handler
@@ -245,15 +680,109 @@ const SEOLab = () => {
       toast.error('Failed to delete keyword.');
     } else {
       setKeywords(prev => prev.filter(k => k.id !== id));
+      // Locally remove the deleted keyword ID from any affected presets
+      setPresets(prevPresets => prevPresets.map(p => {
+        if (p.keyword_ids && p.keyword_ids.includes(id)) {
+           return { ...p, keyword_ids: p.keyword_ids.filter(kid => kid !== id) };
+        }
+        return p;
+      }));
       toast.success(`"${tag}" removed from Keyword Bank`);
     }
     setDeletingId(null);
   };
 
+  // Inline Preset update handler
+  const handleUpdatePresetField = async (id, field, value) => {
+    if (field === 'title' && !value) {
+      toast.error('Preset title cannot be empty.');
+      return;
+    }
+    const { error } = await supabase
+      .from('keyword_presets')
+      .update({ [field]: value, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) {
+      console.error(`Failed to update preset ${field}:`, error);
+      toast.error(`Failed to update preset ${field}.`);
+      return;
+    }
+    setPresets(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+    toast.success('Preset updated');
+  };
+
+  // Remove individual keyword from preset
+  const handleRemoveKeywordFromPreset = async (presetId, keywordIdToRemove) => {
+    // 1. Find the preset in local state to get current keywords
+    const targetPreset = presets.find(p => p.id === presetId);
+    if (!targetPreset || !targetPreset.keyword_ids) return;
+
+    // 2. Filter out the ID to remove
+    const updatedIds = targetPreset.keyword_ids.filter(id => id !== keywordIdToRemove);
+    
+    // 3. Update Supabase
+    const { error } = await supabase
+      .from('keyword_presets')
+      .update({ keyword_ids: updatedIds, updated_at: new Date().toISOString() })
+      .eq('id', presetId);
+
+    if (error) {
+       console.error('Failed to remove keyword from preset:', error);
+       toast.error('Failed to remove keyword from preset.');
+       return;
+    }
+
+    // 4. Update React State optimistically
+    setPresets(prev => prev.map(p => 
+      p.id === presetId ? { ...p, keyword_ids: updatedIds } : p
+    ));
+    toast.success('Keyword removed from preset');
+  };
+
+  // Add/Manage keywords in a preset
+  const handleSavePresetKeywords = async (presetId, newKeywordIds) => {
+    const { error } = await supabase
+      .from('keyword_presets')
+      .update({ keyword_ids: newKeywordIds, updated_at: new Date().toISOString() })
+      .eq('id', presetId);
+
+    if (error) {
+       console.error('Failed to update preset keywords:', error);
+       toast.error('Failed to update preset keywords.');
+       return;
+    }
+
+    setPresets(prev => prev.map(p => 
+      p.id === presetId ? { ...p, keyword_ids: newKeywordIds } : p
+    ));
+    toast.success('Preset keywords updated');
+  };
+
+  const handleDeletePreset = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this preset?")) return;
+    const { error } = await supabase.from('keyword_presets').delete().eq('id', id);
+    if (error) {
+       toast.error('Failed to delete preset.');
+    } else {
+       setPresets(prev => prev.filter(p => p.id !== id));
+       toast.success('Preset deleted.');
+    }
+  };
+
   // Filtered keywords
-  const filtered = searchQuery.trim()
+  const filtered = view === 'keywords' && searchQuery.trim()
     ? keywords.filter(k => k.tag.toLowerCase().includes(searchQuery.toLowerCase()))
     : keywords;
+    
+  // Filtered presets
+  const filteredPresets = view === 'presets' && searchQuery.trim()
+    ? presets.filter(p => (
+        p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        p.niche?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.theme?.toLowerCase().includes(searchQuery.toLowerCase())
+      ))
+    : presets;
 
   // Sort toggle: null → asc → desc → null
   const toggleSort = (field) => {
@@ -325,8 +854,34 @@ const SEOLab = () => {
           <p className="text-sm text-slate-500 mt-1">Your strategic keyword workspace. Organize, track, and refine your best-performing tags.</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Tabs Integration */}
+        <div className="flex items-center gap-6 border-b border-slate-200">
+          <button
+            onClick={() => setView('keywords')}
+            className={`py-3 px-1 text-sm font-semibold transition-colors border-b-2 flex items-center gap-2 ${
+              view === 'keywords' 
+                ? 'border-indigo-600 text-indigo-700' 
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Individual Keywords
+          </button>
+          <button
+            onClick={() => setView('presets')}
+            className={`py-3 px-1 text-sm font-semibold transition-colors border-b-2 flex items-center gap-2 ${
+              view === 'presets' 
+                ? 'border-indigo-600 text-indigo-700' 
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            My Presets
+            {presets.length > 0 && <span className="text-xs bg-slate-100 text-slate-600 py-0.5 px-2 rounded-full">{presets.length}</span>}
+          </button>
+        </div>
+
+        {/* Stats Cards - Only on keywords view */}
+        {view === 'keywords' && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4">
             <div className="p-3 rounded-xl bg-indigo-50">
               <Star size={20} className="text-indigo-600" />
@@ -355,20 +910,23 @@ const SEOLab = () => {
             </div>
           </div>
         </div>
+        )}
 
-        {/* Search Bar + Gem Settings */}
-        <div className="flex items-start gap-4 flex-wrap">
+        {/* Search Bar + Gem Settings / Create Preset */}
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="relative max-w-md flex-1 min-w-[240px]">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search keywords..."
+              placeholder={view === 'keywords' ? "Search keywords..." : "Search presets by title or niche..."}
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 shadow-sm"
             />
           </div>
-          <div className="relative" ref={gemSettingsRef}>
+          
+          {view === 'keywords' ? (
+            <div className="relative" ref={gemSettingsRef}>
             <button
               onClick={() => setShowGemSettings(prev => !prev)}
               className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border shadow-sm transition-all ${
@@ -452,12 +1010,22 @@ const SEOLab = () => {
               </div>
             )}
           </div>
+          ) : (
+            <button
+               onClick={() => setIsCreateModalOpen(true)}
+               className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition shadow-sm"
+            >
+               <Plus size={16} />
+               Create Preset
+            </button>
+          )}
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+        {/* Dynamic Table Content */}
+        {view === 'keywords' ? (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                 <tr>
                   <th className="px-4 py-3 font-semibold w-[20%]">
@@ -679,8 +1247,88 @@ const SEOLab = () => {
             </div>
           )}
         </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+             <div className="overflow-x-auto">
+               <table className="w-full text-sm text-left">
+                 <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                   <tr>
+                     <th className="px-4 py-3 font-semibold w-[30%]">Preset Name</th>
+                     <th className="px-3 py-3 font-semibold w-[20%]">Context</th>
+                     <th className="px-3 py-3 font-semibold w-[10%]">Composition</th>
+                     <th className="px-3 py-3 font-semibold w-[10%] text-center">Total Volume</th>
+                     <th className="px-3 py-3 font-semibold w-[15%] text-center">Avg. Competition</th>
+                     <th className="px-3 py-3 font-semibold w-[10%] text-center">Avg. CPC</th>
+                     <th className="px-3 py-3 font-semibold w-[5%] text-center">Actions</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-slate-100">
+                    {isPresetsLoading ? (
+                      <tr>
+                        <td colSpan="7" className="px-4 py-12 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <Loader2 size={24} className="text-indigo-500 animate-spin" />
+                            <span className="text-sm text-slate-400">Loading your presets...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : filteredPresets.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="px-4 py-12 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <Folder size={28} className="text-slate-200 mb-2" />
+                            <p className="text-sm text-slate-400 font-medium">
+                              {searchQuery ? 'No presets match your search.' : 'You haven\'t created any presets yet.'}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              {!searchQuery && 'Click "Create Preset" to build your first strategy.'}
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredPresets.map(preset => (
+                         <PresetRow 
+                            key={preset.id} 
+                            preset={preset} 
+                            bankKeywords={keywords} 
+                            onDelete={handleDeletePreset}
+                            onUpdate={handleUpdatePresetField}
+                            onRemoveKeyword={handleRemoveKeywordFromPreset}
+                            onEditKeywords={setEditingPresetForKeywords}
+                         />
+                      ))
+                    )}
+                 </tbody>
+               </table>
+             </div>
+             {!isPresetsLoading && filteredPresets.length > 0 && (
+                <div className="bg-slate-50/50 border-t border-slate-100 px-4 py-3 text-xs text-slate-400 text-center">
+                  Showing {filteredPresets.length} of {presets.length} presets
+                </div>
+              )}
+          </div>
+        )}
 
       </div>
+      
+      {/* Create Modal */}
+      <CreatePresetModal 
+         isOpen={isCreateModalOpen} 
+         onClose={() => setIsCreateModalOpen(false)} 
+         user={user}
+         userKeywordBank={keywords}
+         onSuccess={(newPreset) => setPresets(prev => [newPreset, ...prev])}
+      />
+
+      {/* Edit Keywords Modal */}
+      <EditPresetKeywordsModal
+         isOpen={!!editingPresetForKeywords}
+         preset={editingPresetForKeywords}
+         onClose={() => setEditingPresetForKeywords(null)}
+         userKeywordBank={keywords}
+         onSave={handleSavePresetKeywords}
+      />
     </Layout>
   );
 };
