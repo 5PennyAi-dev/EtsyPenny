@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { FlaskConical, Star, Search, RefreshCw, Trash2, Pencil, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Gem, Settings2, X, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, ChevronLeft, Folder, Plus } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { FlaskConical, Star, Search, RefreshCw, Trash2, Pencil, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Gem, Settings2, X, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, ChevronLeft, Folder, Plus, Filter } from 'lucide-react';
 import Layout from '../components/Layout';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -548,6 +548,10 @@ const SEOLab = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   
+  // Advanced Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({ theme: '', niche: '', subNiche: '' });
+  
   const gemSettingsRef = useRef(null);
 
   // Gem thresholds with Supabase persistence
@@ -776,9 +780,39 @@ const SEOLab = () => {
   };
 
   // Filtered keywords
-  const filtered = view === 'keywords' && searchQuery.trim()
-    ? keywords.filter(k => k.tag.toLowerCase().includes(searchQuery.toLowerCase()))
-    : keywords;
+  const filtered = useMemo(() => {
+    if (view === 'presets') {
+      return presets.filter(p => !searchQuery || 
+        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.niche && p.niche.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+
+    return keywords.filter(kw => {
+      // Base search
+      const matchesSearch = !searchQuery || 
+        kw.tag.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (kw.theme && kw.theme.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (kw.niche && kw.niche.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (kw.sub_niche && kw.sub_niche.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      // Gem filtering
+      const checkComp = kw.last_competition != null ? parseFloat(kw.last_competition) : Infinity;
+      const checkCpc = kw.last_cpc != null ? parseFloat(kw.last_cpc) : 0;
+      const matchesGem = !showGemSettings || (
+        (kw.last_volume || 0) >= gemThresholds.minVolume &&
+        checkComp <= gemThresholds.maxCompetition &&
+        checkCpc >= gemThresholds.minCpc
+      );
+
+      // Advanced Category Filters
+      const matchesTheme = !filters.theme || kw.theme === filters.theme;
+      const matchesNiche = !filters.niche || kw.niche === filters.niche;
+      const matchesSubNiche = !filters.subNiche || kw.sub_niche === filters.subNiche;
+
+      return matchesSearch && matchesGem && matchesTheme && matchesNiche && matchesSubNiche;
+    });
+  }, [keywords, presets, searchQuery, view, showGemSettings, gemThresholds, filters]);
     
   // Filtered presets
   const filteredPresets = view === 'presets' && searchQuery.trim()
@@ -824,6 +858,40 @@ const SEOLab = () => {
       : <ChevronDown size={12} className="text-indigo-600" />;
   };
 
+  // Extract unique options for dropdowns
+  const uniqueThemes = useMemo(() => {
+    return [...new Set(keywords.map(k => k.theme).filter(Boolean))].sort();
+  }, [keywords]);
+
+  const uniqueNiches = useMemo(() => {
+    return [...new Set(keywords
+      .filter(k => !filters.theme || k.theme === filters.theme)
+      .map(k => k.niche)
+      .filter(Boolean))].sort();
+  }, [keywords, filters.theme]);
+
+  const uniqueSubNiches = useMemo(() => {
+    return [...new Set(keywords
+      .filter(k => (!filters.theme || k.theme === filters.theme) && (!filters.niche || k.niche === filters.niche))
+      .map(k => k.sub_niche)
+      .filter(Boolean))].sort();
+  }, [keywords, filters.theme, filters.niche]);
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => {
+      const newFilters = { ...prev, [key]: value };
+      // Cascade resets: If theme changes, clearing niche/subNiche often makes sense, but we'll let user control.
+      // However, if the active niche is no longer valid for the new theme, reset it.
+      return newFilters;
+    });
+    setCurrentPage(1);
+  };
+  
+  const handleClearFilters = () => {
+    setFilters({ theme: '', niche: '', subNiche: '' });
+    setCurrentPage(1);
+  };
+
   // Sorted data
   const sorted = (() => {
     if (!sortField) return filtered;
@@ -852,6 +920,11 @@ const SEOLab = () => {
       return comparison;
     });
   })();
+
+  // Reset pagination on search, sort, or view change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortField, sortDirection, view, filters]);
 
   // Pagination Logic
   const startIndex = (currentPage - 1) * pageSize;
@@ -942,15 +1015,37 @@ const SEOLab = () => {
 
         {/* Search Bar + Gem Settings / Create Preset */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="relative max-w-md flex-1 min-w-[240px]">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={view === 'keywords' ? "Search keywords..." : "Search presets by title or niche..."}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 shadow-sm"
-            />
+          <div className="flex gap-2 w-full md:w-auto flex-1 min-w-[240px] max-w-md">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={view === 'keywords' ? "Search bank..." : "Search presets title or niche..."}
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 shadow-sm"
+              />
+            </div>
+            
+            {view === 'keywords' && (
+              <button
+                onClick={() => setShowFilters(prev => !prev)}
+                className={`relative flex-shrink-0 p-2.5 rounded-xl border shadow-sm transition-all focus:outline-none flex items-center justify-center ${
+                  showFilters || Object.values(filters).some(Boolean)
+                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                }`}
+                title="Filter by Theme & Niche"
+              >
+                <Filter size={18} />
+                {Object.values(filters).filter(Boolean).length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
+                  </span>
+                )}
+              </button>
+            )}
           </div>
           
           {view === 'keywords' ? (
@@ -1048,6 +1143,56 @@ const SEOLab = () => {
             </button>
           )}
         </div>
+
+        {/* Filter Bar (Conditional) */}
+        {view === 'keywords' && showFilters && (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-wrap items-end gap-4 animate-in fade-in slide-in-from-top-2 shadow-sm">
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Theme</label>
+              <select 
+                value={filters.theme} 
+                onChange={(e) => handleFilterChange('theme', e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+              >
+                <option value="">All Themes</option>
+                {uniqueThemes.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Niche</label>
+              <select 
+                value={filters.niche} 
+                onChange={(e) => handleFilterChange('niche', e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+              >
+                <option value="">All Niches</option>
+                {uniqueNiches.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Sub-niche</label>
+              <select 
+                value={filters.subNiche} 
+                onChange={(e) => handleFilterChange('subNiche', e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+              >
+                <option value="">All Sub-niches</option>
+                {uniqueSubNiches.map(sn => <option key={sn} value={sn}>{sn}</option>)}
+              </select>
+            </div>
+
+            {Object.values(filters).some(Boolean) && (
+              <button 
+                onClick={handleClearFilters}
+                className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors h-[38px]"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Dynamic Table Content */}
         {view === 'keywords' ? (

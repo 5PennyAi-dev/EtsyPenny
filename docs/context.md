@@ -421,6 +421,12 @@
     - Reused the existing `<EditableCell />` component to allow users to inline-edit a preset's Title, Theme, Niche, and Sub-niche directly from the table.
     - Added a "Trash" icon to individual keywords inside a preset's expanded sub-table, allowing users to remove keywords from a preset dynamically (instantly recalculating the preset's aggregate stats).
     - Added a `Plus` button on the main preset row to launch an `EditPresetKeywordsModal`, enabling users to seamlessly search and append new keywords from their bank to a pre-existing preset.
+- **Advanced Keyword Filtering** (2026-03-06):
+    - Implemented a dynamic filtering system for the SEO Lab Individual Keywords bank.
+    - Added a "Filter" toggle button next to the search bar. When active, it expands an inline panel with dropdowns for Theme, Niche, and Sub-niche.
+    - The filter options are automatically derived and populated from the existing unique values in the user's keyword bank.
+    - The dropdowns cascade dynamically (e.g., selecting a Theme narrows down the available Niches to only those associated with that Theme).
+    - Includes a subtle "active filter" ping indicator on the main button and a "Clear Filters" mechanism.
 
 ### Immediate Next Steps
 1.  Verify the n8n webhook's handling of the newly structured `parameters` payload for `resetPool`.
