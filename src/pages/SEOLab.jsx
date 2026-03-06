@@ -232,10 +232,12 @@ const PresetRow = ({ preset, bankKeywords, onDelete, onUpdate, onRemoveKeyword, 
                     const cpc = parseFloat(kw.last_cpc);
                     return (
                     <tr key={kw.id} className="text-xs hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 px-4 font-semibold text-slate-700">
+                      <td className="py-2.5 px-4 font-semibold text-slate-700 w-[35%]">
                          <div className="flex items-center gap-2">
                            <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
-                           {kw.tag}
+                           <span className="font-semibold text-slate-700 bg-slate-100/80 hover:bg-slate-200/80 transition-colors px-2.5 py-0.5 rounded-full text-[11px] cursor-default truncate max-w-[200px]" title={kw.tag}>
+                             {kw.tag}
+                           </span>
                          </div>
                       </td>
                       <td className="py-2.5 px-3 text-center font-mono text-slate-600">{(kw.last_volume || 0).toLocaleString()}</td>
@@ -1139,7 +1141,7 @@ const SEOLab = () => {
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            Individual Keywords
+            Favorite Tags
           </button>
           <button
             onClick={() => setView('presets')}
@@ -1607,7 +1609,7 @@ const SEOLab = () => {
               </div>
               
               <div className="text-center font-medium">
-                {startIndex + 1}-{Math.min(endIndex, sorted.length)} of {sorted.length} keywords
+                {startIndex + 1}-{Math.min(endIndex, sorted.length)} of {sorted.length} tags
               </div>
               
               <div className="flex items-center gap-1">
