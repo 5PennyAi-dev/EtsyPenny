@@ -156,7 +156,7 @@ const PresetRow = ({ preset, bankKeywords, onDelete, onUpdate, onRemoveKeyword, 
           </div>
         </td>
         <td className="px-3 text-sm text-slate-500">
-          <div className="flex items-center gap-1.5 text-xs truncate max-w-[200px]" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5 text-xs truncate max-w-[400px]" onClick={(e) => e.stopPropagation()}>
              <EditableCell
                 value={preset.theme}
                 onSave={(val) => onUpdate(preset.id, 'theme', val)}
@@ -1253,11 +1253,11 @@ const SEOLab = () => {
                <table className="w-full text-sm text-left">
                  <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                    <tr>
-                     <th className="px-4 py-3 font-semibold w-[30%]">Preset Name</th>
-                     <th className="px-3 py-3 font-semibold w-[20%]">Context</th>
+                     <th className="px-4 py-3 font-semibold w-[25%]">Preset Name</th>
+                     <th className="px-3 py-3 font-semibold w-[30%]">Context</th>
                      <th className="px-3 py-3 font-semibold w-[10%]">Composition</th>
                      <th className="px-3 py-3 font-semibold w-[10%] text-center">Total Volume</th>
-                     <th className="px-3 py-3 font-semibold w-[15%] text-center">Avg. Competition</th>
+                     <th className="px-3 py-3 font-semibold w-[10%] text-center">Avg. Competition</th>
                      <th className="px-3 py-3 font-semibold w-[10%] text-center">Avg. CPC</th>
                      <th className="px-3 py-3 font-semibold w-[5%] text-center">Actions</th>
                    </tr>
