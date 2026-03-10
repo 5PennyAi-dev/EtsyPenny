@@ -2,7 +2,7 @@
   Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, 
   ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, 
   Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart, 
-  Pin, Tag, User, Zap, Swords, DollarSign, Award, ChevronRight, X, UserSearch, FileText, Share2, Printer, Hash, PlayCircle, BarChart3, AlertCircle, Clock, Activity, ArrowRight, LayoutTemplate, Layers, CheckCircle, ListPlus, EyeOff, LayoutPanelLeft, MousePointerClick, History 
+  Pin, Tag, User, Zap, Swords, DollarSign, Award, ChevronRight, X, UserSearch, FileText, Share2, Printer, Hash, PlayCircle, BarChart3, AlertCircle, Clock, Activity, ArrowRight, LayoutTemplate, Layers, CheckCircle, ListPlus, EyeOff, LayoutPanelLeft, MousePointerClick, History, Folder 
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,6 +11,7 @@ import ListingPDFDocument from '../pdf/ListingPDFDocument';
 import Accordion from '../ui/Accordion';
 import StrategyTuner from './StrategyTuner';
 import FavoritesPickerModal from './FavoritesPickerModal';
+import CreatePresetModal from './CreatePresetModal';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import SeoBadge from './SeoBadge';
@@ -684,6 +685,7 @@ const SidebarSkeleton = ({ phase }) => (
 
     // --- Favorites Picker Modal State ---
     const [showFavoritesPicker, setShowFavoritesPicker] = useState(false);
+    const [showCreatePresetModal, setShowCreatePresetModal] = useState(false);
 
     // Existing keywords set for duplicate detection
     const existingKeywordsSet = useMemo(() => {
@@ -836,6 +838,23 @@ const SidebarSkeleton = ({ phase }) => (
                             Recalculate Scores
                          </button>
 
+                         <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowCreatePresetModal(true);
+                            }}
+                            disabled={selectedTags.length === 0}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors border shadow-sm ${
+                                selectedTags.length === 0
+                                    ? 'bg-slate-50 text-slate-400 border-slate-200 opacity-50 cursor-not-allowed'
+                                    : 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-100'
+                            }`}
+                            title={selectedTags.length === 0 ? "Select keywords first" : "Save selected keywords as a preset"}
+                         >
+                            <Folder size={12} />
+                            Save as Preset
+                         </button>
+
                          <div className="flex items-center gap-3 text-xs text-slate-500 ml-2 hidden sm:flex border-l border-slate-200 pl-3">
                              <span className="flex items-center gap-1" title="Rising star: Significant growth detected! Search volume in the last 3 months is at least 50% higher than the yearly average."><Flame size={12} className="text-orange-500"/></span>
                              <span className="flex items-center gap-1" title="Consistent demand: This keyword shows stable search volume throughout the year, indicating a non-seasonal safe bet."><Leaf size={12} className="text-emerald-500"/></span>
@@ -929,12 +948,15 @@ const SidebarSkeleton = ({ phase }) => (
                                         selectedIndexInView = visibleAnalytics.slice(0, i + 1).filter(r => selectedTags.includes(r.keyword)).length - 1;
                                     }
 
-                                    // Detect if this is the first unselected row to inject divider
-                                    const prevRow = i > 0 ? visibleAnalytics[i - 1] : null;
-                                    const showDivider = !isSelected && (i === 0 || (prevRow && selectedTags.includes(prevRow.keyword)));
+                                    // "Suggestions & Discovery" divider always at position 13 (after row index 12)
+                                    const showDivider = i === 13;
                                     
-                                    const isExceeding13 = selectedIndexInView >= 13;
+                                    const isExceeding13 = isSelected && selectedIndexInView >= 13;
                                     const showLimitDivider = isSelected && selectedIndexInView === 13;
+
+                                    // Determine if this unselected row is in the top 13 (an "empty slot")
+                                    const isAboveDivider = i < 13;
+                                    const isEmptySlot = !isSelected && isAboveDivider;
 
                                     return (
                                       <React.Fragment key={row.keyword}>
@@ -973,7 +995,7 @@ const SidebarSkeleton = ({ phase }) => (
                                             className={`transition-colors group ${
                                                 isSelected
                                                     ? isExceeding13 ? 'bg-rose-50/40 hover:bg-rose-50/70 border-l-2 border-l-rose-400' : 'bg-indigo-50/40 hover:bg-indigo-50/60'
-                                                    : 'opacity-60 hover:opacity-80 hover:bg-slate-50'
+                                                    : isEmptySlot ? 'bg-rose-50/30 hover:bg-rose-50/50 border-l-2 border-l-rose-300' : 'opacity-60 hover:opacity-80 hover:bg-slate-50'
                                             }`}
                                         >
                                     <td className="pl-3 pr-1 py-3 text-center">
@@ -996,7 +1018,12 @@ const SidebarSkeleton = ({ phase }) => (
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                if (onTogglePin) onTogglePin(row.keyword, !row.is_pinned);
+                                                const newPinState = !row.is_pinned;
+                                                if (onTogglePin) onTogglePin(row.keyword, newPinState);
+                                                // Auto-select when pinning
+                                                if (newPinState && !selectedTags.includes(row.keyword)) {
+                                                    setSelectedTags(prev => [row.keyword, ...prev]);
+                                                }
                                             }}
                                             className={`p-0.5 rounded transition-all duration-200 hover:scale-110 ${
                                                 row.is_pinned 
@@ -1396,8 +1423,8 @@ const SidebarSkeleton = ({ phase }) => (
                   const success = await onAddBatchKeywords(keywordsArray);
                   if (success !== false) { // Handle undefined in older versions just in case
                       setSelectedTags(prev => {
-                          const toAdd = keywordsArray.filter(k => !prev.includes(k));
-                          return [...toAdd, ...prev];
+                          const newTags = keywordsArray.map(kw => kw.tag || kw).filter(tag => !prev.includes(tag));
+                          return [...newTags, ...prev];
                       });
                   }
               }
@@ -1406,6 +1433,30 @@ const SidebarSkeleton = ({ phase }) => (
           user={user}
           currentListing={currentListing}
           existingKeywords={existingKeywordsSet}
+      />
+
+      {/* Create Preset Modal */}
+      <CreatePresetModal
+          isOpen={showCreatePresetModal}
+          onClose={() => setShowCreatePresetModal(false)}
+          user={user}
+          currentListing={currentListing}
+          initialTheme={currentListing?.theme || ''}
+          initialNiche={currentListing?.niche || ''}
+          initialSubNiche={currentListing?.sub_niche || ''}
+          initialKeywordTags={primaryAnalytics
+              .filter(k => selectedTags.includes(k.keyword))
+              .map(k => ({ tag: k.keyword, volume: k.volume || 0, competition: k.competition, cpc: k.cpc, volume_history: k.volume_history || [] }))
+          }
+          onSuccess={() => {
+              // Refresh the favorite stars immediately after saving
+              if (user?.id) {
+                  supabase.from('user_keyword_bank').select('tag').eq('user_id', user.id)
+                      .then(({ data }) => {
+                          if (data) setFavoriteTags(new Set(data.map(row => row.tag)));
+                      });
+              }
+          }}
       />
     </div>
   );

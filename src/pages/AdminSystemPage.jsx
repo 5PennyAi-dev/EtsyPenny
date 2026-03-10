@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Layout from '../components/Layout';
 import Accordion from '../components/ui/Accordion';
-import { Settings2, Zap, Edit2, Check, X, Trash2, Plus, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Settings2, Zap, Edit2, Check, X, Trash2, Plus, ArrowUpDown, ChevronUp, ChevronDown, Globe } from 'lucide-react';
+import TaxonomyManagement from '../components/admin/TaxonomyManagement';
 import { toast } from 'sonner';
 
 export default function AdminSystemPage() {
@@ -497,6 +498,24 @@ export default function AdminSystemPage() {
                 No intelligence thresholds found in database.
               </div>
             )}
+          </Accordion>
+
+          {/* Table Area 3: Global Taxonomy */}
+          <Accordion
+            defaultOpen={false}
+            title={
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                  <Globe size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 text-left">Global Taxonomy</h2>
+                  <p className="text-sm text-slate-500 font-normal mt-0.5 text-left">Manage the system-wide themes and niches used by the AI for image analysis.</p>
+                </div>
+              </div>
+            }
+          >
+            <TaxonomyManagement />
           </Accordion>
 
         </div>

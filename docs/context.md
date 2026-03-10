@@ -394,11 +394,7 @@
     - Added color-coded Tailwind pills (**Indigo** for Very High, **Emerald** for High, **Amber** for Moderate, **Slate** for Low) and specific educational tooltips tailored for Relevance or Intent on hover to explain the "Why" behind each score, reducing cognitive load.
     - **Interactive Score Editing**: Developed a custom single-click dropdown menu for the `SeoBadge` component, replacing the native `<select>`. Users can manually override AI-generated scores. Changes immediately reflect in the UI and are synced to Supabase (`listing_seo_stats` table).
 
-## 5. Next Steps (Action Items)
-- **Deployment**: Verify the new `AdminSystemPage` functionality on the live environment.
-- **Testing**: Run a full end-to-end SEO generation flow to ensure `userDefaults` are correctly applied for first-time listings.
-- **Polish**: Clean up any remaining debug `console.log` statements in `ProductStudio.jsx`.
-- **Feature**: Build the Stripe Payment Integration (Credits & Subscriptions).
+
 
 ## 6. Session Handover (2026-03-05)
 ### Summary of Achievements
@@ -431,7 +427,48 @@
 - **SEO Lab UI Polish** (2026-03-06):
     - Renamed the "Individual Keywords" tab to **"Favorite Tags"** across the tab label and pagination footer for clearer branding.
     - Applied pill-style rendering (`rounded-full`, `bg-slate-100/80`, hover effect) to keyword tags inside the Preset expanded sub-tables, matching the style already used in the main Favorite Tags table.
+- **Add From Favorites Payload Restructure** (2026-03-06):
+    - Changed the Favorites Bank "Add Selected Keywords" flow from action `userKeyword` to `addFromFavorites`.
+    - `FavoritesPickerModal.jsx` now passes full keyword bank objects (with `last_volume`, `last_competition`, `last_cpc`, `volume_history`) instead of plain tag strings.
+    - `handleAddBatchKeywords` in `ProductStudio.jsx` builds the n8n-compatible `tasks[].result[]` payload structure, mapping bank fields to DataForSEO schema (`search_volume`, `competition`, `cpc`, `monthly_searches` with `year`/`month`/`search_volume` objects). This eliminates redundant API lookups for cached keywords.
+- **Pin Auto-Select & Divider Fix** (2026-03-06):
+    - Pinning a keyword now auto-selects it (checkbox + counter sync).
+    - Batch-added keywords from Favorites are now properly auto-selected using `kw.tag` mapping.
+    - "Suggestions & Discovery" divider now always appears after the 13th row (fixed position). Unselected keywords in the top 13 show in pale rose as "empty slots."
+- **Save as Preset from Keyword Performance** (2026-03-07):
+    - Extracted `CreatePresetModal` from `SEOLab.jsx` into shared `src/components/studio/CreatePresetModal.jsx`.
+    - Dual-mode component: **"performance mode"** (from ResultsDisplay) shows only the selected Performance table keywords as selectable items; **"bank mode"** (from SEOLab) shows the full favorites bank.
+    - In performance mode, top 10 by volume are pre-selected. On save, non-favorite keywords are auto-inserted into `user_keyword_bank`. Filter UI is hidden in this mode.
+    - `initialTheme/Niche/SubNiche` props pre-fill from listing context.
+    - "Save as Preset" button added to the Keyword Performance table header in `ResultsDisplay.jsx`.
+- **Webhook Parameters Alignment** (2026-03-07):
+    - Added the full `parameters` block (Volume, Competition, Transaction, Niche, CPC + smart badge thresholds) to both `userKeyword` and `addFromFavorites` payloads in `ProductStudio.jsx`, matching the same structure as `generate_seo`.
+- **Presets Tab in Favorites Modal** (2026-03-07):
+    - Added a two-tab system to `FavoritesPickerModal.jsx`: **Favorite Tags** (existing) and **Presets** (new).
+    - Presets tab fetches `keyword_presets`, resolves `keyword_ids` to bank objects, displays each preset with name, theme breadcrumb, tag count, and total volume.
+    - Single-select (radio-style). On submit, resolved keywords pass through the same `onAddBatchKeywords` flow as individual favorites.
+
+- **Global Taxonomy Management** (2026-03-08):
+    - **Feature**: New `TaxonomyManagement.jsx` component (`src/components/admin/TaxonomyManagement.jsx`) for managing `system_themes` (23 rows) and `system_niches` (28 rows) Supabase tables.
+    - **UI**: Tabbed interface ("System Themes" / "System Niches") with framer-motion animated tab indicator and content transitions. Blue icon accent for themes, orange for niches.
+    - **Table**: Columns — Name, Description (Hints), Status (toggle switch), Actions (Edit/Delete). Inline editing for name and description. Custom `ToggleSwitch` component for `is_active` with optimistic updates.
+    - **Features**: Real-time search filtering, inline "Add" row, duplicate name detection (Supabase unique constraint → toast error), delete with confirmation, loading states.
+    - **Integration**: Added as the third `<Accordion>` section ("Global Taxonomy" with emerald Globe icon) in `AdminSystemPage.jsx`, below "Intelligence Thresholds". No DB migration needed — tables already existed with the correct schema.
+
+- **Settings Page Accordion Refactor** (2026-03-08):
+    - **Refactor**: Rewrote `UserSettings.jsx` from flat multi-column layout + sticky sidebar to a clean 4-accordion design matching the Admin panel.
+    - **Removed**: "Current Live Values" sidebar (`liveValues` state, `fetchLiveValues()` function) — freed horizontal space.
+    - **Accordion 1**: "SEO Strategy Weights" (Sliders icon, indigo) — 5 segmented controls in 2-col grid.
+    - **Accordion 2**: "Smart Badge Sensitivity" (Zap icon, amber) — 3 segmented controls.
+    - **Accordion 3**: "Analysis Constraints" (BarChart3 icon, amber + Premium badge) — 3 numeric inputs.
+    - **Accordion 4**: "My Shop Identity" (Tags icon, emerald) — Uses `UserTaxonomyManagement.jsx` component (`src/components/settings/UserTaxonomyManagement.jsx`) mirroring the Admin's `TaxonomyManagement` pattern: tabbed table layout (My Themes / My Niches), search bar, inline editing, favorite star (★) toggle, add/delete rows. Operates on `user_custom_themes` and `user_custom_niches` tables scoped to the current user.
+    - **Preserved**: All existing settings state management, `handleSave`, `handleMultiSettingChange`, `renderSegmentedControl`.
+
+- **RLS Policies for Custom Taxonomy** (2026-03-08):
+    - **Fix**: `is_favorite` toggle on custom niches was not persisting because RLS was enabled on `user_custom_niches` table without proper policies.
+    - **Migration**: `add_rls_policies_user_custom_taxonomy` — added full CRUD policies (SELECT, INSERT, UPDATE, DELETE) scoped to `auth.uid() = user_id` on both `user_custom_niches` and `user_custom_themes`.
 
 ### Immediate Next Steps
 1.  Verify the n8n webhook's handling of the newly structured `parameters` payload for `resetPool`.
 2.  Begin work on the Stripe subscription model integration.
+

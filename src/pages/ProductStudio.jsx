@@ -1172,6 +1172,16 @@ const ProductStudio = () => {
               keywords: [newKeyword],
               listing_id: currentListingId,
               user_id: user?.id,
+              parameters: {
+                  ...(userDefaults ? {
+                      Volume: userDefaults.param_volume,
+                      Competition: userDefaults.param_competition,
+                      Transaction: userDefaults.param_transaction,
+                      Niche: userDefaults.param_niche,
+                      CPC: userDefaults.param_cpc
+                  } : getStrategyValues(strategySelections)),
+                  ...getSmartBadgePayload()
+              },
               payload: {
                   image_url: results?.imageUrl,
                   // Visual analysis fields
@@ -1334,10 +1344,10 @@ const ProductStudio = () => {
           return;
       }
 
-      // Filter out duplicates
+      // Filter out duplicates — keywordsArray now contains full objects with .tag property
       const existingSet = new Set(results.analytics.map(a => a.keyword.toLowerCase()));
-      const newKeywords = keywordsArray.filter(kw => !existingSet.has(kw.toLowerCase()));
-      if (newKeywords.length === 0) {
+      const newKeywordObjects = keywordsArray.filter(kw => !existingSet.has(kw.tag.toLowerCase()));
+      if (newKeywordObjects.length === 0) {
           toast.info("All selected keywords are already in the performance table.");
           return;
       }
@@ -1346,11 +1356,55 @@ const ProductStudio = () => {
       try {
           const formData = optimizationFormRef.current?.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
           
+          // Build n8n-compatible tasks[].result[] structure from bank keyword stats
+          const now = new Date();
+          const taskResults = newKeywordObjects.map(kw => {
+              // Reconstruct monthly_searches from volume_history (flat array)
+              // volume_history is stored most-recent-first, so index 0 = current month
+              let monthly_searches = null;
+              if (Array.isArray(kw.volume_history) && kw.volume_history.length > 0) {
+                  monthly_searches = kw.volume_history.map((vol, idx) => {
+                      const d = new Date(now.getFullYear(), now.getMonth() - idx, 1);
+                      return {
+                          year: d.getFullYear(),
+                          month: d.getMonth() + 1,
+                          search_volume: vol || 0
+                      };
+                  });
+              }
+
+              return {
+                  keyword: kw.tag,
+                  location_code: 2840,
+                  language_code: "en",
+                  search_partners: false,
+                  competition: kw.last_competition != null ? parseFloat(kw.last_competition) : null,
+                  cpc: kw.last_cpc != null ? parseFloat(kw.last_cpc) : null,
+                  search_volume: kw.last_volume || 0,
+                  categories: null,
+                  monthly_searches: monthly_searches
+              };
+          });
+
           const payload = {
-              action: 'userKeyword',
-              keywords: newKeywords,
+              action: 'addFromFavorites',
               listing_id: currentListingId,
               user_id: user?.id,
+              parameters: {
+                  ...(userDefaults ? {
+                      Volume: userDefaults.param_volume,
+                      Competition: userDefaults.param_competition,
+                      Transaction: userDefaults.param_transaction,
+                      Niche: userDefaults.param_niche,
+                      CPC: userDefaults.param_cpc
+                  } : getStrategyValues(strategySelections)),
+                  ...getSmartBadgePayload()
+              },
+              tasks: [
+                  {
+                      result: taskResults
+                  }
+              ],
               payload: {
                   image_url: results?.imageUrl,
                   visual_aesthetic: visualAnalysis.aesthetic,

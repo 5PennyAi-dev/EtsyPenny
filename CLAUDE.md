@@ -32,9 +32,11 @@ npm run preview   # Preview production build
 `@` maps to `./src` (configured in vite.config.js)
 
 ### Key Directories
-- `src/pages/` — Full page components (ProductStudio (SEO Listings), Dashboard, HistoryPage, BrandProfilePage, LoginPage)
-- `src/components/studio/` — SEO Listings sub-components (OptimizationForm, ResultsDisplay, ImageUpload, StrategyTuner, FavoritesPickerModal, etc.)
+- `src/pages/` — Full page components (ProductStudio (SEO Listings), Dashboard, HistoryPage, BrandProfilePage, LoginPage, AdminSystemPage, UserSettings)
+- `src/components/studio/` — SEO Listings sub-components (OptimizationForm, ResultsDisplay, ImageUpload, StrategyTuner, FavoritesPickerModal, CreatePresetModal, SeoBadge, etc.)
 - `src/components/dashboard/` — Dashboard widgets (PerformanceCard, MarketInsights, RadialGauge)
+- `src/components/admin/` — Admin panel components (TaxonomyManagement — system themes/niches CRUD)
+- `src/components/settings/` — User settings components (UserTaxonomyManagement — custom themes/niches CRUD)
 - `src/components/ui/` — Reusable UI primitives (Accordion, ConfirmationModal, SearchableSelect)
 - `src/components/pdf/` — PDF export (ListingPDFDocument using @react-pdf/renderer)
 - `src/context/AuthContext.jsx` — Auth provider wrapping the app (provides user, profile, signOut, loading)
@@ -62,8 +64,11 @@ npm run preview   # Preview production build
 - **`listings_global_eval`** — Per-mode SEO evaluation scores (visibility, relevance, conversion, strength) keyed by listing_id + seo_mode
 - **`listing_seo_stats`** — Individual keyword/tag metrics (search_volume, competition, opportunity_score, trending/evergreen flags)
 - **`user_keyword_bank`** — User's saved favorite keywords with cached metrics (tag, last_volume, last_competition, last_cpc, theme, niche)
+- **`keyword_presets`** — Named keyword groupings (title, theme, niche, sub_niche, keyword_ids[] referencing user_keyword_bank). Used by CreatePresetModal and FavoritesPickerModal Presets tab.
 - **`user_settings`** — User preferences including Smart Badge thresholds and gem settings (gem_min_volume, etc.)
 - **`system_seo_constants`** — System-wide SEO constants and labels used for rendering UI dropdowns and calculating thresholds
+- **`system_themes`** / **`system_niches`** — Global taxonomy (admin-managed). Columns: id, name, is_active, description, created_at
+- **`user_custom_themes`** / **`user_custom_niches`** — Per-user custom taxonomy. Columns: id, user_id, name, is_favorite, description, created_at. RLS enabled with user_id-scoped policies.
 - **`profiles`** — User profiles (fetched in AuthContext)
 - **`product_types`** — Product categorization lookup
 - **`view_listing_scores`** — Aggregated view joining listings with their scores
