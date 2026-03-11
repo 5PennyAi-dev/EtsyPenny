@@ -482,7 +482,10 @@
     - **Fix (Trigger)**: Fixed a database trigger `check_if_product_type_exists_in_system` that was causing `relation "public.system_product_types" does not exist` errors when saving new custom types, by correcting the referenced table to `public.product_types`.
     - **Fix (Constraint)**: Dropped the stale `listings_product_type_id_fkey` constraint on the `listings` table, allowing `product_type_id` to legally accept UUIDs generated from the `user_custom_product_types` table.
     - **Fix (Loading)**: Removed an outdated implicit `product_types(name)` join from `handleLoadListing` in `ProductStudio.jsx` which was causing a `PGRST200` relation error after the foreign key was successfully dropped.
+    - **Fix (Hydration)**: Replaced rendering of the deprecated `product_type_text` column with a dynamic fetch from the `v_combined_product_types` view using the `product_type_id` during listing load to ensure custom and system product types appear correctly after refresh.
+
+- **Minor Polish** (2026-03-11):
+    - **App Icon**: Updated `index.html` to point to the correct `favicon.ico` asset instead of the default Vite boilerplate SVG.
 
 ### Immediate Next Steps
 1.  Verify end-to-end flow of saving a new custom product type and generating an SEO strategy.
-

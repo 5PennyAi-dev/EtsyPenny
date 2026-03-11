@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Layout from '../components/Layout';
 import Accordion from '../components/ui/Accordion';
-import { Settings2, Zap, Edit2, Check, X, Trash2, Plus, ArrowUpDown, ChevronUp, ChevronDown, Globe } from 'lucide-react';
+import { Settings2, Zap, Edit2, Check, X, Trash2, Plus, ArrowUpDown, ChevronUp, ChevronDown, Globe, Package } from 'lucide-react';
 import TaxonomyManagement from '../components/admin/TaxonomyManagement';
+import ProductTypeManagement from '../components/admin/ProductTypeManagement';
 import { toast } from 'sonner';
 
 export default function AdminSystemPage() {
@@ -516,6 +517,24 @@ export default function AdminSystemPage() {
             }
           >
             <TaxonomyManagement />
+          </Accordion>
+
+          {/* Table Area 4: Product Types & Categories */}
+          <Accordion
+            defaultOpen={false}
+            title={
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                  <Package size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 text-left">Product Types & Categories</h2>
+                  <p className="text-sm text-slate-500 font-normal mt-0.5 text-left">Manage the system-wide product categories and the underlying product types.</p>
+                </div>
+              </div>
+            }
+          >
+            <ProductTypeManagement />
           </Accordion>
 
         </div>

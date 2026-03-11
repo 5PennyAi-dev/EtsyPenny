@@ -2148,6 +2148,21 @@ const ProductStudio = () => {
 
         if (statsError) throw statsError;
         
+        // Fetch product type name dynamically if product_type_id exists
+        let fetchedProductTypeName = "";
+        if (listing.product_type_id) {
+            const { data: ptData, error: ptError } = await supabase
+                .from('v_combined_product_types')
+                .select('name')
+                .eq('id', listing.product_type_id)
+                .single();
+            if (!ptError && ptData) {
+                fetchedProductTypeName = ptData.name;
+            } else if (ptError) {
+                console.error("Failed to fetch product type name:", ptError);
+            }
+        }
+
         // Reconstruct Analysis Context (Handle missing relations gracefully)
         const parsedCustom = listing.custom_listing ? JSON.parse(listing.custom_listing) : {};
 
@@ -2161,8 +2176,8 @@ const ProductStudio = () => {
             niche: listing.niche || parsedCustom.niche || listing.niches?.name || "",
             sub_niche: listing.sub_niche || parsedCustom.sub_niche || listing.sub_niches?.name || "",
 
-            // Product Type: fallback gracefully to legacy text (we no longer join product_types directly)
-            product_type_name: listing.product_type_text || "",
+            // Product Type: dynamically fetched from view, with fallback to legacy text
+            product_type_name: fetchedProductTypeName || listing.product_type_text || "",
             product_type_id: listing.product_type_id || null,
             tone_name: listing.tones?.name || "Engaging",
             

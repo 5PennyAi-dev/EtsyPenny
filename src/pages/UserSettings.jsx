@@ -392,7 +392,7 @@ export default function UserSettings() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-slate-900 text-left">My Shop Identity</h2>
-                  <p className="text-sm text-slate-500 font-normal mt-0.5 text-left">Manage your personalized themes and niches to guide the AI analysis.</p>
+                  <p className="text-sm text-slate-500 font-normal mt-0.5 text-left">Manage your personalized themes, niches, and product types to guide the AI analysis.</p>
                 </div>
               </div>
             }

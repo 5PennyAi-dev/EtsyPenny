@@ -1,21 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../context/AuthContext';
-import { Search, Plus, Edit2, Check, X, Trash2, Layers, Tags, Star, Package } from 'lucide-react';
+import { Search, Plus, Edit2, Check, X, Trash2, FolderTree, PackageOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 const TABS = [
-  { key: 'themes', label: 'My Themes', table: 'user_custom_themes', icon: Layers, accent: 'bg-blue-50 text-blue-600' },
-  { key: 'niches', label: 'My Niches', table: 'user_custom_niches', icon: Tags, accent: 'bg-orange-50 text-orange-600' },
-  { key: 'product_types', label: 'My Product Types', table: 'user_custom_product_types', icon: Package, accent: 'bg-teal-50 text-teal-600' },
+  { key: 'categories', label: 'Product Categories', table: 'product_categories', icon: FolderTree, accent: 'bg-indigo-50 text-indigo-600' },
+  { key: 'product_types', label: 'Product Types', table: 'product_types', icon: PackageOpen, accent: 'bg-teal-50 text-teal-600' },
 ];
 
-export default function UserTaxonomyManagement() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('themes');
-  const [themes, setThemes] = useState([]);
-  const [niches, setNiches] = useState([]);
+export default function ProductTypeManagement() {
+  const [activeTab, setActiveTab] = useState('categories');
+  const [categories, setCategories] = useState([]);
   const [productTypes, setProductTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -26,45 +22,52 @@ export default function UserTaxonomyManagement() {
 
   // Add new row
   const [isAddingMode, setIsAddingMode] = useState(false);
-  const [newItem, setNewItem] = useState({ name: '', description: '' });
+  // Optional category_id for new product types
+  const [newItem, setNewItem] = useState({ name: '', category_id: '' });
 
   const activeTabConfig = TABS.find(t => t.key === activeTab);
-  const currentData = activeTab === 'themes' ? themes : activeTab === 'niches' ? niches : productTypes;
-  const setCurrentData = activeTab === 'themes' ? setThemes : activeTab === 'niches' ? setNiches : setProductTypes;
+  const currentData = activeTab === 'categories' ? categories : productTypes;
+  const setCurrentData = activeTab === 'categories' ? setCategories : setProductTypes;
 
   // --- Data Fetching ---
   useEffect(() => {
-    if (user) fetchAll();
-  }, [user]);
+    fetchAll();
+  }, []);
 
   const fetchAll = async () => {
     try {
       setLoading(true);
-      const [themesRes, nichesRes, productTypesRes] = await Promise.all([
-        supabase.from('user_custom_themes').select('*').eq('user_id', user.id).order('name', { ascending: true }),
-        supabase.from('user_custom_niches').select('*').eq('user_id', user.id).order('name', { ascending: true }),
-        supabase.from('user_custom_product_types').select('*').eq('user_id', user.id).order('name', { ascending: true }),
+      const [categoriesRes, productTypesRes] = await Promise.all([
+        supabase.from('product_categories').select('*').order('name', { ascending: true }),
+        supabase.from('product_types').select('*, product_categories(name)').order('name', { ascending: true }),
       ]);
-      if (themesRes.error) throw themesRes.error;
-      if (nichesRes.error) throw nichesRes.error;
+      
+      if (categoriesRes.error) throw categoriesRes.error;
       if (productTypesRes.error) throw productTypesRes.error;
-      setThemes(themesRes.data || []);
-      setNiches(nichesRes.data || []);
+      
+      setCategories(categoriesRes.data || []);
       setProductTypes(productTypesRes.data || []);
     } catch (error) {
-      console.error('Error fetching custom taxonomy:', error);
-      toast.error('Failed to load your custom taxonomy');
+      console.error('Error fetching product taxonomy:', error);
+      toast.error('Failed to load product categories and types');
     } finally {
       setLoading(false);
     }
   };
 
-  // --- Filtered Data ---
+  // --- Filtered & Sorted Data ---
   const filteredData = useMemo(() => {
     if (!search.trim()) return currentData;
     const q = search.toLowerCase();
-    return currentData.filter(item => item.name.toLowerCase().includes(q));
-  }, [currentData, search]);
+    
+    return currentData.filter(item => {
+      // Search by name
+      if (item.name.toLowerCase().includes(q)) return true;
+      // Search by category name if it's a product type
+      if (activeTab === 'product_types' && item.product_categories?.name?.toLowerCase().includes(q)) return true;
+      return false;
+    });
+  }, [currentData, search, activeTab]);
 
   // --- CRUD Handlers ---
   const handleAdd = async () => {
@@ -72,30 +75,42 @@ export default function UserTaxonomyManagement() {
       toast.error('Name is required');
       return;
     }
+    
+    if (activeTab === 'product_types' && !newItem.category_id) {
+        toast.error('Please select a category for this product type');
+        return;
+    }
+
     try {
       setIsSaving(true);
+      
+      const insertPayload = activeTab === 'categories' 
+        ? { name: newItem.name.trim() }
+        : { name: newItem.name.trim(), category_id: newItem.category_id };
+        
       const { data, error } = await supabase
         .from(activeTabConfig.table)
-        .insert([{ user_id: user.id, name: newItem.name.trim(), description: newItem.description.trim() || null, is_favorite: true }])
-        .select();
+        .insert([insertPayload])
+        .select(activeTab === 'product_types' ? '*, product_categories(name)' : '*');
 
       if (error) {
-        if (error.code === '23505') {
-          toast.error(`This ${activeTab.replace('_', ' ').replace(/s$/, '')} already exists`);
+        if (error.code === '23505') { // unique violation
+          toast.error(`A ${activeTab === 'categories' ? 'category' : 'product type'} with this name already exists`);
         } else {
           throw error;
         }
         return;
       }
+      
       if (data) {
         setCurrentData(prev => [...prev, data[0]].sort((a, b) => a.name.localeCompare(b.name)));
-        toast.success(`${activeTabConfig.label} added`);
+        toast.success(`${activeTab === 'categories' ? 'Category' : 'Product Type'} created successfully`);
         setIsAddingMode(false);
-        setNewItem({ name: '', description: '' });
+        setNewItem({ name: '', category_id: '' });
       }
     } catch (error) {
       console.error('Error adding item:', error);
-      toast.error('Failed to add item');
+      toast.error('Failed to create item');
     } finally {
       setIsSaving(false);
     }
@@ -106,12 +121,24 @@ export default function UserTaxonomyManagement() {
       toast.error('Name is required');
       return;
     }
+    
+    if (activeTab === 'product_types' && !editData.category_id) {
+        toast.error('Please select a category for this product type');
+        return;
+    }
+
     try {
       setIsSaving(true);
-      const { error } = await supabase
+      
+      const updatePayload = activeTab === 'categories' 
+        ? { name: editData.name.trim() }
+        : { name: editData.name.trim(), category_id: editData.category_id };
+        
+      const { data, error } = await supabase
         .from(activeTabConfig.table)
-        .update({ name: editData.name.trim(), description: editData.description?.trim() || null })
-        .eq('id', id);
+        .update(updatePayload)
+        .eq('id', id)
+        .select(activeTab === 'product_types' ? '*, product_categories(name)' : '*');
 
       if (error) {
         if (error.code === '23505') {
@@ -122,37 +149,19 @@ export default function UserTaxonomyManagement() {
         return;
       }
 
-      setCurrentData(prev =>
-        prev.map(item => item.id === id ? { ...item, name: editData.name.trim(), description: editData.description?.trim() || null } : item)
-          .sort((a, b) => a.name.localeCompare(b.name))
-      );
-      toast.success('Updated');
-      setEditData(null);
+      if (data) {
+          setCurrentData(prev =>
+            prev.map(item => item.id === id ? data[0] : item)
+              .sort((a, b) => a.name.localeCompare(b.name))
+          );
+          toast.success('Updated successfully');
+          setEditData(null);
+      }
     } catch (error) {
       console.error('Error updating:', error);
       toast.error('Failed to update');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleToggleFavorite = async (item) => {
-    const newValue = !item.is_favorite;
-    // Optimistic update
-    setCurrentData(prev => prev.map(i => i.id === item.id ? { ...i, is_favorite: newValue } : i));
-
-    try {
-      const { error } = await supabase
-        .from(activeTabConfig.table)
-        .update({ is_favorite: newValue })
-        .eq('id', item.id);
-
-      if (error) throw error;
-    } catch (error) {
-      // Revert on failure
-      setCurrentData(prev => prev.map(i => i.id === item.id ? { ...i, is_favorite: !newValue } : i));
-      console.error('Error toggling favorite:', error);
-      toast.error('Failed to update');
     }
   };
 
@@ -166,7 +175,16 @@ export default function UserTaxonomyManagement() {
         .delete()
         .eq('id', item.id);
 
-      if (error) throw error;
+      if (error) {
+          // Check for foreign key constraint violation (e.g. deleting a category with product types)
+          if (error.code === '23503') {
+             toast.error(`Cannot delete "${item.name}" because it is currently in use.`);
+          } else {
+            throw error;
+          }
+          return;
+      }
+      
       setCurrentData(prev => prev.filter(i => i.id !== item.id));
       toast.success(`"${item.name}" deleted`);
     } catch (error) {
@@ -183,7 +201,7 @@ export default function UserTaxonomyManagement() {
     setSearch('');
     setEditData(null);
     setIsAddingMode(false);
-    setNewItem({ name: '', description: '' });
+    setNewItem({ name: '', category_id: '' });
   };
 
   // --- Loading State ---
@@ -195,7 +213,7 @@ export default function UserTaxonomyManagement() {
     );
   }
 
-  const entityLabel = activeTab === 'themes' ? 'Theme' : activeTab === 'niches' ? 'Niche' : 'Product Type';
+  const entityLabel = activeTab === 'categories' ? 'Category' : 'Product Type';
 
   return (
     <div className="p-0">
@@ -218,9 +236,10 @@ export default function UserTaxonomyManagement() {
                   <Icon size={14} />
                 </div>
                 {tab.label}
+                {/* Animated underline indicator */}
                 {isActive && (
                   <motion.div
-                    layoutId="user-taxonomy-tab-indicator"
+                    layoutId="product-type-tab-indicator"
                     className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                   />
@@ -246,7 +265,7 @@ export default function UserTaxonomyManagement() {
         <button
           onClick={() => {
             setIsAddingMode(true);
-            setNewItem({ name: '', description: '' });
+            setNewItem({ name: '', category_id: categories.length > 0 ? categories[0].id : '' });
           }}
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-all shadow-sm"
         >
@@ -267,9 +286,10 @@ export default function UserTaxonomyManagement() {
             <table className="w-full text-left">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[30%]">Name</th>
-                  <th className="px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                  <th className="px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 text-center">Favorite</th>
+                  <th className={`px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider ${activeTab === 'categories' ? 'w-[70%]' : 'w-[40%]'}`}>Name</th>
+                  {activeTab === 'product_types' && (
+                      <th className="px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[40%]">Category</th>
+                  )}
                   <th className="px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 text-right">Actions</th>
                 </tr>
               </thead>
@@ -288,19 +308,22 @@ export default function UserTaxonomyManagement() {
                         className="w-full px-2.5 py-1.5 text-sm border border-indigo-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       />
                     </td>
-                    <td className="px-6 py-3.5">
-                      <input
-                        type="text"
-                        value={newItem.description}
-                        onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-                        placeholder="Optional description"
-                        onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                        className="w-full px-2.5 py-1.5 text-sm border border-indigo-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      />
-                    </td>
-                    <td className="px-6 py-3.5 text-center">
-                      <Star size={16} className="mx-auto text-amber-500" fill="currentColor" />
-                    </td>
+                    
+                    {activeTab === 'product_types' && (
+                        <td className="px-6 py-3.5">
+                          <select
+                            value={newItem.category_id}
+                            onChange={(e) => setNewItem({ ...newItem, category_id: e.target.value })}
+                            className="w-full px-2.5 py-1.5 text-sm border border-indigo-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                          >
+                             <option value="" disabled>Select a Category</option>
+                             {categories.map(cat => (
+                                 <option key={cat.id} value={cat.id}>{cat.name}</option>
+                             ))}
+                          </select>
+                        </td>
+                    )}
+                    
                     <td className="px-6 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
@@ -312,7 +335,7 @@ export default function UserTaxonomyManagement() {
                           <Check size={18} />
                         </button>
                         <button
-                          onClick={() => { setIsAddingMode(false); setNewItem({ name: '', description: '' }); }}
+                          onClick={() => { setIsAddingMode(false); setNewItem({ name: '', category_id: '' }); }}
                           disabled={isSaving}
                           className="p-1.5 text-slate-400 hover:bg-slate-200 rounded-md transition-colors disabled:opacity-50"
                           title="Cancel"
@@ -327,8 +350,8 @@ export default function UserTaxonomyManagement() {
                 {/* --- Data Rows --- */}
                 {filteredData.length === 0 && !isAddingMode ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-10 text-center text-slate-400 text-sm">
-                      {search ? `No ${activeTab} matching "${search}"` : `No custom ${activeTab} yet. Add one to get started.`}
+                    <td colSpan={activeTab === 'categories' ? 2 : 3} className="px-6 py-10 text-center text-slate-400 text-sm">
+                      {search ? `No ${activeTab} matching "${search}"` : `No ${activeTab} found in database.`}
                     </td>
                   </tr>
                 ) : (
@@ -352,37 +375,27 @@ export default function UserTaxonomyManagement() {
                           )}
                         </td>
 
-                        {/* Description */}
-                        <td className="px-6 py-3.5">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={editData.description || ''}
-                              onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                              onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id)}
-                              placeholder="Description"
-                              className="w-full px-2.5 py-1.5 text-sm border border-indigo-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            />
-                          ) : (
-                            <span className="text-sm text-slate-500">{item.description || '—'}</span>
-                          )}
-                        </td>
-
-                        {/* Favorite Toggle */}
-                        <td className="px-6 py-3.5 text-center">
-                          <button
-                            onClick={() => handleToggleFavorite(item)}
-                            disabled={isSaving}
-                            className={`p-1 rounded-md transition-colors mx-auto ${
-                              item.is_favorite
-                                ? 'text-amber-500 hover:bg-amber-50'
-                                : 'text-slate-300 hover:text-amber-400 hover:bg-amber-50'
-                            } disabled:opacity-50`}
-                            title={item.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
-                          >
-                            <Star size={18} fill={item.is_favorite ? 'currentColor' : 'none'} />
-                          </button>
-                        </td>
+                        {/* Category (if Product Type tab) */}
+                        {activeTab === 'product_types' && (
+                            <td className="px-6 py-3.5">
+                              {isEditing ? (
+                                <select
+                                    value={editData.category_id || ''}
+                                    onChange={(e) => setEditData({ ...editData, category_id: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 text-sm border border-indigo-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                                >
+                                    <option value="" disabled>Select a Category</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    ))}
+                                </select>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700">
+                                   {item.product_categories?.name || 'Uncategorized'}
+                                </span>
+                              )}
+                            </td>
+                        )}
 
                         {/* Actions */}
                         <td className="px-6 py-3.5 text-right">
@@ -434,7 +447,7 @@ export default function UserTaxonomyManagement() {
 
           {/* Footer count */}
           <div className="px-6 py-3 border-t border-slate-100 text-xs text-slate-400">
-            {filteredData.length} {activeTab} · {filteredData.filter(i => i.is_favorite).length} favorites
+            {filteredData.length} {activeTab.replace('_', ' ')}
           </div>
         </motion.div>
       </AnimatePresence>
