@@ -201,7 +201,7 @@ const HistoryPage = () => {
             (item.original_title  || '').toLowerCase().includes(searchLower) ||
             (item.theme           || '').toLowerCase().includes(searchLower) ||
             (item.niche           || '').toLowerCase().includes(searchLower) ||
-            (item.product_type_text || '').toLowerCase().includes(searchLower);
+            (item.product_type_name || item.product_type_text || '').toLowerCase().includes(searchLower);
 
         const status = item.status_name || 'New';
         const normalized = ['Listing completed', 'SEO analysis completed'].includes(status) ? 'completed' : 'processing';

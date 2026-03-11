@@ -115,21 +115,9 @@ const ProductStudio = () => {
   // Ref for OptimizationForm to access its state
   const optimizationFormRef = useRef(null);
 
-  // Ref holding the sentinel "Custom type" row ID from product_types
-  const customTypeIdRef = useRef(null);
-
   useEffect(() => {
-    const fetchCustomTypeId = async () => {
-      const { data } = await supabase
-        .from('product_types')
-        .select('id')
-        .eq('name', 'Custom type')
-        .single();
-      if (data) customTypeIdRef.current = data.id;
-    };
-    
     const fetchUserDefaults = async () => {
-        if (!user) return;
+      if (!user) return;
         try {
             const { data, error } = await supabase
                 .from('v_user_seo_active_settings')
@@ -156,7 +144,6 @@ const ProductStudio = () => {
         }
     };
 
-    fetchCustomTypeId();
     fetchUserDefaults();
   }, [user]);
 
@@ -296,6 +283,37 @@ const ProductStudio = () => {
     };
   }, [listingId]);
 
+  const ensureProductType = async (formData) => {
+    if (formData.product_type_id) return formData.product_type_id;
+    if (!formData.product_type_name) return null;
+
+    try {
+        const { data, error } = await supabase
+            .from('user_custom_product_types')
+            .insert({ name: formData.product_type_name, user_id: user.id })
+            .select('id')
+            .single();
+
+        if (error) {
+            if (error.code === '23505') { // Unique constraint violation
+                const { data: existingData } = await supabase
+                    .from('v_combined_product_types')
+                    .select('id')
+                    .eq('name', formData.product_type_name)
+                    .or(`user_id.eq.${user.id},origin.eq.system`)
+                    .single();
+                return existingData?.id || null;
+            }
+            console.error("Error inserting custom product type:", error);
+            return null;
+        }
+        return data.id;
+    } catch (err) {
+        console.error("Exception ensuring product type:", err);
+        return null;
+    }
+  };
+
   const handleAnalyzeDesign = async () => {
       // 1. Check if image selected
       if (!selectedImage && !results?.imageUrl) {
@@ -331,12 +349,13 @@ const ProductStudio = () => {
 
           // Auto-save form data before analyzing image
           let currentListingId = listingId;
+          const resolvedProductTypeId = await ensureProductType(currentFormData);
+
           const savePayload = {
               theme: currentFormData.theme_name || null,
               niche: currentFormData.niche_name || null,
               sub_niche: currentFormData.sub_niche_name || null,
-              product_type_id: currentFormData.product_type_id || customTypeIdRef.current,
-              product_type_text: currentFormData.product_type_text || null,
+              product_type_id: resolvedProductTypeId,
               user_description: currentFormData.context || null,
               image_url: publicUrl, // Save the image URL immediately
               is_image_analysed: false // Reset flag to prevent instant polling hit on re-runs
@@ -387,7 +406,7 @@ const ProductStudio = () => {
               payload: {
                   image_url: publicUrl,
                   product_details: {
-                      product_type: currentFormData.product_type_text || currentFormData.product_type_name || null,
+                      product_type: currentFormData.product_type_name || null,
                       client_description: currentFormData.context || null
                   }
               }
@@ -465,9 +484,10 @@ const ProductStudio = () => {
               sub_niche: formData.sub_niche_name
           };
 
+          const resolvedProductTypeId = await ensureProductType(formData);
+
           const commonFields = {
-                product_type_id: formData.product_type_id || customTypeIdRef.current,
-                product_type_text: formData.product_type_text || null,
+                product_type_id: resolvedProductTypeId,
                 tone_id: formData.tone_id,
                 theme: formData.theme_name || null,
                 niche: formData.niche_name || null,
@@ -590,12 +610,12 @@ const ProductStudio = () => {
             theme: formData.theme_name,
             niche: formData.niche_name,
             sub_niche: formData.sub_niche_name,
-            product_type: formData.product_type_id ? null : formData.product_type_name
         };
 
+        const resolvedProductTypeId = await ensureProductType(formData);
+
         const commonFields = {
-            product_type_id: formData.product_type_id || customTypeIdRef.current,
-            product_type_text: formData.product_type_text || null,
+            product_type_id: resolvedProductTypeId,
             tone_id: formData.tone_id,
             theme: formData.theme_name || null,
             niche: formData.niche_name || null,
@@ -666,7 +686,7 @@ const ProductStudio = () => {
                 visual_overall_vibe: visualAnalysis.overall_vibe,
                 categorization: formatCategorizationPayload(formData),
                 product_details: {
-                    product_type: formData.product_type_text || formData.product_type_name,
+                    product_type: formData.product_type_name,
                     tone: formData.tone_name,
                     client_description: formData.context,
                     tag_count: formData.tag_count,
@@ -832,7 +852,7 @@ const ProductStudio = () => {
                     user_description: listingMeta?.user_description || null
                 },
                 product_details: {
-                    product_type: analysisContext.product_type_text || analysisContext.product_type_name || "Product",
+                    product_type: analysisContext.product_type_name || "Product",
                     tone: analysisContext.tone_name || "Engaging",
                     client_description: listingMeta?.user_description || analysisContext.context || ""
                 },
@@ -1193,7 +1213,7 @@ const ProductStudio = () => {
                   visual_overall_vibe: visualAnalysis.overall_vibe,
                   categorization: formatCategorizationPayload(formData),
                   product_details: {
-                      product_type: formData.product_type_text || formData.product_type_name || "Product",
+                      product_type: formData.product_type_name || "Product",
                       tone: formData.tone_name || "Engaging",
                       client_description: formData.context || "",
                       tag_count: formData.tag_count,
@@ -1415,7 +1435,7 @@ const ProductStudio = () => {
                   visual_overall_vibe: visualAnalysis.overall_vibe,
                   categorization: formatCategorizationPayload(formData),
                   product_details: {
-                      product_type: formData.product_type_text || formData.product_type_name || "Product",
+                      product_type: formData.product_type_name || "Product",
                       tone: formData.tone_name || "Engaging",
                       client_description: formData.context || "",
                       tag_count: formData.tag_count,
@@ -1601,7 +1621,7 @@ const ProductStudio = () => {
           visual_overall_vibe: visualAnalysis.overall_vibe,
           categorization: formatCategorizationPayload(formData),
           product_details: {
-            product_type: formData.product_type_text || formData.product_type_name || "Product",
+            product_type: formData.product_type_name || "Product",
             tone: formData.tone_name || "Engaging",
             client_description: formData.context || ""
           },
@@ -1902,7 +1922,7 @@ const ProductStudio = () => {
           visual_overall_vibe: visualAnalysis.overall_vibe,
           categorization: formatCategorizationPayload(analysisContext),
           product_details: {
-            product_type: analysisContext.product_type_text || analysisContext.product_type_name || "Product",
+            product_type: analysisContext.product_type_name || "Product",
             tone: analysisContext.tone_name || "Engaging",
             client_description: analysisContext.context || ""
           },
@@ -2093,7 +2113,7 @@ const ProductStudio = () => {
         // Fetch Listing Details
         const { data: listing, error: listingError } = await supabase
             .from('listings')
-            .select(`*, niches(name), themes(name), sub_niches(name), product_types(name), tones(name)`)
+            .select(`*, niches(name), themes(name), sub_niches(name), tones(name)`)
             .eq('id', listingId)
             .single();
 
@@ -2141,10 +2161,9 @@ const ProductStudio = () => {
             niche: listing.niche || parsedCustom.niche || listing.niches?.name || "",
             sub_niche: listing.sub_niche || parsedCustom.sub_niche || listing.sub_niches?.name || "",
 
-            // Product Type: prefer custom text, fall back to FK join name
-            product_type_name: listing.product_type_text || listing.product_types?.name || "",
-            product_type_text: listing.product_type_text || null,
-            product_type_id: listing.product_type_text ? null : listing.product_type_id,
+            // Product Type: fallback gracefully to legacy text (we no longer join product_types directly)
+            product_type_name: listing.product_type_text || "",
+            product_type_id: listing.product_type_id || null,
             tone_name: listing.tones?.name || "Engaging",
             
             // Advanced SEO Settings
@@ -2682,7 +2701,7 @@ const ProductStudio = () => {
   };
 
   const currentListingContext = useMemo(() => ({
-    product_type_text: analysisContext?.product_type_text || analysisContext?.product_type_name || '',
+    product_type_name: analysisContext?.product_type_name || '',
     theme: analysisContext?.theme_name || analysisContext?.theme || '',
     niche: analysisContext?.niche_name || analysisContext?.niche || '',
     sub_niche: analysisContext?.sub_niche_name || analysisContext?.sub_niche || ''

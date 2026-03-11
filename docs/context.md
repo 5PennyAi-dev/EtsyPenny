@@ -468,7 +468,21 @@
     - **Fix**: `is_favorite` toggle on custom niches was not persisting because RLS was enabled on `user_custom_niches` table without proper policies.
     - **Migration**: `add_rls_policies_user_custom_taxonomy` — added full CRUD policies (SELECT, INSERT, UPDATE, DELETE) scoped to `auth.uid() = user_id` on both `user_custom_niches` and `user_custom_themes`.
 
+- **Taxonomy Form Dropdowns** (2026-03-10):
+    - **Feature**: Replaced the plain text `<input>` fields for "Theme" and "Niche" in `OptimizationForm.jsx` with `<select>` dropdowns.
+    - **Data**: These dropdowns are now dynamically populated on load by concurrently fetching active rows from the `system_themes` and `system_niches` Supabase tables alongside product categories.
+    - **Graceful Fallback**: The UI natively supports legacy text values (e.g. from history rehydration) by rendering a custom `<option>` when the string does not belong to the active system taxonomy, ensuring zero data loss during the transition.
+    
+- **Unified Product Types** (2026-03-10):
+    - **Feature**: Transitioned from plain text `product_type_text` storage to a unified UUID-based system via `v_combined_product_types` view, blending `product_types` and `user_custom_product_types`.
+    - **Frontend**: `ProductTypeCombobox.jsx` fetches and groups a flat list into System vs Custom categories. Custom types visually distinguished.
+    - **Integration**: `ProductStudio.jsx` introduces `ensureProductType` helper to intercept custom strings, INSERT them into `user_custom_product_types`, handle conflicts, and return the `product_type_id` before saving to `listings`.
+    - **Cleanup**: Removed all legacy `product_type_text` usage across `HistoryPage`, `CreatePresetModal`, `ResultsDisplay`, and Webhook payloads. Flow relies entirely on explicit UUID-linked names or text fallbacks where appropriate.
+    - **Fix (RLS)**: Applied missing RLS policies (`auth.uid() = user_id`) to the `user_custom_product_types` table to resolve silent INSERT failures when users attempted to save a custom product type.
+    - **Fix (Trigger)**: Fixed a database trigger `check_if_product_type_exists_in_system` that was causing `relation "public.system_product_types" does not exist` errors when saving new custom types, by correcting the referenced table to `public.product_types`.
+    - **Fix (Constraint)**: Dropped the stale `listings_product_type_id_fkey` constraint on the `listings` table, allowing `product_type_id` to legally accept UUIDs generated from the `user_custom_product_types` table.
+    - **Fix (Loading)**: Removed an outdated implicit `product_types(name)` join from `handleLoadListing` in `ProductStudio.jsx` which was causing a `PGRST200` relation error after the foreign key was successfully dropped.
+
 ### Immediate Next Steps
-1.  Verify the n8n webhook's handling of the newly structured `parameters` payload for `resetPool`.
-2.  Begin work on the Stripe subscription model integration.
+1.  Verify end-to-end flow of saving a new custom product type and generating an SEO strategy.
 

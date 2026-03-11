@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHand
 import { Sparkles, Package, Settings, ChevronRight, ChevronDown, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import ProductTypeCombobox from './ProductTypeCombobox';
 // import SmartNicheAutocomplete from './SmartNicheAutocomplete';
 
@@ -19,6 +20,7 @@ const MAX_TAGS_LIMIT = 13;
 
 const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, isImageAnalysed, isLoading, onCancel, initialValues }, ref) => {
 
+  const { user } = useAuth();
   // Data State
   const [groupedProductTypes, setGroupedProductTypes] = useState([]);
 
@@ -32,6 +34,10 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
   const [nicheName, setNicheName] = useState("");
   const [subNicheName, setSubNicheName] = useState("");
 
+  // System Taxonomy State
+  const [systemThemes, setSystemThemes] = useState([]);
+  const [systemNiches, setSystemNiches] = useState([]);
+
   // Advanced section toggle
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
@@ -41,31 +47,52 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
 
   const contextRef = useRef(null);
 
-  // Initial Fetch (Product Categories+Types only)
+  // Initial Fetch (Product Types and System Taxonomy)
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch product types grouped by category
-      const { data: categoriesData } = await supabase
-        .from('product_categories')
-        .select('id, name, product_types(id, name)')
-        .order('name');
+      if (!user) return;
       
-      if (categoriesData) {
-        const grouped = categoriesData
+      // Fetch product types and system taxonomy concurrently
+      const [categoriesRes, customTypesRes, themesRes, nichesRes] = await Promise.all([
+        supabase.from('product_categories').select('id, name, product_types(id, name)').order('name'),
+        supabase.from('user_custom_product_types').select('id, name').eq('user_id', user.id).order('name'),
+        supabase.from('system_themes').select('name').eq('is_active', true).order('name'),
+        supabase.from('system_niches').select('name').eq('is_active', true).order('name')
+      ]);
+      
+      let allGrouped = [];
+
+      // Maps custom types first for visibility
+      if (customTypesRes.data && customTypesRes.data.length > 0) {
+        allGrouped.push({
+          category: 'My Custom Types',
+          isCustomGroup: true,
+          types: customTypesRes.data.map(t => ({ ...t, origin: 'custom' }))
+        });
+      }
+
+      if (categoriesRes.data) {
+        const systemGrouped = categoriesRes.data
           .map((cat) => ({
             category: cat.name,
-            types: (cat.product_types || []).sort((a, b) => a.name.localeCompare(b.name))
+            isCustomGroup: false,
+            types: (cat.product_types || [])
+              .map(t => ({ ...t, origin: 'system' }))
+              .sort((a, b) => a.name.localeCompare(b.name))
           }))
           .filter((g) => g.types.length > 0);
         
-        setGroupedProductTypes(grouped);
-
-
+        allGrouped = [...allGrouped, ...systemGrouped];
       }
+
+      setGroupedProductTypes(allGrouped);
+
+      if (themesRes.data) setSystemThemes(themesRes.data);
+      if (nichesRes.data) setSystemNiches(nichesRes.data);
 
     };
     fetchData();
-  }, []); // Run once on mount
+  }, [user]); // Run when user is available
 
   // Initialize from initialValues
   useEffect(() => {
@@ -75,17 +102,13 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
           setNicheName(initialValues.niche_name || initialValues.niche || initialValues.custom_niche || "");
           setSubNicheName(initialValues.sub_niche_name || initialValues.sub_niche || initialValues.custom_sub_niche || "");
           
-          // Product Type: hydrate from ID (find name) or from custom text
-          if (initialValues.product_type_text) {
-            // Custom type — use the stored text
-            setProductTypeId(null);
-            setProductTypeName(initialValues.product_type_text);
-          } else if (initialValues.product_type_id) {
+          // Product Type: hydrate from ID (find name) or fallback legacy text
+          if (initialValues.product_type_id) {
             setProductTypeId(initialValues.product_type_id);
             setProductTypeName(initialValues.product_type_name || "");
-          } else if (initialValues.product_type_name) {
+          } else if (initialValues.product_type_text || initialValues.product_type_name) {
             setProductTypeId(null);
-            setProductTypeName(initialValues.product_type_name);
+            setProductTypeName(initialValues.product_type_text || initialValues.product_type_name);
           }
 
           setTone(initialValues.tone_name ? initialValues.tone_name.toLowerCase() : 'auto');
@@ -98,7 +121,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
       }
   }, [initialValues]);
 
-  // Resolve product type name from ID once grouped data loads
+  // Resolve product type name from ID once data loads
   useEffect(() => {
     if (productTypeId && groupedProductTypes.length > 0 && !productTypeName) {
       for (const group of groupedProductTypes) {
@@ -145,7 +168,6 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
       // Product Details
       product_type_id: productTypeId,
       product_type_name: productTypeName,
-      product_type_text: productTypeId ? null : productTypeName,
       tone_id: null,
       tone_name: resolvedToneName,
       
@@ -167,7 +189,6 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
           return {
               product_type_id: productTypeId,
               product_type_name: productTypeName,
-              product_type_text: productTypeId ? null : productTypeName,
               tone_name: resolvedToneName,
               context: contextRef.current?.value || "",
               
@@ -213,32 +234,52 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
                 />
             </div>
 
-            {/* CATEGORIZATION (TEXT INPUTS) */}
+            {/* CATEGORIZATION */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                {/* THEME */}
-                <div className="space-y-1">
+                {/* THEME (Dropdown) */}
+                <div className="space-y-1 relative">
                     <label htmlFor="theme" className="text-sm font-medium text-slate-700">Theme</label>
-                    <input
-                        type="text"
-                        id="theme"
-                        value={themeName}
-                        onChange={(e) => setThemeName(e.target.value)}
-                        placeholder="e.g. Occasions"
-                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 text-sm"
-                    />
+                    <div className="relative">
+                        <select
+                            id="theme"
+                            value={themeName}
+                            onChange={(e) => setThemeName(e.target.value)}
+                            className={`w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all appearance-none text-sm ${!themeName ? 'text-slate-400' : 'text-slate-700'}`}
+                        >
+                            <option value="">Select a Theme...</option>
+                            {systemThemes.map(t => (
+                                <option key={t.name} value={t.name}>{t.name}</option>
+                            ))}
+                            {/* Allow preserving a custom value not in the list (e.g., from history) */}
+                            {themeName && !systemThemes.some(t => t.name === themeName) && (
+                                <option value={themeName}>{themeName}</option>
+                            )}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
                 </div>
 
-                {/* NICHE */}
-                <div className="space-y-1">
+                {/* NICHE (Dropdown) */}
+                <div className="space-y-1 relative">
                     <label htmlFor="niche" className="text-sm font-medium text-slate-700">Niche</label>
-                    <input
-                        type="text"
-                        id="niche"
-                        value={nicheName}
-                        onChange={(e) => setNicheName(e.target.value)}
-                        placeholder="e.g. Wedding"
-                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 text-sm"
-                    />
+                    <div className="relative">
+                        <select
+                            id="niche"
+                            value={nicheName}
+                            onChange={(e) => setNicheName(e.target.value)}
+                            className={`w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all appearance-none text-sm ${!nicheName ? 'text-slate-400' : 'text-slate-700'}`}
+                        >
+                            <option value="">Select a Niche...</option>
+                            {systemNiches.map(n => (
+                                <option key={n.name} value={n.name}>{n.name}</option>
+                            ))}
+                            {/* Allow preserving a custom value not in the list (e.g., from history) */}
+                            {nicheName && !systemNiches.some(n => n.name === nicheName) && (
+                                <option value={nicheName}>{nicheName}</option>
+                            )}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
                 </div>
 
                 {/* SUB-NICHE */}

@@ -21,7 +21,7 @@ const ProductTypeCombobox = ({ groupedOptions = [], value = '', onChange, disabl
       if (matchingTypes.length > 0) {
         items.push({ type: 'header', label: group.category });
         matchingTypes.forEach((t) => {
-          items.push({ type: 'item', id: t.id, name: t.name });
+          items.push({ type: 'item', id: t.id, name: t.name, origin: t.origin });
         });
       }
     });
@@ -57,9 +57,9 @@ const ProductTypeCombobox = ({ groupedOptions = [], value = '', onChange, disabl
 
   const handleSelect = (item) => {
     if (item.type === 'item') {
-      onChange(item.id, item.name);
+      onChange(item.id, item.name, item.origin);
     } else if (item.type === 'custom') {
-      onChange(null, item.name);
+      onChange(null, item.name, 'custom');
     }
     setSearch('');
     setIsOpen(false);
@@ -202,7 +202,7 @@ const ProductTypeCombobox = ({ groupedOptions = [], value = '', onChange, disabl
                     ${isHighlighted ? 'bg-indigo-50 text-indigo-700' : 'text-indigo-600 hover:bg-indigo-50'}`}
                 >
                   <span className="text-indigo-400 font-bold">+</span>
-                  Use "<span className="font-semibold">{item.name}</span>" as custom type
+                  Save "<span className="font-semibold">{item.name}</span>" as custom
                 </button>
               );
             }
@@ -213,12 +213,15 @@ const ProductTypeCombobox = ({ groupedOptions = [], value = '', onChange, disabl
                 type="button"
                 data-highlighted={isHighlighted}
                 onClick={() => handleSelect(item)}
-                className={`w-full px-4 py-2 text-left text-sm transition-colors
+                className={`w-full px-4 py-2 text-left text-sm transition-colors flex justify-between items-center
                   ${isHighlighted ? 'bg-indigo-50 text-indigo-700' : ''}
                   ${isSelected && !isHighlighted ? 'bg-indigo-50/50 text-indigo-600 font-medium' : ''}
                   ${!isHighlighted && !isSelected ? 'text-slate-700 hover:bg-slate-50' : ''}`}
               >
-                {item.name}
+                <span>{item.name}</span>
+                {item.origin === 'custom' && (
+                  <span className="text-[10px] font-medium bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded tracking-wide">Custom</span>
+                )}
               </button>
             );
           })}
