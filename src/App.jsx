@@ -9,6 +9,7 @@ import BrandProfilePage from './pages/BrandProfilePage';
 import SEOLab from './pages/SEOLab';
 import AdminSystemPage from './pages/AdminSystemPage';
 import UserSettings from './pages/UserSettings';
+import LandingPage from './pages/LandingPage';
 
 import { Toaster } from 'sonner';
 
@@ -76,7 +77,7 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<LandingPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

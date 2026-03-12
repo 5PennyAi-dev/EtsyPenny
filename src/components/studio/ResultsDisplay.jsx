@@ -1,4 +1,4 @@
-﻿import { 
+import { 
   Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, 
   ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, 
   Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart, 
@@ -896,10 +896,10 @@ const SidebarSkeleton = ({ phase }) => (
                                 >
                                     Score <SortIcon columnKey="score" />
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold w-[8%]">
+                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[10%]">
                                     Conv. Intent.
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold w-[8%]">
+                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[10%]">
                                     Relevance
                                 </th>
                                 <th 

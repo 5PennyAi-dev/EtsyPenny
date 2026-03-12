@@ -487,5 +487,17 @@
 - **Minor Polish** (2026-03-11):
     - **App Icon**: Updated `index.html` to point to the correct `favicon.ico` asset instead of the default Vite boilerplate SVG.
 
+### March 12th, 2026 - Landing Page & UI Polish
+- **Feature**: Built and integrated a new "Coming Soon" Landing Page component for PennySEO (`LandingPage.jsx`).
+    - **UI Design**: A clean, 2-column Hero section on desktop featuring dynamic waitlist email capture and a preview image of the PennySEO dashboard (`dashboard_preview.jpg`).
+    - **Visuals**: Employs a SaaS aesthetic utilizing a `slate-50` background with striking Indigo and Orange accents.
+    - **Branding**: Integrated PennySEO logo and 5PennyAi company logo ("Powered by 5PennyAi") in the navigation.
+- **UI Refinement**: Optimized the "Keyword Performance" table in `ResultsDisplay.jsx`.
+    - Widened "Conv. Intent." and "Relevance" columns to 10% each.
+    - Added `whitespace-nowrap` to headers and badges to ensure "VERY HIGH" pills never wrap onto two lines.
+- **Routing Integration**: Configured the React Router in `App.jsx` to natively display the Landing Page at the absolute root URL (`/`), migrating the protected application gateway functionally down to `/dashboard`.
+
 ### Immediate Next Steps
 1.  Verify end-to-end flow of saving a new custom product type and generating an SEO strategy.
+2.  Hook up the Waitlist capture form on the Landing Page to an active n8n webhook or database insertion method.
+3.  Perform responsive stress-testing on the new Landing Page for edge-case mobile devices.
