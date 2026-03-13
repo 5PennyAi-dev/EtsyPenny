@@ -673,7 +673,10 @@ const ProductStudio = () => {
                     Niche: userDefaults.param_niche,
                     CPC: userDefaults.param_cpc
                 } : getStrategyValues(strategySelections)),
-                ...getSmartBadgePayload()
+                ...getSmartBadgePayload(),
+                ai_selection_count: userDefaults?.ai_selection_count ?? 13,
+                working_pool_count: userDefaults?.working_pool_count ?? 40,
+                concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
             },
             payload: {
                 image_url: publicUrl,
@@ -1117,7 +1120,10 @@ const ProductStudio = () => {
         listing_id: listingId,
         parameters: {
             ...getStrategyValues(strategySelections),
-            ...getSmartBadgePayload()
+            ...getSmartBadgePayload(),
+            ai_selection_count: userDefaults?.ai_selection_count ?? 13,
+            working_pool_count: userDefaults?.working_pool_count ?? 40,
+            concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
         }
       });
       toast.success('Keywords pool reset successfully!');
@@ -1148,7 +1154,10 @@ const ProductStudio = () => {
         pinned_count: pinnedCount,
         parameters: {
             ...parameters, 
-            ...getSmartBadgePayload()
+            ...getSmartBadgePayload(),
+            ai_selection_count: userDefaults?.ai_selection_count ?? 13,
+            working_pool_count: userDefaults?.working_pool_count ?? 40,
+            concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
         }
       });
       toast.success('Strategy update triggered! Your results will refresh in a few seconds.');
@@ -1200,7 +1209,10 @@ const ProductStudio = () => {
                       Niche: userDefaults.param_niche,
                       CPC: userDefaults.param_cpc
                   } : getStrategyValues(strategySelections)),
-                  ...getSmartBadgePayload()
+                  ...getSmartBadgePayload(),
+                  ai_selection_count: userDefaults?.ai_selection_count ?? 13,
+                  working_pool_count: userDefaults?.working_pool_count ?? 40,
+                  concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
               },
               payload: {
                   image_url: results?.imageUrl,
@@ -1418,7 +1430,10 @@ const ProductStudio = () => {
                       Niche: userDefaults.param_niche,
                       CPC: userDefaults.param_cpc
                   } : getStrategyValues(strategySelections)),
-                  ...getSmartBadgePayload()
+                  ...getSmartBadgePayload(),
+                  ai_selection_count: userDefaults?.ai_selection_count ?? 13,
+                  working_pool_count: userDefaults?.working_pool_count ?? 40,
+                  concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
               },
               tasks: [
                   {

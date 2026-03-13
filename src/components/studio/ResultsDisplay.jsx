@@ -1110,10 +1110,10 @@ const SidebarSkeleton = ({ phase }) => (
                                                 return <span className="text-slate-400 opacity-50 font-medium text-xs">N/A</span>;
                                             }
                                             const displayVal = numVal.toFixed(2);
-                                            const colorClass = numVal < 0.3 
-                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                                                : numVal < 0.7 
-                                                    ? 'bg-amber-50 text-amber-700 border-amber-100' 
+                                            const colorClass = numVal < 0.5
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                                : numVal < 0.9
+                                                    ? 'bg-amber-50 text-amber-700 border-amber-100'
                                                     : 'bg-rose-50 text-rose-700 border-rose-100';
                                             return (
                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide border ${colorClass}`}>

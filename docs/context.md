@@ -497,6 +497,16 @@
     - Added `whitespace-nowrap` to headers and badges to ensure "VERY HIGH" pills never wrap onto two lines.
 - **Routing Integration**: Configured the React Router in `App.jsx` to natively display the Landing Page at the absolute root URL (`/`), migrating the protected application gateway functionally down to `/dashboard`.
 
+- **Analysis Constraints in Webhook Payloads** (2026-03-12):
+    - Added `ai_selection_count`, `working_pool_count`, and `concept_diversity_limit` to all 5 webhook `parameters` blocks in `ProductStudio.jsx`: `generate_seo`, `userKeyword`, `addFromFavorites`, and both `resetPool` calls (handleResetPool + handleApplyStrategy).
+    - Values sourced from `userDefaults` (fetched from `v_user_seo_active_settings` view at mount). Defaults: 13, 40, 3 respectively.
+    - These fields allow the n8n backend to respect per-user analysis constraints for AI keyword selection count, working pool size, and concept diversity limits.
+
+- **Competition Badge Threshold Update** (2026-03-12):
+    - Updated the color thresholds for the Competition column badge in the Keyword Performance table (`ResultsDisplay.jsx`).
+    - **Old values**: Green `< 0.3`, Amber `0.3–0.7`, Rose `≥ 0.7`.
+    - **New values**: Green `< 0.5` (Real opportunity), Amber `0.5–0.9` (Standard/active niche), Rose `≥ 0.9` (Saturated market).
+
 ### Immediate Next Steps
 1.  Verify end-to-end flow of saving a new custom product type and generating an SEO strategy.
 2.  Hook up the Waitlist capture form on the Landing Page to an active n8n webhook or database insertion method.
