@@ -156,6 +156,7 @@ const ProductStudio = () => {
       evergreen_avg_volume: userDefaults.evergreen_avg_volume,
       trending_dropping_threshold: userDefaults.trending_dropping_threshold,
       trending_current_month_min_volume: userDefaults.trending_current_month_min_volume,
+      trending_growth_factor: userDefaults.trending_growth_factor,
       promising_min_score: userDefaults.promising_min_score,
       promising_competition: userDefaults.promosing_competition || userDefaults.promising_competition
     };

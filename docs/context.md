@@ -507,6 +507,11 @@
     - **Old values**: Green `< 0.3`, Amber `0.3–0.7`, Rose `≥ 0.7`.
     - **New values**: Green `< 0.5` (Real opportunity), Amber `0.5–0.9` (Standard/active niche), Rose `≥ 0.9` (Saturated market).
 
+- **Trending Growth Factor Parameter** (2026-03-13):
+    - **Problem**: The new `trending_growth_factor_id` column in `user_settings` was not being saved when modifying the Trending Growth threshold in the Settings page, and was not being sent to n8n webhooks.
+    - **Fix (UserSettings.jsx)**: Added `trending_growth_factor_id: null` to the initial settings state. Added `'trending_growth_factor'` to the `subKeyMap.trending` array in `handleMultiSettingChange`, so selecting a Trending Growth level now auto-resolves and saves the matching `trending_growth_factor` constant ID alongside the existing `trending_dropping_id` and `trending_current_month_min_id`.
+    - **Fix (ProductStudio.jsx)**: Added `trending_growth_factor: userDefaults.trending_growth_factor` to the `getSmartBadgePayload()` helper function, which feeds all 5 n8n webhook payloads (`generate_seo`, `userKeyword`, `addFromFavorites`, and both `resetPool` calls).
+
 ### Immediate Next Steps
 1.  Verify end-to-end flow of saving a new custom product type and generating an SEO strategy.
 2.  Hook up the Waitlist capture form on the Landing Page to an active n8n webhook or database insertion method.

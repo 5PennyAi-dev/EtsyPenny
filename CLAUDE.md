@@ -65,7 +65,7 @@ npm run preview   # Preview production build
 - **`listing_seo_stats`** — Individual keyword/tag metrics (search_volume, competition, opportunity_score, trending/evergreen flags)
 - **`user_keyword_bank`** — User's saved favorite keywords with cached metrics (tag, last_volume, last_competition, last_cpc, theme, niche)
 - **`keyword_presets`** — Named keyword groupings (title, theme, niche, sub_niche, keyword_ids[] referencing user_keyword_bank). Used by CreatePresetModal and FavoritesPickerModal Presets tab.
-- **`user_settings`** — User preferences including Smart Badge thresholds and gem settings (gem_min_volume, etc.)
+- **`user_settings`** — User preferences including Smart Badge thresholds (trending_growth_factor_id, trending_dropping_id, trending_current_month_min_id, evergreen_stability_ratio_id, etc.) and gem settings (gem_min_volume, etc.)
 - **`system_seo_constants`** — System-wide SEO constants and labels used for rendering UI dropdowns and calculating thresholds
 - **`system_themes`** / **`system_niches`** — Global taxonomy (admin-managed). Columns: id, name, is_active, description, created_at
 - **`user_custom_themes`** / **`user_custom_niches`** — Per-user custom taxonomy. Columns: id, user_id, name, is_favorite, description, created_at. RLS enabled with user_id-scoped policies.

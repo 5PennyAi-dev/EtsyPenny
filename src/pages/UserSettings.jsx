@@ -54,6 +54,7 @@ export default function UserSettings() {
     promising_competition_id: null,
     trending_dropping_id: null,
     trending_current_month_min_id: null,
+    trending_growth_factor_id: null,
     
     ai_selection_count: 13,
     working_pool_count: 40,
@@ -152,7 +153,7 @@ export default function UserSettings() {
     const subKeyMap = {
       'evergreen': ['evergreen_stability_ratio', 'evergreen_min', 'evergreen_avg_volume'],
       'promising': ['promising_min_score', 'promising_competition'],
-      'trending': ['trending_dropping', 'trending_current_month_min']
+      'trending': ['trending_dropping', 'trending_current_month_min', 'trending_growth_factor']
     };
 
     const subKeys = subKeyMap[masterKey];
