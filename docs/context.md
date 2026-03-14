@@ -512,6 +512,24 @@
     - **Fix (UserSettings.jsx)**: Added `trending_growth_factor_id: null` to the initial settings state. Added `'trending_growth_factor'` to the `subKeyMap.trending` array in `handleMultiSettingChange`, so selecting a Trending Growth level now auto-resolves and saves the matching `trending_growth_factor` constant ID alongside the existing `trending_dropping_id` and `trending_current_month_min_id`.
     - **Fix (ProductStudio.jsx)**: Added `trending_growth_factor: userDefaults.trending_growth_factor` to the `getSmartBadgePayload()` helper function, which feeds all 5 n8n webhook payloads (`generate_seo`, `userKeyword`, `addFromFavorites`, and both `resetPool` calls).
 
+### March 14th, 2026 - Add Custom Keyword Stale State Fix
+
+- **Critical Bug Fix: "Add Custom Keyword" / "Add from Favorites" Not Working After Fresh Analysis**
+    - **Symptom**: After running a fresh SEO analysis (without page refresh), clicking "Add Custom Keyword" or "Add from Favorites" would silently fail — no webhook fired, no toast, no error. After a manual page refresh, the same buttons worked perfectly.
+    - **Root Cause (Diagnosed via Toast Diagnostics)**: 
+        - `handleAnalyzeDesign` sets `results = { imageUrl: "..." }` (partial object, **no `analytics` property**) before SEO analysis begins.
+        - After SEO completes, `handleLoadListing` sets proper `results` with `analytics`. However, the `handleAddCustomKeyword` closure still held the partial `results` from the earlier render.
+        - Guard check `if (!freshResults.analytics)` silently returned because `analytics` was `undefined` on the partial object.
+        - Both closure variables AND `latestRef.current` captured the same stale value — the ref pattern didn't help because both were updated from the same React render cycle.
+    - **Fix (ProductStudio.jsx)**:
+        - **Removed `useMemo` wrapper** from `MemoizedResultsDisplay` — now renders `<ResultsDisplay>` directly, ensuring all callback props are always fresh on every render.
+        - **Eliminated `results.analytics` dependency** in `handleAddCustomKeyword` — duplicate check now **queries Supabase directly** (`listing_seo_stats` table) instead of reading from potentially stale `results.analytics`.
+        - **Direct closure variables** used for webhook payload (`userDefaults`, `strategySelections`, `visualAnalysis`) with `latestRef` as fallback for `imageUrl`.
+        - Added `latestRef` pattern (always-fresh ref updated every render) as safety net for async handlers.
+    - **Fix (Accordion.jsx)**: Added `useEffect` to auto-open accordion when `defaultOpen` transitions from `false` to `true` (previously only checked on mount).
+    - **Fix (handleAddBatchKeywords)**: Updated payload to use `freshResults` and `freshVisualAnalysis` from `latestRef` instead of stale closure variables.
+    - **Database Migration**: Added unique constraint on `listing_seo_stats(listing_id, tag)` to support upsert operations (`20260314_unique_listing_tag_constraint.sql`).
+
 ### Immediate Next Steps
 1.  Verify end-to-end flow of saving a new custom product type and generating an SEO strategy.
 2.  Hook up the Waitlist capture form on the Landing Page to an active n8n webhook or database insertion method.

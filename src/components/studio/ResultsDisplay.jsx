@@ -202,6 +202,9 @@ const SidebarSkeleton = ({ phase }) => (
       return num.toString();
     };
 
+    // Detect pre-analysis state: scores are null/undefined (listing saved but not yet analyzed)
+    const isPreAnalysis = score == null;
+
     const mainTier = getMetricsColor(score);
     const visTier = getMetricsColor(listingVisibility);
     const relTier = getMetricsColor(listingRelevance);
@@ -215,10 +218,12 @@ const SidebarSkeleton = ({ phase }) => (
 
     const MiniGauge = ({ value, tier }) => (
       <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1.5">
-        <div 
-          className={`h-full rounded-full ${tier.bg} transition-all duration-1000 ease-out`} 
-          style={{ width: `${Math.min(100, Math.max(0, Number(value) || 0))}%` }} 
-        />
+        {!isPreAnalysis && value != null && (
+          <div 
+            className={`h-full rounded-full ${tier.bg} transition-all duration-1000 ease-out`} 
+            style={{ width: `${Math.min(100, Math.max(0, Number(value) || 0))}%` }} 
+          />
+        )}
       </div>
     );
 
@@ -226,6 +231,29 @@ const SidebarSkeleton = ({ phase }) => (
       const radius = 36;
       const circumference = 2 * Math.PI * radius;
       const strokeDashoffset = circumference - (Number(value) / 100) * circumference;
+
+      // Pre-analysis: dashed gray ring + sparkle icon
+      if (isPreAnalysis) {
+        return (
+          <div className="relative flex items-center justify-center">
+            <svg className="transform -rotate-90 w-24 h-24">
+              <circle
+                strokeWidth="4"
+                stroke="#cbd5e1"
+                strokeDasharray="6 4"
+                strokeLinecap="round"
+                fill="transparent"
+                r={radius}
+                cx="48"
+                cy="48"
+              />
+            </svg>
+            <div className="absolute flex items-center justify-center">
+              <Sparkles size={28} className="text-indigo-300" />
+            </div>
+          </div>
+        );
+      }
       
       return (
         <div className="relative flex items-center justify-center">
@@ -310,7 +338,9 @@ const SidebarSkeleton = ({ phase }) => (
                                 </div>
                             )}
                         </div>
-                        <span className={`text-sm font-bold ${visTier.text}`}>{listingVisibility || 0}</span>
+                        <span className={`text-sm font-bold ${isPreAnalysis ? 'text-slate-400' : visTier.text}`}>
+                          {isPreAnalysis ? '--' : (listingVisibility || 0)}
+                        </span>
                     </div>
                     <MiniGauge value={listingVisibility} tier={visTier} />
                 </div>
@@ -320,7 +350,9 @@ const SidebarSkeleton = ({ phase }) => (
                          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
                            <Target size={14} className="text-slate-400" /> Relevance
                          </span>
-                         <span className={`text-sm font-bold ${relTier.text}`}>{listingRelevance || 0}</span>
+                         <span className={`text-sm font-bold ${isPreAnalysis ? 'text-slate-400' : relTier.text}`}>
+                           {isPreAnalysis ? '--' : (listingRelevance || 0)}
+                         </span>
                     </div>
                     <MiniGauge value={listingRelevance} tier={relTier} />
                 </div>
@@ -330,7 +362,9 @@ const SidebarSkeleton = ({ phase }) => (
                          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
                            <ShoppingCart size={14} className="text-slate-400" /> Conversion
                          </span>
-                         <span className={`text-sm font-bold ${convTier.text}`}>{listingConversion || 0}</span>
+                         <span className={`text-sm font-bold ${isPreAnalysis ? 'text-slate-400' : convTier.text}`}>
+                           {isPreAnalysis ? '--' : (listingConversion || 0)}
+                         </span>
                     </div>
                     <MiniGauge value={listingConversion} tier={convTier} />
                 </div>
@@ -340,7 +374,9 @@ const SidebarSkeleton = ({ phase }) => (
                          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
                            <Swords size={14} className="text-slate-400" /> Competition
                          </span>
-                         <span className={`text-sm font-bold ${compTier.text}`}>{listingCompetition || 0}</span>
+                         <span className={`text-sm font-bold ${isPreAnalysis ? 'text-slate-400' : compTier.text}`}>
+                           {isPreAnalysis ? '--' : (listingCompetition || 0)}
+                         </span>
                     </div>
                     <MiniGauge value={listingCompetition} tier={compTier} />
                 </div>
@@ -356,14 +392,16 @@ const SidebarSkeleton = ({ phase }) => (
                    <DollarSign 
                       key={index} 
                       size={24} 
-                      className={`transition-colors duration-500 ${index <= filledDollars ? profitTier.text : 'text-slate-200'}`} 
-                      strokeWidth={index <= filledDollars ? 3 : 2}
+                      className={`transition-colors duration-500 ${!isPreAnalysis && index <= filledDollars ? profitTier.text : 'text-slate-200'}`} 
+                      strokeWidth={!isPreAnalysis && index <= filledDollars ? 3 : 2}
                    />
                 ))}
             </div>
             
             <div className="flex items-baseline gap-1.5 mt-1">
-                 <span className={`text-3xl font-black ${profitTier.text}`}>{profitScore}</span>
+                 <span className={`text-3xl font-black ${isPreAnalysis ? 'text-slate-400' : profitTier.text}`}>
+                   {isPreAnalysis ? '--' : profitScore}
+                 </span>
                  <span className="text-sm font-medium text-slate-400">/100</span>
             </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import clsx from 'clsx';
@@ -16,6 +16,14 @@ const Accordion = ({
     
     const isControlled = controlledIsOpen !== undefined;
     const isOpen = isControlled ? controlledIsOpen : internalIsOpen;
+
+    // Respond to defaultOpen changes (e.g. when results load after mount)
+    // Only applies in uncontrolled mode and only opens — never auto-closes
+    useEffect(() => {
+        if (!isControlled && defaultOpen && !internalIsOpen) {
+            setInternalIsOpen(true);
+        }
+    }, [defaultOpen]);
 
     const handleToggle = () => {
         if (isControlled && onToggle) {

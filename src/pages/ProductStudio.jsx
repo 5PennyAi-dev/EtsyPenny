@@ -162,9 +162,23 @@ const ProductStudio = () => {
     };
   };
 
+  // Always-fresh ref for values used inside memoized/async handlers — avoids stale closure issues
+  const latestRef = useRef({});
+  latestRef.current = {
+    listingId,
+    results,
+    globalEvals,
+    activeMode,
+    userDefaults,
+    strategySelections,
+    visualAnalysis,
+  };
+
   // Refs to track background SEO completion (avoids stale closures)
   const isWaitingForSeoRef = useRef(false);
   const seoTriggeredAtRef = useRef(null); // ISO timestamp captured when analysis starts
+  const shouldAutoResetPoolRef = useRef(false); // Flag: auto-call resetPool after generate_seo completes
+  const [postSeoTrigger, setPostSeoTrigger] = useState(0); // Incremented to fire post-SEO effect with fresh state
   
   // Refs to track background Image Analysis
   const isWaitingForImageAnalysisRef = useRef(false);
@@ -175,14 +189,12 @@ const ProductStudio = () => {
     if (!listingId) return;
 
     // Shared handler — called by whichever mechanism detects completion first
-    const handleSeoDone = async () => {
+    // Uses setPostSeoTrigger to hand off to a fresh-state useEffect, avoiding stale closure issues
+    const handleSeoDone = () => {
       if (!isWaitingForSeoRef.current) return; // Already handled
       isWaitingForSeoRef.current = false;
       seoTriggeredAtRef.current = null;
-      toast.success("SEO Analysis completed! Loading results...");
-      await handleLoadListing(listingId);
-      setIsInsightLoading(false);
-      setIsLoading(false);
+      setPostSeoTrigger(t => t + 1); // Delegate to post-SEO effect (has fresh state)
     };
 
     // Helper: We now rely on database state resets instead of timestamps to avoid clock skew bugs.
@@ -283,6 +295,37 @@ const ProductStudio = () => {
       clearInterval(pollInterval);
     };
   }, [listingId]);
+
+  // Post-SEO completion effect — runs with fresh state (no stale closures)
+  // Triggered by handleSeoDone via setPostSeoTrigger
+  useEffect(() => {
+    if (postSeoTrigger === 0 || !listingId) return;
+
+    const runPostSeoFlow = async () => {
+      toast.success("SEO Analysis completed! Loading results...");
+      await handleLoadListing(listingId);
+      setIsInsightLoading(false);
+      setIsLoading(false);
+
+      // Auto-call resetPool with current strategy parameters
+      if (shouldAutoResetPoolRef.current) {
+        shouldAutoResetPoolRef.current = false;
+        const params = userDefaults
+          ? {
+              Volume: userDefaults.param_volume,
+              Competition: userDefaults.param_competition,
+              Transaction: userDefaults.param_transaction,
+              Niche: userDefaults.param_niche,
+              CPC: userDefaults.param_cpc,
+            }
+          : getStrategyValues(strategySelections);
+        await handleApplyStrategy(params);
+      }
+    };
+
+    runPostSeoFlow();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postSeoTrigger]);
 
   const ensureProductType = async (formData) => {
     if (formData.product_type_id) return formData.product_type_id;
@@ -721,12 +764,14 @@ const ProductStudio = () => {
             console.error("Webhook trigger failed:", err);
             toast.error("Failed to start analysis. Check your connection.");
             isWaitingForSeoRef.current = false;
+            shouldAutoResetPoolRef.current = false;
             setIsInsightLoading(false);
         });
 
         // Signal the Realtime listener to watch for completion
         seoTriggeredAtRef.current = new Date().toISOString();
         isWaitingForSeoRef.current = true;
+        shouldAutoResetPoolRef.current = true; // Auto-call resetPool once SEO completes
 
         toast.success("SEO Analysis started in the background! You can safely close this page.");
         
@@ -1175,20 +1220,32 @@ const ProductStudio = () => {
   const [isAddingKeyword, setIsAddingKeyword] = useState(false);
 
   const handleAddCustomKeyword = async (newKeyword, onSuccess) => {
-      if (!newKeyword || !results || !results.analytics) return;
-      
-      const currentListingId = listingId || results?.listing_id;
+      if (!newKeyword) return;
+
+      const currentListingId = listingId || latestRef.current.listingId;
       if (!currentListingId) {
           toast.error("Error: Missing listing ID");
           return;
       }
 
+      // Fetch existing tags directly from DB — avoids stale closure/ref issues entirely
+      const { data: existingTags, error: fetchTagsErr } = await supabase
+          .from('listing_seo_stats')
+          .select('tag')
+          .eq('listing_id', currentListingId)
+          .eq('is_current_pool', true);
+      
+      if (fetchTagsErr) {
+          console.error("Failed to fetch existing tags:", fetchTagsErr);
+          toast.error("Failed to check for duplicates. Please try again.");
+          return;
+      }
+
       const normalizedKeyword = newKeyword.toLowerCase();
-      // 1. Check for duplicates in current analytics table
-      const isDuplicate = results.analytics.some(a => a.keyword.toLowerCase() === normalizedKeyword);
+      const isDuplicate = (existingTags || []).some(row => row.tag.toLowerCase() === normalizedKeyword);
       if (isDuplicate) {
            toast.error(`"${newKeyword}" is already in the performance table.`);
-           if (onSuccess) onSuccess(); // close row anyway
+           if (onSuccess) onSuccess();
            return;
       }
 
@@ -1216,7 +1273,7 @@ const ProductStudio = () => {
                   concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
               },
               payload: {
-                  image_url: results?.imageUrl,
+                  image_url: results?.imageUrl || latestRef.current.results?.imageUrl,
                   // Visual analysis fields
                   visual_aesthetic: visualAnalysis.aesthetic,
                   visual_typography: visualAnalysis.typography,
@@ -1305,13 +1362,13 @@ const ProductStudio = () => {
                newStat.evaluation_id = currentEvalId;
           }
 
-          // 4. Save to DB
-          const { error: insertError } = await supabase
+          // 4. Save to DB (upsert to prevent duplicates on listing_id + tag)
+          const { error: upsertError } = await supabase
               .from('listing_seo_stats')
-              .insert([newStat]);
+              .upsert([newStat], { onConflict: 'listing_id,tag' });
               
-          if (insertError) {
-              console.error("Insert Error (handleAddCustomKeyword):", insertError);
+          if (upsertError) {
+              console.error("Upsert Error (handleAddCustomKeyword):", upsertError);
               throw new Error("Failed to save keyword to database.");
           }
 
@@ -1369,16 +1426,30 @@ const ProductStudio = () => {
   const [isAddingBatchKeywords, setIsAddingBatchKeywords] = useState(false);
 
   const handleAddBatchKeywords = async (keywordsArray, onProgress) => {
-      if (!keywordsArray?.length || !results || !results.analytics) return;
+      // Always read fresh state from latestRef — avoids stale closure issues in memoized callbacks
+      const {
+        listingId: freshListingId,
+        results: freshResults,
+        globalEvals: freshGlobalEvals,
+        activeMode: freshActiveMode,
+        userDefaults: freshUserDefaults,
+        strategySelections: freshStrategySelections,
+        visualAnalysis: freshVisualAnalysis,
+      } = latestRef.current;
+
+      if (!keywordsArray?.length || !freshResults || !freshResults.analytics) {
+          if (!freshResults) toast.error("No analysis results loaded. Please try again.");
+          return;
+      }
       
-      const currentListingId = listingId || results?.listing_id;
+      const currentListingId = freshListingId || freshResults?.listing_id;
       if (!currentListingId) {
           toast.error("Error: Missing listing ID");
           return;
       }
 
       // Filter out duplicates — keywordsArray now contains full objects with .tag property
-      const existingSet = new Set(results.analytics.map(a => a.keyword.toLowerCase()));
+      const existingSet = new Set(freshResults.analytics.map(a => a.keyword.toLowerCase()));
       const newKeywordObjects = keywordsArray.filter(kw => !existingSet.has(kw.tag.toLowerCase()));
       if (newKeywordObjects.length === 0) {
           toast.info("All selected keywords are already in the performance table.");
@@ -1442,20 +1513,20 @@ const ProductStudio = () => {
                   }
               ],
               payload: {
-                  image_url: results?.imageUrl,
-                  visual_aesthetic: visualAnalysis.aesthetic,
-                  visual_typography: visualAnalysis.typography,
-                  visual_graphics: visualAnalysis.graphics,
-                  visual_colors: visualAnalysis.colors,
-                  visual_target_audience: visualAnalysis.target_audience,
-                  visual_overall_vibe: visualAnalysis.overall_vibe,
+                  image_url: freshResults?.imageUrl,
+                  visual_aesthetic: freshVisualAnalysis.aesthetic,
+                  visual_typography: freshVisualAnalysis.typography,
+                  visual_graphics: freshVisualAnalysis.graphics,
+                  visual_colors: freshVisualAnalysis.colors,
+                  visual_target_audience: freshVisualAnalysis.target_audience,
+                  visual_overall_vibe: freshVisualAnalysis.overall_vibe,
                   categorization: formatCategorizationPayload(formData),
                   product_details: {
                       product_type: formData.product_type_name || "Product",
                       tone: formData.tone_name || "Engaging",
                       client_description: formData.context || "",
                       tag_count: formData.tag_count,
-                      seo_mode: formData.seo_mode || activeMode || 'balanced'
+                      seo_mode: formData.seo_mode || freshActiveMode || 'balanced'
                   },
                   shop_context: {
                       shop_name: profile?.shop_name,
@@ -1551,12 +1622,12 @@ const ProductStudio = () => {
           }
 
           if (newStats.length > 0) {
-              // Batch insert to DB
-              const { error: insertError } = await supabase
+              // Batch upsert to DB (prevent duplicates on listing_id + tag)
+              const { error: upsertError } = await supabase
                   .from('listing_seo_stats')
-                  .insert(newStats);
-              if (insertError) {
-                  console.error("Batch insert error:", insertError);
+                  .upsert(newStats, { onConflict: 'listing_id,tag' });
+              if (upsertError) {
+                  console.error("Batch upsert error:", upsertError);
                   throw new Error("Failed to save keywords to database.");
               }
 
@@ -2119,8 +2190,10 @@ const ProductStudio = () => {
         target_audience: "",
         overall_vibe: ""
     });
-    setFormKey(prev => prev + 1); // Reset form state
-    setIsNewListingActive(true); // Manually activate the form for a new session
+    setIsImageAnalyzedState(false); // Reset: new listing has no image analysis yet
+    setIsAnalyzingDesign(false);    // Also clear any in-progress spinner
+    setFormKey(prev => prev + 1);   // Reset form state
+    setIsNewListingActive(true);    // Manually activate the form for a new session
   };
 
   const handleLoadListing = async (listingId) => {
@@ -2430,54 +2503,6 @@ const ProductStudio = () => {
     );
   };
 
-  // --- ADD COMPETITOR KEYWORD TO PERFORMANCE ---
-  const handleAddKeywordToPerformance = async (keywordData) => {
-    // Fix: Use state listingId instead of results.listing_id which might be missing
-    const currentListingId = listingId || results?.listing_id;
-    
-    if (!currentListingId) {
-        console.error("Missing listing ID. State:", { listingId, results });
-        toast.error("Error: Missing listing ID");
-        return;
-    }
-
-    try {
-        const statsToInsert = {
-            listing_id: currentListingId,
-            tag: keywordData.keyword,
-            search_volume: keywordData.volume,
-            competition: keywordData.competition,
-            opportunity_score: keywordData.score,
-            is_competition: false,
-            volume_history: keywordData.volume_history || [],
-            is_trending: keywordData.is_trending,
-            is_evergreen: keywordData.is_evergreen,
-            is_promising: keywordData.is_promising
-        };
-
-
-
-        const { error } = await supabase
-            .from('listing_seo_stats')
-            .insert(statsToInsert);
-
-        if (error) {
-            console.error("Supabase insert error:", error);
-            toast.error(`Failed to add keyword: ${error.message}`);
-            return;
-        }
-
-        toast.success(`Keyword "${keywordData.keyword}" added!`);
-        
-        // Refresh data
-        await handleLoadListing(currentListingId);
-
-    } catch (err) {
-        console.error("Unexpected error in handleAddKeywordToPerformance:", err);
-        toast.error("An unexpected error occurred");
-    }
-  };
-
   // --- DELETE KEYWORD FROM PERFORMANCE POOL ---
   const handleDeleteKeyword = async (keywordToRemove) => {
       const currentListingId = listingId || results?.listing_id;
@@ -2488,16 +2513,16 @@ const ProductStudio = () => {
       }
 
       try {
-          // Update DB to soft delete (set is_current_pool = false)
+          // Hard delete the keyword row from listing_seo_stats
           const { error } = await supabase
               .from('listing_seo_stats')
-              .update({ is_current_pool: false })
+              .delete()
               .eq('listing_id', currentListingId)
               .eq('tag', keywordToRemove);
 
           if (error) {
-              console.error("Supabase update error:", error);
-              toast.error(`Failed to remove keyword: ${error.message}`);
+              console.error("Supabase delete error:", error);
+              toast.error(`Failed to delete keyword: ${error.message}`);
               return;
           }
 
@@ -2513,7 +2538,7 @@ const ProductStudio = () => {
           // Also remove it from allSeoStats cache if present
           setAllSeoStats(prev => prev.filter(item => item.tag !== keywordToRemove));
 
-          toast.success(`Removed "${keywordToRemove}" from current pool`);
+          toast.success(`Deleted "${keywordToRemove}" from listing`);
       } catch (err) {
           console.error("Unexpected error in handleDeleteKeyword:", err);
           toast.error("Failed to remove keyword");
@@ -2738,7 +2763,8 @@ const ProductStudio = () => {
     sub_niche: analysisContext?.sub_niche_name || analysisContext?.sub_niche || ''
   }), [analysisContext]);
 
-  const MemoizedResultsDisplay = useMemo(() => (
+  // Render ResultsDisplay directly (no useMemo) — ensures all callback props are always fresh
+  const MemoizedResultsDisplay = (
     <ResultsDisplay 
       results={results} 
       onGenerateDraft={handleGenerateDraft}
@@ -2777,7 +2803,7 @@ const ProductStudio = () => {
     >
         <RecentOptimizations onViewResults={handleLoadListing} />
     </ResultsDisplay>
-  ), [results, isGeneratingDraft, isInsightLoading, isSniperLoading, isCompetitionLoading, isAddingKeyword, isRecalculating, isApplyingStrategy, strategySelections, resetSelectionKey, activeMode, globalEvals, user, currentListingContext, handleDeleteKeyword, handleTogglePin, handleScoreUpdate]);
+  );
 
   return (
     <Layout>

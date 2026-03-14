@@ -407,7 +407,8 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
             {isLoading === 'triggering' && 'STARTING...'}
             {isLoading === true && 'ANALYZING...'} 
             {!isLoading && (
-                !isImageAnalysed ? 'GENERATE SEO DATA' :
+                !isImageSelected ? 'SELECT AN IMAGE FIRST' :
+                !isImageAnalysed ? 'ANALYZE IMAGE FIRST ↑' :
                 !productTypeName ? 'SELECT PRODUCT TYPE' :
                 'ANALYZE (1 Credit)'
             )}

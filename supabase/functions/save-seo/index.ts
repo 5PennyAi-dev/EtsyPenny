@@ -142,27 +142,26 @@ serve(async (req) => {
             evaluation_id: evaluationId
         }));
 
-        if (evaluationId) {
-            // Delete old primary keywords for this mode
-            const { error: delError } = await supabaseClient
-                .from('listing_seo_stats')
-                .delete()
-                .eq('evaluation_id', evaluationId)
-                .eq('is_competition', false);
+        // Delete old AI-generated keywords for this listing, but preserve user-added ones
+        const { error: delError } = await supabaseClient
+            .from('listing_seo_stats')
+            .delete()
+            .eq('listing_id', listing_id)
+            .eq('is_competition', false)
+            .or('is_user_added.is.null,is_user_added.eq.false');
 
-            if (delError) {
-                console.error(`Delete Stats Error (${mode}):`, delError);
-                throw delError;
-            }
+        if (delError) {
+            console.error(`Delete Stats Error (${mode}):`, delError);
+            throw delError;
         }
 
         if (statsToInsert.length > 0) {
             const { error: insError } = await supabaseClient
                 .from('listing_seo_stats')
-                .insert(statsToInsert);
+                .upsert(statsToInsert, { onConflict: 'listing_id,tag' });
             
             if (insError) {
-                console.error(`Insert Stats Error (${mode}):`, insError);
+                console.error(`Upsert Stats Error (${mode}):`, insError);
                 throw insError;
             }
         }
