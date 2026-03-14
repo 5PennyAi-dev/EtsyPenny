@@ -104,6 +104,9 @@ const ProductStudio = () => {
   // Active Session State for "New Listing" flow
   const [isNewListingActive, setIsNewListingActive] = useState(false);
 
+  // SEO Analysis Accordion open/close state
+  const [isSeoAnalysisOpen, setIsSeoAnalysisOpen] = useState(false);
+
   // No changes to imports
 
   // ... (keep useEffect for realtime as a backup or removal? Let's keep it but focusing on the direct response)
@@ -302,13 +305,9 @@ const ProductStudio = () => {
     if (postSeoTrigger === 0 || !listingId) return;
 
     const runPostSeoFlow = async () => {
-      toast.success("SEO Analysis completed! Loading results...");
-      await handleLoadListing(listingId);
-      setIsInsightLoading(false);
-      setIsLoading(false);
-
-      // Auto-call resetPool with current strategy parameters
       if (shouldAutoResetPoolRef.current) {
+        // Skip intermediate load — go straight to resetPool, which calls handleLoadListing at the end
+        toast.success("SEO Analysis completed! Optimizing keyword pool...");
         shouldAutoResetPoolRef.current = false;
         const params = userDefaults
           ? {
@@ -319,7 +318,15 @@ const ProductStudio = () => {
               CPC: userDefaults.param_cpc,
             }
           : getStrategyValues(strategySelections);
-        await handleApplyStrategy(params);
+        await handleApplyStrategy(params); // Single final load happens inside here
+        setIsInsightLoading(false);
+        setIsLoading(false);
+      } else {
+        // No resetPool planned — do the normal single load
+        toast.success("SEO Analysis completed! Loading results...");
+        await handleLoadListing(listingId);
+        setIsInsightLoading(false);
+        setIsLoading(false);
       }
     };
 
@@ -623,6 +630,7 @@ const ProductStudio = () => {
         setIsLoading(false);
         setShowResults(true);
         setIsFormCollapsed(true);
+        setIsSeoAnalysisOpen(true); // Auto-expand SEO Analysis accordion
         
         
         let publicUrl = formData.existingImageUrl;
@@ -2194,6 +2202,7 @@ const ProductStudio = () => {
     setIsAnalyzingDesign(false);    // Also clear any in-progress spinner
     setFormKey(prev => prev + 1);   // Reset form state
     setIsNewListingActive(true);    // Manually activate the form for a new session
+    setIsSeoAnalysisOpen(false);    // Collapse SEO Analysis accordion for fresh start
   };
 
   const handleLoadListing = async (listingId) => {
@@ -2406,6 +2415,7 @@ const ProductStudio = () => {
 
       setShowResults(true);
       setIsFormCollapsed(true);
+      setIsSeoAnalysisOpen(true); // Auto-expand SEO Analysis accordion when loading a listing
       setIsLoading(false);
 
       // Check for pending Image Analysis to resume polling and spinner
@@ -2796,6 +2806,10 @@ const ProductStudio = () => {
       activeMode={activeMode}
       onModeChange={handleModeChange}
       availableModes={globalEvals.map(e => e.seo_mode).filter(Boolean)}
+
+      // SEO Analysis Accordion Props
+      seoAnalysisOpen={isSeoAnalysisOpen}
+      onSeoAnalysisOpenChange={setIsSeoAnalysisOpen}
 
       // Favorite Keyword Bank Props
       user={user}

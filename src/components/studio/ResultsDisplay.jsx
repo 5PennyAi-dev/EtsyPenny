@@ -432,6 +432,9 @@ const SidebarSkeleton = ({ phase }) => (
     activeMode,
     onModeChange,
     availableModes,
+    // SEO Analysis Accordion Props
+    seoAnalysisOpen,
+    onSeoAnalysisOpenChange,
     // Favorite Keyword Bank Props
     user,
     currentListing
@@ -786,47 +789,74 @@ const SidebarSkeleton = ({ phase }) => (
           {/* --- MAIN CONTENT (Fluid width) --- */}
           <div className="flex-1 min-w-0 space-y-8">
   
-              {/* Strategy Switcher Removed per User Request */}
-              {/* Hero Audit Header with integrated SEO Sniper */}
-              {isInsightLoading ? (
-                  <AuditSkeleton />
-              ) : (results && (
-                  <AuditHeader
-                      score={results.listing_strength ?? results.global_strength}
-                      imageUrl={results.imageUrl}
-                      statusLabel={results.status_label}
-                      strategicVerdict={results.strategic_verdict}
-                      improvementPriority={results.improvement_priority}
-                      listingVisibility={results.listing_visibility}
-                      listingEstMarketReach={results.listing_est_market_reach}
-                      listingConversion={results.listing_conversion}
-                      listingRelevance={results.listing_relevance}
-                      listingCompetition={results.listing_competition}
-                      listingProfit={results.listing_profit}
-                      improvementPlanRemove={results.improvement_plan_remove}
-                      improvementPlanAdd={results.improvement_plan_add}
-                      primaryAction={results.improvement_plan_primary_action}
-                  />
-              ))}
+              {/* === PARENT: SEO Analysis Accordion === */}
+              <Accordion
+                  isOpen={seoAnalysisOpen}
+                  onToggle={onSeoAnalysisOpenChange}
+                  className="border-indigo-100/50"
+                  title={
+                      <div className="flex items-center gap-3">
+                          <BarChart3 size={16} className="text-indigo-600" />
+                          <span className="text-sm font-bold text-slate-900">SEO Analysis</span>
+                          {results?.listing_strength != null && (
+                              <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${
+                                  (results.listing_strength ?? results.global_strength) >= 80
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : (results.listing_strength ?? results.global_strength) >= 50
+                                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                              }`}>
+                                  Score: {results.listing_strength ?? results.global_strength}
+                              </span>
+                          )}
+                          {isInsightLoading && (
+                              <Loader2 size={14} className="text-indigo-500 animate-spin" />
+                          )}
+                      </div>
+                  }
+              >
+                <div className="p-4 lg:p-6 space-y-6">
 
-              {/* Strategy Tuner Accordion — between AuditHeader and Keyword Table */}
-              {results && (
-                  <StrategyTuner
-                      listingId={listingId}
-                      onApplyStrategy={onApplyStrategy}
-                      isApplyingStrategy={isApplyingStrategy}
-                      selections={strategySelections}
-                      onSelectionsChange={onStrategySelectionsChange}
-                  />
-              )}
+                  {/* Hero Audit Header with integrated SEO Sniper */}
+                  {isInsightLoading ? (
+                      <AuditSkeleton />
+                  ) : (results && (
+                      <AuditHeader
+                          score={results.listing_strength ?? results.global_strength}
+                          imageUrl={results.imageUrl}
+                          statusLabel={results.status_label}
+                          strategicVerdict={results.strategic_verdict}
+                          improvementPriority={results.improvement_priority}
+                          listingVisibility={results.listing_visibility}
+                          listingEstMarketReach={results.listing_est_market_reach}
+                          listingConversion={results.listing_conversion}
+                          listingRelevance={results.listing_relevance}
+                          listingCompetition={results.listing_competition}
+                          listingProfit={results.listing_profit}
+                          improvementPlanRemove={results.improvement_plan_remove}
+                          improvementPlanAdd={results.improvement_plan_add}
+                          primaryAction={results.improvement_plan_primary_action}
+                      />
+                  ))}
 
-            {/* 1. Full Width Performance Table */}
-            {isInsightLoading ? (
-                <TableSkeleton 
-                    message={isInsightLoading === 'insight' ? "Insight generation" : "Generating SEO data"}
-                    subMessage={isInsightLoading === 'insight' ? "Analyzing keywords and calculating your listing score." : "Analyzing search volume, competition, and trends."}
-                />
-            ) : (
+                  {/* Strategy Tuner — between AuditHeader and Keyword Table */}
+                  {results && (
+                      <StrategyTuner
+                          listingId={listingId}
+                          onApplyStrategy={onApplyStrategy}
+                          isApplyingStrategy={isApplyingStrategy}
+                          selections={strategySelections}
+                          onSelectionsChange={onStrategySelectionsChange}
+                      />
+                  )}
+
+                  {/* Keyword Performance Table */}
+                  {isInsightLoading ? (
+                      <TableSkeleton 
+                          message={isInsightLoading === 'insight' ? "Insight generation" : "Generating SEO data"}
+                          subMessage={isInsightLoading === 'insight' ? "Analyzing keywords and calculating your listing score." : "Analyzing search volume, competition, and trends."}
+                      />
+                  ) : (
                 <div className={!results ? "opacity-50 grayscale pointer-events-none" : ""}>
                 <Accordion
                     defaultOpen={!!results} // Collapsed if no results
@@ -1295,6 +1325,8 @@ const SidebarSkeleton = ({ phase }) => (
             </div>
             )}
 
+                </div>
+              </Accordion>
 
         {/* Injected Content (e.g. Recent History) */}
         {children}

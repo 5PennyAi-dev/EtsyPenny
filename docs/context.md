@@ -1,5 +1,5 @@
-# 🧠 Project Context: EtsyPenny (5PennyAi)
-*Dernière mise à jour : 2026-02-21 (Session 7)*
+# 🧠 Project Context: EtsyPenny (PennySEO)
+*Dernière mise à jour : 2026-03-14*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -529,6 +529,15 @@
     - **Fix (Accordion.jsx)**: Added `useEffect` to auto-open accordion when `defaultOpen` transitions from `false` to `true` (previously only checked on mount).
     - **Fix (handleAddBatchKeywords)**: Updated payload to use `freshResults` and `freshVisualAnalysis` from `latestRef` instead of stale closure variables.
     - **Database Migration**: Added unique constraint on `listing_seo_stats(listing_id, tag)` to support upsert operations (`20260314_unique_listing_tag_constraint.sql`).
+
+- **SEO Analysis Parent Accordion** (2026-03-14):
+    - **Goal**: Reduce visual clutter in the main content area by wrapping the entire SEO results section (AuditHeader + StrategyTuner + Keyword Performance table) inside a single collapsible parent `<Accordion>` in `ResultsDisplay.jsx`.
+    - **Header**: Displays "SEO Analysis" label with `BarChart3` icon, a color-coded score badge (emerald ≥80, amber 50-79, rose <50), and a loading spinner when insight generation is in progress.
+    - **Controlled State**: `isSeoAnalysisOpen` state lifted to `ProductStudio.jsx` and passed down as `seoAnalysisOpen` / `onSeoAnalysisOpenChange` props. Auto-opens on analysis completion (`handleAnalyze`) and listing load (`handleLoadListing`). Auto-closes on "New Listing" click for a clean slate.
+
+- **Post-SEO Flow Optimization** (2026-03-14):
+    - **Problem**: After `save-seo` edge function completed, the `postSeoTrigger` effect would first call `handleLoadListing` (fetching full data), then immediately call `handleApplyStrategy` (which also calls `handleLoadListing` internally), resulting in a redundant double-load.
+    - **Fix**: When `shouldAutoResetPoolRef.current` is true, the post-SEO flow now skips the intermediate `handleLoadListing` and goes directly to `handleApplyStrategy`, which performs its own single final load. Toast message updated to "Optimizing keyword pool..." for the auto-reset path.
 
 ### Immediate Next Steps
 1.  Verify end-to-end flow of saving a new custom product type and generating an SEO strategy.
