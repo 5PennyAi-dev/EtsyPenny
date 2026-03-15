@@ -1,20 +1,11 @@
 
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Sparkles, Package, Settings, ChevronRight, ChevronDown, Lock } from 'lucide-react';
+import { Sparkles, Package, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import ProductTypeCombobox from './ProductTypeCombobox';
 // import SmartNicheAutocomplete from './SmartNicheAutocomplete';
-
-const TONE_OPTIONS = [
-  { value: 'auto', label: '✨ Auto-detect from image' },
-  { value: 'professional', label: 'Professional' },
-  { value: 'funny', label: 'Funny' },
-  { value: 'sarcastic', label: 'Sarcastic' },
-  { value: 'minimalist', label: 'Minimalist' },
-  { value: 'emotional', label: 'Emotional' },
-];
 
 const MAX_TAGS_LIMIT = 13;
 
@@ -25,21 +16,21 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
   const [groupedProductTypes, setGroupedProductTypes] = useState([]);
 
   // Selection State
-  const [tone, setTone] = useState('auto');
-  const [tagLimit, setTagLimit] = useState(MAX_TAGS_LIMIT);
   const [seoMode, setSeoMode] = useState('balanced');
   
   // Niche Selection State
   const [themeName, setThemeName] = useState("");
+  const [themeId, setThemeId] = useState("");
+  
   const [nicheName, setNicheName] = useState("");
+  const [nicheId, setNicheId] = useState("");
+  
   const [subNicheName, setSubNicheName] = useState("");
 
-  // System Taxonomy State
-  const [systemThemes, setSystemThemes] = useState([]);
-  const [systemNiches, setSystemNiches] = useState([]);
+  // System/Custom Taxonomy State
+  const [themes, setThemes] = useState([]);
+  const [niches, setNiches] = useState([]);
 
-  // Advanced section toggle
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
   // Product Type State — name-based with optional ID
   const [productTypeName, setProductTypeName] = useState("");
@@ -52,12 +43,22 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
     const fetchData = async () => {
       if (!user) return;
       
-      // Fetch product types and system taxonomy concurrently
+      // Fetch product types and combined taxonomy concurrently
       const [categoriesRes, customTypesRes, themesRes, nichesRes] = await Promise.all([
         supabase.from('product_categories').select('id, name, product_types(id, name)').order('name'),
         supabase.from('user_custom_product_types').select('id, name').eq('user_id', user.id).order('name'),
-        supabase.from('system_themes').select('name').eq('is_active', true).order('name'),
-        supabase.from('system_niches').select('name').eq('is_active', true).order('name')
+        supabase.from('v_combined_themes')
+            .select('id, name, description, origin, user_id, is_active')
+            .or(`user_id.eq.${user.id},origin.eq.system`)
+            .eq('is_active', true)
+            .order('origin', { ascending: false }) // 'custom' comes before 'system'
+            .order('name', { ascending: true }),
+        supabase.from('v_combined_niches')
+            .select('id, name, description, origin, user_id, is_active')
+            .or(`user_id.eq.${user.id},origin.eq.system`)
+            .eq('is_active', true)
+            .order('origin', { ascending: false }) // 'custom' comes before 'system'
+            .order('name', { ascending: true })
       ]);
       
       let allGrouped = [];
@@ -87,8 +88,8 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
 
       setGroupedProductTypes(allGrouped);
 
-      if (themesRes.data) setSystemThemes(themesRes.data);
-      if (nichesRes.data) setSystemNiches(nichesRes.data);
+      if (themesRes.data) setThemes(themesRes.data);
+      if (nichesRes.data) setNiches(nichesRes.data);
 
     };
     fetchData();
@@ -111,8 +112,6 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
             setProductTypeName(initialValues.product_type_text || initialValues.product_type_name);
           }
 
-          setTone(initialValues.tone_name ? initialValues.tone_name.toLowerCase() : 'auto');
-          setTagLimit(initialValues.tag_count ? Math.min(initialValues.tag_count, MAX_TAGS_LIMIT) : MAX_TAGS_LIMIT);
           setSeoMode(initialValues.seo_mode || 'balanced');
           
           if (contextRef.current) {
@@ -134,9 +133,38 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
     }
   }, [productTypeId, groupedProductTypes]);
 
+  // Resolve dynamic IDs when name or lists change (for backwards compat and initial load)
+  useEffect(() => {
+     if (themeName && themes.length > 0 && !themeId) {
+         const found = themes.find(t => t.name === themeName);
+         if (found) setThemeId(found.id);
+     }
+  }, [themeName, themes, themeId]);
+  
+  useEffect(() => {
+     if (nicheName && niches.length > 0 && !nicheId) {
+         const found = niches.find(n => n.name === nicheName);
+         if (found) setNicheId(found.id);
+     }
+  }, [nicheName, niches, nicheId]);
+
   const handleProductTypeChange = (id, name) => {
       setProductTypeId(id);
       setProductTypeName(name);
+  };
+  
+  const handleThemeChange = (e) => {
+      const selectedId = e.target.value;
+      setThemeId(selectedId);
+      const themeObj = themes.find(t => t.id === selectedId);
+      setThemeName(themeObj ? themeObj.name : selectedId); // fallback back to string if it's a legacy saved value
+  };
+
+  const handleNicheChange = (e) => {
+      const selectedId = e.target.value;
+      setNicheId(selectedId);
+      const nicheObj = niches.find(n => n.id === selectedId);
+      setNicheName(nicheObj ? nicheObj.name : selectedId); // fallback back to string if it's a legacy saved value
   };
 
   const getFormData = () => {
@@ -150,9 +178,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
          return null;
     }
 
-    // Resolve tone label
-    const toneOption = TONE_OPTIONS.find(t => t.value === tone);
-    const resolvedToneName = tone === 'auto' ? 'Auto-detect' : (toneOption?.label || 'Auto-detect');
+    const resolvedToneName = 'Auto-detect';
     
     return {
       // Categorization (Text for AI & DB)
@@ -172,7 +198,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
       tone_name: resolvedToneName,
       
       ton_name: resolvedToneName, 
-      tag_count: Math.min(tagLimit, MAX_TAGS_LIMIT),
+      tag_count: MAX_TAGS_LIMIT,
       seo_mode: seoMode,
       
       context: contextRef.current.value
@@ -182,9 +208,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
   // Expose state to parent via ref
   useImperativeHandle(ref, () => ({
       getCurrentState: () => {
-          // Resolve tone label
-          const toneOption = TONE_OPTIONS.find(t => t.value === tone);
-          const resolvedToneName = tone === 'auto' ? 'Auto-detect' : (toneOption?.label || 'Auto-detect');
+          const resolvedToneName = 'Auto-detect';
 
           return {
               product_type_id: productTypeId,
@@ -193,7 +217,6 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
               context: contextRef.current?.value || "",
               
               theme_name: themeName,
-              niche_name: nicheName,
               niche_name: nicheName,
               sub_niche_name: subNicheName,
               seo_mode: seoMode
@@ -242,16 +265,36 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
                     <div className="relative">
                         <select
                             id="theme"
-                            value={themeName}
-                            onChange={(e) => setThemeName(e.target.value)}
-                            className={`w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all appearance-none text-sm ${!themeName ? 'text-slate-400' : 'text-slate-700'}`}
+                            value={themeId || themeName} // fallback to text for custom history
+                            onChange={handleThemeChange}
+                            className={`w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all appearance-none text-sm ${!themeId && !themeName ? 'text-slate-400' : 'text-slate-700'}`}
                         >
                             <option value="">Select a Theme...</option>
-                            {systemThemes.map(t => (
-                                <option key={t.name} value={t.name}>{t.name}</option>
-                            ))}
+                            
+                            {/* Group: User Custom */}
+                            {themes.some(t => t.origin === 'custom') && (
+                                <optgroup label="My Themes">
+                                    {themes.filter(t => t.origin === 'custom').map(t => (
+                                        <option key={t.id} value={t.id} title={t.description || ''}>
+                                            {t.name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            )}
+
+                            {/* Group: PennySEO Themes */}
+                            {themes.some(t => t.origin === 'system') && (
+                                <optgroup label="PennySEO Themes">
+                                    {themes.filter(t => t.origin === 'system').map(t => (
+                                        <option key={t.id} value={t.id} title={t.description || ''}>
+                                            {t.name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            )}
+
                             {/* Allow preserving a custom value not in the list (e.g., from history) */}
-                            {themeName && !systemThemes.some(t => t.name === themeName) && (
+                            {themeName && !themes.some(t => t.name === themeName) && (
                                 <option value={themeName}>{themeName}</option>
                             )}
                         </select>
@@ -265,16 +308,36 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
                     <div className="relative">
                         <select
                             id="niche"
-                            value={nicheName}
-                            onChange={(e) => setNicheName(e.target.value)}
-                            className={`w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all appearance-none text-sm ${!nicheName ? 'text-slate-400' : 'text-slate-700'}`}
+                            value={nicheId || nicheName} // fallback to text for custom history
+                            onChange={handleNicheChange}
+                            className={`w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all appearance-none text-sm ${!nicheId && !nicheName ? 'text-slate-400' : 'text-slate-700'}`}
                         >
                             <option value="">Select a Niche...</option>
-                            {systemNiches.map(n => (
-                                <option key={n.name} value={n.name}>{n.name}</option>
-                            ))}
+                            
+                            {/* Group: User Custom */}
+                            {niches.some(n => n.origin === 'custom') && (
+                                <optgroup label="My Niches">
+                                    {niches.filter(n => n.origin === 'custom').map(n => (
+                                        <option key={n.id} value={n.id} title={n.description || ''}>
+                                            {n.name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            )}
+
+                            {/* Group: PennySEO Niches */}
+                            {niches.some(n => n.origin === 'system') && (
+                                <optgroup label="PennySEO Niches">
+                                    {niches.filter(n => n.origin === 'system').map(n => (
+                                        <option key={n.id} value={n.id} title={n.description || ''}>
+                                            {n.name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            )}
+
                             {/* Allow preserving a custom value not in the list (e.g., from history) */}
-                            {nicheName && !systemNiches.some(n => n.name === nicheName) && (
+                            {nicheName && !niches.some(n => n.name === nicheName) && (
                                 <option value={nicheName}>{nicheName}</option>
                             )}
                         </select>
@@ -311,79 +374,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
         </div>
       </div>
 
-      {/* ADVANCED SEO SETTINGS — Collapsible */}
-      <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
-          <button
-            type="button"
-            onClick={() => setIsAdvancedOpen(prev => !prev)}
-            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-colors"
-          >
-            <span className="flex items-center gap-2">
-              <Settings size={14} className="text-slate-400" />
-              Advanced SEO Settings
-            </span>
-            <ChevronRight
-              size={16}
-              className={`text-slate-400 transition-transform duration-200 ${isAdvancedOpen ? 'rotate-90' : ''}`}
-            />
-          </button>
 
-          <div
-            className={`grid transition-all duration-300 ease-in-out ${isAdvancedOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
-          >
-            <div className="overflow-hidden">
-              <div className="px-4 pb-4 pt-1 space-y-4 border-t border-slate-200">
-
-                {/* Tone Override */}
-                <div className="space-y-1">
-                  <label htmlFor="tone" className="text-sm font-medium text-slate-700">Tone Override</label>
-                  <p className="text-xs text-slate-400">Leave on auto to let AI detect the best tone from your image.</p>
-                  <div className="relative">
-                    <select
-                      id="tone"
-                      value={tone}
-                      onChange={(e) => setTone(e.target.value)}
-                      className={`w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all appearance-none text-sm
-                        ${tone === 'auto' ? 'text-slate-400 italic' : 'text-slate-700'}`}
-                    >
-                      {TONE_OPTIONS.map((t) => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </select>
-                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Max Tags — Locked */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label htmlFor="tagLimit" className="text-sm font-medium text-slate-700">Max Tags</label>
-                    <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium">
-                      <Lock size={10} />
-                      Standard Plan: {MAX_TAGS_LIMIT} tags
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range"
-                      id="tagLimit"
-                      min="5"
-                      max={MAX_TAGS_LIMIT}
-                      value={tagLimit}
-                      onChange={(e) => setTagLimit(parseInt(e.target.value))}
-                      className="flex-1 h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-indigo-600"
-                    />
-                    <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg min-w-[44px] text-center">
-                      {tagLimit}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400">Upgrade to unlock up to 25 tags per listing.</p>
-                </div>
-
-              </div>
-            </div>
-          </div>
-      </div>
 
       {/* SEO Strategy Selector Removed per User Request */}
 

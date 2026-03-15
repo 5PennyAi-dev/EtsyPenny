@@ -180,7 +180,7 @@ const ProductStudio = () => {
   // Refs to track background SEO completion (avoids stale closures)
   const isWaitingForSeoRef = useRef(false);
   const seoTriggeredAtRef = useRef(null); // ISO timestamp captured when analysis starts
-  const shouldAutoResetPoolRef = useRef(false); // Flag: auto-call resetPool after generate_seo completes
+
   const [postSeoTrigger, setPostSeoTrigger] = useState(0); // Incremented to fire post-SEO effect with fresh state
   
   // Refs to track background Image Analysis
@@ -305,29 +305,10 @@ const ProductStudio = () => {
     if (postSeoTrigger === 0 || !listingId) return;
 
     const runPostSeoFlow = async () => {
-      if (shouldAutoResetPoolRef.current) {
-        // Skip intermediate load — go straight to resetPool, which calls handleLoadListing at the end
-        toast.success("SEO Analysis completed! Optimizing keyword pool...");
-        shouldAutoResetPoolRef.current = false;
-        const params = userDefaults
-          ? {
-              Volume: userDefaults.param_volume,
-              Competition: userDefaults.param_competition,
-              Transaction: userDefaults.param_transaction,
-              Niche: userDefaults.param_niche,
-              CPC: userDefaults.param_cpc,
-            }
-          : getStrategyValues(strategySelections);
-        await handleApplyStrategy(params); // Single final load happens inside here
-        setIsInsightLoading(false);
-        setIsLoading(false);
-      } else {
-        // No resetPool planned — do the normal single load
-        toast.success("SEO Analysis completed! Loading results...");
-        await handleLoadListing(listingId);
-        setIsInsightLoading(false);
-        setIsLoading(false);
-      }
+      toast.success("SEO Analysis completed! Loading results...");
+      await handleLoadListing(listingId);
+      setIsInsightLoading(false);
+      setIsLoading(false);
     };
 
     runPostSeoFlow();
@@ -772,14 +753,12 @@ const ProductStudio = () => {
             console.error("Webhook trigger failed:", err);
             toast.error("Failed to start analysis. Check your connection.");
             isWaitingForSeoRef.current = false;
-            shouldAutoResetPoolRef.current = false;
             setIsInsightLoading(false);
         });
 
         // Signal the Realtime listener to watch for completion
         seoTriggeredAtRef.current = new Date().toISOString();
         isWaitingForSeoRef.current = true;
-        shouldAutoResetPoolRef.current = true; // Auto-call resetPool once SEO completes
 
         toast.success("SEO Analysis started in the background! You can safely close this page.");
         

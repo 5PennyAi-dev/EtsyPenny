@@ -152,7 +152,7 @@ const PresetRow = ({ preset, bankKeywords, onDelete, onUpdate, onRemoveKeyword, 
                    placeholder="Preset Title"
                 />
               </div>
-              <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full uppercase tracking-widest font-bold">Preset</span>
+
             </div>
           </div>
         </td>

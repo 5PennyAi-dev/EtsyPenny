@@ -539,7 +539,34 @@
     - **Problem**: After `save-seo` edge function completed, the `postSeoTrigger` effect would first call `handleLoadListing` (fetching full data), then immediately call `handleApplyStrategy` (which also calls `handleLoadListing` internally), resulting in a redundant double-load.
     - **Fix**: When `shouldAutoResetPoolRef.current` is true, the post-SEO flow now skips the intermediate `handleLoadListing` and goes directly to `handleApplyStrategy`, which performs its own single final load. Toast message updated to "Optimizing keyword pool..." for the auto-reset path.
 
+- **Backend resetPool Orchestration** (2026-03-15):
+    - **Problem**: If the user navigated away before `generateSEO` completed, the client-side `resetPool` call would never fire.
+    - **Fix**: Moved `resetPool` trigger logic entirely to the `save-seo` Supabase Edge Function. The `save-seo` function now reads a `trigger_reset_pool` flag from the n8n payload. If `true`, it fetches user settings from `v_user_seo_active_settings`, constructs the `resetPool` payload, and fires the n8n webhook server-side as a fire-and-forget.
+    - **Loop Prevention**: When `trigger_reset_pool` is true, the listing is NOT set to `SEO_DONE` by that call. The subsequent `resetPool` action calls `save-seo` again WITHOUT this flag, which then sets `SEO_DONE` and `is_generating_seo = false`.
+    - **Payload Parsing Fix**: Corrected array-unwrapping for n8n bodies (both top-level and `results` are unwrapped with `Array.isArray` checks).
+    - **Webhook URL Fix**: Changed from hardcoded test URL to `N8N_WEBHOOK_URL_RESET_POOL` env var — test webhook only works when n8n is in test mode; production requires the activation URL.
+    - **Frontend Cleanup**: Removed `shouldAutoResetPoolRef` and its `useEffect` from `ProductStudio.jsx`.
+
+- **Keyword Table: Data Normalization for Low-Volume Keywords** (2026-03-15):
+    - **Goal**: Avoid displaying misleading "0", aggressive red trend lines, or meaningless competition scores for keywords below the API's measurement threshold.
+    - **Implementation**: Added an `isLowVolume` flag (`volume < 10`) computed per row in `ResultsDisplay.jsx`.
+    - **Volume column**: Shows `"< 10"` (slate-400) instead of "0".
+    - **Trend column**: Hides the `Sparkline` and shows a neutral `—` dash (slate-300) for low-volume rows.
+    - **Competition column**: Shows `"N/A"` (slate-300) for low-volume rows, overriding the colored badge.
+    - **CPC column**: Changed the empty state from "N/A" text to a `—` dash (slate-300) for all rows.
+    - **Row opacity**: Low-volume rows that are selected get `opacity-60`; unselected low-volume rows get `opacity-40` (stacked on existing `opacity-60`).
+
 ### Immediate Next Steps
-1.  Verify end-to-end flow of saving a new custom product type and generating an SEO strategy.
-2.  Hook up the Waitlist capture form on the Landing Page to an active n8n webhook or database insertion method.
-3.  Perform responsive stress-testing on the new Landing Page for edge-case mobile devices.
+1.  Add `N8N_WEBHOOK_URL_RESET_POOL` to Supabase Edge Function secrets (production webhook URL for the resetPool n8n workflow).
+2.  Redeploy the `save-seo` edge function with the latest changes.
+3.  Test the end-to-end `generateSEO → save-seo → resetPool` flow by closing the browser mid-generation and verifying `resetPool` is triggered from the backend.
+4.  Update n8n `generate_seo` workflow to include `"trigger_reset_pool": true` in the payload sent to `save-seo`.
+
+- **Keyword Table: High-Volume Outlier Cap** (2026-03-15):
+    - **Goal**: Prevent display of statistically implausible volumes (e.g. "17,342,342") that erode tool credibility.
+    - **Implementation**: Added `isHighVolume` flag (`volume >= 1,000,000`) per row in `ResultsDisplay.jsx`.
+    - **Volume column**: Shows `"> 1M"` in bold indigo text for keywords at peak saturation — sorting remains accurate since `row.volume` is unchanged.
+    - **Reasoning**: For Etsy sellers, 1M and 17M are strategically identical (unrankable main terms); capping avoids implying false precision.
+
+- **SEO Lab Preset Pill Removal** (2026-03-15):
+    - Removed the redundant `Preset` pill badge from each row in the My Presets tab in `SEOLab.jsx`. It was uninformative since every row in that tab is already a preset by definition.

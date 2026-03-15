@@ -957,7 +957,7 @@ const SidebarSkeleton = ({ phase }) => (
                                         className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
                                     />
                                 </th>
-                                <th className="px-3 py-2 font-semibold text-left">Tag / Keyword</th>
+                                <th className="px-3 py-2 font-semibold text-left w-[18%]">Tag / Keyword</th>
                                 <th 
                                     className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[8%]"
                                     onClick={() => requestSort('score')}
@@ -971,25 +971,25 @@ const SidebarSkeleton = ({ phase }) => (
                                     Relevance
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[10%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[8%]"
                                     onClick={() => requestSort('volume')}
                                 >
                                     Avg. Vol <SortIcon columnKey="volume" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[10%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[8%]"
                                     onClick={() => requestSort('trend')}
                                 >
                                     Trend <SortIcon columnKey="trend" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[10%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[8%]"
                                     onClick={() => requestSort('competition')}
                                 >
                                     Competition <SortIcon columnKey="competition" />
                                 </th>
                                 <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[8%]"
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[6%]"
                                     onClick={() => requestSort('cpc')}
                                 >
                                     CPC <SortIcon columnKey="cpc" />
@@ -1008,6 +1008,8 @@ const SidebarSkeleton = ({ phase }) => (
                             ) : (
                               <AnimatePresence initial={false}>
                                 {visibleAnalytics.map((row, i) => {
+                                    const isLowVolume = (row.volume || 0) < 10;
+                                    const isHighVolume = (row.volume || 0) >= 1000000;
                                     const isSelected = selectedTags.includes(row.keyword);
                                     
                                     // Count how many selected rows appear BEFORE this row in the currently sorted view
@@ -1062,8 +1064,8 @@ const SidebarSkeleton = ({ phase }) => (
                                             transition={{ layout: { duration: 0.3, ease: 'easeInOut' }, opacity: { duration: 0.2 } }}
                                             className={`transition-colors group ${
                                                 isSelected
-                                                    ? isExceeding13 ? 'bg-rose-50/40 hover:bg-rose-50/70 border-l-2 border-l-rose-400' : 'bg-indigo-50/40 hover:bg-indigo-50/60'
-                                                    : isEmptySlot ? 'bg-rose-50/30 hover:bg-rose-50/50 border-l-2 border-l-rose-300' : 'opacity-60 hover:opacity-80 hover:bg-slate-50'
+                                                    ? isExceeding13 ? 'bg-rose-50/40 hover:bg-rose-50/70 border-l-2 border-l-rose-400' : `bg-indigo-50/40 hover:bg-indigo-50/60${isLowVolume ? ' opacity-60' : ''}`
+                                                    : isEmptySlot ? 'bg-rose-50/30 hover:bg-rose-50/50 border-l-2 border-l-rose-300' : `opacity-60 hover:opacity-80 hover:bg-slate-50${isLowVolume ? ' opacity-40' : ''}`
                                             }`}
                                         >
                                     <td className="pl-3 pr-1 py-3 text-center">
@@ -1164,18 +1166,29 @@ const SidebarSkeleton = ({ phase }) => (
                                         />
                                     </td>
                                     <td className="px-4 py-3 text-center text-slate-700">
-                                        {(row.volume || 0).toLocaleString()}
+                                        {isLowVolume
+                                            ? <span className="text-slate-400 font-medium text-xs">&lt; 10</span>
+                                            : isHighVolume
+                                                ? <span className="font-bold text-indigo-600">&gt; 1M</span>
+                                                : (row.volume || 0).toLocaleString()
+                                        }
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex justify-center">
-                                            <Sparkline data={row.volume_history} />
+                                            {isLowVolume
+                                                ? <span className="text-slate-300 font-medium text-sm">—</span>
+                                                : <Sparkline data={row.volume_history} />
+                                            }
                                         </div>
                                     </td>
                                     <td className="px-4 py-3 text-center">
                                         {(() => {
+                                            if (isLowVolume) {
+                                                return <span className="text-slate-300 font-medium text-xs">N/A</span>;
+                                            }
                                             const numVal = parseFloat(row.competition);
                                             if (isNaN(numVal) || row.competition === null || row.competition === undefined) {
-                                                return <span className="text-slate-400 opacity-50 font-medium text-xs">N/A</span>;
+                                                return <span className="text-slate-300 font-medium text-xs">N/A</span>;
                                             }
                                             const displayVal = numVal.toFixed(2);
                                             const colorClass = numVal < 0.5
@@ -1194,7 +1207,7 @@ const SidebarSkeleton = ({ phase }) => (
                                         {(() => {
                                             const numVal = parseFloat(row.cpc);
                                             if (isNaN(numVal) || numVal === 0 || row.cpc === null || row.cpc === undefined) {
-                                                return <span className="text-slate-400 opacity-50 font-medium text-xs">N/A</span>;
+                                                return <span className="text-slate-300 font-medium text-sm">—</span>;
                                             }
                                             
                                             let colorClass = 'bg-slate-50 text-slate-500 border-slate-100';

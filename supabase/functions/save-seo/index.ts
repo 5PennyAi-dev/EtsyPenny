@@ -26,10 +26,15 @@ serve(async (req) => {
     }
 
     // 3. Parse JSON Body from N8N
-    const { listing_id, results } = await req.json()
+    const rawPayload = await req.json();
+    
+    // N8N often wraps the webhook body in an array if it's processing batches.
+    const payload = Array.isArray(rawPayload) ? rawPayload[0] : rawPayload;
+    
+    const { listing_id, results, trigger_reset_pool } = payload;
 
-    if (!listing_id || (!results && !Array.isArray(results))) {
-      return new Response(JSON.stringify({ error: 'Bad Request: Missing listing_id or results array' }), {
+    if (!listing_id || !results) {
+      return new Response(JSON.stringify({ error: 'Bad Request: Missing listing_id or results' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -64,6 +69,7 @@ serve(async (req) => {
         const globalStrength = modeData.listing_strength ?? modeData.global_strength ?? fallbackGlobalStrength;
         const breakdown = modeData.breakdown || {};
         const stats = modeData.stats || {};
+        const seo_parameters= modeData.seo_parameters || {};
         const keywords = modeData.keywords || [];
 
         // Save status data to use later for the listing update if this is 'balanced' (our default mode)
@@ -74,14 +80,25 @@ serve(async (req) => {
 
         // --- UPSERT GLOBAL EVALUATION ---
         const globalEvalPayload = {
-            listing_id,
+              listing_id,
             seo_mode: mode,
             global_strength: globalStrength,
             listing_strength: globalStrength,
             listing_visibility: breakdown.visibility,
             listing_conversion: breakdown.conversion,
             listing_relevance: breakdown.relevance,
+            listing_competition: breakdown.competition,
+            listing_profit: breakdown.profit,
             listing_raw_visibility_index: stats.raw_visibility_index,
+            listing_avg_cpc:stats.avg_cpc,
+            listing_avg_competition:stats.best_opportunity_comp,
+            listing_avg_competition_all:stats.avg_competition_all,
+            listing_est_market_reach:stats.est_market_reach,
+            param_Volume:seo_parameters.Volume,
+            param_Competition:seo_parameters.Competition,
+            param_Niche:seo_parameters.Niche,
+            param_Transaction:seo_parameters.Transaction,
+            param_cpc:seo_parameters.CPC,
             status_label: modeData.status_label || null,
             strategic_verdict: modeData.strategic_verdict || null,
             updated_at: new Date().toISOString()
@@ -120,14 +137,16 @@ serve(async (req) => {
 
         // --- PREPARE AND INSERT KEYWORDS ---
         const statsToInsert = keywords.map((item: any) => ({
-            listing_id,
+        listing_id,
             tag: item.keyword,
             search_volume: item.search_volume || 0,
             competition: String(item.competition), 
+            cpc: item.cpc,
             opportunity_score: item.opportunity_score,
-            volume_history: item.monthly_searches 
-                ? item.monthly_searches.map((m: any) => m.search_volume).reverse() 
-                : (item.volumes_history || []),
+            volume_history: (Array.isArray(item.volume_history) ? item.volume_history : []).map((m: any) => m?.search_volume ?? m ?? 0),
+           // volume_history: item.monthly_searches 
+               // ? item.monthly_searches.map((m: any) => m.search_volume).reverse() 
+                //: (item.volumes_history || []),
             is_trending: item.status?.trending || false,
             is_evergreen: item.status?.evergreen || false,
             is_promising: item.status?.promising || false,
@@ -139,10 +158,14 @@ serve(async (req) => {
             relevance_label: item.relevance_label || null,
             is_selection_ia: item.is_selection_ia || false,
             is_competition: false,
+            is_current_eval: item.is_current_eval || false,
+            is_current_pool:item.is_current_pool,
+            is_user_added:item.is_user_added,
+            is_pinned:item.is_pinned,
             evaluation_id: evaluationId
         }));
 
-        // Delete old AI-generated keywords for this listing, but preserve user-added ones
+        // Delete old primary keywords for this listing (by listing_id to catch all cases)
         const { error: delError } = await supabaseClient
             .from('listing_seo_stats')
             .delete()
@@ -170,10 +193,14 @@ serve(async (req) => {
     // 5. Update The Main Listing Table Status
     // Only update title/desc if they were included
     const updatePayload: any = {
-        status_id: STATUS_IDS.SEO_DONE,
-        is_generating_seo: false,
         updated_at: new Date().toISOString(),
     };
+    
+    // Crucial Loop Prevention: Only set SEO_DONE if we are NOT triggering resetPool
+    if (!trigger_reset_pool) {
+        updatePayload.status_id = STATUS_IDS.SEO_DONE;
+        updatePayload.is_generating_seo = false;
+    }
     
     if (generatedTitle) updatePayload.generated_title = generatedTitle;
     if (generatedDescription) updatePayload.generated_description = generatedDescription;
@@ -192,6 +219,70 @@ serve(async (req) => {
         .eq('id', listing_id);
 
     if (updateListingError) throw updateListingError;
+
+    // 6. Trigger resetPool if requested
+    if (trigger_reset_pool) {
+        try {
+            // Get user_id for the listing
+            const { data: listingData } = await supabaseClient
+                .from('listings')
+                .select('user_id')
+                .eq('id', listing_id)
+                .single();
+
+            if (listingData?.user_id) {
+                // Fetch user specific active settings
+                const { data: userSettings } = await supabaseClient
+                    .from('v_user_seo_active_settings')
+                    .select('*')
+                    .eq('user_id', listingData.user_id)
+                    .single();
+
+                // Construct backend payload mirroring frontend's getSmartBadgePayload and strategy
+                const parameters = {
+                    Volume: userSettings?.param_volume ?? 5,
+                    Competition: userSettings?.param_competition ?? 5,
+                    Transaction: userSettings?.param_transaction ?? 5,
+                    Niche: userSettings?.param_niche ?? 5,
+                    CPC: userSettings?.param_cpc ?? 5,
+                    
+                    evergreen_stability_ratio: userSettings?.evergreen_stability_ratio ?? 0.5,
+                    evergreen_minimum_volume: userSettings?.evergreen_minimum_volume ?? 100,
+                    evergreen_avg_volume: userSettings?.evergreen_avg_volume ?? 250,
+                    trending_dropping_threshold: userSettings?.trending_dropping_threshold ?? -0.2,
+                    trending_current_month_min_volume: userSettings?.trending_current_month_min_volume ?? 100,
+                    trending_growth_factor: userSettings?.trending_growth_factor ?? 1.15,
+                    promising_min_score: userSettings?.promising_min_score ?? 70,
+                    promising_competition: userSettings?.promising_competition ?? 0.4,
+                    
+                    ai_selection_count: userSettings?.ai_selection_count ?? 13,
+                    working_pool_count: userSettings?.working_pool_count ?? 40,
+                    concept_diversity_limit: userSettings?.concept_diversity_limit ?? 3,
+                };
+
+                // Use N8N_WEBHOOK_URL_RESET_POOL env var (production URL, not test URL)
+                const webhookUrl = Deno.env.get('N8N_WEBHOOK_URL_RESET_POOL');
+                if (!webhookUrl) {
+                    console.error('Missing env var: N8N_WEBHOOK_URL_RESET_POOL. Cannot trigger resetPool.');
+                    return;
+                }
+                
+                // Fire and forget fetch to n8n webhook
+                fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'resetPool',
+                        listing_id: listing_id,
+                        parameters: parameters
+                    })
+                }).catch(err => console.error("Failed to trigger resetPool webhook:", err));
+            }
+        } catch (resetPoolErr) {
+            console.error("Error initiating resetPool:", resetPoolErr);
+            // We don't throw here, we still want to return 200 since SEO was saved
+        }
+    }
 
     return new Response(JSON.stringify({ success: true, message: 'SEO Data Saved Successfully', listing_id }), {
       status: 200,

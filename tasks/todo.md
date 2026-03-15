@@ -1,28 +1,28 @@
-# 📝 Tasks: Coming Soon Landing Page
 
-## Objectives
-Build a professional "Coming Soon" Landing Page component for PennySEO using a modern SaaS aesthetic, and integrate it into the root routing.
+## 📝 Tasks: Backend Reliability & Display Normalization
 
-## Execution Plan & Checklist
+### Phase 4: Backend Reliability (`save-seo` Edge Function)
+- [x] Fix payload array parsing to correctly handle n8n batching format.
+- [x] Replace hardcoded test webhook URLs with production environment variable `N8N_WEBHOOK_URL_RESET_POOL`.
+- [x] Refactor results validation to allow plain objects (fixing broken `Array.isArray` check).
+- [x] Move `resetPool` trigger entirely to the backend to ensure it fires even if the browser is closed.
 
-### Phase 1: Planning
-- [x] Analyze requirements and visual style instructions (clean, slate-50 background, Indigo/Orange accents, 2-column hero, 3-column features).
-- [x] Write detailed execution plan in `tasks/todo.md`.
+### Phase 5: UI Display Normalization (`ResultsDisplay.jsx`)
+- [x] Implement `< 10` display for low-volume keywords to avoid misleading "0" values.
+- [x] Neutralize trend display (show `—`) for keywords with volume < 10 to avoid irrelevant "-100%" red alerts.
+- [x] Standardize Competition and CPC columns: show `N/A` or `—` for low-volume or missing data.
+- [x] Implement high-volume outlier cap: show `> 1M` for keywords over 1 million searches.
+- [x] Apply visual hierarchy: reduced opacity for low-volume rows to emphasize high-value keywords.
 
-### Phase 2: Implementation
-- [x] Create `src/pages/LandingPage.jsx`.
-- [x] Implement Hero Section with Waitlist Form and Dashboard Preview screenshot (`/dashboard_preview.png`).
-- [x] Implement Features Section highlighting AI Visual Analysis, Strategy Tuner, and Keyword Favorites with Lucide icons.
-- [x] Add navigation and footer branding matching "PennySEO" and "5PennyAi" with the `logo_pennyseo.png` icon mapped from `src/assets/`.
-- [x] Hook up `LandingPage` to the root path `/` mapping in `App.jsx`, bumping the existing auto-redirect logic gracefully.
-
-### Phase 3: QA & Polish
-- [x] Ensure mobile responsiveness via tailwind breakpoints (`md:`, `lg:` grids).
-- [x] Verified `lucide-react` icons render correctly with appropriate styling.
-- [x] Refined Landing Page copy and layout components.
-- [x] Integrated 5PennyAi company logo in "Powered by" section.
-- [x] Adjusted Keyword Performance table column widths and pill wrapping in `ResultsDisplay.jsx`.
-- [x] App builds without errors (`npm run build` completed successfully).
+### Phase 6: Sync & Polish
+- [x] Remove redundant "PRESET" badge from `SEOLab.jsx`.
+- [x] Update `docs/context.md` with session developments.
+- [/] Commit and Push all changes to the repository.
 
 ## Review
-The Landing Page has been fully designed and deployed within the project routing! The `App.jsx` file has been updated to reflect the `<LandingPage />` at the root path (`/`). The application now loads this component for unregistered visitors or manual root-path navigations, replacing the previous immediate redirection behavior. The component has a fully responsive design emphasizing the product's visual AI nature. `docs/context.md` has been updated with these developments.
+- **Unified Selectors**: Themes and Niches now query unified views, displaying user-custom items at the top with grouped categorization.
+- **Backend Reliability**: The `save-seo` function now orchestrates the `resetPool` trigger. This guarantees that the keyword pool is refreshed after analysis even if the user navigates away or closes the browser.
+- **Data Normalization**: The Keyword Performance table now handles statistical edge cases gracefully. Extremely low-volume keywords are de-emphasized and normalized (capped at `< 10`), while massive outliers are capped at `> 1M` to maintain tool credibility.
+- **UI Polish**: Cleaned up the SEO Lab by removing redundant badges and improving table legibility via opacity rules.
+- **Tech Stack**: Modifications strictly followed React, Vite, Tailwind, and Supabase standards.
+
