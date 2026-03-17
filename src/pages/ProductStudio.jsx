@@ -428,25 +428,18 @@ const ProductStudio = () => {
                }
           }
 
-          // Trigger n8n webhook
-          const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-          
-          const payload = {
-              action: "analyseImage", // As requested
-              user_id: user.id,
+          // Call local API server (proxied via Vite to Express on :3001)
+          const analyzePayload = {
               listing_id: currentListingId,
-              payload: {
-                  image_url: publicUrl,
-                  product_details: {
-                      product_type: currentFormData.product_type_name || null,
-                      client_description: currentFormData.context || null
-                  }
-              }
+              user_id: user.id,
+              mockup_url: publicUrl,
+              product_type: currentFormData.product_type_name || '',
+              client_description: currentFormData.context || '',
           };
 
-          // Fire and forget webhook
-          axios.post(webhookUrl, payload).catch(err => {
-              console.error("Webhook trigger failed:", err);
+          // Fire and forget — the Realtime listener will detect completion
+          axios.post('/api/seo/analyze-image', analyzePayload).catch(err => {
+              console.error("Analyze-image API call failed:", err);
               toast.error("Failed to start analysis. Check your connection.");
               isWaitingForImageAnalysisRef.current = false;
               setIsAnalyzingDesign(false);

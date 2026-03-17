@@ -68,6 +68,7 @@ export async function POST(request: Request) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''}`,
                 'x-api-key': process.env.N8N_WEBHOOK_SECRET ?? '',
             },
             body: JSON.stringify(finalAnalysis),

@@ -34,14 +34,14 @@ async function urlToGenerativePart(url: string, mimeType: string) {
 }
 
 export async function runVisionModel(prompt: string, imageUrl: string) {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig, safetySettings });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash", generationConfig, safetySettings });
     const imagePart = await urlToGenerativePart(imageUrl, "image/jpeg");
     const result = await model.generateContent([prompt, imagePart]);
     return result.response.text();
 }
 
 export async function runTextModel(prompt: string) {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-nano", generationConfig, safetySettings });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash", generationConfig, safetySettings });
     const result = await model.generateContent(prompt);
 return result.response.text();
 }

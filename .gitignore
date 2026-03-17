@@ -1,3 +1,10 @@
+# Sensitive workflow/test files (may contain secrets)
+docs/n8nWorkflow.json
+docs/analyse-image-logic.ts
+docs/generate-seo-logic.ts
+docs/generate-seo-logic.ts.bak
+test-analyze-image.mjs
+
 # Logs
 logs
 *.log

@@ -562,6 +562,31 @@
 3.  Test the end-to-end `generateSEO → save-seo → resetPool` flow by closing the browser mid-generation and verifying `resetPool` is triggered from the backend.
 4.  Update n8n `generate_seo` workflow to include `"trigger_reset_pool": true` in the payload sent to `save-seo`.
 
+---
+
+### March 17th, 2026 — Local API Server: Analyse Design Migrated Off n8n
+
+- **Architecture Change: `analyseImage` no longer uses n8n webhook.**
+  - The "Analyse Design" button in `ProductStudio.jsx` (`handleAnalyzeDesign`) previously fired a fire-and-forget POST to the n8n webhook with `action: "analyseImage"`.
+  - It now calls a **local Express API server** at `/api/seo/analyze-image` instead.
+
+- **New file: `server.mjs`** — Standalone Express server on port `3001`.
+  - Full pipeline inline: Gemini Vision → Supabase taxonomy fetch → Gemini taxonomy mapping → `save-image-analysis` Edge Function.
+  - Visual analysis context is **injected into the taxonomy prompt** (prepended as `# Visual Analysis Input`) to fix `theme: undefined` / `niche: undefined` mapping failures.
+  - Uses `gemini-2.0-flash` for both vision and text models.
+  - All secrets (`GOOGLE_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `N8N_WEBHOOK_SECRET`) are loaded server-side only via `--env-file=.env` — **never exposed to the frontend**.
+
+- **`vite.config.js` updated** — Added `server.proxy` block: `/api` → `http://localhost:3001`. Frontend calls `/api/seo/analyze-image` and Vite transparently forwards it to Express, eliminating CORS issues.
+
+- **`package.json` scripts updated**:
+  - `npm run dev` → runs **both** Express API + Vite concurrently (via `concurrently`).
+  - `npm run dev:api` → Express API only.
+  - `npm run dev:vite` → Vite frontend only.
+
+- **New dependencies**: `express` (runtime), `concurrently` (runtime, used in dev script).
+
+- **Tech Stack update**: AI vision route is now served locally (Node.js/Express), removing dependency on n8n for the `analyseImage` action. n8n is still used for `generate_seo`, `drafting_seo`, `userKeyword`, `addFromFavorites`, `generateInsight`, `competitionAnalysis`, `resetPool`.
+
 - **Keyword Table: High-Volume Outlier Cap** (2026-03-15):
     - **Goal**: Prevent display of statistically implausible volumes (e.g. "17,342,342") that erode tool credibility.
     - **Implementation**: Added `isHighVolume` flag (`volume >= 1,000,000`) per row in `ResultsDisplay.jsx`.

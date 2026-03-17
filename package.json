@@ -4,17 +4,22 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -n api,vite -c blue,green \"node --env-file=.env server.mjs\" \"vite\"",
+    "dev:vite": "vite",
+    "dev:api": "node --env-file=.env server.mjs",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/supabase-js": "latest",
     "axios": "^1.13.5",
     "clsx": "latest",
+    "concurrently": "^9.2.1",
     "date-fns": "^4.1.0",
+    "express": "^5.2.1",
     "framer-motion": "^12.34.0",
     "lucide-react": "latest",
     "react": "^19.0.0",
