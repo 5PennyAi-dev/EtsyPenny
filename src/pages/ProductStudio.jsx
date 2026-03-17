@@ -686,11 +686,18 @@ const ProductStudio = () => {
              setListingId(activeListingId);
         }
 
-        // 3. Trigger Webhook (N8N)
-        const webhookPayload = {
-            action: "generate_seo",
+        // 3. Call generate-keywords API directly (synchronous, ~30s — no N8N)
+        const keywordsPayload = {
             listing_id: activeListingId,
             user_id: user.id,
+            product_type: formData.product_type_name || '',
+            theme: formData.theme_name || '',
+            niche: formData.niche_name || '',
+            sub_niche: formData.sub_niche_name || '',
+            client_description: formData.context || '',
+            visual_aesthetic: visualAnalysis.aesthetic,
+            visual_target_audience: visualAnalysis.target_audience,
+            visual_overall_vibe: visualAnalysis.overall_vibe,
             parameters: {
                 ...(userDefaults ? {
                     Volume: userDefaults.param_volume,
@@ -699,64 +706,19 @@ const ProductStudio = () => {
                     Niche: userDefaults.param_niche,
                     CPC: userDefaults.param_cpc
                 } : getStrategyValues(strategySelections)),
-                ...getSmartBadgePayload(),
                 ai_selection_count: userDefaults?.ai_selection_count ?? 13,
-                working_pool_count: userDefaults?.working_pool_count ?? 40,
-                concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
             },
-            payload: {
-                image_url: publicUrl,
-                // Visual analysis fields
-                visual_aesthetic: visualAnalysis.aesthetic,
-                visual_typography: visualAnalysis.typography,
-                visual_graphics: visualAnalysis.graphics,
-                visual_colors: visualAnalysis.colors,
-                visual_target_audience: visualAnalysis.target_audience,
-                visual_overall_vibe: visualAnalysis.overall_vibe,
-                categorization: formatCategorizationPayload(formData),
-                product_details: {
-                    product_type: formData.product_type_name,
-                    tone: formData.tone_name,
-                    client_description: formData.context,
-                    tag_count: formData.tag_count,
-                    seo_mode: formData.seo_mode || 'balanced'
-                },
-                shop_context: {
-                    shop_name: profile?.shop_name,
-                    shop_bio: profile?.shop_bio,
-                    target_audience: profile?.target_audience,
-                    brand_tone: profile?.brand_tone,
-                    brand_keywords: profile?.brand_keywords,
-                    signature_text: profile?.signature_text
-                }
-            },
-            metadata: {
-                app_version: "1.0.0",
-                timestamp: new Date().toISOString()
-            }
         };
 
-        // Note: The N8N workflow now runs asynchronously and saves via Supabase Edge Function.
-        const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
+        await axios.post('/api/seo/generate-keywords', keywordsPayload);
 
-        // Fire and forget for generate_seo. 
-        // IMPORTANT: Do NOT set the n8n Webhook Trigger node to 'Respond Immediately' globally, as it will break analyseImage and others.
-        // Instead, use a 'Respond to Webhook' node locally at the beginning of the generate_seo branch in n8n.
-        axios.post(webhookUrl, webhookPayload).catch(err => {
-            console.error("Webhook trigger failed:", err);
-            toast.error("Failed to start analysis. Check your connection.");
-            isWaitingForSeoRef.current = false;
-            setIsInsightLoading(false);
-        });
+        // Brief pause to let the save-seo edge function's pool reset fully commit to DB
+        await new Promise(r => setTimeout(r, 1500));
 
-        // Signal the Realtime listener to watch for completion
-        seoTriggeredAtRef.current = new Date().toISOString();
-        isWaitingForSeoRef.current = true;
-
-        toast.success("SEO Analysis started in the background! You can safely close this page.");
-        
-        // We stay in the 'seo' loading state. The Realtime listener will catch the
-        // status_id change to SEO_DONE and call handleLoadListing to refresh the UI.
+        // Pipeline complete — load results directly from DB
+        toast.success("SEO Analysis completed! Loading results...");
+        await handleLoadListing(activeListingId);
+        setIsInsightLoading(false);
 
     } catch (err) {
         console.error("Error in handleAnalyze:", err);

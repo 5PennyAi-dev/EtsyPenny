@@ -1,0 +1,198 @@
+{
+  "name": "Niche_scoring",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=\n# Keywords to Analyze:\n{{ JSON.stringify($json.keywordsBatch) }}\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=# Role\nYou are a Senior Etsy SEO Specialist. Your task is to evaluate tags based on their niche precision.\n\n# Objective\nFor each keyword provided, assign a **Niche Score**. This ensures the listing reaches qualified buyers by separating \"Elite\" tags from \"Filler\" ones.The more the keywords correspond to the product context, the higher the score. \n\n# Product context:\n1. Use the following target:\n- **Theme:** {{ $json.Theme }}\n- **Niche:** {{ $json.Niche }}\n- **Sub-niche:** {{ $json.SubNiche }}\n- **Product Type:** {{ $json.ProductType }}\n\n2. Visual & Marketing Data:\n- **Aesthetic/Style:** {{ $json.visual_aesthetic }}\n- **Target Audience:** {{ $json.visual_target_audience }}\n- **Overall_vibe:** {{ $json.visual_overall_vibe }}\n\n# Scoring Tiers (Assign strictly one of these four)\n##**Niche-Specific (Score 10):** Elite tags. Perfect alignment of style + subject + niche. (e.g., \"Victorian raccoon oil painting\").\n- **Strong (Score 7):** High relevance. Clear descriptive tags that target the right audience but are less unique. (e.g., \"Dark academia shirt\").\n- **Neutral (Score 4):** Broadly descriptive. Standard tags that describe the product type without specific style. (e.g., \"Raccoon t-shirt\").\n- **Broad (Score 1):** Filler/Generic. Buzzwords or broad occasions. (e.g., \"Gift for her\", \"Personalized gift\").\n\n# Reference Datasets (For Calibration)\n- **Niche-Specifid (Score 10):** Gothic Skull Planter, Y2K Grunge Jewelry, Sarcastic Office Mug, Witchy Moon Altar, Retro Gamer Apparel, Modern Farmhouse Key, Dainty Bridal Comb, Industrial Desk Lamp, Celestial Sun Tarot, Pastel Kawaii Plush, Viking Rune Pendant, 90s Streetwear Hat, Funny Nurse Shirt, Boho Nursery Decor, Mid Century Planter, Coastal Grandma Tee, Dark Forest Candle, Anatomy Science Mug, Steampunk Gear Ring, Moody Floral Case, Minimalist Dog Tag, Vegan Leather Purse, Wabi Sabi Ceramics, Glitch Core Apparel, Zodiac Crystal Kit\n\n- **Strong (Score 7):** Gothic Black Shirt, Floral Summer Dress, Boho Wall Hanging, Silver Hoop Earring, Modern Coffee Table, Vintage Style Jeans, Minimalist Wallet, Abstract Throw Case, Wooden Picture Frame, Gold Dainty Ring, Leather Travel Bag, Baby Shower Decor, Wedding Guest Book, Celestial Jewelry, Nurse Life Apparel, Witchy Room Decor, Gamer Room Poster, Dog Lover Apparel, Aesthetic Stationery, Farmhouse Kitchen, Zodiac Sign Pendant, Handmade Soy Candle, Retro Sunglasses, Yoga Mat Bag, Industrial Shelf\n\n- **Neutral (Score 4):** Raccoon T-shirt, Cat Coffee Mug, Dog Wall Art, Flower Necklace, Heart Ring, Star Earring, Tree Ornament, Beach Towel, Mountain Print, Bird Sticker, Moon Lamp, Leaf Pillow, Sun Keychain, Bear Hoodie, Elephant Toy, Butterfly Clip, Rose Bracelet, Owl Statue, Fox Patch, Pine Candle\n\n- **Broad (Score 1):** Gift for her, Personalized Gift, Best Seller Etsy, Mothers Day Gift, Custom Clothing, High Quality Tee, Unique Gift Idea, Birthday Present, Handmade with Love, Trending Now Item, Christmas Gift, Women's Fashion, Gift for Him, Special Occasion, Top Rated Item, Anniversary Gift, Holiday Season, Luxury Gift Idea, Great Gift for Mom, New Arrival Item\n\n# Scoring Instructions\n1. **No Nuance:** You must choose exactly 10, 7, 4, or 1. Do not use intermediate numbers.\n2. **Structure Analysis:** Reward \"Style + Subject + Product\" with a 10.\n3. **Fluff Ceiling:** Tags containing ONLY filler words (gift, best, quality, custom, personalized, shipping) MUST be scored as 1 (Broad).\nTags combining a niche keyword WITH a filler word (e.g., \"Goth gift\", \"Punk custom\") MUST be capped at a maximum score of 4 (Neutral). They can never be Strong (7) or Niche-Specific (10).\n4. **Context Match:** A tag is only \"Niche-Specific\" if it matches the Theme AND Style provided in the product context.\n\n\n\n# Output Requirement\n- Return ONLY a valid JSON object.\n- NO introductory text, NO markdown code blocks (no ```json), NO conclusion.\n- Return ONLY the following JSON structure. NO markers, NO markdown:{\"output\": {\"keywords\": [{\"keyword\": \"string\", \"transactional_score\": number}]}}",
+          "batching": {
+            "batchSize": 8,
+            "delayBetweenBatches": 0
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        192,
+        -48
+      ],
+      "id": "83a25299-e7dd-40ff-b2c6-982de6203b51",
+      "name": "Niche scoring",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        160,
+        176
+      ],
+      "id": "b76bc955-da43-4c1e-a047-24d24a957a07",
+      "name": "Google Gemini Chat Model9",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"keywords\": [\n      { \"keyword\": \"Gothic moon moth\", \"niche_score\": 10 },\n      { \"keyword\": \"Alternative belt\", \"niche_score\": 7},\n      { \"keyword\": \"Birthday gift\", \"niche_score\": 1}\n    ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        400,
+        176
+      ],
+      "id": "83d7c835-a846-44a6-8bc8-8a4f98c341ea",
+      "name": "Structured Output Parser10"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        -48
+      ],
+      "id": "148c545e-db4f-4c7e-98d7-d371ec10dfbc",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// On récupère le premier item entrant (le gros JSON)\nconst input = $input.first().json;\nconst keywords = input.output.keywords;\nconst batchSize = 25;\nconst batches = [];\n\n// On prépare les paquets\nfor (let i = 0; i < keywords.length; i += batchSize) {\n    batches.push({\n        json: {\n            Theme: input.Theme,\n            Niche: input.Niche,\n            SubNiche: input.SubNiche,\n            ProductType: input.ProductType,\n            Description: input.Description,\n            visual_aesthetic:input.visual_aesthetic,\n            visual_typography:input.visual_typography,\n            visual_graphics:input.visual_graphics,\n            visual_colors: input.visual_colors,\n            visual_target_audience: input.visual_target_audience,\n            visual_overall_vibe: input.visual_overall_vibe,\n\n  \n            // On envoie un morceau de la liste\n            keywordsBatch: keywords.slice(i, i + batchSize)\n        }\n    });\n}\n\n// n8n va maintenant voir X items (batches) et pourra les traiter en parallèle\nreturn batches;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -48
+      ],
+      "id": "5d06bd9f-edd1-4d51-bb98-dfea43690c28",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// On récupère tous les batches (les 8 items)\nconst allItems = $input.all();\nlet combinedKeywords = [];\n\n// On boucle sur chaque batch pour extraire les keywords scorés\nfor (const item of allItems) {\n    if (item.json.output && item.json.output.keywords) {\n        combinedKeywords = combinedKeywords.concat(item.json.output.keywords);\n    }\n}\n\n// On renvoie un objet unique contenant la liste totale\nreturn {\n    total_keywords: combinedKeywords.length,\n    keywords: combinedKeywords\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        -48
+      ],
+      "id": "661b223d-70e3-41dd-bed2-de77f2bce52e",
+      "name": "Code in JavaScript3"
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "output": {
+            "keywords": [
+              "canvas wall art",
+              "whimsical art print",
+              "framed art print",
+              "modern farmhouse art"
+            ]
+          },
+          "ProductType": "Diaper",
+          "Description": "Weekly diaper organizer. The 50x50cm diaper can be taken anywhere with you to protect your shoulder when baby burps, wipe his face or place under his bottom during changing.",
+          "Theme": "Botanical & Floral",
+          "Niche": "Boho Baby",
+          "SubNiche": "Gender Neutral Nursery",
+          "visual_aesthetic": "Organic Boho, Scandi-Baby, Neutral Minimalist",
+          "visual_graphics": "Rolled muslin texture (double gauze), hand-drawn sunflower illustrations, dainty wildflower patterns, leafy sprigs, soft sherpa background texture.",
+          "visual_colors": "Warm Earth Tones: Oatmeal, Cream, Taupe, Mocha, Rust, Muted Sage. Evokes calmness, warmth, and nature.",
+          "visual_target_audience": "Boho aesthetic lover, Eco-conscious parent, Minimalist mom, Nesting expectant mother",
+          "visual_overall_vibe": "Earthy, organic softness designed for the modern, aesthetically conscious nursery."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Google Gemini Chat Model9": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Niche scoring",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser10": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Niche scoring",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Niche scoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Niche scoring": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "e9b31f5b-c061-47ce-8866-0fd9d2641a8d",
+  "meta": {
+    "instanceId": "cfd1401e3f0b2075dfe4693ad7a10a5d7ad8db7a3e3bef4f1f623f48b2a7a4ed"
+  },
+  "id": "sU1FdPTnCSIYTwAq",
+  "tags": []
+}

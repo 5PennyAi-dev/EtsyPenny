@@ -17,6 +17,8 @@ const GOOGLE_API_KEY       = process.env.GOOGLE_API_KEY;
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const N8N_SECRET           = process.env.N8N_WEBHOOK_SECRET;
+const DATAFORSEO_LOGIN     = process.env.DATAFORSEO_LOGIN;
+const DATAFORSEO_PASSWORD  = process.env.DATAFORSEO_PASSWORD;
 
 for (const [name, val] of Object.entries({ GOOGLE_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY, N8N_SECRET })) {
   if (!val) { console.error(`❌ Missing env var: ${name}`); process.exit(1); }
@@ -237,6 +239,310 @@ ${JSON.stringify(visualAnalysis, null, 2)}
   }
 });
 
+// ─── GENERATE-KEYWORDS HELPERS ────────────────────────────
+const scoringConfig = { ...generationConfig, temperature: 0.1 };
+
+function getEtsyVolume(webVol) {
+  if (!webVol || webVol <= 0) return 0;
+  return Math.round(22 * Math.pow(webVol, 0.9));
+}
+
+const KEYWORD_SEGMENTS = [
+  { name: 'Broad & High Volume', description: 'High-level niche terms and general gift categories. Focus on high search volume.' },
+  { name: 'Balanced & Descriptive', description: 'Mid-range keywords combining the niche with specific themes and graphics from the visual analysis.' },
+  { name: 'Audience & Gift Scenarios', description: "Target specific buyers (e.g., 'Gift for Coworker') and occasions (Birthday, Christmas, etc.)." },
+  { name: 'Sniper & Long-Tail', description: 'Ultra-specific, low-competition terms and cultural sub-niches related to the design.' },
+  { name: 'Aesthetic & Vibe', description: "Focus on the look, mood, and specific art style (e.g., 'Kawaii Aesthetic', 'Cyberpunk Vibe')." },
+];
+
+// Step A: Generate keyword pool (5 parallel Gemini calls)
+async function generateKeywordPool(ctx) {
+  const results = await Promise.allSettled(
+    KEYWORD_SEGMENTS.map(async (seg) => {
+      const prompt = `# Role\nYou are an expert Etsy SEO Specialist.\n\n# Task\nGenerate 50 high-intent keywords for: ${seg.name}\n${seg.name}: ${seg.description}\n\n# Context\n- Product Type: ${ctx.product_type}\n- Theme: ${ctx.theme}\n- Niche: ${ctx.niche}\n- Sub-niche: ${ctx.sub_niche}\n- Description: ${ctx.client_description}\n\n# Visual & Marketing Data\n- Aesthetic/Style: ${ctx.visual_aesthetic}\n- Target Audience: ${ctx.visual_target_audience}\n- Overall Vibe: ${ctx.visual_overall_vibe}\n\n# Rules\n- Max 20 characters per keyword (CRITICAL for Etsy tags).\n- Max 3 words per phrase.\n- No duplicates, no trademarks, lowercase only.\n- Include product type in keywords at least 75% of the time.\n- Format: JSON object {"keywords": ["keyword1", "keyword2", ...]}`;
+      const raw = await runTextModel(prompt);
+      const parsed = JSON.parse(extractJson(raw));
+      const kws = parsed.keywords ?? parsed.output?.keywords ?? [];
+      return kws.filter(k => typeof k === 'string' && k.length > 0).map(k => k.toLowerCase().trim()).filter(k => k.length <= 20);
+    })
+  );
+  const pool = [];
+  for (const r of results) {
+    if (r.status === 'fulfilled') pool.push(...r.value);
+    else console.warn(`   ⚠️ Segment FAILED: ${r.reason?.message}`);
+  }
+  return [...new Set(pool)];
+}
+
+// Step B: Enrich with cache + DataForSEO
+async function enrichKeywords(keywords) {
+  // B1: Cache check
+  let cached = [];
+  try {
+    const cacheRes = await fetch(`${SUPABASE_URL}/functions/v1/check-keyword-cache`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`, 'x-api-key': N8N_SECRET },
+      body: JSON.stringify({ keywords }),
+    });
+    if (cacheRes.ok) { const d = await cacheRes.json(); cached = d.cachedKeywords || []; }
+  } catch (e) { console.warn('   ⚠️ Cache check failed:', e.message); }
+
+  const cachedTags = new Set(cached.map(c => c.tag));
+  const fromCache = cached.map(c => ({ keyword: c.tag, search_volume: c.search_volume || 0, competition: c.competition ?? 0.5, cpc: c.cpc || 0, volume_history: c.volume_history || [], fromCache: true }));
+
+  // B2: DataForSEO for uncached
+  const uncached = keywords.filter(kw => !cachedTags.has(kw));
+  let fromAPI = [];
+  if (uncached.length > 0 && DATAFORSEO_LOGIN && !DATAFORSEO_LOGIN.startsWith('your_')) {
+    try {
+      const dfsRes = await fetch('https://api.dataforseo.com/v3/keywords_data/google/search_volume/live', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Basic ' + Buffer.from(`${DATAFORSEO_LOGIN}:${DATAFORSEO_PASSWORD}`).toString('base64') },
+        body: JSON.stringify([{ keywords: uncached, location_name: 'United States', language_name: 'English' }]),
+      });
+      if (dfsRes.ok) {
+        const dfsData = await dfsRes.json();
+        const items = dfsData?.tasks?.[0]?.result || [];
+        fromAPI = items.map(item => ({
+          keyword: item.keyword,
+          search_volume: getEtsyVolume(item.search_volume || 0),
+          competition: item.competition ?? 0.5,
+          cpc: item.cpc || 0,
+          volume_history: item.monthly_searches ? item.monthly_searches.map(m => getEtsyVolume(m.search_volume || 0)).reverse() : new Array(12).fill(0),
+          fromCache: false,
+        }));
+      }
+    } catch (e) { console.warn('   ⚠️ DataForSEO failed:', e.message); }
+  }
+
+  // B3: Zero-fill missing
+  const known = new Set([...fromCache.map(k => k.keyword), ...fromAPI.map(k => k.keyword)]);
+  const missing = keywords.filter(kw => !known.has(kw)).map(kw => ({ keyword: kw, search_volume: 0, competition: 0.5, cpc: 0, volume_history: new Array(12).fill(0), fromCache: false }));
+  console.log(`   📊 Enriched: ${fromCache.length} cached + ${fromAPI.length} API + ${missing.length} zero-fill = ${fromCache.length + fromAPI.length + missing.length}`);
+  return [...fromCache, ...fromAPI, ...missing];
+}
+
+// Step C: Score keywords (niche + transactional)
+async function scoreKeywords(stats, ctx) {
+  const kws = stats.map(s => s.keyword);
+  const nicheSystem = `# Role\nYou are a Senior Etsy SEO Specialist evaluating tags on niche precision.\n\n# Product context:\n- Theme: ${ctx.theme} | Niche: ${ctx.niche} | Sub-niche: ${ctx.sub_niche}\n- Product Type: ${ctx.product_type}\n- Aesthetic/Style: ${ctx.visual_aesthetic} | Target Audience: ${ctx.visual_target_audience} | Vibe: ${ctx.visual_overall_vibe}\n\n# Scoring: Use ONLY 10, 7, 4, or 1.\n- 10 = Niche-Specific (Style + Subject + Product alignment)\n- 7 = Strong (High relevance but less unique)\n- 4 = Neutral (Broadly descriptive or niche+filler combo)\n- 1 = Broad (Generic filler: "gift for her", "personalized")\n\nReturn ONLY: {"keywords": [{"keyword": "...", "niche_score": N}]}`;
+  const transSystem = `# Role\nYou are a Senior Etsy SEO Specialist evaluating tags on purchase intent.\n\n# Context: Product Type: ${ctx.product_type} | Theme: ${ctx.theme} | Niche: ${ctx.niche}\n\n# Scoring: Use ONLY 10, 7, 4, or 1.\n- 10 = High-Conversion (Product Noun + Purchase Trigger + Recipient/Occasion)\n- 7 = Product-Focused (Product Noun + Style, no recipient)\n- 4 = Browsing (Style/vibe, missing product noun)\n- 1 = Informational (DIY, ideas, tutorials)\n\nReturn ONLY: {"keywords": [{"keyword": "...", "transactional_score": N}]}`;
+
+  const BATCH = 25;
+  const batches = [];
+  for (let i = 0; i < kws.length; i += BATCH) batches.push(kws.slice(i, i + BATCH));
+
+  const runScoring = async (systemPrompt, batchList) => {
+    const results = [];
+    for (const batch of batchList) {
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash', generationConfig: scoringConfig, safetySettings, systemInstruction: systemPrompt });
+      const raw = await model.generateContent(`# Keywords to Analyze:\n${JSON.stringify(batch)}`);
+      const text = raw.response.text().replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+      const parsed = JSON.parse(text);
+      results.push(...(parsed.keywords ?? []));
+    }
+    return results;
+  };
+
+  const [nicheResults, transResults] = await Promise.all([
+    runScoring(nicheSystem, batches),
+    runScoring(transSystem, batches),
+  ]);
+
+  const VALID = new Set([10, 7, 4, 1]);
+  const nicheMap = new Map(nicheResults.map(r => [r.keyword?.toLowerCase(), VALID.has(r.niche_score) ? r.niche_score : 1]));
+  const transMap = new Map(transResults.map(r => [r.keyword?.toLowerCase(), VALID.has(r.transactional_score) ? r.transactional_score : 1]));
+
+  return stats.map(s => ({
+    keyword: s.keyword, search_volume: s.search_volume, competition: s.competition, cpc: s.cpc,
+    volume_history: s.volume_history,
+    niche_score: nicheMap.get(s.keyword) ?? null,
+    transactional_score: transMap.get(s.keyword) ?? null,
+    is_selection_ia: false, is_user_added: false, is_pinned: false, fromCache: s.fromCache,
+  }));
+}
+
+// Step D: Select top keywords + calculate LSI
+function selectAndScore(keywords, params) {
+  const volW = (params.Volume ?? 5) / 5;
+  const compW = (params.Competition ?? 5) / 5;
+  const transW = (params.Transaction ?? 5) / 5;
+  const nicheW = (params.Niche ?? 5) / 5;
+  const cpcW = (params.CPC ?? 5) / 5;
+
+  const scored = keywords.map(kw => {
+    const nS = (kw.niche_score ?? 5) / 10;
+    const tS = (kw.transactional_score ?? 5) / 10;
+    const volNorm = Math.log10(Math.max(1, kw.search_volume + 1)) / 7;
+    const compPenalty = kw.competition ?? 0.5;
+    const cpcNorm = Math.min(1, (kw.cpc || 0) / 2.5);
+    const composite = nS * nicheW + tS * transW + volNorm * volW - compPenalty * compW + cpcNorm * cpcW;
+    return { kw, composite };
+  });
+  scored.sort((a, b) => b.composite - a.composite);
+
+  const N = params.ai_selection_count ?? 13;
+  scored.forEach((item, idx) => { item.kw.is_selection_ia = idx < N; });
+  const finalKws = scored.map(s => s.kw);
+  const selected = finalKws.filter(kw => kw.is_selection_ia);
+
+  let strength = null;
+  if (selected.length > 0) {
+    let totalMarketReach = 0, totalPowerIndex = 0;
+    selected.forEach(kw => {
+      const vol = Math.min(1000000, kw.search_volume || 0);
+      const nS = kw.niche_score ?? 5;
+      const tS = kw.transactional_score ?? 5;
+      const dw = 0.8 + (nS / 20) + (tS / 20);
+      totalMarketReach += vol * dw;
+      totalPowerIndex += Math.sqrt(vol) * dw;
+    });
+    const ceil = 10000000;
+    const visibility = Math.min(100, Math.round((Math.log10(Math.max(1, totalMarketReach)) / Math.log10(ceil)) * 100));
+    const avgTrans = selected.reduce((a, k) => a + (k.transactional_score || 5), 0) / selected.length;
+    const avgCPC = selected.reduce((a, k) => a + (k.cpc || 0), 0) / selected.length;
+    const cpcS = Math.min(10, (avgCPC / 2.5) * 10);
+    const conversion = (avgTrans * 5) + (cpcS * 5);
+    const avgNiche = selected.reduce((a, k) => a + (k.niche_score || 5), 0) / selected.length;
+    const relevance = avgNiche * 10;
+    const sorted = [...selected].sort((a, b) => (a.competition || 1) - (b.competition || 1));
+    const top5 = sorted.slice(0, 5);
+    const avgBestComp = top5.reduce((a, k) => a + (k.competition || 0.9), 0) / top5.length;
+    const competition = Math.round(Math.pow(1 - Math.min(0.99, avgBestComp), 0.3) * 100);
+    const cpcAll = Math.min(100, (avgCPC / 2.5) * 100);
+    const transS = avgTrans * 10;
+    const profit = Math.round((visibility * 0.35) + (cpcAll * 0.40) + (transS * 0.25));
+    const lsi = Math.round((visibility * 0.25) + (conversion * 0.35) + (relevance * 0.25) + (competition * 0.15));
+
+    strength = {
+      listing_strength: lsi,
+      breakdown: { visibility, conversion: Math.round(conversion), relevance: Math.round(relevance), competition, profit },
+      stats: {
+        total_keywords: selected.length,
+        avg_cpc: parseFloat(avgCPC.toFixed(2)),
+        avg_competition_all: parseFloat((selected.reduce((a, k) => a + (k.competition || 0.8), 0) / selected.length).toFixed(2)),
+        best_opportunity_comp: parseFloat(avgBestComp.toFixed(2)),
+        raw_visibility_index: Math.round(totalPowerIndex),
+        est_market_reach: Math.round(totalMarketReach),
+      },
+    };
+  }
+  return { keywords: finalKws, strength };
+}
+
+// Step E: Persist via save-seo edge function
+async function persistSeo(listingId, keywords, strength, params) {
+  const payload = {
+    listing_id: listingId,
+    results: {
+      balanced: {
+        listing_strength: strength?.listing_strength ?? 0,
+        breakdown: strength?.breakdown ?? {},
+        stats: strength?.stats ?? {},
+        seo_parameters: params,
+        keywords: keywords.map(kw => ({
+          keyword: kw.keyword, search_volume: kw.search_volume, competition: kw.competition, cpc: kw.cpc,
+          volume_history: kw.volume_history, niche_score: kw.niche_score, transactional_score: kw.transactional_score,
+          is_selection_ia: kw.is_selection_ia, is_user_added: kw.is_user_added, is_pinned: kw.is_pinned,
+          is_current_pool: true, is_current_eval: false,
+        })),
+      },
+    },
+    trigger_reset_pool: true,
+  };
+
+  const saveRes = await fetch(`${SUPABASE_URL}/functions/v1/save-seo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`, 'x-api-key': N8N_SECRET },
+    body: JSON.stringify(payload),
+  });
+  if (!saveRes.ok) {
+    const errText = await saveRes.text();
+    throw new Error(`save-seo failed (${saveRes.status}): ${errText}`);
+  }
+  return await saveRes.json();
+}
+
+// ─── API ROUTE: POST /api/seo/generate-keywords ──────────
+app.post('/api/seo/generate-keywords', async (req, res) => {
+  const t0 = Date.now();
+  try {
+    const {
+      listing_id, user_id, product_type = '', theme = '', niche = '', sub_niche = '',
+      client_description = '', visual_aesthetic = '', visual_target_audience = '', visual_overall_vibe = '',
+      parameters = {},
+    } = req.body;
+
+    if (!listing_id || !user_id) {
+      return res.status(400).json({ error: 'Missing required fields: listing_id and user_id' });
+    }
+
+    const ctx = { product_type, theme, niche, sub_niche, client_description, visual_aesthetic, visual_target_audience, visual_overall_vibe };
+    const params = { Volume: 5, Competition: 5, Transaction: 5, Niche: 5, CPC: 5, ai_selection_count: 13, ...parameters };
+
+    console.log(`\n🔍 [generate-keywords] Starting for listing ${listing_id}`);
+    console.log(`   Product: ${product_type} | ${theme} > ${niche} > ${sub_niche}`);
+
+    // Step A
+    console.log('   Step A: Generating keyword pool...');
+    const uniqueKeywords = await generateKeywordPool(ctx);
+    console.log(`   ✅ ${uniqueKeywords.length} unique keywords (${Date.now() - t0}ms)`);
+    if (uniqueKeywords.length === 0) return res.status(500).json({ error: 'No keywords generated' });
+
+    // Step B
+    console.log('   Step B: Enriching keywords...');
+    const enriched = await enrichKeywords(uniqueKeywords);
+
+    // Step C
+    console.log('   Step C: Scoring keywords...');
+    const scored = await scoreKeywords(enriched, ctx);
+    console.log(`   ✅ Scored ${scored.length} keywords (${Date.now() - t0}ms)`);
+
+    // Step D
+    console.log('   Step D: Selecting + calculating LSI...');
+    const { keywords: finalKeywords, strength } = selectAndScore(scored, params);
+    const selected = finalKeywords.filter(kw => kw.is_selection_ia);
+    console.log(`   ✅ Selected ${selected.length} / ${finalKeywords.length} | LSI = ${strength?.listing_strength ?? 'N/A'}`);
+
+    // Step E
+    console.log('   Step E: Saving via save-seo...');
+    await persistSeo(listing_id, finalKeywords, strength, params);
+    console.log('   ✅ Saved!');
+
+    // Update listing flags: SEO done, no longer generating
+    const STATUS_SEO_DONE = '35660e24-94bb-4586-aa5a-a5027546b4a1';
+    await supabaseAdmin.from('listings').update({
+      is_generating_seo: false,
+      status_id: STATUS_SEO_DONE,
+      updated_at: new Date().toISOString(),
+    }).eq('id', listing_id);
+
+    console.log(`   🎉 Pipeline complete in ${((Date.now() - t0) / 1000).toFixed(1)}s\n`);
+
+    return res.json({
+      success: true,
+      listing_id,
+      pool_size: finalKeywords.length,
+      selected_count: selected.length,
+      listing_strength: strength?.listing_strength ?? null,
+      breakdown: strength?.breakdown ?? null,
+      stats: strength?.stats ?? null,
+      elapsed_ms: Date.now() - t0,
+    });
+
+  } catch (error) {
+    console.error('❌ [generate-keywords] Error:', error.message || error);
+    // Try to reset is_generating_seo on failure
+    try {
+      const { listing_id } = req.body || {};
+      if (listing_id) {
+        await supabaseAdmin.from('listings').update({ is_generating_seo: false }).eq('id', listing_id);
+      }
+    } catch (_) {}
+    return res.status(500).json({ error: 'Failed to generate keywords.', details: error.message || 'Unknown error' });
+  }
+});
+
 // ─── HEALTH CHECK ─────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -246,5 +552,6 @@ app.get('/api/health', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`\n🚀 EtsyPenny API server running on http://localhost:${PORT}`);
   console.log(`   POST /api/seo/analyze-image`);
+  console.log(`   POST /api/seo/generate-keywords`);
   console.log(`   GET  /api/health\n`);
 });

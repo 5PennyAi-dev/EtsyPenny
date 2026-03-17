@@ -595,3 +595,36 @@
 
 - **SEO Lab Preset Pill Removal** (2026-03-15):
     - Removed the redundant `Preset` pill badge from each row in the My Presets tab in `SEOLab.jsx`. It was uninformative since every row in that tab is already a preset by definition.
+
+---
+
+### March 17th, 2026 — SEO Generation Migrated to Local API Server
+
+- **Architecture Change: `generate_seo` no longer uses n8n webhook.**
+    - The "Analyse" button in `ProductStudio.jsx` (`handleAnalyze`) previously fired a fire-and-forget POST to the n8n webhook with `action: "generate_seo"`, then relied on a Supabase Realtime listener + 5s polling fallback to detect `SEO_DONE`.
+    - It now calls a **local Express API server** at `/api/seo/generate-keywords` (synchronous, ~30s) and `await`s the response directly.
+    - After the call returns, a **1.5s delay** is inserted (`await new Promise(r => setTimeout(r, 1500))`) to allow the `save-seo` edge function's pool reset (`is_current_pool` DB writes) to fully commit before `handleLoadListing` reads the results — eliminating a race condition where all keywords (not just `is_current_pool = true`) were displayed immediately after generation.
+
+- **New file: `app/api/seo/generate-keywords/route.ts`** — Full SEO keyword pipeline:
+    1. Gemini generates keyword ideas from product context + visual analysis.
+    2. DataForSEO enriches with real search volume, competition, CPC, and 12-month history.
+    3. Niche scoring (`lib/seo/niche-scoring.ts`) and transactional scoring (`lib/seo/transactional-scoring.ts`) applied per keyword.
+    4. LSI (Latent Semantic Indexing) relevance score calculated.
+    5. Results persisted via the `save-seo` Supabase Edge Function (which handles pool reset, multi-mode upserts, and sets `is_generating_seo = false` + `status_id = SEO_DONE`).
+
+- **`server.mjs` updated** — Added `POST /api/seo/generate-keywords` Express route, loading and executing `app/api/seo/generate-keywords/route.ts` via `tsx`.
+
+- **`ProductStudio.jsx` — `handleAnalyze` updated**:
+    - Replaced the N8N fire-and-forget + Realtime listener pattern with a single `await axios.post('/api/seo/generate-keywords', payload)`.
+    - After response, waits 1.5s then calls `handleLoadListing` directly to render final results.
+    - The Realtime subscription and polling fallback remain in the codebase for `is_image_analysed` image analysis events — they are no longer used for the SEO generation flow.
+
+- **n8n still used for**: `drafting_seo`, `userKeyword`, `addFromFavorites`, `generateInsight`, `competitionAnalysis`, `resetPool`.
+
+- **New support files**:
+    - `lib/seo/niche-scoring.ts` — Niche relevance scoring logic.
+    - `lib/seo/transactional-scoring.ts` — Buyer intent / transactional scoring logic.
+    - `test-generate-keywords.mjs` — End-to-end test script for the new route.
+    - `docs/generate-seo-logic.ts` — Reference doc for the full pipeline logic.
+
+- **Operational note**: Both Express routes (`analyze-image` and `generate-keywords`) now run on `http://localhost:3001`. The server must be restarted (`node --env-file=.env server.mjs`) whenever `server.mjs` changes. Use `npx nodemon --env-file=.env server.mjs` for auto-reload during development.

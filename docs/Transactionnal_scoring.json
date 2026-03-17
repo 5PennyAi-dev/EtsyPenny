@@ -1,0 +1,484 @@
+{
+  "name": "Transactionnal_scoring",
+  "nodes": [
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n    \"keywords\": [\n    { \"keyword\": \"Studded belt for him\", \"transactional_score\": 10},\n    { \"keyword\": \"Black leather belt\", \"transactional_score\": 7},\n    { \"keyword\": \"How to style belts\", \"transactional_score\": 1}\n  ]\n}\n\n\n\n\n\n\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        480
+      ],
+      "id": "4ce636c4-0beb-48f8-9cc5-b3fdbb0022fb",
+      "name": "Structured Output Parser6"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.1,
+          "topP": 1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        464
+      ],
+      "id": "cbaa1a57-0064-48a7-9661-25ef4cc17457",
+      "name": "Google Gemini Chat Model10",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CnwZNGOBnl4fccXE",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Keywords to Analyze:\n{{ JSON.stringify($json.keywordsBatch) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=# Role\nYou are a Senior Etsy SEO Specialist. Your task is to evaluate tags based on their **Purchase Intent** (how close the user is to buying a physical product).\n\n# Objective\nFor each keyword provided, assign a **Transactional Score**. This data will be used to determine if a keyword represents a \"High-Conversion\" intent (Buyer ready to purchase a specific product) or an \"Informational\" intent (User seeking ideas or browsing).\n\n# Target Context for Calibration\nUse the following context to identify the specific product being sold:\n- **Product Type:** {{ $json.ProductType }}\n- **Theme/Niche:** {{ $json.Theme }} / {{ $json.Niche }}\n\n# Scoring Tiers (Assign strictly one of these four)\n- **High-Conversion (Score 10):** \"The Sniper\". Must be a precise, ready-to-buy product search. It MUST include: [Specific Product Noun] + [Premium/Usage Modifier] + [Specific Recipient or Occasion]. \n- **Product-Focused (Score 7):** Clear descriptive tags. Includes the product noun and a style, but lacks a specific recipient. \n- **Browsing (Score 4):** Descriptive/Conceptual. Describes the style or vibe but MISSES the physical product noun.\n- **Informational (Score 1):** Educational or DIY intent. User is looking for ideas, history, or how-to, not a product. \n\n# Reference Datasets (20-Character Max): \n- **High-Conversion (Score 10):** Gift for New Mom, Nurse Life Shirt, Wedding Photo Frame, Dad Birthday Gift, Custom Name Mug, Teacher Gift Idea, Baby Shower Decor, Pet Memorial Stone, Anniversary Jewelry, Groom Cufflinks\n\n- **Product-Focused (Score 7):** Cotton Graphic Tee, Ceramic Coffee Mug, Gold Layered Ring, Canvas Tote Bag, Leather Wallet Men, Glass Flower Vase, Abstract Wall Art, Wool Winter Beanie, Silver Hoop Earring, Wooden Phone Stand\n\n- **Browsing (Score 4):** Boho Room Decor, Aesthetic Vibe, Retro 70s Look, Minimalist Style, Cottagecore Dream, Goth Fashion Idea, Zen Garden Mood, Coastal Home Vibe, Y2K Outfit Style, Rustic Farmhouse\n\n- **Informational (Score 1):**How to Style Tees, DIY Room Decor, Mug Cleaning Tips, History of Art, Gift Idea List, Outfit Inspiration, Sewing Tutorial, Interior Guide, Photo Edit Tips, Wood Carving DIY\n\n\n# Scoring Instructions\n\n\n1- The Strict 10 Rule (The Sniper): To assign a 10, the tag MUST combine a specific product noun with an explicit Purchase Trigger (e.g., \"Gift\", \"Custom\", \"Set\", \"Box\") AND a Recipient/Occasion (e.g., \"Mom\", \"Teacher\", \"Wedding\", \"Birthday\"). If one of these three pillars is missing, it cannot be a 10.\n\n2- The Product Noun Requirement: To get a 7 or 10, the tag MUST contain a noun representing the physical object being sold (e.g., \"Mug\", \"Shirt\", \"Ring\").\n\n3- The \"Style-Only\" Cap (Score 7): Tags that describe a product + a style/material but lack a specific recipient or gift intent are capped at 7. (e.g., \"Ceramic Coffee Mug\", \"Gold Hoop Earring\").\n\n4- The Aesthetic Trap (Score 4): Tags describing a lifestyle, a party theme, or a visual vibe (e.g., \"Coquette Tea Party\", \"Boho Decor\", \"Y2K Aesthetic\") are capped at 4, even if they contain a vague noun. They represent browsing, not buying.\n\n5- The DIY & Info Penalty (Score 1): Any tag indicating a search for knowledge, ideas, or tutorials (e.g., \"How to\", \"DIY\", \"Ideas\", \"Tips\", \"Recipe\") must be a 1.\n\n6- No Nuance: You must choose exactly 10, 7, 4, or 1. Any hesitation between two scores must result in the lower score to maintain the \"Strict Sniper\" philosophy.\n\n# Output Requirement\n- Return ONLY a valid JSON object.\n- NO introductory text, NO markdown code blocks (no ```json), NO conclusion.\n- Return ONLY the following JSON structure. NO markers, NO markdown:{\"output\": {\"keywords\": [{\"keyword\": \"string\", \"transactional_score\": number}]}}",
+          "batching": {
+            "batchSize": 8
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        16,
+        160
+      ],
+      "id": "8bd53401-b025-4138-90b3-2df3dbcdda16",
+      "name": "Transactionnal intention scoring",
+      "retryOnFail": true,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -624,
+        160
+      ],
+      "id": "7a8d0d03-0cf6-41da-931c-aada9a48b739",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n// On ne garde ici QUE les mots-clés pour l'instant\nreturn input.output.keywords.map(kw => ({ json: { keyword: kw } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -624,
+        672
+      ],
+      "id": "cfb7482c-1a3d-4786-af8c-471293909d02",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0b538f1c-c88a-4c3f-8c3a-ea646e292658",
+              "name": "Theme",
+              "value": "={{ $json.Theme }}",
+              "type": "string"
+            },
+            {
+              "id": "a0cc7596-2696-4e49-8fc2-e43180bea266",
+              "name": "Niche",
+              "value": "={{ $json.Niche }}",
+              "type": "string"
+            },
+            {
+              "id": "aa217682-521d-4ca9-9627-ce87b5e1a6e0",
+              "name": "SubNiche",
+              "value": "={{ $json.SubNiche }}",
+              "type": "string"
+            },
+            {
+              "id": "994aeac1-10d3-466e-ac92-1ea108164e5c",
+              "name": "ProductType",
+              "value": "={{ $json.ProductType }}",
+              "type": "string"
+            },
+            {
+              "id": "a76e2347-a814-4da1-bea7-5d01c6e00ac2",
+              "name": "output.keywords",
+              "value": "={{ JSON.stringify($json.output.keywords) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -864,
+        688
+      ],
+      "id": "be195baa-eb3b-4e88-9bac-01e08068186f",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Récupérer les mots-clés du batch actuel (25 items)\nconst batchItems = $input.all();\nconst keywordsList = batchItems.map(item => item.json.keyword);\n\n// 2. Récupérer le contexte une seule fois (depuis le nœud source, ex: \"Analyse Image\")\nconst globalData = $(\"Edit Fields\").first().json;\n\nreturn {\n  Theme: globalData.Theme,\n  Niche: globalData.Niche,\n  ProductType: globalData.ProductType,\n  keywordsBatch: keywordsList // Un tableau de 25 mots-clés\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        688
+      ],
+      "id": "fda875ed-6984-4848-b9fa-e6cbb3928e74",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst keywords = input.output.keywords;\nconst batchSize = 25;\nconst batches = [];\n\n// On découpe en paquets de 25\nfor (let i = 0; i < keywords.length; i += batchSize) {\n    batches.push({\n        json: {\n            Theme: input.Theme,\n            Niche: input.Niche,\n            ProductType: input.ProductType,\n            keywordsBatch: keywords.slice(i, i + batchSize)\n        }\n    });\n}\n\nreturn batches;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        160
+      ],
+      "id": "23cd4db3-879c-4e48-95ce-c4ecc927565e",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// On récupère tous les batches (les 8 items)\nconst allItems = $input.all();\nlet combinedKeywords = [];\n\n// On boucle sur chaque batch pour extraire les keywords scorés\nfor (const item of allItems) {\n    if (item.json.output && item.json.output.keywords) {\n        combinedKeywords = combinedKeywords.concat(item.json.output.keywords);\n    }\n}\n\n// On renvoie un objet unique contenant la liste totale\nreturn {\n    total_keywords: combinedKeywords.length,\n    keywords: combinedKeywords\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        160
+      ],
+      "id": "dbff56aa-7068-4bec-9cab-d979ccb25ff4",
+      "name": "Code in JavaScript3"
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "Theme": "Dark Academia & Gothic",
+          "Niche": "Alternative Fashion",
+          "SubNiche": "Y2K Goth Accessories",
+          "output": {
+            "keywords": [
+              "Goth belt",
+              "Gothic belt",
+              "Y2K belt",
+              "Punk belt",
+              "Grunge belt",
+              "Leather belt",
+              "Black belt",
+              "Fashion belt",
+              "Waist belt",
+              "Studded belt",
+              "Emo belt",
+              "Streetwear belt",
+              "Alternative belt",
+              "Womens belt",
+              "Mens belt",
+              "Unisex belt",
+              "Trendy belt",
+              "Cool belt",
+              "Retro belt",
+              "Vintage style belt",
+              "Designer belt",
+              "Statement belt",
+              "Hip belt",
+              "Jean belt",
+              "Pant belt",
+              "Dress belt",
+              "Outfit accessory belt",
+              "Belt for women",
+              "Belt for men",
+              "Stylish belt",
+              "Luxury belt",
+              "Costume belt",
+              "Party belt",
+              "Club belt",
+              "Festival belt",
+              "Rock belt",
+              "Metal belt",
+              "Chain belt",
+              "Buckle belt",
+              "Wide belt",
+              "Y2K goth belt",
+              "Dark academia belt",
+              "Rhinestone belt",
+              "Bling belt",
+              "Studded leather belt",
+              "Black goth belt",
+              "Grunge aesthetic belt",
+              "Alt fashion belt",
+              "Pop punk belt",
+              "McBling belt",
+              "Cyber y2k belt",
+              "Edgy fashion belt",
+              "Skull belt",
+              "Cross belt",
+              "Spike belt",
+              "Rivet belt",
+              "Grommet belt",
+              "Eyelet belt",
+              "Double grommet belt",
+              "PU leather belt",
+              "Vegan leather belt",
+              "Silver buckle belt",
+              "Graphic belt",
+              "Patterned belt",
+              "Bold belt",
+              "Chunky belt",
+              "Heavy duty belt",
+              "Western goth belt",
+              "Embroidered belt",
+              "Printed belt",
+              "Contrast stitch belt",
+              "Hot topic belt",
+              "Mall goth belt",
+              "Scene kid belt",
+              "2000s belt",
+              "90s belt",
+              "Nostalgia belt",
+              "Urban belt",
+              "Skater belt",
+              "Biker belt",
+              "Goth gift belt",
+              "Girlfriend gift belt",
+              "Boyfriend gift belt",
+              "Punk lover gift",
+              "Gen Z belt",
+              "Teen girl belt",
+              "Teen boy belt",
+              "Fashion lover belt",
+              "Streetwear gift belt",
+              "Birthday gift belt",
+              "Christmas gift belt",
+              "Valentine gift belt",
+              "Best friend belt",
+              "Sister gift belt",
+              "Brother gift belt",
+              "Concert outfit belt",
+              "Rave outfit belt",
+              "Festival gear belt",
+              "Cosplay belt",
+              "Halloween belt",
+              "Party outfit belt",
+              "Date night belt",
+              "School outfit belt",
+              "College gift belt",
+              "Graduation gift belt",
+              "Goth accessory gift",
+              "Y2K lover gift",
+              "Retro fan belt",
+              "Musician gift belt",
+              "Artist gift belt",
+              "Rebel gift belt",
+              "Edgy friend belt",
+              "Stylist gift belt",
+              "Influencer style belt",
+              "Fashionista belt",
+              "Cool kid belt",
+              "Niece gift belt",
+              "Nephew gift belt",
+              "Couple belts",
+              "Friendship belt",
+              "Cyber grunge belt",
+              "Fairy grunge belt",
+              "Whimsigoth belt",
+              "Dark luxury belt",
+              "Vampire goth belt",
+              "Witchy belt",
+              "Occult belt",
+              "Bat buckle belt",
+              "Spider web belt",
+              "Skeleton hand belt",
+              "Coffin belt",
+              "Pentagram belt",
+              "Harajuku belt",
+              "Visual kei belt",
+              "Egirl belt",
+              "Eboy belt",
+              "Glitch core belt",
+              "Webcore belt",
+              "Scenecore belt",
+              "Trashy y2k belt",
+              "Juicy vibe belt",
+              "Bimbocore belt",
+              "Mean girls belt",
+              "Bratz style belt",
+              "Star studded belt",
+              "Heart buckle belt",
+              "Butterfly belt",
+              "Dragon belt",
+              "Tribal print belt",
+              "Flame print belt",
+              "Checkerboard belt",
+              "Tattoo art belt",
+              "Graffiti belt",
+              "Spray paint belt",
+              "Distressed belt",
+              "Worn look belt",
+              "Upcycled style belt",
+              "Custom look belt",
+              "Unique goth belt",
+              "Rare find belt",
+              "Dark aesthetic belt",
+              "Moody fashion belt",
+              "Mysterious belt",
+              "Dramatic belt",
+              "Aggressive style belt",
+              "Bold accessory belt",
+              "Loud fashion belt",
+              "Vibrant goth belt",
+              "Neon goth belt",
+              "Pastel goth belt",
+              "Cute goth belt",
+              "Scary belt",
+              "Horror theme belt",
+              "Spooky belt",
+              "Creepy cute belt",
+              "Deadstock vibe belt",
+              "Thrift style belt",
+              "Vintage vibe belt",
+              "High fashion belt",
+              "Couture style belt",
+              "Runway look belt",
+              "Editorial belt",
+              "Photogenic belt",
+              "Instagram belt",
+              "TikTok trend belt",
+              "Viral product belt",
+              "Must have belt",
+              "Essential accessory belt",
+              "Wardrobe staple belt",
+              "Closet essential belt",
+              "Finishing touch belt",
+              "Waist cincher belt",
+              "Hip hugger belt",
+              "Low rise belt",
+              "High waist belt",
+              "Oversized belt",
+              "Skinny belt",
+              "Layering belt",
+              "Decoration belt",
+              "Waist jewelry belt"
+            ]
+          },
+          "Description": "",
+          "ProductType": "Belt",
+          "visual_aesthetic": "Y2K McBling fusion with Gothic Grunge and Streetwear, characterized by bold iconography and contrasting pop colors.",
+          "visual_typography": "No textual typography present; the design language relies entirely on symbolic gothic motifs and heavy metalwork to convey identity.",
+          "visual_graphics": "Repeated gothic cross patches (fleur-de-lis style), ornate silver Baroque-style buckles with deep relief, metal studs, skull motifs on belt keepers, and textured pebbled leather.",
+          "visual_colors": "Dominant Black base contrasted with vibrant Neon Pink, Lime Green, Bright Yellow, and Leopard Print patches; accented by cold, polished Silver/Chrome hardware.",
+          "visual_target_audience": "Gen Z fashion enthusiasts styling bold streetwear looks with nostalgic early 2000s statement accessories.",
+          "visual_overall_vibe": "A rebellious, high-energy fusion of dark gothic luxury and playful 2000s pop-punk nostalgia."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Structured Output Parser6": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Transactionnal intention scoring",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model10": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Transactionnal intention scoring",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transactionnal intention scoring": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Transactionnal intention scoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "41946d7c-e1ed-4d71-825d-a68c896d77be",
+  "meta": {
+    "instanceId": "cfd1401e3f0b2075dfe4693ad7a10a5d7ad8db7a3e3bef4f1f623f48b2a7a4ed"
+  },
+  "id": "IcuCp30iBBk0aL4T",
+  "tags": []
+}
