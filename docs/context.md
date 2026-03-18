@@ -628,3 +628,12 @@
     - `docs/generate-seo-logic.ts` — Reference doc for the full pipeline logic.
 
 - **Operational note**: Both Express routes (`analyze-image` and `generate-keywords`) now run on `http://localhost:3001`. The server must be restarted (`node --env-file=.env server.mjs`) whenever `server.mjs` changes. Use `npx nodemon --env-file=.env server.mjs` for auto-reload during development.
+
+### March 18th, 2026 — Image Analysis Fixes
+- **Fix**: The `analyseImage` local API was failing to return a `theme` and `niche` consistently.
+    - **Root Cause**: The second AI call (`PROMPT_TAXONOMY_MAPPING`) was not receiving the visual analysis context from the first AI call.
+    - **Fix**: Injected the visual analysis results and product details into the taxonomy prompt.
+    - **Hardening**: Made the prompt more explicit to ensure the AI *always* returns a `theme` and `niche`, even if it has to select "Others".
+    - **Data Structure**: Corrected the `mergeAnalysisResults` function to handle cases where the AI returns a single-element array instead of a plain object.
+- **Dev Experience**:
+    - **`nodemon`**: Installed `nodemon` and updated the `dev` script. The local Express server now auto-restarts on file changes, eliminating the need for manual server restarts.

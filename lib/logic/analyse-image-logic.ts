@@ -58,6 +58,9 @@ You are an E-commerce Database Architect. Your goal is to map visual data into a
 # Task
 Based on the visual analysis provided and product details, assign the most accurate Theme and Niche from lists provided. Give priority the user's themes and niches if you find one that corresponds, otherwise use PennySEO's themes and niches. If you are not sure or no theme or niche quite corresponds, select 'Others'. Then, create a high-potential Sub-niche.
 
+# Visual analysis:
+{{visualAnalysis}}
+
 {{formattedTaxonomyReport}}
 
 1. **Theme Selection:** Pick exactly ONE from the "USER'S THEMES" (priority) or "PennySEO THEMES" list. Use the name only.
@@ -91,18 +94,14 @@ export function formatTaxonomyLists(themes: TaxonomyItem[], niches: TaxonomyItem
   return `
 # Available Themes and Niches
 ### USER'S THEMES
-${t.user.join('
-')}
+${t.user.join("\\n")}
 ### PennySEO THEMES
-${t.system.join('
-')}
+${t.system.join("\\n")}
 ---
 ### USER'S NICHES
-${n.user.join('
-')}
+${n.user.join("\\n")}
 ### PennySEO NICHES
-${n.system.join('
-')}
+${n.system.join("\\n")}
   `.trim();
 }
 

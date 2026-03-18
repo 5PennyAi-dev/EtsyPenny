@@ -15,6 +15,7 @@ function extractJson(raw: string): string {
 }
 
 export async function POST(request: Request) {
+    console.log("Request received in analyze-image API route");
     try {
         const body: AnalyzeImagePayload = await request.json();
         const {
@@ -56,7 +57,21 @@ export async function POST(request: Request) {
         const formattedTaxonomy = formatTaxonomyLists(themes, niches);
 
         // Step 4: Taxonomy Mapping (AI Call #2)
-        const taxonomyPrompt = PROMPT_TAXONOMY_MAPPING.replace('{{formattedTaxonomyReport}}', formattedTaxonomy);
+        const visualAnalysisContext = `
+Aesthetic style: ${visualAnalysis.aesthetic_style}
+Typography details: ${visualAnalysis.typography_details}
+Graphic elements: ${visualAnalysis.graphic_elements}
+Color palette: ${visualAnalysis.color_palette}
+Target audience: ${visualAnalysis.target_audience}
+Overall Vibe: ${visualAnalysis.overall_vibe}
+`;
+
+        const taxonomyPrompt = PROMPT_TAXONOMY_MAPPING
+            .replace('{{visualAnalysis}}', visualAnalysisContext)
+            .replace('{{formattedTaxonomyReport}}', formattedTaxonomy);
+
+        console.log("Taxonomy Prompt:", taxonomyPrompt);
+
         const taxonomyMappingRaw = await runTextModel(taxonomyPrompt);
         const taxonomyMapping: TaxonomyMapping = JSON.parse(extractJson(taxonomyMappingRaw));
 

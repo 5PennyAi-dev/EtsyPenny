@@ -102,7 +102,10 @@ const PROMPT_TAXONOMY_MAPPING = `
 You are an E-commerce Database Architect. Your goal is to map visual data into a specific store taxonomy.
 
 # Task
-Based on the visual analysis provided and product details, assign the most accurate Theme and Niche from lists provided. Give priority the user's themes and niches if you find one that corresponds, otherwise use PennySEO's themes and niches. If you are not sure or no theme or niche quite corresponds, select 'Others'. Then, create a high-potential Sub-niche.
+Based on the visual analysis provided and product details, you MUST assign the most accurate Theme and Niche from the lists provided. You MUST always return a theme and a niche. Give priority to the user's themes and niches if you find one that corresponds, otherwise use PennySEO's themes and niches. If no theme or niche corresponds, you MUST select 'Others'. Then, create a high-potential Sub-niche.
+
+# Visual analysis:
+{{visualAnalysis}}
 
 {{formattedTaxonomyReport}}
 
@@ -141,15 +144,15 @@ ${n.system.join('\n')}`;
 }
 
 function mergeAnalysisResults(listingId, visualData, taxonomyData) {
+  const taxonomy = Array.isArray(taxonomyData) ? taxonomyData[0] : taxonomyData;
+  console.log("Taxonomy Data in mergeAnalysisResults:", taxonomy);
   return {
     listing_id: listingId,
-    output: {
-      visual_analysis: {
-        ...visualData,
-        theme: taxonomyData.theme,
-        niche: taxonomyData.niche,
-        "sub-niche": taxonomyData.sub_niche
-      }
+    visual_analysis: {
+      ...visualData,
+      theme: taxonomy?.theme || null,
+      niche: taxonomy?.niche || null,
+      "sub-niche": taxonomy?.sub_niche || null
     }
   };
 }
@@ -198,18 +201,38 @@ app.post('/api/seo/analyze-image', async (req, res) => {
 
     // Step 4: Taxonomy Mapping (Gemini Text)
     console.log('   Step 4: Running Gemini Taxonomy mapping...');
-    const taxonomyPrompt = `
-# Visual Analysis Input
-${JSON.stringify(visualAnalysis, null, 2)}
+    const visualAnalysisContext = `
+Aesthetic style: ${visualAnalysis.aesthetic_style}
+Typography details: ${visualAnalysis.typography_details}
+Graphic elements: ${visualAnalysis.graphic_elements}
+Color palette: ${visualAnalysis.color_palette}
+Target audience: ${visualAnalysis.target_audience}
+Overall Vibe: ${visualAnalysis.overall_vibe}
+`;
 
-` + PROMPT_TAXONOMY_MAPPING.replace('{{formattedTaxonomyReport}}', formattedTaxonomy);
+    const productDetailsContext = `
+#Product details:
+Product type: ${product_type}
+Product details: ${client_description}
+`;
+
+    const taxonomyPrompt = PROMPT_TAXONOMY_MAPPING
+        .replace('{{visualAnalysis}}', visualAnalysisContext)
+        .replace('{{formattedTaxonomyReport}}', formattedTaxonomy)
+        .replace('# Visual analysis:', `${productDetailsContext}\n# Visual analysis:`);
+
+    console.log("Taxonomy Prompt:", taxonomyPrompt);
+
     const taxonomyRaw = await runTextModel(taxonomyPrompt);
     const taxonomyMapping = JSON.parse(extractJson(taxonomyRaw));
+    console.log("Taxonomy Mapping Output:", taxonomyMapping);
     console.log(`   ✅ Theme: ${taxonomyMapping.theme}, Niche: ${taxonomyMapping.niche}`);
 
     // Step 5: Merge & Save via Edge Function
     console.log('   Step 5: Saving via edge function...');
     const finalAnalysis = mergeAnalysisResults(listing_id, visualAnalysis, taxonomyMapping);
+
+    console.log("Final Analysis Payload:", JSON.stringify(finalAnalysis, null, 2));
 
     const edgeFnUrl = `${SUPABASE_URL}/functions/v1/save-image-analysis`;
     const saveResponse = await fetch(edgeFnUrl, {
