@@ -1102,10 +1102,9 @@ const ProductStudio = () => {
     }
     setIsResettingPool(true);
     try {
-      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-      await axios.post(webhookUrl, {
-        action: 'resetPool',
+      const payload = {
         listing_id: listingId,
+        seo_mode: activeMode || 'balanced',
         parameters: {
             ...getStrategyValues(strategySelections),
             ...getSmartBadgePayload(),
@@ -1113,7 +1112,8 @@ const ProductStudio = () => {
             working_pool_count: userDefaults?.working_pool_count ?? 40,
             concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
         }
-      });
+      };
+      await axios.post('/api/seo/reset-pool', payload);
       toast.success('Keywords pool reset successfully!');
       await handleLoadListing(listingId);
     } catch (err) {
@@ -1135,10 +1135,9 @@ const ProductStudio = () => {
 
     setIsApplyingStrategy(true);
     try {
-      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-      await axios.post(webhookUrl, {
-        action: 'resetPool',
+      const payload = {
         listing_id: listingId,
+        seo_mode: activeMode || 'balanced',
         pinned_count: pinnedCount,
         parameters: {
             ...parameters, 
@@ -1147,7 +1146,8 @@ const ProductStudio = () => {
             working_pool_count: userDefaults?.working_pool_count ?? 40,
             concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
         }
-      });
+      };
+      await axios.post('/api/seo/reset-pool', payload);
       toast.success('Strategy update triggered! Your results will refresh in a few seconds.');
       await handleLoadListing(listingId);
     } catch (err) {

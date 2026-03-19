@@ -422,15 +422,15 @@ function selectAndScore(keywords, params) {
     });
     const ceil = 10000000;
     const visibility = Math.min(100, Math.round((Math.log10(Math.max(1, totalMarketReach)) / Math.log10(ceil)) * 100));
-    const avgTrans = selected.reduce((a, k) => a + (k.transactional_score || 5), 0) / selected.length;
-    const avgCPC = selected.reduce((a, k) => a + (k.cpc || 0), 0) / selected.length;
+    const avgTrans = selected.reduce((a, k) => a + (Number(k.transactional_score) || 5), 0) / selected.length;
+    const avgCPC = selected.reduce((a, k) => a + (Number(k.cpc) || 0), 0) / selected.length;
     const cpcS = Math.min(10, (avgCPC / 2.5) * 10);
     const conversion = (avgTrans * 5) + (cpcS * 5);
-    const avgNiche = selected.reduce((a, k) => a + (k.niche_score || 5), 0) / selected.length;
+    const avgNiche = selected.reduce((a, k) => a + (Number(k.niche_score) || 5), 0) / selected.length;
     const relevance = avgNiche * 10;
-    const sorted = [...selected].sort((a, b) => (a.competition || 1) - (b.competition || 1));
+    const sorted = [...selected].sort((a, b) => (Number(a.competition) || 1) - (Number(b.competition) || 1));
     const top5 = sorted.slice(0, 5);
-    const avgBestComp = top5.reduce((a, k) => a + (k.competition || 0.9), 0) / top5.length;
+    const avgBestComp = top5.reduce((a, k) => a + (Number(k.competition) || 0.9), 0) / top5.length;
     const competition = Math.round(Math.pow(1 - Math.min(0.99, avgBestComp), 0.3) * 100);
     const cpcAll = Math.min(100, (avgCPC / 2.5) * 100);
     const transS = avgTrans * 10;
@@ -443,7 +443,7 @@ function selectAndScore(keywords, params) {
       stats: {
         total_keywords: selected.length,
         avg_cpc: parseFloat(avgCPC.toFixed(2)),
-        avg_competition_all: parseFloat((selected.reduce((a, k) => a + (k.competition || 0.8), 0) / selected.length).toFixed(2)),
+        avg_competition_all: parseFloat((selected.reduce((a, k) => a + (Number(k.competition) || 0.8), 0) / selected.length).toFixed(2)),
         best_opportunity_comp: parseFloat(avgBestComp.toFixed(2)),
         raw_visibility_index: Math.round(totalPowerIndex),
         est_market_reach: Math.round(totalMarketReach),
@@ -571,10 +571,268 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// ─── HELPER: APPLY SEO FILTER (from PennySEO Filter node) ─
+export function applySEOFilter(keywords, params) {
+  if (!keywords || keywords.length === 0) return [];
+
+  const maxRefCPC = 2.5;
+  const maxVol = Math.max(...keywords.map(k => k.search_volume || k.volume || 0), 100);
+
+  const MIN_TRANSACTIONAL = 5;
+  const MIN_NICHE = 2;
+
+  const processed = keywords.map(item => {
+    const vol = item.search_volume || item.volume || 0;
+    const rawComp = (item.competition !== null && item.competition !== undefined) ? Number(item.competition) : 0.5;
+    const txScore = item.transactional_score || 5;
+    const nicheScore = item.niche_score || 5;
+    const rawCPC = item.cpc || 0;
+
+    if (txScore < MIN_TRANSACTIONAL || nicheScore < MIN_NICHE) return null;
+
+    const V = Math.log(vol + 1) / Math.log(maxVol + 1);
+    const C = 1 - rawComp;
+    const T = Math.pow(txScore / 10, 2);
+    const N = Math.pow(nicheScore / 10, 2);
+    const E = Math.min(1, rawCPC / maxRefCPC);
+
+    let finalScore = 100 * (
+      Math.pow(V || 0.01, params.Volume) *
+      Math.pow(C || 0.01, params.Competition) *
+      Math.pow(T || 0.01, params.Transaction) *
+      Math.pow(N || 0.01, params.Niche) *
+      Math.pow(E || 0.01, params.CPC)
+    );
+
+    const wordCount = (item.keyword || item.tag || '').split(' ').filter(w => w.length > 0).length;
+    if (wordCount >= 3) finalScore *= 1.1;
+
+    const history = [...(item.volume_history || [])];
+    while (history.length < 12) history.push(0);
+
+    const currentMonth = history[0];
+    const recentAvg = (history[0] + history[1] + history[2]) / 3;
+    const pastMonths = history.slice(3, 12);
+    const historicalAvg = pastMonths.reduce((a, b) => a + b, 0) / (pastMonths.length || 1) || 1;
+
+    const isDropping = currentMonth < (history[1] * params.trending_dropping_threshold);
+    const isTrending = !isDropping && (recentAvg > historicalAvg * params.trending_growth_factor) && currentMonth > params.trending_current_month_min_volume;
+
+    const nonZeroHistory = history.filter(v => v > 0);
+    const minVol = nonZeroHistory.length > 0 ? Math.min(...nonZeroHistory) : 0;
+    const maxVolInHistory = Math.max(...history, 0);
+    const stabilityRatio = maxVolInHistory / (minVol || 1);
+
+    const isEvergreen = !isTrending &&
+                        vol > params.evergreen_avg_volume &&
+                        stabilityRatio < params.evergreen_stability_ratio &&
+                        minVol > (vol * params.evergreen_minimum_volume);
+
+    const isPromising = finalScore > params.promising_min_score && rawComp < params.promising_competition;
+
+    return {
+      ...item,
+      opportunity_score: Math.round(finalScore),
+      status: { trending: isTrending, evergreen: isEvergreen, promising: isPromising },
+      is_pinned: item.is_pinned || false
+    };
+  }).filter(i => i !== null);
+
+  processed.sort((a, b) => {
+    if (a.is_pinned && !b.is_pinned) return -1;
+    if (!a.is_pinned && b.is_pinned) return 1;
+    return b.opportunity_score - a.opportunity_score;
+  });
+
+  const selectedTags = [];
+  const conceptTracker = {};
+  const TAG_COUNT = 200;
+
+  for (const item of processed) {
+    if (selectedTags.length >= TAG_COUNT) break;
+    const concept = (item.keyword || item.tag || '').toLowerCase().split(' ').slice(0, 2).join(' ');
+    conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;
+    if (conceptTracker[concept] <= params.concept_diversity_limit) {
+      selectedTags.push(item);
+    }
+  }
+
+  return selectedTags.map((item, index) => {
+    const isInTopSelection = index < (params.ai_selection_count || 13);
+    const isInPool = index < (params.working_pool_count || 40);
+    return {
+      ...item,
+      is_selection_ia: isInTopSelection,
+      is_current_eval: isInTopSelection,
+      is_current_pool: isInPool,
+    };
+  });
+}
+
+// ─── API ROUTE: POST /api/seo/reset-pool ──────────────────
+app.post('/api/seo/reset-pool', async (req, res) => {
+  try {
+    const { listing_id, seo_mode = 'balanced' } = req.body;
+    if (!listing_id) {
+      return res.status(400).json({ error: 'Missing listing_id' });
+    }
+
+    console.log(`\n🔄 [reset-pool] Starting for listing ${listing_id}`);
+
+    // 1. Fetch keywords for the listing
+    const { data: keywords, error: kwError } = await supabaseAdmin
+      .from('listing_seo_stats')
+      .select('*')
+      .eq('listing_id', listing_id);
+
+    if (kwError) throw kwError;
+    if (!keywords || keywords.length === 0) {
+      return res.status(404).json({ error: 'No keywords found for this listing' });
+    }
+
+    // 2. Fetch the listing owner
+    const { data: listing, error: listingError } = await supabaseAdmin
+      .from('listings')
+      .select('user_id')
+      .eq('id', listing_id)
+      .single();
+
+    if (listingError || !listing) throw listingError || new Error("Listing not found");
+
+    // 3. Fetch user settings from view
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from('v_user_seo_active_settings')
+      .select('*')
+      .eq('user_id', listing.user_id)
+      .single();
+
+    if (settingsError || !settings) throw settingsError || new Error("Settings not found");
+
+    const params = {
+      Volume: settings.param_volume ?? 0.25,
+      Competition: settings.param_competition ?? 0.15,
+      Transaction: settings.param_transaction ?? 0.35,
+      Niche: settings.param_niche ?? 0.25,
+      CPC: settings.param_cpc ?? 0,
+      evergreen_stability_ratio: settings.evergreen_stability_ratio ?? 4,
+      evergreen_minimum_volume: settings.evergreen_minimum_volume ?? 0.3,
+      evergreen_avg_volume: settings.evergreen_avg_volume ?? 50,
+      trending_dropping_threshold: settings.trending_dropping_threshold ?? 0.8,
+      trending_current_month_min_volume: settings.trending_current_month_min_volume ?? 150,
+      trending_growth_factor: settings.trending_growth_factor ?? 1.5,
+      promising_min_score: settings.promising_min_score ?? 55,
+      promising_competition: settings.promising_competition ?? settings.promosing_competition ?? 0.4,
+      ai_selection_count: settings.ai_selection_count || 13,
+      working_pool_count: settings.working_pool_count || 40,
+      concept_diversity_limit: settings.concept_diversity_limit || 5
+    };
+
+    // Override with incoming parameters
+    const finalParams = { ...params, ...(req.body.parameters || {}) };
+
+    // 4. Apply filter
+    const filteredKeywords = applySEOFilter(keywords, finalParams);
+
+    // 4.5 Reset flags for all keywords before applying the new ones
+    await supabaseAdmin
+      .from('listing_seo_stats')
+      .update({
+        is_selection_ia: false,
+        is_current_eval: false,
+        is_current_pool: false
+      })
+      .eq('listing_id', listing_id)
+      .eq('is_competition', false);
+
+    // 5. Update keywords in DB
+    const updates = filteredKeywords.map(kw => ({
+      id: kw.id,
+      listing_id: kw.listing_id,
+      tag: kw.tag,
+      opportunity_score: kw.opportunity_score,
+      is_trending: kw.status.trending,
+      is_evergreen: kw.status.evergreen,
+      is_promising: kw.status.promising,
+      is_selection_ia: kw.is_selection_ia,
+      is_current_eval: kw.is_current_eval,
+      is_current_pool: kw.is_current_pool,
+      is_pinned: kw.is_pinned
+    }));
+
+    const { error: updateError } = await supabaseAdmin
+      .from('listing_seo_stats')
+      .upsert(updates, { onConflict: 'id' });
+
+    if (updateError) throw updateError;
+
+    // 6. Calculate new listing strength using selectAndScore logic as fallback
+    const { strength } = selectAndScore(filteredKeywords, finalParams);
+    
+    if (strength) {
+      await supabaseAdmin
+        .from('listings')
+        .update({
+           listing_strength: strength.listing_strength,
+           visibility_score: strength.breakdown.visibility,
+           relevance_score: strength.breakdown.relevance,
+           conversion_score: strength.breakdown.conversion,
+           competition_score: strength.breakdown.competition,
+           profit_score: strength.breakdown.profit,
+           est_market_reach: strength.stats.est_market_reach
+        })
+        .eq('id', listing_id);
+
+      // Check if global eval exists for this mode
+      const { data: existingEvalRows } = await supabaseAdmin
+        .from('listings_global_eval')
+        .select('id')
+        .eq('listing_id', listing_id)
+        .eq('seo_mode', seo_mode);
+
+      const evalPayload = {
+        listing_id,
+        seo_mode,
+        listing_strength: strength.listing_strength,
+        listing_visibility: strength.breakdown.visibility,
+        listing_conversion: strength.breakdown.conversion,
+        listing_relevance: Math.round(strength.breakdown.relevance),
+        listing_competition: strength.breakdown.competition,
+        listing_profit: strength.breakdown.profit,
+        listing_est_market_reach: strength.stats.est_market_reach,
+        param_Volume: finalParams.Volume,
+        param_Competition: finalParams.Competition,
+        param_Transaction: finalParams.Transaction,
+        param_Niche: finalParams.Niche,
+        param_cpc: finalParams.CPC,
+        updated_at: new Date().toISOString()
+      };
+
+      if (existingEvalRows?.length > 0) {
+        await supabaseAdmin
+          .from('listings_global_eval')
+          .update(evalPayload)
+          .eq('id', existingEvalRows[0].id);
+      } else {
+        await supabaseAdmin
+          .from('listings_global_eval')
+          .insert(evalPayload);
+      }
+    }
+
+    console.log(`   ✅ Pool reset complete for ${listing_id}`);
+    return res.json({ success: true, processed: filteredKeywords.length, top_selections: filteredKeywords.filter(k => k.is_selection_ia).length, strength });
+
+  } catch (error) {
+    console.error('❌ [reset-pool] Error:', error.message || error);
+    return res.status(500).json({ error: 'Failed to reset pool.', details: error.message || 'Unknown error' });
+  }
+});
+
 // ─── START ────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🚀 EtsyPenny API server running on http://localhost:${PORT}`);
   console.log(`   POST /api/seo/analyze-image`);
   console.log(`   POST /api/seo/generate-keywords`);
+  console.log(`   POST /api/seo/reset-pool`);
   console.log(`   GET  /api/health\n`);
 });
