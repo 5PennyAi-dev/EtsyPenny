@@ -637,3 +637,243 @@
     - **Data Structure**: Corrected the `mergeAnalysisResults` function to handle cases where the AI returns a single-element array instead of a plain object.
 - **Dev Experience**:
     - **`nodemon`**: Installed `nodemon` and updated the `dev` script. The local Express server now auto-restarts on file changes, eliminating the need for manual server restarts.
+
+- [Sync] Committed and pushed latest architectural changes (local API migration for analyze-image, generate-keywords, and reset-pool).
+- [Architecture] Unified the keyword filtering and analysis logic into the local server (`server.mjs`), reducing dependency on untracked cloud workflows.
+- [QA] Added test scripts (`test-filter-logic.ts`, `test-reset-pool.ts`) and database documentation for the new local SEO pipeline.
+- [Sync] Staged and committed core untracked logic in `lib/seo/filter-logic.ts` to ensure repository integrity.
+
+## 6. Session Handover (2026-03-19)
+### Summary of Achievements
+- **Local API Transition**: Successfully transitioned `analyseImage`, `generate-keywords`, and `reset-pool` actions to a local Express server.
+- **Data Integrity**: Capped keyword volumes (`> 1M`, `< 10`) to maintain tool credibility and normalized trend displays.
+    - **Features**: Real-time search filtering, inline "Add" row, duplicate name detection (Supabase unique constraint → toast error), delete with confirmation, loading states.
+    - **Integration**: Added as the third `<Accordion>` section ("Global Taxonomy" with emerald Globe icon) in `AdminSystemPage.jsx`, below "Intelligence Thresholds". No DB migration needed — tables already existed with the correct schema.
+
+- **Settings Page Accordion Refactor** (2026-03-08):
+    - **Refactor**: Rewrote `UserSettings.jsx` from flat multi-column layout + sticky sidebar to a clean 4-accordion design matching the Admin panel.
+    - **Removed**: "Current Live Values" sidebar (`liveValues` state, `fetchLiveValues()` function) — freed horizontal space.
+    - **Accordion 1**: "SEO Strategy Weights" (Sliders icon, indigo) — 5 segmented controls in 2-col grid.
+    - **Accordion 2**: "Smart Badge Sensitivity" (Zap icon, amber) — 3 segmented controls.
+    - **Accordion 3**: "Analysis Constraints" (BarChart3 icon, amber + Premium badge) — 3 numeric inputs.
+    - **Accordion 4**: "My Shop Identity" (Tags icon, emerald) — Uses `UserTaxonomyManagement.jsx` component (`src/components/settings/UserTaxonomyManagement.jsx`) mirroring the Admin's `TaxonomyManagement` pattern: tabbed table layout (My Themes / My Niches), search bar, inline editing, favorite star (★) toggle, add/delete rows. Operates on `user_custom_themes` and `user_custom_niches` tables scoped to the current user.
+    - **Preserved**: All existing settings state management, `handleSave`, `handleMultiSettingChange`, `renderSegmentedControl`.
+
+- **RLS Policies for Custom Taxonomy** (2026-03-08):
+    - **Fix**: `is_favorite` toggle on custom niches was not persisting because RLS was enabled on `user_custom_niches` table without proper policies.
+    - **Migration**: `add_rls_policies_user_custom_taxonomy` — added full CRUD policies (SELECT, INSERT, UPDATE, DELETE) scoped to `auth.uid() = user_id` on both `user_custom_niches` and `user_custom_themes`.
+
+- **Taxonomy Form Dropdowns** (2026-03-10):
+    - **Feature**: Replaced the plain text `<input>` fields for "Theme" and "Niche" in `OptimizationForm.jsx` with `<select>` dropdowns.
+    - **Data**: These dropdowns are now dynamically populated on load by concurrently fetching active rows from the `system_themes` and `system_niches` Supabase tables alongside product categories.
+    - **Graceful Fallback**: The UI natively supports legacy text values (e.g. from history rehydration) by rendering a custom `<option>` when the string does not belong to the active system taxonomy, ensuring zero data loss during the transition.
+    
+- **Unified Product Types** (2026-03-10):
+    - **Feature**: Transitioned from plain text `product_type_text` storage to a unified UUID-based system via `v_combined_product_types` view, blending `product_types` and `user_custom_product_types`.
+    - **Frontend**: `ProductTypeCombobox.jsx` fetches and groups a flat list into System vs Custom categories. Custom types visually distinguished.
+    - **Integration**: `ProductStudio.jsx` introduces `ensureProductType` helper to intercept custom strings, INSERT them into `user_custom_product_types`, handle conflicts, and return the `product_type_id` before saving to `listings`.
+    - **Cleanup**: Removed all legacy `product_type_text` usage across `HistoryPage`, `CreatePresetModal`, `ResultsDisplay`, and Webhook payloads. Flow relies entirely on explicit UUID-linked names or text fallbacks where appropriate.
+    - **Fix (RLS)**: Applied missing RLS policies (`auth.uid() = user_id`) to the `user_custom_product_types` table to resolve silent INSERT failures when users attempted to save a custom product type.
+    - **Fix (Trigger)**: Fixed a database trigger `check_if_product_type_exists_in_system` that was causing `relation "public.system_product_types" does not exist` errors when saving new custom types, by correcting the referenced table to `public.product_types`.
+    - **Fix (Constraint)**: Dropped the stale `listings_product_type_id_fkey` constraint on the `listings` table, allowing `product_type_id` to legally accept UUIDs generated from the `user_custom_product_types` table.
+    - **Fix (Loading)**: Removed an outdated implicit `product_types(name)` join from `handleLoadListing` in `ProductStudio.jsx` which was causing a `PGRST200` relation error after the foreign key was successfully dropped.
+    - **Fix (Hydration)**: Replaced rendering of the deprecated `product_type_text` column with a dynamic fetch from the `v_combined_product_types` view using the `product_type_id` during listing load to ensure custom and system product types appear correctly after refresh.
+
+- **Minor Polish** (2026-03-11):
+    - **App Icon**: Updated `index.html` to point to the correct `favicon.ico` asset instead of the default Vite boilerplate SVG.
+
+### March 12th, 2026 - Landing Page & UI Polish
+- **Feature**: Built and integrated a new "Coming Soon" Landing Page component for PennySEO (`LandingPage.jsx`).
+    - **UI Design**: A clean, 2-column Hero section on desktop featuring dynamic waitlist email capture and a preview image of the PennySEO dashboard (`dashboard_preview.jpg`).
+    - **Visuals**: Employs a SaaS aesthetic utilizing a `slate-50` background with striking Indigo and Orange accents.
+    - **Branding**: Integrated PennySEO logo and 5PennyAi company logo ("Powered by 5PennyAi") in the navigation.
+- **UI Refinement**: Optimized the "Keyword Performance" table in `ResultsDisplay.jsx`.
+    - Widened "Conv. Intent." and "Relevance" columns to 10% each.
+    - Added `whitespace-nowrap` to headers and badges to ensure "VERY HIGH" pills never wrap onto two lines.
+- **Routing Integration**: Configured the React Router in `App.jsx` to natively display the Landing Page at the absolute root URL (`/`), migrating the protected application gateway functionally down to `/dashboard`.
+
+- **Analysis Constraints in Webhook Payloads** (2026-03-12):
+    - Added `ai_selection_count`, `working_pool_count`, and `concept_diversity_limit` to all 5 webhook `parameters` blocks in `ProductStudio.jsx`: `generate_seo`, `userKeyword`, `addFromFavorites`, and both `resetPool` calls (handleResetPool + handleApplyStrategy).
+    - Values sourced from `userDefaults` (fetched from `v_user_seo_active_settings` view at mount). Defaults: 13, 40, 3 respectively.
+    - These fields allow the n8n backend to respect per-user analysis constraints for AI keyword selection count, working pool size, and concept diversity limits.
+
+- **Competition Badge Threshold Update** (2026-03-12):
+    - Updated the color thresholds for the Competition column badge in the Keyword Performance table (`ResultsDisplay.jsx`).
+    - **Old values**: Green `< 0.3`, Amber `0.3–0.7`, Rose `≥ 0.7`.
+    - **New values**: Green `< 0.5` (Real opportunity), Amber `0.5–0.9` (Standard/active niche), Rose `≥ 0.9` (Saturated market).
+
+- **Trending Growth Factor Parameter** (2026-03-13):
+    - **Problem**: The new `trending_growth_factor_id` column in `user_settings` was not being saved when modifying the Trending Growth threshold in the Settings page, and was not being sent to n8n webhooks.
+    - **Fix (UserSettings.jsx)**: Added `trending_growth_factor_id: null` to the initial settings state. Added `'trending_growth_factor'` to the `subKeyMap.trending` array in `handleMultiSettingChange`, so selecting a Trending Growth level now auto-resolves and saves the matching `trending_growth_factor` constant ID alongside the existing `trending_dropping_id` and `trending_current_month_min_id`.
+    - **Fix (ProductStudio.jsx)**: Added `trending_growth_factor: userDefaults.trending_growth_factor` to the `getSmartBadgePayload()` helper function, which feeds all 5 n8n webhook payloads (`generate_seo`, `userKeyword`, `addFromFavorites`, and both `resetPool` calls).
+
+### March 14th, 2026 - Add Custom Keyword Stale State Fix
+
+- **Critical Bug Fix: "Add Custom Keyword" / "Add from Favorites" Not Working After Fresh Analysis**
+    - **Symptom**: After running a fresh SEO analysis (without page refresh), clicking "Add Custom Keyword" or "Add from Favorites" would silently fail — no webhook fired, no toast, no error. After a manual page refresh, the same buttons worked perfectly.
+    - **Root Cause (Diagnosed via Toast Diagnostics)**: 
+        - `handleAnalyzeDesign` sets `results = { imageUrl: "..." }` (partial object, **no `analytics` property**) before SEO analysis begins.
+        - After SEO completes, `handleLoadListing` sets proper `results` with `analytics`. However, the `handleAddCustomKeyword` closure still held the partial `results` from the earlier render.
+        - Guard check `if (!freshResults.analytics)` silently returned because `analytics` was `undefined` on the partial object.
+        - Both closure variables AND `latestRef.current` captured the same stale value — the ref pattern didn't help because both were updated from the same React render cycle.
+    - **Fix (ProductStudio.jsx)**:
+        - **Removed `useMemo` wrapper** from `MemoizedResultsDisplay` — now renders `<ResultsDisplay>` directly, ensuring all callback props are always fresh on every render.
+        - **Eliminated `results.analytics` dependency** in `handleAddCustomKeyword` — duplicate check now **queries Supabase directly** (`listing_seo_stats` table) instead of reading from potentially stale `results.analytics`.
+        - **Direct closure variables** used for webhook payload (`userDefaults`, `strategySelections`, `visualAnalysis`) with `latestRef` as fallback for `imageUrl`.
+        - Added `latestRef` pattern (always-fresh ref updated every render) as safety net for async handlers.
+    - **Fix (Accordion.jsx)**: Added `useEffect` to auto-open accordion when `defaultOpen` transitions from `false` to `true` (previously only checked on mount).
+    - **Fix (handleAddBatchKeywords)**: Updated payload to use `freshResults` and `freshVisualAnalysis` from `latestRef` instead of stale closure variables.
+    - **Database Migration**: Added unique constraint on `listing_seo_stats(listing_id, tag)` to support upsert operations (`20260314_unique_listing_tag_constraint.sql`).
+
+- **SEO Analysis Parent Accordion** (2026-03-14):
+    - **Goal**: Reduce visual clutter in the main content area by wrapping the entire SEO results section (AuditHeader + StrategyTuner + Keyword Performance table) inside a single collapsible parent `<Accordion>` in `ResultsDisplay.jsx`.
+    - **Header**: Displays "SEO Analysis" label with `BarChart3` icon, a color-coded score badge (emerald ≥80, amber 50-79, rose <50), and a loading spinner when insight generation is in progress.
+    - **Controlled State**: `isSeoAnalysisOpen` state lifted to `ProductStudio.jsx` and passed down as `seoAnalysisOpen` / `onSeoAnalysisOpenChange` props. Auto-opens on analysis completion (`handleAnalyze`) and listing load (`handleLoadListing`). Auto-closes on "New Listing" click for a clean slate.
+
+- **Post-SEO Flow Optimization** (2026-03-14):
+    - **Problem**: After `save-seo` edge function completed, the `postSeoTrigger` effect would first call `handleLoadListing` (fetching full data), then immediately call `handleApplyStrategy` (which also calls `handleLoadListing` internally), resulting in a redundant double-load.
+    - **Fix**: When `shouldAutoResetPoolRef.current` is true, the post-SEO flow now skips the intermediate `handleLoadListing` and goes directly to `handleApplyStrategy`, which performs its own single final load. Toast message updated to "Optimizing keyword pool..." for the auto-reset path.
+
+- **Backend resetPool Orchestration** (2026-03-15):
+    - **Problem**: If the user navigated away before `generateSEO` completed, the client-side `resetPool` call would never fire.
+    - **Fix**: Moved `resetPool` trigger logic entirely to the `save-seo` Supabase Edge Function. The `save-seo` function now reads a `trigger_reset_pool` flag from the n8n payload. If `true`, it fetches user settings from `v_user_seo_active_settings`, constructs the `resetPool` payload, and fires the n8n webhook server-side as a fire-and-forget.
+    - **Loop Prevention**: When `trigger_reset_pool` is true, the listing is NOT set to `SEO_DONE` by that call. The subsequent `resetPool` action calls `save-seo` again WITHOUT this flag, which then sets `SEO_DONE` and `is_generating_seo = false`.
+    - **Payload Parsing Fix**: Corrected array-unwrapping for n8n bodies (both top-level and `results` are unwrapped with `Array.isArray` checks).
+    - **Webhook URL Fix**: Changed from hardcoded test URL to `N8N_WEBHOOK_URL_RESET_POOL` env var — test webhook only works when n8n is in test mode; production requires the activation URL.
+    - **Frontend Cleanup**: Removed `shouldAutoResetPoolRef` and its `useEffect` from `ProductStudio.jsx`.
+
+- **Keyword Table: Data Normalization for Low-Volume Keywords** (2026-03-15):
+    - **Goal**: Avoid displaying misleading "0", aggressive red trend lines, or meaningless competition scores for keywords below the API's measurement threshold.
+    - **Implementation**: Added an `isLowVolume` flag (`volume < 10`) computed per row in `ResultsDisplay.jsx`.
+    - **Volume column**: Shows `"< 10"` (slate-400) instead of "0".
+    - **Trend column**: Hides the `Sparkline` and shows a neutral `—` dash (slate-300) for low-volume rows.
+    - **Competition column**: Shows `"N/A"` (slate-300) for low-volume rows, overriding the colored badge.
+    - **CPC column**: Changed the empty state from "N/A" text to a `—` dash (slate-300) for all rows.
+    - **Row opacity**: Low-volume rows that are selected get `opacity-60`; unselected low-volume rows get `opacity-40` (stacked on existing `opacity-60`).
+
+### Immediate Next Steps
+1.  Add `N8N_WEBHOOK_URL_RESET_POOL` to Supabase Edge Function secrets (production webhook URL for the resetPool n8n workflow).
+2.  Redeploy the `save-seo` edge function with the latest changes.
+3.  Test the end-to-end `generateSEO → save-seo → resetPool` flow by closing the browser mid-generation and verifying `resetPool` is triggered from the backend.
+4.  Update n8n `generate_seo` workflow to include `"trigger_reset_pool": true` in the payload sent to `save-seo`.
+
+---
+
+### March 17th, 2026 — Local API Server: Analyse Design Migrated Off n8n
+
+- **Architecture Change: `analyseImage` no longer uses n8n webhook.**
+  - The "Analyse Design" button in `ProductStudio.jsx` (`handleAnalyzeDesign`) previously fired a fire-and-forget POST to the n8n webhook with `action: "analyseImage"`.
+  - It now calls a **local Express API server** at `/api/seo/analyze-image` instead.
+
+- **New file: `server.mjs`** — Standalone Express server on port `3001`.
+  - Full pipeline inline: Gemini Vision → Supabase taxonomy fetch → Gemini taxonomy mapping → `save-image-analysis` Edge Function.
+  - Visual analysis context is **injected into the taxonomy prompt** (prepended as `# Visual Analysis Input`) to fix `theme: undefined` / `niche: undefined` mapping failures.
+  - Uses `gemini-2.0-flash` for both vision and text models.
+  - All secrets (`GOOGLE_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `N8N_WEBHOOK_SECRET`) are loaded server-side only via `--env-file=.env` — **never exposed to the frontend**.
+
+- **`vite.config.js` updated** — Added `server.proxy` block: `/api` → `http://localhost:3001`. Frontend calls `/api/seo/analyze-image` and Vite transparently forwards it to Express, eliminating CORS issues.
+
+- **`package.json` scripts updated**:
+  - `npm run dev` → runs **both** Express API + Vite concurrently (via `concurrently`).
+  - `npm run dev:api` → Express API only.
+  - `npm run dev:vite` → Vite frontend only.
+
+- **New dependencies**: `express` (runtime), `concurrently` (runtime, used in dev script).
+
+- **Tech Stack update**: AI vision route is now served locally (Node.js/Express), removing dependency on n8n for the `analyseImage` action. n8n is still used for `generate_seo`, `drafting_seo`, `userKeyword`, `addFromFavorites`, `generateInsight`, `competitionAnalysis`, `resetPool`.
+
+- **Keyword Table: High-Volume Outlier Cap** (2026-03-15):
+    - **Goal**: Prevent display of statistically implausible volumes (e.g. "17,342,342") that erode tool credibility.
+    - **Implementation**: Added `isHighVolume` flag (`volume >= 1,000,000`) per row in `ResultsDisplay.jsx`.
+    - **Volume column**: Shows `"> 1M"` in bold indigo text for keywords at peak saturation — sorting remains accurate since `row.volume` is unchanged.
+    - **Reasoning**: For Etsy sellers, 1M and 17M are strategically identical (unrankable main terms); capping avoids implying false precision.
+
+- **SEO Lab Preset Pill Removal** (2026-03-15):
+    - Removed the redundant `Preset` pill badge from each row in the My Presets tab in `SEOLab.jsx`. It was uninformative since every row in that tab is already a preset by definition.
+
+---
+
+### March 17th, 2026 — SEO Generation Migrated to Local API Server
+
+- **Architecture Change: `generate_seo` no longer uses n8n webhook.**
+    - The "Analyse" button in `ProductStudio.jsx` (`handleAnalyze`) previously fired a fire-and-forget POST to the n8n webhook with `action: "generate_seo"`, then relied on a Supabase Realtime listener + 5s polling fallback to detect `SEO_DONE`.
+    - It now calls a **local Express API server** at `/api/seo/generate-keywords` (synchronous, ~30s) and `await`s the response directly.
+    - After the call returns, a **1.5s delay** is inserted (`await new Promise(r => setTimeout(r, 1500))`) to allow the `save-seo` edge function's pool reset (`is_current_pool` DB writes) to fully commit before `handleLoadListing` reads the results — eliminating a race condition where all keywords (not just `is_current_pool = true`) were displayed immediately after generation.
+
+- **New file: `app/api/seo/generate-keywords/route.ts`** — Full SEO keyword pipeline:
+    1. Gemini generates keyword ideas from product context + visual analysis.
+    2. DataForSEO enriches with real search volume, competition, CPC, and 12-month history.
+    3. Niche scoring (`lib/seo/niche-scoring.ts`) and transactional scoring (`lib/seo/transactional-scoring.ts`) applied per keyword.
+    4. LSI (Latent Semantic Indexing) relevance score calculated.
+    5. Results persisted via the `save-seo` Supabase Edge Function (which handles pool reset, multi-mode upserts, and sets `is_generating_seo = false` + `status_id = SEO_DONE`).
+
+- **`server.mjs` updated** — Added `POST /api/seo/generate-keywords` Express route, loading and executing `app/api/seo/generate-keywords/route.ts` via `tsx`.
+
+- **`ProductStudio.jsx` — `handleAnalyze` updated**:
+    - Replaced the N8N fire-and-forget + Realtime listener pattern with a single `await axios.post('/api/seo/generate-keywords', payload)`.
+    - After response, waits 1.5s then calls `handleLoadListing` directly to render final results.
+    - The Realtime subscription and polling fallback remain in the codebase for `is_image_analysed` image analysis events — they are no longer used for the SEO generation flow.
+
+- **n8n still used for**: `drafting_seo`, `userKeyword`, `addFromFavorites`, `generateInsight`, `competitionAnalysis`, `resetPool`.
+
+- **New support files**:
+    - `lib/seo/niche-scoring.ts` — Niche relevance scoring logic.
+    - `lib/seo/transactional-scoring.ts` — Buyer intent / transactional scoring logic.
+    - `test-generate-keywords.mjs` — End-to-end test script for the new route.
+    - `docs/generate-seo-logic.ts` — Reference doc for the full pipeline logic.
+
+- **Operational note**: Both Express routes (`analyze-image` and `generate-keywords`) now run on `http://localhost:3001`. The server must be restarted (`node --env-file=.env server.mjs`) whenever `server.mjs` changes. Use `npx nodemon --env-file=.env server.mjs` for auto-reload during development.
+
+### March 18th, 2026 — Image Analysis Fixes
+- **Fix**: The `analyseImage` local API was failing to return a `theme` and `niche` consistently.
+    - **Root Cause**: The second AI call (`PROMPT_TAXONOMY_MAPPING`) was not receiving the visual analysis context from the first AI call.
+    - **Fix**: Injected the visual analysis results and product details into the taxonomy prompt.
+    - **Hardening**: Made the prompt more explicit to ensure the AI *always* returns a `theme` and `niche`, even if it has to select "Others".
+    - **Data Structure**: Corrected the `mergeAnalysisResults` function to handle cases where the AI returns a single-element array instead of a plain object.
+- **Dev Experience**:
+    - **`nodemon`**: Installed `nodemon` and updated the `dev` script. The local Express server now auto-restarts on file changes, eliminating the need for manual server restarts.
+
+- [Sync] Committed and pushed latest architectural changes (local API migration for analyze-image, generate-keywords, and reset-pool).
+- [Architecture] Unified the keyword filtering and analysis logic into the local server (`server.mjs`), reducing dependency on untracked cloud workflows.
+- [QA] Added test scripts (`test-filter-logic.ts`, `test-reset-pool.ts`) and database documentation for the new local SEO pipeline.
+- [Sync] Staged and committed core untracked logic in `lib/seo/filter-logic.ts` to ensure repository integrity.
+
+## 6. Session Handover (2026-03-19)
+### Summary of Achievements
+- **Local API Transition**: Successfully transitioned `analyseImage`, `generate-keywords`, and `reset-pool` actions to a local Express server.
+- **Data Integrity**: Capped keyword volumes (`> 1M`, `< 10`) to maintain tool credibility and normalized trend displays.
+- **Repository Health**: Staged and tracked critical SEO logic previously missing from version control and synced with the `imageAnalysis` branch.
+- **State Preservation**: Fixed form hydration bugs where user-typed instructions were cleared during AI analysis.
+
+### Latest Developments
+- **2026-03-19: User-Keyword API Integration & Testing**
+  - **New Feature**: Implemented `POST /api/seo/user-keyword` in `server.mjs`.
+  - **Functionality**: Manual keyword addition with live DataForSEO enrichment, AI scoring, and pool re-ranking.
+  - **Frontend**: Integrated `handleAddCustomKeyword` to call the local API instead of n8n.
+  - **Visibility Fix**: Relaxed `evaluation_id` filter in `ProductStudio.jsx` to ensure user-added keywords are always visible.
+  - **Default Pinning Fix**: Set `is_pinned: false` as the default for user-added keywords.
+  - **Selection Flag Fix**: Explicitly set `is_selection_ia: false` and `is_current_eval: null` for user-added keywords in both the `applySEOFilter` logic and the `/api/seo/user-keyword` route response. This ensures they are not misidentified as AI recommendations.
+  - **Verification**: Confirmed with `test-user-keyword.ts` that user keywords return `is_selection_ia: false`.
+  - **Verification**: Confirmed with `test-user-keyword.ts` that user-added keywords return `is_selection_ia: false`.
+  - **Opportunity Score Fix**: Modified local `applySEOFilter` in `server.mjs` to bypass hard filters and diversity limits for user-added keywords, ensuring they always get a score and stay in the pool.
+  - **Verification**: Confirmed with `test-user-keyword.ts` that user keywords return non-null `opportunity_score`.
+  - **AI Selection Count Fix**: Modified `applySEOFilter` (in `server.mjs` and `filter-logic.ts`) so both user-added custom keywords and pinned keywords explicitly consume the `ai_selection_count` quota alongside AI-sele  - **Concept Diversity Processing Fix**: `concept_diversity_limit` now correctly strips punctuation and splits by any whitespace when tallying phrase frequencies (e.g., standardizing "tea set," and "tea  set" to "tea set"). This reliably enforces the limit bounds on the generated backend keyword pool even if generated text holds formatting inconsistencies.
+  - **Preserving AI Selections on User Keyword Add**: Intentionally excluded `is_selection_ia` overwrites in `/api/seo/user-keyword`. This retains the exact 13 AI selections when adding user keywords (making the total visual selection temporarily 14), rather than strictly un-selecting 1 AI keyword prematurely before the next "Apply Strategy" phase.
+  - **Correcting Unpinned User Keyword Selection Flow**: Migrated the "auto-select custom keyword" behavior entirely to the backend (`/api/seo/user-keyword` now natively sets `is_current_eval: true` for the single new insertion). I explicitly removed the permanent frontend `is_user_added` forced-selection hack from `ResultsDisplay.jsx`. Now, newly added manual keywords appear selected initially, but if the user generates a new strategy and the keyword scores poorly and isn't pinned, it is successfully unselected.
+  - **Fixing AI Quota Stealing**: Revised sorting logic securely decouples unpinned custom keywords from hijacking the 13 `ai_selection_count` quota slots. They now compete naturally via opportunity score but actively bypass the `working_pool` length limit (40) ensuring they maintain permanent table visibility.
+  - **Zero Volume Investigation**: Verified that keywords showing 0 volume were simply not present in the DataForSEO index (long-tail/niche phrases). Confirmed logic correctly handles zero-fill and ranking for these keywords without data loss.
+
+### Session Handover
+- **Summary**: This session focused on enterprise-grade stability for the keyword selection engine. We resolved several sophisticated edge cases regarding the 13-keyword AI selection quota, ensuring pinned and user-added keywords consume the quota correctly without "stealing" slots from high-performers. We also implemented a robust concept diversity filter and fixed the selection persistence bug for manual keywords.
+- **Achievements**:
+  - Implemented the `/api/seo/user-keyword` route with full scoring and enrichment.
+  - Fixed strict 13-keyword Selection Limit (Pinned/User-Added/AI).
+  - Implemented robust Concept Diversity Normalization.
+  - Fixed selection hijacking where unpinned user keywords consumed AI quota.
+  - Investigated and dismissed the "Zero Volume" bug (verified as data unavailability).
+
+### Next Immediate Steps
+1. **ESLint Configuration**: Initialize a standard ESLint configuration to resolve the `npm run lint` failure.
+2. **Environment Sync**: Update Supabase Edge Function secrets with the production `N8N_WEBHOOK_URL_RESET_POOL` if not already done.
+3. **Deployment**: Redeploy the `save-seo` Edge Function to ensure the backend-triggered pool reset flow is active.
+4. **Listing Generation Migration**: Finalize the migration of listing generation logic (title/description) from n8n to `server.mjs`.

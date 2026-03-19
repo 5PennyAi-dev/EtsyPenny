@@ -1193,172 +1193,23 @@ const ProductStudio = () => {
 
       setIsAddingKeyword(true);
       try {
-          const formData = optimizationFormRef.current?.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
-          
-          // 2. N8N Webhook Call - using same payload structure as generate_seo plus the custom keyword
-          const payload = {
-              action: 'userKeyword',
-              keywords: [newKeyword],
+          const response = await axios.post('/api/seo/user-keyword', {
               listing_id: currentListingId,
-              user_id: user?.id,
-              parameters: {
-                  ...(userDefaults ? {
-                      Volume: userDefaults.param_volume,
-                      Competition: userDefaults.param_competition,
-                      Transaction: userDefaults.param_transaction,
-                      Niche: userDefaults.param_niche,
-                      CPC: userDefaults.param_cpc
-                  } : getStrategyValues(strategySelections)),
-                  ...getSmartBadgePayload(),
-                  ai_selection_count: userDefaults?.ai_selection_count ?? 13,
-                  working_pool_count: userDefaults?.working_pool_count ?? 40,
-                  concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
-              },
-              payload: {
-                  image_url: results?.imageUrl || latestRef.current.results?.imageUrl,
-                  // Visual analysis fields
-                  visual_aesthetic: visualAnalysis.aesthetic,
-                  visual_typography: visualAnalysis.typography,
-                  visual_graphics: visualAnalysis.graphics,
-                  visual_colors: visualAnalysis.colors,
-                  visual_target_audience: visualAnalysis.target_audience,
-                  visual_overall_vibe: visualAnalysis.overall_vibe,
-                  categorization: formatCategorizationPayload(formData),
-                  product_details: {
-                      product_type: formData.product_type_name || "Product",
-                      tone: formData.tone_name || "Engaging",
-                      client_description: formData.context || "",
-                      tag_count: formData.tag_count,
-                      seo_mode: formData.seo_mode || activeMode || 'balanced'
-                  },
-                  shop_context: {
-                      shop_name: profile?.shop_name,
-                      shop_bio: profile?.shop_bio,
-                      target_audience: profile?.target_audience,
-                      brand_tone: profile?.brand_tone,
-                      brand_keywords: profile?.brand_keywords,
-                      signature_text: profile?.signature_text
-                  }
-              },
-              metadata: {
-                  app_version: "1.0.0",
-                  timestamp: new Date().toISOString()
-              }
-          };
-          
-          const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-          const response = await axios.post(webhookUrl, payload);
-          
-          // Unwrap array if returned
-          let rawData = Array.isArray(response.data) ? response.data[0] : response.data;
-          
-          // Check for multi-mode format (e.g. data is nested under 'balanced', 'broad', etc.)
-          const defaultMode = activeMode || 'balanced';
-          if (rawData && typeof rawData === 'object' && rawData[defaultMode]) {
-              // Extract the first keyword from the mode stack array
-              rawData = Array.isArray(rawData[defaultMode]) ? rawData[defaultMode][0] : rawData[defaultMode];
-          } else if (rawData && typeof rawData === 'object' && !rawData.keyword && Object.values(rawData).length > 0) {
-              // Fallback just in case they sent a different key
-              const firstValue = Object.values(rawData)[0];
-              if (Array.isArray(firstValue)) rawData = firstValue[0];
-          }
-
-          const responseData = rawData;
-          
-          if (!responseData || (responseData.volume === undefined && responseData.search_volume === undefined)) {
-               console.error("Malformed response from server:", responseData);
-               throw new Error("Invalid keyword data returned from server.");
-          }
-
-          // 3. Shape the data
-          const newStat = {
-              tag: responseData.keyword || newKeyword,
-              search_volume: responseData.search_volume ?? (responseData.volume || 0),
-              competition: responseData.competition != null ? String(responseData.competition) : "0",
-              opportunity_score: responseData.opportunity_score ?? (responseData.score || 0),
-              volume_history: Array.isArray(responseData.monthly_searches) 
-                  ? responseData.monthly_searches.map(m => m.search_volume || 0)
-                  : (responseData.volume_history || []),
-              is_trending: responseData.status?.trending || false,
-              is_evergreen: responseData.status?.evergreen || false,
-              is_promising: responseData.status?.promising || false,
-              insight: responseData.insight || null,
-              is_top: responseData.is_top || null,
-              transactional_score: responseData.transactional_score || null,
-              intent_label: responseData.intent_label || null,
-              niche_score: responseData.niche_score || null,
-              relevance_label: responseData.relevance_label || null,
-              is_selection_ia: responseData.is_selection_ia !== undefined ? responseData.is_selection_ia : true, // Map from response if present
-              is_user_added: true,   // Flag as user added per requirement
-              is_competition: false, // It's standard, not competitor
-              listing_id: currentListingId,
-              cpc: responseData.cpc !== undefined ? responseData.cpc : null,
-              is_current_pool: responseData.is_current_pool !== undefined ? responseData.is_current_pool : true
-          };
-
-          // We need the current active evaluation_id to link it properly in the DB
-          let currentEvalId = null;
-          if (globalEvals && globalEvals.length > 0) {
-               const activeEval = globalEvals.find(e => e.seo_mode === activeMode) || globalEvals[0];
-               currentEvalId = activeEval.id;
-               newStat.evaluation_id = currentEvalId;
-          }
-
-          // 4. Save to DB (upsert to prevent duplicates on listing_id + tag)
-          const { error: upsertError } = await supabase
-              .from('listing_seo_stats')
-              .upsert([newStat], { onConflict: 'listing_id,tag' });
-              
-          if (upsertError) {
-              console.error("Upsert Error (handleAddCustomKeyword):", upsertError);
-              throw new Error("Failed to save keyword to database.");
-          }
-
-          // 5. Update Local State (`allSeoStats`)
-          setAllSeoStats(prev => [...prev, newStat]);
-
-          // 6. Update UI State (`results`)
-          const formattedNewStat = {
-             keyword: newStat.tag,
-             volume: newStat.search_volume,
-             competition: newStat.competition,
-             score: newStat.opportunity_score,
-             volume_history: newStat.volume_history,
-             is_trending: newStat.is_trending,
-             is_evergreen: newStat.is_evergreen,
-             is_promising: newStat.is_promising,
-             insight: newStat.insight,
-             is_top: newStat.is_top,
-             transactional_score: newStat.transactional_score,
-             intent_label: newStat.intent_label,
-             niche_score: newStat.niche_score,
-             relevance_label: newStat.relevance_label,
-             is_selection_ia: newStat.is_selection_ia,
-             is_competition: newStat.is_competition,
-             is_user_added: newStat.is_user_added,
-             cpc: newStat.cpc
-          };
-
-          setResults(prev => {
-              if (!prev) return prev;
-              const newAnalytics = [...(prev.analytics || [])];
-              // Insert before competition keywords (at the end of primary keywords)
-              const firstCompIndex = newAnalytics.findIndex(k => k.is_competition);
-              if (firstCompIndex !== -1) {
-                  newAnalytics.splice(firstCompIndex, 0, formattedNewStat);
-              } else {
-                  newAnalytics.push(formattedNewStat);
-              }
-              return { ...prev, analytics: newAnalytics };
+              keyword: newKeyword
           });
-
-          toast.success(`Keyword "${formattedNewStat.keyword}" added successfully!`);
           
-          if (onSuccess) onSuccess();
+          if (response.data.success) {
+              // Refresh the listing to load the newly re-ranked pool and global strength
+              toast.success(`Keyword "${response.data.keyword?.tag || newKeyword}" added successfully!`);
+              await handleLoadListing(currentListingId);
+              if (onSuccess) onSuccess();
+          } else {
+              throw new Error(response.data.error || 'Failed to add keyword');
+          }
 
       } catch (err) {
           console.error("Error adding custom keyword:", err);
-          toast.error(err.message || "Failed to add keyword.");
+          toast.error(err.response?.data?.error || err.message || "Failed to add keyword.");
       } finally {
           setIsAddingKeyword(false);
       }
@@ -2255,8 +2106,10 @@ const ProductStudio = () => {
         const activeEvalData = globalEvalsData?.find(e => e.seo_mode === initialMode) || latestEval; // Fallback to latest if explicit mode missing
         const activeEvalId = activeEvalData?.id;
 
-        // Filter stats for this eval
-        const relevantStats = (stats || []).filter(s => activeEvalId ? s.evaluation_id === activeEvalId : true); // Fallback to all if no eval ID (legacy)
+        // Filter stats: Include if matching evaluation_id OR if it's a manually added user keyword (which are global)
+        const relevantStats = (stats || []).filter(s => 
+            s.is_user_added || (activeEvalId ? s.evaluation_id === activeEvalId : true)
+        );
 
         const constructedResults = {
             title: listing.generated_title,

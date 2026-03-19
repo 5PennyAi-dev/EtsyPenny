@@ -7,6 +7,7 @@ export interface KeywordInput {
   transactional_score?: number | null;
   volume_history?: number[] | null;
   is_pinned?: boolean | null;
+  is_user_added?: boolean | null;
   [key: string]: any; // Allow pass-through properties
 }
 
@@ -77,8 +78,8 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
     const nicheScore = item.niche_score || 5;
     const rawCPC = item.cpc || 0;
 
-    // Hard Filters
-    if (txScore < MIN_TRANSACTIONAL || nicheScore < MIN_NICHE) return null;
+    // Hard Filters (Bypass for user-added keywords)
+    if (!item.is_user_added && (txScore < MIN_TRANSACTIONAL || nicheScore < MIN_NICHE)) return null;
 
     // A. Normalization & Scoring
     const V = Math.log(vol + 1) / Math.log(maxVol + 1);
@@ -140,13 +141,15 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
   }).filter((i): i is NonNullable<typeof i> => i !== null);
 
 
-  // C. Sorting
+  // D. Sorting
+  // Sort ONLY by pinned and then by score
   processed.sort((a, b) => {
     // 1. Pinned keywords always first
-    if (a.is_pinned && !b.is_pinned) return -1;
-    if (!a.is_pinned && b.is_pinned) return 1;
+    if ((a as any).is_pinned && !(b as any).is_pinned) return -1;
+    if (!(a as any).is_pinned && (b as any).is_pinned) return 1;
+
     // 2. Then by opportunity score descending
-    return b.opportunity_score - a.opportunity_score;
+    return ((b as any).opportunity_score || 0) - ((a as any).opportunity_score || 0);
   });
 
   // D. Concept Diversity Filtering
@@ -161,23 +164,51 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
     if (selectedTags.length >= TAG_COUNT) break;
     
     // Concept is the first two words of the keyword
-    const concept = (item.keyword || '').toLowerCase().split(' ').slice(0, 2).join(' ');
+    const rawKeyword = (item.keyword || (item as any).tag || '').toLowerCase();
+    const concept = rawKeyword
+      .replace(/[^\w\s]/g, '') // Remove punctuation
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .join(' ');
+      
     conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;
 
-    if (conceptTracker[concept] <= params.concept_diversity_limit) {
+    if (item.is_user_added || conceptTracker[concept] <= params.concept_diversity_limit) {
       selectedTags.push(item);
     }
   }
 
-  // E. Selection Marking
+  let aiCount = 0;
+  let poolCount = 0;
+  const WORKING_POOL_LIMIT = params.working_pool_count || 40;
+
   return selectedTags.map((item, index) => {
-    const isInTopSelection = index < params.ai_selection_count;
-    const isInPool = index < params.working_pool_count;
+    const isUserAdded = (item as any).is_user_added === true || (item as any).is_user_added === 'true';
+    let isInTopSelection = false;
+
+    // 1. AI Selection Quota (13 limit)
+    if ((item as any).is_pinned) {
+        aiCount++; // Pinned explicitly consumes a slot
+    } else if (aiCount < (params.ai_selection_count || 13)) {
+        isInTopSelection = true;
+        aiCount++;
+    }
+
+    // 2. Visibility Pool (40 limit)
+    // Always show user-added/pinned keywords, even if their score pushes them beyond index 40
+    let isInPool = false;
+    if (isUserAdded || (item as any).is_pinned) {
+        isInPool = true;
+    } else if (poolCount < WORKING_POOL_LIMIT) {
+        isInPool = true;
+        poolCount++;
+    }
 
     return {
       ...(item as any), // Cast to access original properties
       is_selection_ia: isInTopSelection,
-      is_current_eval: isInTopSelection,
+      is_current_eval: isInTopSelection ? true : null,
       is_current_pool: isInPool,
     };
   });

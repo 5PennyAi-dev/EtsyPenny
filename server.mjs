@@ -588,7 +588,8 @@ export function applySEOFilter(keywords, params) {
     const nicheScore = item.niche_score || 5;
     const rawCPC = item.cpc || 0;
 
-    if (txScore < MIN_TRANSACTIONAL || nicheScore < MIN_NICHE) return null;
+    // Hard Filters (Bypass for user-added keywords)
+    if (!item.is_user_added && (txScore < MIN_TRANSACTIONAL || nicheScore < MIN_NICHE)) return null;
 
     const V = Math.log(vol + 1) / Math.log(maxVol + 1);
     const C = 1 - rawComp;
@@ -639,8 +640,11 @@ export function applySEOFilter(keywords, params) {
   }).filter(i => i !== null);
 
   processed.sort((a, b) => {
+    // 1. Pinned keywords always first
     if (a.is_pinned && !b.is_pinned) return -1;
     if (!a.is_pinned && b.is_pinned) return 1;
+
+    // 2. Then by opportunity score descending
     return b.opportunity_score - a.opportunity_score;
   });
 
@@ -650,20 +654,50 @@ export function applySEOFilter(keywords, params) {
 
   for (const item of processed) {
     if (selectedTags.length >= TAG_COUNT) break;
-    const concept = (item.keyword || item.tag || '').toLowerCase().split(' ').slice(0, 2).join(' ');
+    const rawKeyword = (item.keyword || item.tag || '').toLowerCase();
+    const concept = rawKeyword
+      .replace(/[^\w\s]/g, '') // Remove punctuation
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .join(' ');
+    
     conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;
-    if (conceptTracker[concept] <= params.concept_diversity_limit) {
+    if (item.is_user_added || conceptTracker[concept] <= params.concept_diversity_limit) {
       selectedTags.push(item);
     }
   }
 
+  let aiCount = 0;
+  let poolCount = 0;
+  const WORKING_POOL_LIMIT = params.working_pool_count || 40;
+
   return selectedTags.map((item, index) => {
-    const isInTopSelection = index < (params.ai_selection_count || 13);
-    const isInPool = index < (params.working_pool_count || 40);
+    const isUserAdded = item.is_user_added === true || item.is_user_added === 'true';
+    let isInTopSelection = false;
+
+    // 1. AI Selection Quota (13 limit)
+    if (item.is_pinned) {
+        aiCount++; // Pinned explicitly consumes a slot
+    } else if (aiCount < (params.ai_selection_count || 13)) {
+        isInTopSelection = true;
+        aiCount++;
+    }
+
+    // 2. Visibility Pool (40 limit)
+    // Always show user-added/pinned keywords, even if their score pushes them beyond index 40
+    let isInPool = false;
+    if (isUserAdded || item.is_pinned) {
+        isInPool = true;
+    } else if (poolCount < WORKING_POOL_LIMIT) {
+        isInPool = true;
+        poolCount++;
+    }
+
     return {
       ...item,
       is_selection_ia: isInTopSelection,
-      is_current_eval: isInTopSelection,
+      is_current_eval: isInTopSelection ? true : null,
       is_current_pool: isInPool,
     };
   });
@@ -825,6 +859,174 @@ app.post('/api/seo/reset-pool', async (req, res) => {
   } catch (error) {
     console.error('❌ [reset-pool] Error:', error.message || error);
     return res.status(500).json({ error: 'Failed to reset pool.', details: error.message || 'Unknown error' });
+  }
+});
+
+// ─── API ROUTE: POST /api/seo/user-keyword ────────────
+app.post('/api/seo/user-keyword', async (req, res) => {
+  const t0 = Date.now();
+  console.log(`\n📥 [user-keyword] Request for listing: ${req.body.listing_id}`);
+  const { listing_id, keyword } = req.body;
+
+  if (!listing_id || !keyword) {
+    return res.status(400).json({ error: 'Missing listing_id or keyword' });
+  }
+
+  try {
+    const cleanKeyword = keyword.trim().toLowerCase();
+
+    // 1. Fetch listing context
+    const { data: listing, error: listingError } = await supabaseAdmin
+      .from('listings')
+      .select('*')
+      .eq('id', listing_id)
+      .single();
+
+    if (listingError || !listing) throw new Error("Listing not found");
+
+    const ctx = {
+      product_type: listing.product_type || listing.product_type_text,
+      theme: listing.theme,
+      niche: listing.niche,
+      sub_niche: listing.sub_niche,
+      visual_aesthetic: listing.visual_aesthetic,
+      visual_target_audience: listing.visual_target_audience,
+      visual_overall_vibe: listing.visual_overall_vibe
+    };
+
+    // 2. Fetch SEO settings
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from('v_user_seo_active_settings')
+      .select('*')
+      .eq('user_id', listing.user_id)
+      .single();
+
+    if (settingsError || !settings) throw new Error("Settings not found");
+
+    const params = {
+      Volume: settings.param_volume ?? 0.25,
+      Competition: settings.param_competition ?? 0.15,
+      Transaction: settings.param_transaction ?? 0.35,
+      Niche: settings.param_niche ?? 0.25,
+      CPC: settings.param_cpc ?? 0,
+      evergreen_stability_ratio: settings.evergreen_stability_ratio ?? 4,
+      evergreen_minimum_volume: settings.evergreen_minimum_volume ?? 0.3,
+      evergreen_avg_volume: settings.evergreen_avg_volume ?? 50,
+      trending_dropping_threshold: settings.trending_dropping_threshold ?? 0.8,
+      trending_current_month_min_volume: settings.trending_current_month_min_volume ?? 150,
+      trending_growth_factor: settings.trending_growth_factor ?? 1.5,
+      promising_min_score: settings.promising_min_score ?? 55,
+      promising_competition: settings.promising_competition ?? 0.4,
+      ai_selection_count: settings.ai_selection_count || 13,
+      working_pool_count: settings.working_pool_count || 40,
+      concept_diversity_limit: settings.concept_diversity_limit || 5
+    };
+
+    // 3. Enrich + Score the single keyword
+    console.log(`   🔍 Enriching & Scoring: "${cleanKeyword}"`);
+    const stats = await enrichKeywords([cleanKeyword]);
+    const scored = await scoreKeywords(stats, ctx);
+    const newKw = scored[0];
+
+    // 4. Initial Upsert
+    const upsertPayload = {
+      listing_id,
+      tag: cleanKeyword,
+      search_volume: newKw.search_volume,
+      competition: (newKw.competition ?? 0.5).toString(),
+      cpc: newKw.cpc,
+      volume_history: newKw.volume_history,
+      niche_score: newKw.niche_score,
+      transactional_score: newKw.transactional_score,
+      is_user_added: true,
+      is_pinned: false,
+      is_current_pool: true,
+      is_selection_ia: true,
+      is_current_eval: true
+    };
+
+    const { error: initialUpsertError } = await supabaseAdmin
+      .from('listing_seo_stats')
+      .upsert(upsertPayload, { onConflict: 'listing_id,tag' });
+    
+    if (initialUpsertError) throw initialUpsertError;
+
+    // 5. Fetch full pool and Re-rank
+    const { data: pool, error: poolError } = await supabaseAdmin
+      .from('listing_seo_stats')
+      .select('*')
+      .eq('listing_id', listing_id)
+      .eq('is_current_pool', true);
+
+    if (poolError) throw poolError;
+
+    const processedPool = applySEOFilter(pool, params);
+
+    // 6. Sync Pool Updates
+    const updates = processedPool.map(kw => ({
+      id: kw.id,
+      listing_id: kw.listing_id,
+      tag: kw.tag,
+      opportunity_score: kw.opportunity_score,
+      is_trending: kw.status.trending,
+      is_evergreen: kw.status.evergreen,
+      is_promising: kw.status.promising,
+      // Omit `is_selection_ia` and `is_current_eval` to preserve the current AI selections
+      // until the user explicitly applies a new strategy (which will enforce the strict 13 limit).
+      is_current_pool: kw.is_current_pool,
+      is_pinned: kw.is_pinned
+    }));
+
+    const { error: batchUpdateError } = await supabaseAdmin
+      .from('listing_seo_stats')
+      .upsert(updates, { onConflict: 'id' });
+    
+    if (batchUpdateError) throw batchUpdateError;
+
+    // 7. Update Listing Strength
+    const { strength } = selectAndScore(processedPool, params);
+    if (strength) {
+      await supabaseAdmin
+        .from('listings')
+        .update({
+           listing_strength: strength.listing_strength,
+           visibility_score: strength.breakdown.visibility,
+           relevance_score: strength.breakdown.relevance,
+           conversion_score: strength.breakdown.conversion,
+           competition_score: strength.breakdown.competition,
+           profit_score: strength.breakdown.profit,
+           est_market_reach: strength.stats.est_market_reach
+        })
+        .eq('id', listing_id);
+    }
+
+    const finalKw = processedPool.find(k => k.tag === cleanKeyword) || newKw;
+    
+    console.log(`   ✅ User keyword added: ${cleanKeyword} (${Date.now() - t0}ms)`);
+    return res.json({
+      success: true,
+      listing_strength: strength?.listing_strength || 0,
+      keyword: {
+        tag: finalKw.tag || cleanKeyword,
+        is_user_added: true,
+        is_pinned: false,
+        search_volume: finalKw.search_volume,
+        competition: finalKw.competition,
+        cpc: finalKw.cpc,
+        niche_score: finalKw.niche_score,
+        transactional_score: finalKw.transactional_score,
+        opportunity_score: finalKw.opportunity_score,
+        is_selection_ia: false,
+        is_current_eval: null,
+        is_trending: finalKw.status?.trending || false,
+        is_evergreen: finalKw.status?.evergreen || false,
+        is_promising: finalKw.status?.promising || false
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [user-keyword] Error:', error.message || error);
+    return res.status(500).json({ error: 'Failed to add user keyword.', details: error.message || 'Unknown error' });
   }
 });
 

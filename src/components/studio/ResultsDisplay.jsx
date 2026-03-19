@@ -545,7 +545,7 @@ const SidebarSkeleton = ({ phase }) => (
             .filter(r => r.is_current_eval === true && !r.is_pinned)
             .sort((a, b) => (b.score || 0) - (a.score || 0))
             .map(r => r.keyword);
-          
+            
           let initialSelections = [];
 
           if (currentEvalSelections.length > 0 || pinnedTags.length > 0) {
