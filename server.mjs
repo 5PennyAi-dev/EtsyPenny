@@ -348,7 +348,49 @@ async function enrichKeywords(keywords) {
 // Step C: Score keywords (niche + transactional)
 async function scoreKeywords(stats, ctx) {
   const kws = stats.map(s => s.keyword);
-  const nicheSystem = `# Role\nYou are a Senior Etsy SEO Specialist evaluating tags on niche precision.\n\n# Product context:\n- Theme: ${ctx.theme} | Niche: ${ctx.niche} | Sub-niche: ${ctx.sub_niche}\n- Product Type: ${ctx.product_type}\n- Aesthetic/Style: ${ctx.visual_aesthetic} | Target Audience: ${ctx.visual_target_audience} | Vibe: ${ctx.visual_overall_vibe}\n\n# Scoring: Use ONLY 10, 7, 4, or 1.\n- 10 = Niche-Specific (Style + Subject + Product alignment)\n- 7 = Strong (High relevance but less unique)\n- 4 = Neutral (Broadly descriptive or niche+filler combo)\n- 1 = Broad (Generic filler: "gift for her", "personalized")\n\nReturn ONLY: {"keywords": [{"keyword": "...", "niche_score": N}]}`;
+  const nicheSystem = `# Role
+You are a Senior Etsy SEO Specialist. Your task is to evaluate tags based on their niche precision.
+
+# Objective
+For each keyword provided, assign a **Niche Score**. This ensures the listing reaches qualified buyers by separating "Elite" tags from "Filler" ones. The more the keywords correspond to the product context, the higher the score.
+
+# Product context:
+1. Use the following target:
+- **Theme:** ${ctx.theme}
+- **Niche:** ${ctx.niche}
+- **Sub-niche:** ${ctx.sub_niche || ''}
+- **Product Type:** ${ctx.product_type}
+
+2. Visual & Marketing Data:
+- **Aesthetic/Style:** ${ctx.visual_aesthetic || ''}
+- **Target Audience:** ${ctx.visual_target_audience || ''}
+- **Overall_vibe:** ${ctx.visual_overall_vibe || ''}
+
+# Scoring Tiers (Assign strictly one of these four)
+- **Niche-Specific (Score 10):** Elite tags. Perfect alignment of style + subject + niche. (e.g., "Victorian raccoon oil painting").
+- **Strong (Score 7):** High relevance. Clear descriptive tags that target the right audience but are less unique. (e.g., "Dark academia shirt").
+- **Neutral (Score 4):** Broadly descriptive. Standard tags that describe the product type without specific style. (e.g., "Raccoon t-shirt").
+- **Broad (Score 1):** Filler/Generic. Buzzwords or broad occasions. (e.g., "Gift for her", "Personalized gift").
+
+# Reference Datasets (For Calibration)
+- **Niche-Specific (Score 10):** Gothic Skull Planter, Y2K Grunge Jewelry, Sarcastic Office Mug, Witchy Moon Altar, Retro Gamer Apparel, Modern Farmhouse Key, Dainty Bridal Comb, Industrial Desk Lamp, Celestial Sun Tarot, Pastel Kawaii Plush, Viking Rune Pendant, 90s Streetwear Hat, Funny Nurse Shirt, Boho Nursery Decor, Mid Century Planter, Coastal Grandma Tee, Dark Forest Candle, Anatomy Science Mug, Steampunk Gear Ring, Moody Floral Case, Minimalist Dog Tag, Vegan Leather Purse, Wabi Sabi Ceramics, Glitch Core Apparel, Zodiac Crystal Kit
+
+- **Strong (Score 7):** Gothic Black Shirt, Floral Summer Dress, Boho Wall Hanging, Silver Hoop Earring, Modern Coffee Table, Vintage Style Jeans, Minimalist Wallet, Abstract Throw Case, Wooden Picture Frame, Gold Dainty Ring, Leather Travel Bag, Baby Shower Decor, Wedding Guest Book, Celestial Jewelry, Nurse Life Apparel, Witchy Room Decor, Gamer Room Poster, Dog Lover Apparel, Aesthetic Stationery, Farmhouse Kitchen, Zodiac Sign Pendant, Handmade Soy Candle, Retro Sunglasses, Yoga Mat Bag, Industrial Shelf
+
+- **Neutral (Score 4):** Raccoon T-shirt, Cat Coffee Mug, Dog Wall Art, Flower Necklace, Heart Ring, Star Earring, Tree Ornament, Beach Towel, Mountain Print, Bird Sticker, Moon Lamp, Leaf Pillow, Sun Keychain, Bear Hoodie, Elephant Toy, Butterfly Clip, Rose Bracelet, Owl Statue, Fox Patch, Pine Candle
+
+- **Broad (Score 1):** Gift for her, Personalized Gift, Best Seller Etsy, Mothers Day Gift, Custom Clothing, High Quality Tee, Unique Gift Idea, Birthday Present, Handmade with Love, Trending Now Item, Christmas Gift, Women's Fashion, Gift for Him, Special Occasion, Top Rated Item, Anniversary Gift, Holiday Season, Luxury Gift Idea, Great Gift for Mom, New Arrival Item
+
+# Scoring Instructions
+1. **No Nuance:** You must choose exactly 10, 7, 4, or 1. Do not use intermediate numbers.
+2. **Structure Analysis:** Reward "Style + Subject + Product" with a 10.
+3. **Fluff Ceiling:** Tags containing ONLY filler words (gift, best, quality, custom, personalized, shipping) MUST be scored as 1 (Broad). Tags combining a niche keyword WITH a filler word (e.g., "Goth gift", "Punk custom") MUST be capped at a maximum score of 4 (Neutral).
+4. **Context Match:** A tag is only "Niche-Specific" if it matches the Theme AND Style provided in the product context.
+
+# Output Requirement
+- Return ONLY a valid JSON object.
+- NO introductory text, NO markdown code blocks.
+- Ensure the JSON structure matches exactly: {"keywords": [{"keyword": "string", "niche_score": number}]}`;
   const transSystem = `# Role\nYou are a Senior Etsy SEO Specialist evaluating tags on purchase intent.\n\n# Context: Product Type: ${ctx.product_type} | Theme: ${ctx.theme} | Niche: ${ctx.niche}\n\n# Scoring: Use ONLY 10, 7, 4, or 1.\n- 10 = High-Conversion (Product Noun + Purchase Trigger + Recipient/Occasion)\n- 7 = Product-Focused (Product Noun + Style, no recipient)\n- 4 = Browsing (Style/vibe, missing product noun)\n- 1 = Informational (DIY, ideas, tutorials)\n\nReturn ONLY: {"keywords": [{"keyword": "...", "transactional_score": N}]}`;
 
   const BATCH = 25;
@@ -884,8 +926,19 @@ app.post('/api/seo/user-keyword', async (req, res) => {
 
     if (listingError || !listing) throw new Error("Listing not found");
 
+    // Resolve product type name from v_combined_product_types
+    let productTypeName = listing.product_type_text || '';
+    if (!productTypeName && listing.product_type_id) {
+      const { data: ptRow } = await supabaseAdmin
+        .from('v_combined_product_types')
+        .select('name')
+        .eq('id', listing.product_type_id)
+        .single();
+      if (ptRow?.name) productTypeName = ptRow.name;
+    }
+
     const ctx = {
-      product_type: listing.product_type || listing.product_type_text,
+      product_type: productTypeName,
       theme: listing.theme,
       niche: listing.niche,
       sub_niche: listing.sub_niche,
@@ -941,7 +994,7 @@ app.post('/api/seo/user-keyword', async (req, res) => {
       is_user_added: true,
       is_pinned: false,
       is_current_pool: true,
-      is_selection_ia: true,
+      is_selection_ia: false,
       is_current_eval: true
     };
 
@@ -1030,11 +1083,241 @@ app.post('/api/seo/user-keyword', async (req, res) => {
   }
 });
 
+// ─── API ROUTE: POST /api/seo/add-from-favorite ───────────
+app.post('/api/seo/add-from-favorite', async (req, res) => {
+  const t0 = Date.now();
+  const { listing_id, keywords: incomingKeywords } = req.body;
+
+  console.log(`\n⭐ [add-from-favorite] Request for listing: ${listing_id} (${incomingKeywords?.length || 0} keywords)`);
+
+  // ── Step 1: Validation ───────────────────────────────────
+  if (!listing_id || !incomingKeywords || !Array.isArray(incomingKeywords) || incomingKeywords.length === 0) {
+    return res.status(400).json({ error: 'Missing listing_id or keywords array' });
+  }
+
+  try {
+    // Normalize: accept both string[] and object[] for keywords
+    const normalizedKeywords = incomingKeywords.map(kw => {
+      if (typeof kw === 'string') {
+        return { keyword: kw.trim().toLowerCase(), search_volume: 0, competition: 0.5, cpc: 0, volume_history: [] };
+      }
+      // Object format — map from favorites bank field names
+      const tag = (kw.keyword || kw.tag || kw.name || '').trim().toLowerCase();
+      return {
+        keyword: tag,
+        search_volume: kw.search_volume ?? kw.last_volume ?? 0,
+        competition: kw.competition ?? kw.last_competition ?? 0.5,
+        cpc: kw.cpc ?? kw.last_cpc ?? 0,
+        volume_history: kw.volume_history ?? [],
+      };
+    }).filter(kw => kw.keyword.length > 0);
+
+    if (normalizedKeywords.length === 0) {
+      return res.status(400).json({ error: 'No valid keywords found after normalization' });
+    }
+
+    // ── Step 2: Fetch listing context ──────────────────────
+    const { data: listing, error: listingError } = await supabaseAdmin
+      .from('listings')
+      .select('*')
+      .eq('id', listing_id)
+      .single();
+
+    if (listingError || !listing) throw new Error('Listing not found');
+
+    // Resolve product type name from v_combined_product_types
+    let productTypeName = listing.product_type_text || '';
+    if (!productTypeName && listing.product_type_id) {
+      const { data: ptRow } = await supabaseAdmin
+        .from('v_combined_product_types')
+        .select('name')
+        .eq('id', listing.product_type_id)
+        .single();
+      if (ptRow?.name) productTypeName = ptRow.name;
+    }
+
+    const ctx = {
+      product_type: productTypeName,
+      theme: listing.theme || '',
+      niche: listing.niche || '',
+      sub_niche: listing.sub_niche || '',
+      visual_aesthetic: listing.visual_aesthetic || '',
+      visual_target_audience: listing.visual_target_audience || '',
+      visual_overall_vibe: listing.visual_overall_vibe || '',
+    };
+
+    // ── Step 3: Fetch user SEO settings ────────────────────
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from('v_user_seo_active_settings')
+      .select('*')
+      .eq('user_id', listing.user_id)
+      .single();
+
+    if (settingsError || !settings) throw new Error('User settings not found');
+
+    const params = {
+      Volume: settings.param_volume ?? 0.25,
+      Competition: settings.param_competition ?? 0.15,
+      Transaction: settings.param_transaction ?? 0.35,
+      Niche: settings.param_niche ?? 0.25,
+      CPC: settings.param_cpc ?? 0,
+      evergreen_stability_ratio: settings.evergreen_stability_ratio ?? 4,
+      evergreen_minimum_volume: settings.evergreen_minimum_volume ?? 0.3,
+      evergreen_avg_volume: settings.evergreen_avg_volume ?? 50,
+      trending_dropping_threshold: settings.trending_dropping_threshold ?? 0.8,
+      trending_current_month_min_volume: settings.trending_current_month_min_volume ?? 150,
+      trending_growth_factor: settings.trending_growth_factor ?? 1.5,
+      promising_min_score: settings.promising_min_score ?? 55,
+      promising_competition: settings.promising_competition ?? 0.4,
+      ai_selection_count: settings.ai_selection_count || 13,
+      working_pool_count: settings.working_pool_count || 40,
+      concept_diversity_limit: settings.concept_diversity_limit || 5,
+    };
+
+    // Override with any incoming parameters
+    const finalParams = { ...params, ...(req.body.parameters || {}) };
+
+    // ── Step 4: AI Scoring (niche + transactional in parallel)
+    console.log(`   🧠 Scoring ${normalizedKeywords.length} keywords...`);
+    const statsForScoring = normalizedKeywords.map(kw => ({
+      keyword: kw.keyword,
+      search_volume: kw.search_volume,
+      competition: kw.competition,
+      cpc: kw.cpc,
+      volume_history: kw.volume_history,
+      fromCache: true, // Already have stats
+    }));
+
+    const scoredKeywords = await scoreKeywords(statsForScoring, ctx);
+    console.log(`   ✅ Scoring complete (${Date.now() - t0}ms)`);
+
+    // ── Step 5: Bulk Upsert with is_pinned: true ───────────
+    console.log(`   💾 Upserting ${scoredKeywords.length} keywords...`);
+    const upsertPayloads = scoredKeywords.map((scored, i) => {
+      const original = normalizedKeywords[i];
+      return {
+        listing_id,
+        tag: scored.keyword,
+        search_volume: original.search_volume,
+        competition: (original.competition ?? 0.5).toString(),
+        cpc: original.cpc,
+        volume_history: original.volume_history,
+        niche_score: scored.niche_score,
+        transactional_score: scored.transactional_score,
+        is_user_added: true,
+        is_pinned: false,
+        is_current_pool: true,
+        is_selection_ia: false,
+        is_current_eval: true,
+      };
+    });
+
+    const { error: upsertError } = await supabaseAdmin
+      .from('listing_seo_stats')
+      .upsert(upsertPayloads, { onConflict: 'listing_id,tag', ignoreDuplicates: true });
+
+    // For any keywords that already existed in the pool, ensure is_current_eval is marked as true
+    // (so they appear selected) WITHOUT touching is_selection_ia.
+    const tagList = normalizedKeywords.map(k => k.keyword);
+    await supabaseAdmin
+      .from('listing_seo_stats')
+      .update({ is_current_eval: true, is_current_pool: true })
+      .eq('listing_id', listing_id)
+      .in('tag', tagList);
+
+    if (upsertError) throw upsertError;
+
+    // ── Step 6: Pool Re-ranking ────────────────────────────
+    console.log('   🔄 Re-ranking pool...');
+    const { data: pool, error: poolError } = await supabaseAdmin
+      .from('listing_seo_stats')
+      .select('*')
+      .eq('listing_id', listing_id)
+      .eq('is_current_pool', true);
+
+    if (poolError) throw poolError;
+
+    const processedPool = applySEOFilter(pool, finalParams);
+
+    // Update scores/statuses only (preserve is_selection_ia until explicit Apply Strategy)
+    const updates = processedPool.map(kw => ({
+      id: kw.id,
+      listing_id: kw.listing_id,
+      tag: kw.tag,
+      opportunity_score: kw.opportunity_score,
+      is_trending: kw.status.trending,
+      is_evergreen: kw.status.evergreen,
+      is_promising: kw.status.promising,
+      is_current_pool: kw.is_current_pool,
+      is_pinned: kw.is_pinned,
+    }));
+
+    const { error: batchUpdateError } = await supabaseAdmin
+      .from('listing_seo_stats')
+      .upsert(updates, { onConflict: 'id' });
+
+    if (batchUpdateError) throw batchUpdateError;
+
+    // ── Step 7: Listing Strength Update ────────────────────
+    const { strength } = selectAndScore(processedPool, finalParams);
+    if (strength) {
+      await supabaseAdmin
+        .from('listings')
+        .update({
+          listing_strength: strength.listing_strength,
+          visibility_score: strength.breakdown.visibility,
+          relevance_score: strength.breakdown.relevance,
+          conversion_score: strength.breakdown.conversion,
+          competition_score: strength.breakdown.competition,
+          profit_score: strength.breakdown.profit,
+          est_market_reach: strength.stats.est_market_reach,
+        })
+        .eq('id', listing_id);
+    }
+
+    // ── Build response ─────────────────────────────────────
+    const addedTags = new Set(normalizedKeywords.map(k => k.keyword));
+    const responseKeywords = processedPool
+      .filter(kw => addedTags.has(kw.tag))
+      .map(kw => ({
+        tag: kw.tag,
+        is_pinned: false,
+        is_user_added: true,
+        search_volume: kw.search_volume,
+        competition: kw.competition,
+        cpc: kw.cpc,
+        niche_score: kw.niche_score,
+        transactional_score: kw.transactional_score,
+        opportunity_score: kw.opportunity_score,
+        is_selection_ia: kw.is_selection_ia ?? false,
+        is_current_eval: kw.is_current_eval ?? true,
+        is_trending: kw.status?.trending || kw.is_trending || false,
+        is_evergreen: kw.status?.evergreen || kw.is_evergreen || false,
+        is_promising: kw.status?.promising || kw.is_promising || false,
+      }));
+
+    console.log(`   ✅ Added ${responseKeywords.length} keywords | LSI: ${strength?.listing_strength ?? 'N/A'} (${Date.now() - t0}ms)\n`);
+
+    return res.json({
+      success: true,
+      added_count: responseKeywords.length,
+      listing_strength: strength?.listing_strength || 0,
+      keywords: responseKeywords,
+    });
+
+  } catch (error) {
+    console.error('❌ [add-from-favorite] Error:', error.message || error);
+    return res.status(500).json({ error: 'Failed to add keywords from favorites.', details: error.message || 'Unknown error' });
+  }
+});
+
 // ─── START ────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🚀 EtsyPenny API server running on http://localhost:${PORT}`);
   console.log(`   POST /api/seo/analyze-image`);
   console.log(`   POST /api/seo/generate-keywords`);
   console.log(`   POST /api/seo/reset-pool`);
+  console.log(`   POST /api/seo/user-keyword`);
+  console.log(`   POST /api/seo/add-from-favorite`);
   console.log(`   GET  /api/health\n`);
 });

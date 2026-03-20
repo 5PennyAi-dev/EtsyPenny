@@ -877,3 +877,78 @@
 2. **Environment Sync**: Update Supabase Edge Function secrets with the production `N8N_WEBHOOK_URL_RESET_POOL` if not already done.
 3. **Deployment**: Redeploy the `save-seo` Edge Function to ensure the backend-triggered pool reset flow is active.
 4. **Listing Generation Migration**: Finalize the migration of listing generation logic (title/description) from n8n to `server.mjs`.
+
+---
+
+### March 20th, 2026 — Add-From-Favorite API Route
+
+- **New Route: `POST /api/seo/add-from-favorite`** in `server.mjs`.
+  - **Purpose**: Batch-add keywords from a user's Favorites bank or a Preset into a specific listing's SEO pool.
+  - **Key Design**: Keywords from Favorites already carry search stats (`last_volume`, `last_competition`, `last_cpc`, `volume_history`) from the DB, so this route **skips DataForSEO enrichment** — going straight to AI scoring and pool re-ranking.
+  - **Execution Flow**:
+    1. Validation & input normalization (accepts `string[]` or `object[]`).
+    2. Fetch listing context (`theme`, `niche`, `visual_*`) + resolve `product_type` name from `v_combined_product_types`.
+    3. Fetch user SEO settings from `v_user_seo_active_settings`.
+    4. AI Scoring: `scoreKeywords()` runs niche + transactional scoring in parallel via Gemini.
+    5. Bulk upsert into `listing_seo_stats` with `is_pinned: false`, `is_user_added: true`.
+    6. Pool re-ranking via `applySEOFilter()` — updates `opportunity_score` and statuses for the entire pool.
+    7. Listing strength recalculation via `selectAndScore()`.
+  - **Final Keyword Flags** (after all iterations within the session):
+    - `is_pinned: false` — keywords from Favorites are selected but not pinned
+    - `is_selection_ia: false` — does NOT consume an AI quota slot (13 slots belong to Apply Strategy only)
+    - `is_current_eval: true` — appears **checked/selected** in the Keyword Performance table
+    - `is_current_pool: true` — visible in the pool
+    - `is_user_added: true` — marked as user-added in the UI
+  - **Response**: Returns `success`, `added_count`, `listing_strength`, and the processed keyword array.
+- **Frontend Wiring**: Replaced `handleAddBatchKeywords` in `ProductStudio.jsx` — removed ~200 lines of n8n webhook payload assembly + manual DB upserts. Now a clean ~20-line call to `POST /api/seo/add-from-favorite`, followed by `handleLoadListing()` for a full UI refresh.
+- **Niche Scoring Bug Fixed** (applies to both `user-keyword` and `add-from-favorite`):
+  - **Root cause**: `listing.product_type` was `undefined` — the actual column is `product_type_id` (a UUID). Gemini received no product type context and rated all keywords as generic (niche score = 1).
+  - **Fix**: After fetching the listing, do a separate lookup: `supabaseAdmin.from('v_combined_product_types').select('name').eq('id', listing.product_type_id)`. Pass the resolved name (e.g. "iphone case") to `scoreKeywords()`.
+  - **Result**: Keywords now score contextually — e.g. `iphone case` scores niche=4 against a phone case listing, while `mens leather belt` correctly scores 1.
+- **Test Script**: `test-add-from-favorite.mjs` — pre-filled with real listing/keyword data; updated to use the "Phone case" listing for meaningful niche score validation.
+- **Startup Log**: Updated `server.mjs` startup to list all 5 routes including `user-keyword` and `add-from-favorite`.
+
+### Next Immediate Steps
+1. Wire the "Add from Preset" flow to the same `POST /api/seo/add-from-favorite` route (if it uses a different handler than Favorites).
+2. Consider whether `is_current_eval: true` on user-added keywords should be capped when total selected count exceeds the `ai_selection_count` limit — currently they can push past 13.
+3. **ESLint Configuration**: Initialize a standard ESLint configuration to resolve the `npm run lint` failure.
+4. **Listing Generation Migration**: Finalize migration of title/description generation from n8n to `server.mjs`.
+
+---
+
+### March 20th, 2026 — Keyword Selection Flag Fixes & Niche Scoring Quality
+
+#### `add-from-favorite` Selection Flag Regression Fix
+
+- **Bug**: The `POST /api/seo/add-from-favorite` upsert used `onConflict: 'listing_id,tag'` without `ignoreDuplicates`, so if a keyword already existed in the pool (e.g. with `is_selection_ia: true` set by AI), the upsert silently overwrote those flags.
+- **Fix**: Changed to `ignoreDuplicates: true` on the initial upsert (preserving existing AI selection flags), followed by a targeted `update({ is_current_eval: true, is_current_pool: true })` scoped to only the incoming tag list. This gives newly-added favorites the "selected" appearance without touching the AI quota slots of existing keywords.
+- **Response Fix**: Changed the response fallback `is_selection_ia ?? true` to `?? false` so keywords are never misrepresented as AI-selected in the frontend.
+
+#### Niche Scoring Quality Fix (Low Relevance for User-Added Keywords)
+
+- **Root Cause**: `scoreKeywords()` in `server.mjs` (used by both `/api/seo/user-keyword` and `/api/seo/add-from-favorite`) used a minimal 4-line prompt with no calibration examples. The AI scored almost all keywords as `1` (Broad/Low) due to lack of context.
+- **Fix**: Upgraded the niche scoring system prompt in `server.mjs` to match the production-quality prompt in `lib/seo/niche-scoring.ts`, including:
+  - Full objective description with scoring tier definitions
+  - **100 calibration reference examples** across all 4 tiers (Very High/High/Moderate/Low)
+  - Fluff ceiling rules and context-match instructions
+- **Result**: User-added keywords now score with the same quality as keywords from the main `generate-keywords` flow.
+
+#### Favorites Star (⭐) Display Fix — Favorites and Presets
+
+- **Bug**: Keywords added from the Favorites Picker or a Preset did not show the filled golden star in the Keyword Performance table, even though they originated from `user_keyword_bank`.
+- **Root Cause**: `favoriteTags` (a `Set` in `ResultsDisplay`) was fetched once on mount (`[user?.id]`). After `handleAddBatchKeywords` triggered a full `handleLoadListing` reload, the `favoriteTags` Set was stale.
+- **Fix Part 1 — Optimistic update** (`ResultsDisplay.jsx`): When the `FavoritesPickerModal` confirms an add, the incoming keyword tags are immediately added to `favoriteTags` state before awaiting the server response. Works for individual favorites.
+- **Fix Part 2 — Reliable re-fetch** (for presets): Introduced a `refreshFavoritesKey` counter in `ProductStudio.jsx`. It increments after every successful `handleAddBatchKeywords` call (both favorites and presets). `ResultsDisplay` now depends on `[user?.id, refreshFavoritesKey]` for the `favoriteTags` fetch useEffect — guaranteeing a re-sync after any batch add, regardless of keyword count changes.
+
+### Session Handover
+- **Summary**: This session focused on stabilising the `add-from-favorite` server route and fixing the full keyword flow for user-added keywords (from favorites or presets). All three root causes were traced and fixed: (1) selection flag overwrite on upsert, (2) low-quality AI scoring prompt, (3) stale `favoriteTags` state after reload.
+- **Achievements**:
+  - Fixed `add-from-favorite` upsert to use `ignoreDuplicates: true` + scoped update.
+  - Upgraded `scoreKeywords` prompt to use 100 calibration examples.
+  - Fixed favorites star display for both "Add from Favorites" and "Add from Preset" flows.
+  - Introduced `refreshFavoritesKey` counter pattern for reliable post-add state sync.
+
+### Next Immediate Steps
+1. **ESLint Configuration**: Initialize a standard ESLint config to resolve `npm run lint` failures.
+2. **Listing Generation Migration**: Finalize migration of title/description generation from n8n to `server.mjs`.
+3. **Deployment**: Redeploy `save-seo` Edge Function if secrets were updated.

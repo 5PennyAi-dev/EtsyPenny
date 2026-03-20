@@ -437,7 +437,8 @@ const SidebarSkeleton = ({ phase }) => (
     onSeoAnalysisOpenChange,
     // Favorite Keyword Bank Props
     user,
-    currentListing
+    currentListing,
+    refreshFavoritesKey
   }) => {
     const [displayedTitle, setDisplayedTitle] = useState("");
     const [displayedDescription, setDisplayedDescription] = useState("");
@@ -667,7 +668,7 @@ const SidebarSkeleton = ({ phase }) => (
             setFavoriteTags(new Set((data || []).map(row => row.tag)));
         };
         fetchFavorites();
-    }, [user?.id]);
+    }, [user?.id, refreshFavoritesKey]);
 
     const handleToggleFavorite = useCallback(async (keywordData) => {
         if (!user?.id) {
@@ -1503,8 +1504,16 @@ const SidebarSkeleton = ({ phase }) => (
           onClose={() => setShowFavoritesPicker(false)}
           onAddBatchKeywords={async (keywordsArray) => {
               if (onAddBatchKeywords) {
+                  // Optimistically mark these keywords as favorited before the reload
+                  const addedTags = keywordsArray.map(kw => (kw.tag || kw.keyword || kw).toString().trim().toLowerCase()).filter(Boolean);
+                  setFavoriteTags(prev => {
+                      const next = new Set(prev);
+                      addedTags.forEach(t => next.add(t));
+                      return next;
+                  });
+
                   const success = await onAddBatchKeywords(keywordsArray);
-                  if (success !== false) { // Handle undefined in older versions just in case
+                  if (success !== false) {
                       setSelectedTags(prev => {
                           const newTags = keywordsArray.map(kw => kw.tag || kw).filter(tag => !prev.includes(tag));
                           return [...newTags, ...prev];

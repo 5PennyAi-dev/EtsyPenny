@@ -80,6 +80,7 @@ const ProductStudio = () => {
   const [listingName, setListingName] = useState("");
   const [isImageAnalyzedState, setIsImageAnalyzedState] = useState(false);
   const [resetSelectionKey, setResetSelectionKey] = useState(0);
+  const [refreshFavoritesKey, setRefreshFavoritesKey] = useState(0);
   const [userDefaults, setUserDefaults] = useState(null);
   
   // Visual Analysis State
@@ -1215,238 +1216,52 @@ const ProductStudio = () => {
       }
   };
 
-  // Batch "Add Keywords" Handler — sends all keywords in one webhook call
+  // Batch "Add Keywords" Handler — sends all keywords to local /api/seo/add-from-favorite
   const [isAddingBatchKeywords, setIsAddingBatchKeywords] = useState(false);
 
-  const handleAddBatchKeywords = async (keywordsArray, onProgress) => {
-      // Always read fresh state from latestRef — avoids stale closure issues in memoized callbacks
+  const handleAddBatchKeywords = async (keywordsArray) => {
       const {
         listingId: freshListingId,
         results: freshResults,
-        globalEvals: freshGlobalEvals,
-        activeMode: freshActiveMode,
-        userDefaults: freshUserDefaults,
-        strategySelections: freshStrategySelections,
-        visualAnalysis: freshVisualAnalysis,
       } = latestRef.current;
 
-      if (!keywordsArray?.length || !freshResults || !freshResults.analytics) {
-          if (!freshResults) toast.error("No analysis results loaded. Please try again.");
-          return;
-      }
-      
+      if (!keywordsArray?.length) return;
+
       const currentListingId = freshListingId || freshResults?.listing_id;
       if (!currentListingId) {
-          toast.error("Error: Missing listing ID");
+          toast.error('Error: Missing listing ID');
           return;
       }
 
-      // Filter out duplicates — keywordsArray now contains full objects with .tag property
-      const existingSet = new Set(freshResults.analytics.map(a => a.keyword.toLowerCase()));
-      const newKeywordObjects = keywordsArray.filter(kw => !existingSet.has(kw.tag.toLowerCase()));
+      // Filter duplicates against the current pool
+      const existingSet = new Set((freshResults?.analytics || []).map(a => a.keyword.toLowerCase()));
+      const newKeywordObjects = keywordsArray.filter(kw => !existingSet.has((kw.tag || kw.keyword || '').toLowerCase()));
       if (newKeywordObjects.length === 0) {
-          toast.info("All selected keywords are already in the performance table.");
+          toast.info('All selected keywords are already in the performance table.');
           return;
       }
 
       setIsAddingBatchKeywords(true);
       try {
-          const formData = optimizationFormRef.current?.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
-          
-          // Build n8n-compatible tasks[].result[] structure from bank keyword stats
-          const now = new Date();
-          const taskResults = newKeywordObjects.map(kw => {
-              // Reconstruct monthly_searches from volume_history (flat array)
-              // volume_history is stored most-recent-first, so index 0 = current month
-              let monthly_searches = null;
-              if (Array.isArray(kw.volume_history) && kw.volume_history.length > 0) {
-                  monthly_searches = kw.volume_history.map((vol, idx) => {
-                      const d = new Date(now.getFullYear(), now.getMonth() - idx, 1);
-                      return {
-                          year: d.getFullYear(),
-                          month: d.getMonth() + 1,
-                          search_volume: vol || 0
-                      };
-                  });
-              }
-
-              return {
-                  keyword: kw.tag,
-                  location_code: 2840,
-                  language_code: "en",
-                  search_partners: false,
-                  competition: kw.last_competition != null ? parseFloat(kw.last_competition) : null,
-                  cpc: kw.last_cpc != null ? parseFloat(kw.last_cpc) : null,
-                  search_volume: kw.last_volume || 0,
-                  categories: null,
-                  monthly_searches: monthly_searches
-              };
+          // Forward the keyword objects as-is — the route normalises field names
+          // (last_volume, last_competition, last_cpc, volume_history)
+          const response = await axios.post('/api/seo/add-from-favorite', {
+              listing_id: currentListingId,
+              keywords: newKeywordObjects,
           });
 
-          const payload = {
-              action: 'addFromFavorites',
-              listing_id: currentListingId,
-              user_id: user?.id,
-              parameters: {
-                  ...(userDefaults ? {
-                      Volume: userDefaults.param_volume,
-                      Competition: userDefaults.param_competition,
-                      Transaction: userDefaults.param_transaction,
-                      Niche: userDefaults.param_niche,
-                      CPC: userDefaults.param_cpc
-                  } : getStrategyValues(strategySelections)),
-                  ...getSmartBadgePayload(),
-                  ai_selection_count: userDefaults?.ai_selection_count ?? 13,
-                  working_pool_count: userDefaults?.working_pool_count ?? 40,
-                  concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
-              },
-              tasks: [
-                  {
-                      result: taskResults
-                  }
-              ],
-              payload: {
-                  image_url: freshResults?.imageUrl,
-                  visual_aesthetic: freshVisualAnalysis.aesthetic,
-                  visual_typography: freshVisualAnalysis.typography,
-                  visual_graphics: freshVisualAnalysis.graphics,
-                  visual_colors: freshVisualAnalysis.colors,
-                  visual_target_audience: freshVisualAnalysis.target_audience,
-                  visual_overall_vibe: freshVisualAnalysis.overall_vibe,
-                  categorization: formatCategorizationPayload(formData),
-                  product_details: {
-                      product_type: formData.product_type_name || "Product",
-                      tone: formData.tone_name || "Engaging",
-                      client_description: formData.context || "",
-                      tag_count: formData.tag_count,
-                      seo_mode: formData.seo_mode || freshActiveMode || 'balanced'
-                  },
-                  shop_context: {
-                      shop_name: profile?.shop_name,
-                      shop_bio: profile?.shop_bio,
-                      target_audience: profile?.target_audience,
-                      brand_tone: profile?.brand_tone,
-                      brand_keywords: profile?.brand_keywords,
-                      signature_text: profile?.signature_text
-                  }
-              },
-              metadata: {
-                  app_version: "1.0.0",
-                  timestamp: new Date().toISOString()
-              }
-          };
-          
-          const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-          const response = await axios.post(webhookUrl, payload);
-          
-          // Response should be an array of keyword results (or nested under activeMode)
-          let rawData = Array.isArray(response.data) ? response.data : [response.data];
-          
-          // Handle n8n wrapping: [{balanced: [{...}, {...}]}]
-          const defaultMode = activeMode || 'balanced';
-          if (rawData.length === 1 && rawData[0][defaultMode]) {
-              rawData = Array.isArray(rawData[0][defaultMode]) ? rawData[0][defaultMode] : [rawData[0][defaultMode]];
-          }
-          // Handle single-object wrapper: [{ keyword1data, keyword2data }] where keys are mode names
-          if (rawData.length === 1 && typeof rawData[0] === 'object' && !rawData[0].keyword) {
-              const firstVal = Object.values(rawData[0])[0];
-              if (Array.isArray(firstVal)) rawData = firstVal;
-          }
-
-          // Get current eval ID
-          let currentEvalId = null;
-          if (globalEvals?.length > 0) {
-              const activeEval = globalEvals.find(e => e.seo_mode === activeMode) || globalEvals[0];
-              currentEvalId = activeEval.id;
-          }
-
-          const newStats = [];
-          const formattedStats = [];
-
-          for (const responseData of rawData) {
-              if (!responseData || (responseData.volume === undefined && responseData.search_volume === undefined)) continue;
-              
-              const newStat = {
-                  tag: responseData.keyword,
-                  search_volume: responseData.search_volume ?? (responseData.volume || 0),
-                  competition: responseData.competition != null ? String(responseData.competition) : "0",
-                  opportunity_score: responseData.opportunity_score ?? (responseData.score || 0),
-                  volume_history: Array.isArray(responseData.monthly_searches)
-                      ? responseData.monthly_searches.map(m => m.search_volume || 0)
-                      : (responseData.volume_history || []),
-                  is_trending: responseData.status?.trending || false,
-                  is_evergreen: responseData.status?.evergreen || false,
-                  is_promising: responseData.status?.promising || false,
-                  insight: responseData.insight || null,
-                  is_top: responseData.is_top || null,
-                  transactional_score: responseData.transactional_score || null,
-                  intent_label: responseData.intent_label || null,
-                  niche_score: responseData.niche_score || null,
-                  relevance_label: responseData.relevance_label || null,
-                  is_selection_ia: responseData.is_selection_ia ?? true,
-                  is_user_added: true,
-                  is_competition: false,
-                  listing_id: currentListingId,
-                  cpc: responseData.cpc ?? null,
-                  is_current_pool: responseData.is_current_pool ?? true,
-                  ...(currentEvalId ? { evaluation_id: currentEvalId } : {})
-              };
-              newStats.push(newStat);
-              formattedStats.push({
-                  keyword: newStat.tag,
-                  volume: newStat.search_volume,
-                  competition: newStat.competition,
-                  score: newStat.opportunity_score,
-                  volume_history: newStat.volume_history,
-                  is_trending: newStat.is_trending,
-                  is_evergreen: newStat.is_evergreen,
-                  is_promising: newStat.is_promising,
-                  insight: newStat.insight,
-                  is_top: newStat.is_top,
-                  transactional_score: newStat.transactional_score,
-                  intent_label: newStat.intent_label,
-                  niche_score: newStat.niche_score,
-                  relevance_label: newStat.relevance_label,
-                  is_selection_ia: newStat.is_selection_ia,
-                  is_competition: newStat.is_competition,
-                  is_user_added: newStat.is_user_added,
-                  cpc: newStat.cpc
-              });
-          }
-
-          if (newStats.length > 0) {
-              // Batch upsert to DB (prevent duplicates on listing_id + tag)
-              const { error: upsertError } = await supabase
-                  .from('listing_seo_stats')
-                  .upsert(newStats, { onConflict: 'listing_id,tag' });
-              if (upsertError) {
-                  console.error("Batch upsert error:", upsertError);
-                  throw new Error("Failed to save keywords to database.");
-              }
-
-              // Update local states
-              setAllSeoStats(prev => [...prev, ...newStats]);
-              setResults(prev => {
-                  if (!prev) return prev;
-                  const newAnalytics = [...(prev.analytics || [])];
-                  const firstCompIndex = newAnalytics.findIndex(k => k.is_competition);
-                  for (const stat of formattedStats) {
-                      if (firstCompIndex !== -1) {
-                          newAnalytics.splice(firstCompIndex, 0, stat);
-                      } else {
-                          newAnalytics.push(stat);
-                      }
-                  }
-                  return { ...prev, analytics: newAnalytics };
-              });
-
-              toast.success(`${newStats.length} keyword${newStats.length > 1 ? 's' : ''} added successfully!`);
+          if (response.data.success) {
+              toast.success(`${response.data.added_count} keyword${response.data.added_count > 1 ? 's' : ''} added successfully!`);
+              // Full reload so the table, strength badge, and pool flags are all in sync
+              await handleLoadListing(currentListingId);
+              setRefreshFavoritesKey(k => k + 1); // Signal ResultsDisplay to re-sync favorite stars
               return true;
+          } else {
+              throw new Error(response.data.error || 'Unknown error from server');
           }
-          return false;
       } catch (err) {
-          console.error("Error adding batch keywords:", err);
-          toast.error(err.message || "Failed to add keywords.");
+          console.error('Error adding batch keywords:', err);
+          toast.error(err.response?.data?.error || err.message || 'Failed to add keywords.');
           return false;
       } finally {
           setIsAddingBatchKeywords(false);
@@ -2587,6 +2402,7 @@ const ProductStudio = () => {
       strategySelections={strategySelections}
       onStrategySelectionsChange={setStrategySelections}
       resetSelectionKey={resetSelectionKey}
+      refreshFavoritesKey={refreshFavoritesKey}
       onSaveListingInfo={handleSaveListingInfo}
       
       // Strategy Switcher Props
