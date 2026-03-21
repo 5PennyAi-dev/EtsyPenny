@@ -1035,3 +1035,30 @@ Migrated all 8 Express API routes from `server.mjs` to Vercel serverless functio
 3. **Edge function cleanup**: Remove `x-api-key` check from Supabase edge functions (n8n auth no longer needed).
 4. **ESLint Configuration**: Initialize a standard ESLint config to resolve `npm run lint` failures.
 5. **analyseShop**: Consider alternative approach (Etsy API or manual entry) since scraping is blocked.
+
+---
+
+## Session: 2026-03-21 — Codebase Cleanup (6-pass)
+
+### Changes
+- Removed all multi-mode (broad/balanced/sniper) residual code from frontend, api/, lib/, and server.mjs
+- Deleted abandoned `app/api/seo/` legacy Next.js routes (replaced by `api/seo/`)
+- Removed 4 orphaned components (StrategySwitcher, SEOStrategySelector, SemiCircleGauge, SearchableSelect)
+- Cleaned 32 unused Lucide icon imports across 5 files
+- Removed deprecated `product_type_text` fallbacks from 8 files
+- Cleaned production console.log statements in api/ routes (converted to structured console.info)
+- Organized 7 test files into `tests/` directory
+- Cleaned obsolete n8n env vars from .env (VITE_N8N_WEBHOOK_URL_PROD removed)
+- Updated CLAUDE.md to reflect post-cleanup state
+
+### Architecture Impact
+- `seo_mode` column still exists in `listings_global_eval` with hardcoded `'balanced'` value — can be dropped via migration later
+- `product_type_text` column still exists in `listings` but is no longer referenced in code
+- Multi-mode UI (StrategySwitcher, mode switching) is fully removed
+- Strategy Tuner still works — it adjusts parameter weights without mode switching
+
+### Next Steps
+1. Run `node pennyseo-audit.mjs` to verify issue count dropped from 179 to ~30-40
+2. Drop `seo_mode` column from `listings_global_eval` via Supabase migration
+3. Drop `product_type_text` column from `listings` via Supabase migration
+4. Refactor server.mjs to import shared helpers from lib/ (reduce duplication)

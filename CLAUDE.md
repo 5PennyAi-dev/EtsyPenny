@@ -10,7 +10,7 @@ Read `docs/context.md` at the start of every session to understand the full proj
 
 ## Project Overview
 
-**PennySEO** (formerly EtsyPenny / 5PennyAi) is an AI-powered SEO SaaS for Etsy sellers. Users upload product mockup images, the app analyzes them via Gemini Vision AI, generates optimized titles/descriptions/tags, and provides SEO scoring across multiple strategy modes (broad, balanced, sniper). The frontend is React (Vite); the AI/SEO pipeline runs through a local Express API server; data persists in Supabase.
+**PennySEO** (formerly EtsyPenny / 5PennyAi) is an AI-powered SEO SaaS for Etsy sellers. Users upload product mockup images, the app analyzes them via Gemini Vision AI, generates optimized titles/descriptions/tags, and provides SEO scoring with configurable strategy weighting. The frontend is a React (Vite) SPA deployed on Vercel; the AI/SEO pipeline runs through Vercel serverless functions in production (`api/`) and a local Express server (`server.mjs`) for development; data persists in Supabase.
 
 ## Commands
 
@@ -29,11 +29,11 @@ npm run preview   # Preview production build
 - **React 19** + **Vite 5** (JSX, no TypeScript in components)
 - **Tailwind CSS 3** with shadcn/ui-style HSL CSS variables
 - **Supabase** for auth, database, storage (mockups_bucket), and realtime subscriptions
-- **Local Express API** (`server.mjs`, port 3001) — primary AI/SEO pipeline using Gemini 2.0 Flash + DataForSEO
-- **n8n** webhooks — still used for drafting, score recalculation, insight generation, and shop analysis
+- **Vercel Serverless Functions** (`api/`) — production backend for all SEO operations
+- **Local Express API** (`server.mjs`, port 3001) — dev-only mirror of Vercel functions, used via Vite proxy
+- **n8n** webhook — only used for `analyseShop` (auto-fill brand profile from Etsy shop URL)
 - **Google Generative AI** (Gemini 2.0 Flash) for vision analysis and keyword scoring
 - **DataForSEO** API for keyword enrichment (search volume, competition, CPC, volume history)
-- **Zustand** available but primarily used in PDF component; most state is local React state
 - **Framer Motion** for animations
 - **Sonner** for toast notifications
 - **Axios** for API calls
@@ -45,18 +45,19 @@ npm run preview   # Preview production build
 ### Key Directories
 - `src/pages/` — Full page components (ProductStudio, Dashboard, HistoryPage, BrandProfilePage, LoginPage, AdminSystemPage, UserSettings, SEOLab, LandingPage)
 - `src/components/studio/` — SEO Listings sub-components (OptimizationForm, ResultsDisplay, ImageUpload, StrategyTuner, FavoritesPickerModal, CreatePresetModal, SeoBadge, ProductTypeCombobox, etc.)
-- `src/components/dashboard/` — Dashboard widgets (PerformanceCard, MarketInsights, RadialGauge, SemiCircleGauge)
+- `src/components/dashboard/` — Dashboard widgets (PerformanceCard, MarketInsights, RadialGauge)
 - `src/components/admin/` — Admin panel components (TaxonomyManagement, ProductTypeManagement)
 - `src/components/settings/` — User settings components (UserTaxonomyManagement — custom themes/niches CRUD)
-- `src/components/ui/` — Reusable UI primitives (Accordion, ConfirmationModal, SearchableSelect)
+- `src/components/ui/` — Reusable UI primitives (Accordion, ConfirmationModal)
 - `src/components/pdf/` — PDF export (ListingPDFDocument using @react-pdf/renderer)
 - `src/context/AuthContext.jsx` — Auth provider wrapping the app (provides user, profile, signOut, loading)
 - `src/lib/supabase.js` — Supabase client singleton
-- `server.mjs` — Local Express API server (primary backend)
-- `lib/seo/` — Shared backend logic: `niche-scoring.ts`, `transactional-scoring.ts`, `filter-logic.ts`
+- `api/` — Vercel serverless functions (production backend): `analyze-image`, `generate-keywords`, `reset-pool`, `recalculate-scores`, `generate-draft`, `user-keyword`, `add-from-favorite`, `health`
+- `server.mjs` — Local Express dev server (mirrors Vercel functions for local development)
+- `vercel.json` — Vercel deployment config (rewrites `/api/*` to serverless functions)
+- `lib/seo/` — Shared backend logic imported by both `server.mjs` and `api/`: `niche-scoring.ts`, `transactional-scoring.ts`, `filter-logic.ts`
 - `lib/ai/gemini.ts` — Gemini API wrapper
 - `lib/supabase/server.ts` — Server-side Supabase admin client
-- `app/api/seo/` — Legacy Next.js API routes (being migrated to server.mjs, do not use)
 - `supabase/functions/save-seo/` — Deno edge function to persist SEO results
 - `supabase/functions/save-image-analysis/` — Deno edge function to persist image analysis
 - `supabase/functions/check-keyword-cache/` — Deno edge function for keyword cache lookup
@@ -67,9 +68,11 @@ npm run preview   # Preview production build
 - `.agent/personas.md` — AI assistant persona definitions for this project
 - `types/definitions.ts` — TypeScript interfaces for API payloads and data structures
 
-### Local Express API Server (`server.mjs`)
+### Backend: Dual Dev/Production Architecture
 
-The primary backend, running on port 3001. Vite proxies `/api/*` requests to it automatically.
+**Production**: Vercel serverless functions in `api/seo/*.ts` — each route is a standalone function importing shared logic from `lib/`.
+
+**Local dev**: Express server (`server.mjs`, port 3001) — mirrors the same routes. Vite proxies `/api/*` requests to it automatically. Both backends share `lib/seo/`, `lib/ai/`, and `lib/supabase/`.
 
 **Active routes:**
 | Route | Purpose |
@@ -91,10 +94,10 @@ The primary backend, running on port 3001. Vite proxies `/api/*` requests to it 
 - `persistStrength()` — Shared DB persistence for strength scores (used by reset-pool + recalculate-scores)
 - `applySEOFilter()` — Opportunity scores, trending/evergreen flags, pool ranking
 
-### n8n Webhooks (Still Active)
+### n8n Webhook (Single Remaining Use)
 
-This action still uses the n8n webhook (`VITE_N8N_WEBHOOK_URL_TEST`):
-- **`analyseShop`** — Auto-fill brand profile from Etsy shop URL
+Only one action still uses the n8n webhook (`VITE_N8N_WEBHOOK_URL_TEST`):
+- **`analyseShop`** in `BrandProfilePage.jsx` — Auto-fill brand profile from Etsy shop URL
 
 ### Data Flow
 1. **Image Upload**: User uploads mockup → stored in Supabase `mockups_bucket` → listing row created in `listings` table
@@ -105,12 +108,12 @@ This action still uses the n8n webhook (`VITE_N8N_WEBHOOK_URL_TEST`):
 6. **Manual Overrides**: Conv. Intent and Relevance overrides via interactive `SeoBadge` dropdowns → `handleScoreUpdate` syncs to `listing_seo_stats`
 7. **Component Communication**: `ProductStudio.jsx` passes state and callbacks to `ResultsDisplay.jsx` as props
 8. **Realtime Updates**: ProductStudio subscribes to Supabase realtime on `listings` table to detect when image analysis completes
-9. **Display**: ResultsDisplay shows SEO scores, keywords, and strategy comparisons across broad/balanced/sniper modes
+9. **Display**: ResultsDisplay shows SEO scores, keywords, and strategy analysis
 10. **Smart Badges**: User settings from `UserSettings.jsx` feed all API payloads via `v_user_seo_active_settings`
 
 ### Supabase Tables & Views
 - **`listings`** — Core table: image_url, generated_title, generated_description, visual analysis fields, status_id, theme, niche, sub_niche, is_generating_seo, is_image_analysed
-- **`listings_global_eval`** — Per-mode SEO evaluation scores (listing_strength, visibility, relevance, conversion, competition, profit) keyed by listing_id + seo_mode
+- **`listings_global_eval`** — SEO evaluation scores (listing_strength, visibility, relevance, conversion, competition, profit) keyed by listing_id
 - **`listing_seo_stats`** — Individual keyword metrics (tag, search_volume, competition, cpc, opportunity_score, niche_score, transactional_score, is_selection_ia, is_current_pool, is_current_eval, is_pinned, is_user_added, is_competition, volume_history)
 - **`user_keyword_bank`** — User's saved favorite keywords with cached metrics
 - **`keyword_presets`** — Named keyword groupings (keyword_ids[] referencing user_keyword_bank)
@@ -126,12 +129,6 @@ This action still uses the n8n webhook (`VITE_N8N_WEBHOOK_URL_TEST`):
 - **`listings_global_info`** — View joining listings, statuses, and evaluations (used by HistoryPage)
 - **`view_user_performance_stats`** — Aggregated user-level performance metrics (used by Dashboard)
 - **`v_user_seo_active_settings`** — View returning resolved user settings for API payloads
-
-### SEO Modes
-The app operates with three strategy modes, each producing its own set of keywords and global evaluation:
-- **broad** — Wide reach, high volume keywords
-- **balanced** — Default mode, mix of volume and relevance
-- **sniper** — Niche-specific, low competition keywords
 
 ### Listing Status Flow
 Listings progress through statuses tracked by UUID:
@@ -171,7 +168,8 @@ API_PORT                   # Express server port (defaults to 3001)
 - Pages import `Layout` which provides Sidebar + main content area
 - Protected routes wrap content with `ProtectedRoute` (redirects to `/login` if unauthenticated)
 - Supabase queries are made directly in page components (no abstraction layer)
-- Frontend calls local `/api/seo/*` endpoints (proxied to Express via Vite); n8n webhook URL accessed via `import.meta.env.VITE_N8N_WEBHOOK_URL_TEST` for remaining actions
+- Frontend calls `/api/seo/*` endpoints — in dev these are proxied to Express via Vite; in production they hit Vercel serverless functions directly
+- n8n webhook URL accessed via `import.meta.env.VITE_N8N_WEBHOOK_URL_TEST` only for `analyseShop` in BrandProfilePage
 - Node polyfills are enabled for buffer/process/util/stream (needed by @react-pdf/renderer)
 - The style guide document (`docs/styleguide.md`) is written in French
-- `app/api/seo/` contains legacy Next.js routes — do not use; all active backend logic lives in `server.mjs`
+- `tests/` contains test files; `pennyseo-audit.mjs` at root runs the codebase audit
