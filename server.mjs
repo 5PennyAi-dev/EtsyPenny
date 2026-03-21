@@ -713,31 +713,37 @@ export function applySEOFilter(keywords, params) {
   const WORKING_POOL_LIMIT = params.working_pool_count || 40;
   const AI_SELECTION_LIMIT = params.ai_selection_count || 13;
 
-  // 1. Determine AI selection: pinned first, then top-scored keywords by score
-  //    User-added keywords bypass concept diversity for pool visibility,
-  //    but do NOT get selection priority — only score and pinned status matter.
-  const selectionSet = new Set();
+  // 1. Determine AI selection from the FULL processed list (before concept diversity).
+  //    Pinned first, then top-scored. User-added keywords only get selected if their
+  //    score earns it — concept diversity does NOT affect selection, only pool visibility.
+  const selectionTags = new Set();
+  let aiCount = 0;
 
   // Pass 1: pinned keywords always selected
-  for (let i = 0; i < selectedTags.length; i++) {
-    if (selectedTags[i].is_pinned) {
-      selectionSet.add(i);
+  for (const item of processed) {
+    if (item.is_pinned) {
+      selectionTags.add((item.keyword || item.tag || '').toLowerCase());
+      aiCount++;
     }
   }
 
-  // Pass 2: fill remaining slots by score order (selectedTags is already sorted by score)
-  for (let i = 0; i < selectedTags.length && selectionSet.size < AI_SELECTION_LIMIT; i++) {
-    if (!selectionSet.has(i)) {
-      selectionSet.add(i);
+  // Pass 2: fill remaining slots by score order from full processed list
+  for (const item of processed) {
+    if (aiCount >= AI_SELECTION_LIMIT) break;
+    const tag = (item.keyword || item.tag || '').toLowerCase();
+    if (!selectionTags.has(tag)) {
+      selectionTags.add(tag);
+      aiCount++;
     }
   }
 
-  // 2. Assign pool and selection flags
+  // 2. Assign pool and selection flags to the concept-diversity-filtered list
   let poolCount = 0;
 
-  return selectedTags.map((item, index) => {
+  return selectedTags.map((item) => {
     const isUserAdded = item.is_user_added === true || item.is_user_added === 'true';
-    const isInTopSelection = selectionSet.has(index);
+    const tag = (item.keyword || item.tag || '').toLowerCase();
+    const isInTopSelection = selectionTags.has(tag);
 
     // Visibility Pool (40 limit)
     // Always show user-added/pinned keywords, even if their score pushes them beyond index 40
