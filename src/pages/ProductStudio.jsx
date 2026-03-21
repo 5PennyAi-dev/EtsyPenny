@@ -71,10 +71,6 @@ const ProductStudio = () => {
   const [isApplyingStrategy, setIsApplyingStrategy] = useState(false);
   const [strategySelections, setStrategySelections] = useState(DEFAULT_STRATEGY_SELECTIONS);
   
-  // Strategy Switcher State
-  const [activeMode, setActiveMode] = useState('balanced');
-  const [globalEvals, setGlobalEvals] = useState([]); // Stores all loaded evaluations
-  const [allSeoStats, setAllSeoStats] = useState([]); // Stores all loaded stats
   const [analysisContext, setAnalysisContext] = useState(null);
   const [listingName, setListingName] = useState("");
   const [isImageAnalyzedState, setIsImageAnalyzedState] = useState(false);
@@ -170,8 +166,6 @@ const ProductStudio = () => {
   latestRef.current = {
     listingId,
     results,
-    globalEvals,
-    activeMode,
     userDefaults,
     strategySelections,
     visualAnalysis,
@@ -888,7 +882,6 @@ const ProductStudio = () => {
       try {
           const response = await axios.post('/api/seo/recalculate-scores', {
               listing_id: listingId,
-              seo_mode: activeMode || 'balanced',
               selected_keywords: selectedKeywordsData.map(k => ({
                   keyword: k.keyword,
                   search_volume: k.volume,
@@ -928,20 +921,6 @@ const ProductStudio = () => {
               return { ...prev, ...updatePayload, analytics: updatedAnalytics };
           });
 
-          setAllSeoStats(prev => prev.map(s => {
-              if (s.listing_id === listingId) {
-                  return { ...s, is_current_eval: selectedTags.includes(s.tag) };
-              }
-              return s;
-          }));
-
-          setGlobalEvals(prev => prev.map(e => {
-              if (e.seo_mode === activeMode && e.listing_id === listingId) {
-                  return { ...e, ...updatePayload };
-              }
-              return e;
-          }));
-
           toast.success("Scores successfully recalculated!");
       } catch (error) {
           console.error("Recalculate Scores failed:", error);
@@ -965,7 +944,6 @@ const ProductStudio = () => {
     try {
       const payload = {
         listing_id: listingId,
-        seo_mode: activeMode || 'balanced',
         parameters: {
             ...getStrategyValues(strategySelections),
             ...getSmartBadgePayload(),
@@ -999,7 +977,6 @@ const ProductStudio = () => {
     try {
       const payload = {
         listing_id: listingId,
-        seo_mode: activeMode || 'balanced',
         pinned_count: pinnedCount,
         parameters: {
             ...parameters, 
@@ -1185,20 +1162,14 @@ const ProductStudio = () => {
 
         setListingName(listing.title || "");
 
-        // Fetch Global Eval Data (Fetch all versions)
-        const { data: globalEvalsData } = await supabase
+        // Fetch Global Eval Data (single row per listing)
+        const { data: evalData } = await supabase
             .from('listings_global_eval')
             .select('*')
             .eq('listing_id', listingId)
-            .order('updated_at', { ascending: false });
-
-        setGlobalEvals(globalEvalsData || []);
-
-        // Determine active eval (latest updated or fallback to balanced)
-        // Logic: Try to find the last used mode, or default to balanced
-        const latestEval = globalEvalsData && globalEvalsData.length > 0 ? globalEvalsData[0] : null;
-        let initialMode = latestEval?.seo_mode || 'balanced';
-        setActiveMode(initialMode);
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
         // Fetch SEO Stats for this listing (only current pool keywords)
         let statsQuery = supabase
@@ -1208,7 +1179,6 @@ const ProductStudio = () => {
             .eq('is_current_pool', true);
         
         const { data: stats, error: statsError } = await statsQuery;
-        setAllSeoStats(stats || []);
 
         if (statsError) throw statsError;
         
@@ -1276,21 +1246,16 @@ const ProductStudio = () => {
                      niche: listing.niche || listing.niches?.name || "",
                      sub_niche: listing.sub_niche || listing.sub_niches?.name || "",
                      tone: listing.tone || "Auto-detect",
-                     max_tags: listing.max_tags || 13,
-                     seo_mode: initialMode // Set form mode to match loaded data
+                     max_tags: listing.max_tags || 13
                  });
              }
         }, 100);
 
-        // Construct Results Object for the ACTIVE mode
-        // Find specific eval for the initial mode
-        const activeEvalData = globalEvalsData?.find(e => e.seo_mode === initialMode) || latestEval; // Fallback to latest if explicit mode missing
-        const activeEvalId = activeEvalData?.id;
+        // Construct Results Object
+        const activeEvalData = evalData;
 
-        // Filter stats: Include if matching evaluation_id OR if it's a manually added user keyword (which are global)
-        const relevantStats = (stats || []).filter(s => 
-            s.is_user_added || (activeEvalId ? s.evaluation_id === activeEvalId : true)
-        );
+        // All current pool stats are relevant (single eval)
+        const relevantStats = stats || [];
 
         const constructedResults = {
             title: listing.generated_title,
@@ -1513,9 +1478,6 @@ const ProductStudio = () => {
               };
           });
 
-          // Also remove it from allSeoStats cache if present
-          setAllSeoStats(prev => prev.filter(item => item.tag !== keywordToRemove));
-
           toast.success(`Deleted "${keywordToRemove}" from listing`);
       } catch (err) {
           console.error("Unexpected error in handleDeleteKeyword:", err);
@@ -1557,11 +1519,6 @@ const ProductStudio = () => {
               };
           });
 
-          // Also update allSeoStats cache
-          setAllSeoStats(prev => prev.map(item => 
-              item.tag === keyword ? { ...item, is_pinned: newPinStatus } : item
-          ));
-          
           if (newPinStatus) {
                toast.success(`Pinned "${keyword}"`);
           }
@@ -1609,11 +1566,6 @@ const ProductStudio = () => {
               };
           });
 
-          // Also update allSeoStats cache
-          setAllSeoStats(prev => prev.map(item => 
-              item.tag === keyword ? { ...item, [dbColumn]: newScore } : item
-          ));
-          
       } catch (err) {
           console.error("Unexpected error in handleScoreUpdate:", err);
           toast.error("Failed to update score");
@@ -1623,114 +1575,10 @@ const ProductStudio = () => {
   const handleSEOSniper = async () => {
       setIsSniperLoading(true);
       try {
-          // Trigger analysis with 'sniper' mode
-          if (optimizationFormRef.current?.setFormState) {
-              const current = optimizationFormRef.current.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
-              optimizationFormRef.current.setFormState({ ...current, seo_mode: 'sniper' });
-          }
-          
           const formData = optimizationFormRef.current?.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
-          await handleAnalyze({ ...formData, seo_mode: 'sniper' });
+          await handleAnalyze(formData);
       } finally {
           setIsSniperLoading(false);
-      }
-  };
-
-  const handleModeChange = (newMode) => {
-      if (newMode === activeMode) return;
-      setActiveMode(newMode);
-
-      // Filter results based on the new mode
-      // Find specific eval for this mode
-      const activeEvalData = globalEvals.find(e => e.seo_mode === newMode);
-      
-      if (!activeEvalData) {
-          console.warn("Attempted to switch to unavailable mode:", newMode);
-          return;
-      }
-      const activeEvalId = activeEvalData.id;
-
-      // Filter stats for this eval
-      const relevantStats = allSeoStats.filter(s => s.evaluation_id === activeEvalId);
-
-      const constructedResults = {
-          ...results, // Keep standard fields
-          
-          // Mode-specific Global Data
-          global_strength: activeEvalData.global_strength,
-          status_label: activeEvalData.status_label,
-          strategic_verdict: activeEvalData.strategic_verdict,
-          improvement_priority: activeEvalData.improvement_priority,
-          score_explanation: activeEvalData.score_explanation,
-          
-          listing_strength: activeEvalData.listing_strength,
-          listing_visibility: activeEvalData.listing_visibility,
-          listing_conversion: activeEvalData.listing_conversion,
-          listing_competition: activeEvalData.listing_competition,
-          listing_profit: activeEvalData.listing_profit,
-          listing_raw_visibility_index: activeEvalData.listing_raw_visibility_index,
-          listing_avg_cpc: activeEvalData.listing_avg_cpc,
-          listing_avg_competition: activeEvalData.listing_avg_competition,
-
-          // Dashboard Metrics
-          score_justification_visibility: activeEvalData.score_justification_visibility,
-          score_justification_relevance: activeEvalData.score_justification_relevance,
-          score_justification_conversion: activeEvalData.score_justification_conversion,
-          score_justification_strength: activeEvalData.score_justification_strength,
-          improvement_plan_remove: activeEvalData.improvement_plan_remove,
-          improvement_plan_add: activeEvalData.improvement_plan_add,
-          improvement_plan_primary_action: activeEvalData.improvement_plan_primary_action,
-
-          tags: relevantStats.map(s => s.tag),
-          analytics: relevantStats.map(s => ({
-              keyword: s.tag,
-              volume: s.search_volume,
-              competition: s.competition,
-              score: s.opportunity_score,
-              volume_history: s.volume_history,
-              is_trending: s.is_trending,
-              is_evergreen: s.is_evergreen,
-              is_promising: s.is_promising,
-              insight: s.insight,
-              is_top: s.is_top,
-              transactional_score: s.transactional_score,
-              intent_label: s.intent_label,
-              niche_score: s.niche_score,
-              relevance_label: s.relevance_label,
-              is_competition: s.is_competition,
-              is_sniper_seo: s.is_sniper_seo,
-              is_selection_ia: s.is_selection_ia,
-              is_user_added: s.is_user_added,
-              is_current_eval: s.is_current_eval,
-              is_pinned: s.is_pinned,
-              cpc: s.cpc
-          }))
-      };
-      
-      setResults(constructedResults);
-
-      // Hydrate Strategy Tuner sliders for the new mode
-      if (activeEvalData?.param_Volume != null || activeEvalData?.param_Competition != null || activeEvalData?.param_Transaction != null || activeEvalData?.param_Niche != null || activeEvalData?.param_cpc != null) {
-        setStrategySelections(getSelectionsFromValues({
-          Volume: activeEvalData.param_Volume,
-          Competition: activeEvalData.param_Competition,
-          Transaction: activeEvalData.param_Transaction,
-          Niche: activeEvalData.param_Niche,
-          CPC: activeEvalData.param_cpc,
-        }));
-      } else {
-        setStrategySelections(DEFAULT_STRATEGY_SELECTIONS);
-      }
-
-      setResetSelectionKey(k => k + 1); // Reset Keyword Selection
-      
-      // Also update the form visual state to match
-      if (optimizationFormRef.current?.setFormState) {
-         const currentForm = optimizationFormRef.current.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
-         optimizationFormRef.current.setFormState({
-             ...currentForm,
-             seo_mode: newMode
-         });
       }
   };
 
@@ -1768,11 +1616,6 @@ const ProductStudio = () => {
       resetSelectionKey={resetSelectionKey}
       refreshFavoritesKey={refreshFavoritesKey}
       onSaveListingInfo={handleSaveListingInfo}
-      
-      // Strategy Switcher Props
-      activeMode={activeMode}
-      onModeChange={handleModeChange}
-      availableModes={globalEvals.map(e => e.seo_mode).filter(Boolean)}
 
       // SEO Analysis Accordion Props
       seoAnalysisOpen={isSeoAnalysisOpen}

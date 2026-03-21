@@ -10,7 +10,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { listing_id, seo_mode = 'balanced' } = req.body;
+    const { listing_id } = req.body;
     if (!listing_id) {
       return res.status(400).json({ error: 'Missing listing_id' });
     }
@@ -109,7 +109,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { strength } = selectAndScore(filteredKeywords, finalParams);
 
     if (strength) {
-      await persistStrength(listing_id, seo_mode, strength, correctSelectedTags, finalParams);
+      await persistStrength(listing_id, strength, correctSelectedTags, finalParams);
     }
 
     console.log(`   ✅ Pool reset complete for ${listing_id}`);

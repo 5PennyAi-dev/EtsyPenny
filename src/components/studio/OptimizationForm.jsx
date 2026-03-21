@@ -15,9 +15,6 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
   // Data State
   const [groupedProductTypes, setGroupedProductTypes] = useState([]);
 
-  // Selection State
-  const [seoMode, setSeoMode] = useState('balanced');
-  
   // Niche Selection State
   const [themeName, setThemeName] = useState("");
   const [themeId, setThemeId] = useState("");
@@ -112,8 +109,6 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
             setProductTypeName(initialValues.product_type_text || initialValues.product_type_name);
           }
 
-          setSeoMode(initialValues.seo_mode || 'balanced');
-          
           if (contextRef.current) {
               contextRef.current.value = initialValues.context || "";
           }
@@ -199,8 +194,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
       
       ton_name: resolvedToneName, 
       tag_count: MAX_TAGS_LIMIT,
-      seo_mode: seoMode,
-      
+
       context: contextRef.current.value
     };
   };
@@ -218,8 +212,7 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
               
               theme_name: themeName,
               niche_name: nicheName,
-              sub_niche_name: subNicheName,
-              seo_mode: seoMode
+              sub_niche_name: subNicheName
           };
       }
   }));

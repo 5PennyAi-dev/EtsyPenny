@@ -428,10 +428,6 @@ const SidebarSkeleton = ({ phase }) => (
     onStrategySelectionsChange,
     resetSelectionKey,
     children,
-    // Strategy Switcher Props
-    activeMode,
-    onModeChange,
-    availableModes,
     // SEO Analysis Accordion Props
     seoAnalysisOpen,
     onSeoAnalysisOpenChange,

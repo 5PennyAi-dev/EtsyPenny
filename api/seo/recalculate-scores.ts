@@ -9,12 +9,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { listing_id, seo_mode = 'balanced', selected_keywords } = req.body;
+    const { listing_id, selected_keywords } = req.body;
     if (!listing_id || !selected_keywords?.length) {
       return res.status(400).json({ error: 'Missing listing_id or selected_keywords' });
     }
 
-    console.log(`\n📊 [recalculate-scores] Starting for listing ${listing_id} (${selected_keywords.length} keywords, mode: ${seo_mode})`);
+    console.log(`\n📊 [recalculate-scores] Starting for listing ${listing_id} (${selected_keywords.length} keywords)`);
 
     // 1. Fetch listing owner
     const { data: listing, error: listingError } = await supabaseAdmin
@@ -52,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 4. Persist to DB
     const selectedTags = selected_keywords.map((k: { keyword?: string }) => k.keyword);
-    await persistStrength(listing_id, seo_mode, strength, selectedTags, params);
+    await persistStrength(listing_id, strength, selectedTags, params);
 
     console.log(`   ✅ Recalculate complete for ${listing_id} — LSI: ${strength.listing_strength}`);
     return res.json({ success: true, strength });

@@ -746,7 +746,7 @@ export function applySEOFilter(keywords, params) {
 }
 
 // ─── SHARED HELPER: Persist strength scores to DB ──────────
-async function persistStrength(listing_id, seo_mode, strength, selectedTags, params) {
+async function persistStrength(listing_id, strength, selectedTags, params) {
   // 1. Update is_current_eval flags on listing_seo_stats
   await supabaseAdmin
     .from('listing_seo_stats')
@@ -775,16 +775,15 @@ async function persistStrength(listing_id, seo_mode, strength, selectedTags, par
     })
     .eq('id', listing_id);
 
-  // 3. Upsert listings_global_eval for this mode
+  // 3. Upsert listings_global_eval
   const { data: existingEvalRows } = await supabaseAdmin
     .from('listings_global_eval')
     .select('id')
-    .eq('listing_id', listing_id)
-    .eq('seo_mode', seo_mode);
+    .eq('listing_id', listing_id);
 
   const evalPayload = {
     listing_id,
-    seo_mode,
+    seo_mode: 'balanced',
     listing_strength: strength.listing_strength,
     listing_visibility: strength.breakdown.visibility,
     listing_conversion: strength.breakdown.conversion,
@@ -815,7 +814,7 @@ async function persistStrength(listing_id, seo_mode, strength, selectedTags, par
 // ─── API ROUTE: POST /api/seo/reset-pool ──────────────────
 app.post('/api/seo/reset-pool', async (req, res) => {
   try {
-    const { listing_id, seo_mode = 'balanced' } = req.body;
+    const { listing_id } = req.body;
     if (!listing_id) {
       return res.status(400).json({ error: 'Missing listing_id' });
     }
@@ -914,7 +913,7 @@ app.post('/api/seo/reset-pool', async (req, res) => {
     const { strength } = selectAndScore(filteredKeywords, finalParams);
 
     if (strength) {
-      await persistStrength(listing_id, seo_mode, strength, correctSelectedTags, finalParams);
+      await persistStrength(listing_id, strength, correctSelectedTags, finalParams);
     }
 
     console.log(`   ✅ Pool reset complete for ${listing_id}`);
@@ -929,12 +928,12 @@ app.post('/api/seo/reset-pool', async (req, res) => {
 // ─── API ROUTE: POST /api/seo/recalculate-scores ──────────
 app.post('/api/seo/recalculate-scores', async (req, res) => {
   try {
-    const { listing_id, seo_mode = 'balanced', selected_keywords } = req.body;
+    const { listing_id, selected_keywords } = req.body;
     if (!listing_id || !selected_keywords?.length) {
       return res.status(400).json({ error: 'Missing listing_id or selected_keywords' });
     }
 
-    console.log(`\n📊 [recalculate-scores] Starting for listing ${listing_id} (${selected_keywords.length} keywords, mode: ${seo_mode})`);
+    console.log(`\n📊 [recalculate-scores] Starting for listing ${listing_id} (${selected_keywords.length} keywords)`);
 
     // 1. Fetch listing owner
     const { data: listing, error: listingError } = await supabaseAdmin
@@ -972,7 +971,7 @@ app.post('/api/seo/recalculate-scores', async (req, res) => {
 
     // 4. Persist to DB
     const selectedTags = selected_keywords.map(k => k.keyword);
-    await persistStrength(listing_id, seo_mode, strength, selectedTags, params);
+    await persistStrength(listing_id, strength, selectedTags, params);
 
     console.log(`   ✅ Recalculate complete for ${listing_id} — LSI: ${strength.listing_strength}`);
     return res.json({ success: true, strength });

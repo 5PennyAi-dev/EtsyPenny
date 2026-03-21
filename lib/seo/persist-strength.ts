@@ -30,7 +30,6 @@ interface Params {
 
 export async function persistStrength(
   listing_id: string,
-  seo_mode: string,
   strength: Strength,
   selectedTags: string[],
   params: Params
@@ -63,16 +62,15 @@ export async function persistStrength(
     })
     .eq('id', listing_id);
 
-  // 3. Upsert listings_global_eval for this mode
+  // 3. Upsert listings_global_eval
   const { data: existingEvalRows } = await supabaseAdmin
     .from('listings_global_eval')
     .select('id')
-    .eq('listing_id', listing_id)
-    .eq('seo_mode', seo_mode);
+    .eq('listing_id', listing_id);
 
   const evalPayload = {
     listing_id,
-    seo_mode,
+    seo_mode: 'balanced',
     listing_strength: strength.listing_strength,
     listing_visibility: strength.breakdown.visibility,
     listing_conversion: strength.breakdown.conversion,
