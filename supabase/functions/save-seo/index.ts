@@ -213,67 +213,22 @@ serve(async (req) => {
 
     if (updateListingError) throw updateListingError;
 
-    // 6. Trigger resetPool if requested
+    // 6. Trigger resetPool via API if requested
     if (trigger_reset_pool) {
         try {
-            // Get user_id for the listing
-            const { data: listingData } = await supabaseClient
-                .from('listings')
-                .select('user_id')
-                .eq('id', listing_id)
-                .single();
-
-            if (listingData?.user_id) {
-                // Fetch user specific active settings
-                const { data: userSettings } = await supabaseClient
-                    .from('v_user_seo_active_settings')
-                    .select('*')
-                    .eq('user_id', listingData.user_id)
-                    .single();
-
-                // Construct backend payload mirroring frontend's getSmartBadgePayload and strategy
-                const parameters = {
-                    Volume: userSettings?.param_volume ?? 5,
-                    Competition: userSettings?.param_competition ?? 5,
-                    Transaction: userSettings?.param_transaction ?? 5,
-                    Niche: userSettings?.param_niche ?? 5,
-                    CPC: userSettings?.param_cpc ?? 5,
-                    
-                    evergreen_stability_ratio: userSettings?.evergreen_stability_ratio ?? 0.5,
-                    evergreen_minimum_volume: userSettings?.evergreen_minimum_volume ?? 100,
-                    evergreen_avg_volume: userSettings?.evergreen_avg_volume ?? 250,
-                    trending_dropping_threshold: userSettings?.trending_dropping_threshold ?? -0.2,
-                    trending_current_month_min_volume: userSettings?.trending_current_month_min_volume ?? 100,
-                    trending_growth_factor: userSettings?.trending_growth_factor ?? 1.15,
-                    promising_min_score: userSettings?.promising_min_score ?? 70,
-                    promising_competition: userSettings?.promising_competition ?? 0.4,
-                    
-                    ai_selection_count: userSettings?.ai_selection_count ?? 13,
-                    working_pool_count: userSettings?.working_pool_count ?? 40,
-                    concept_diversity_limit: userSettings?.concept_diversity_limit ?? 3,
-                };
-
-                // Use N8N_WEBHOOK_URL_RESET_POOL env var (production URL, not test URL)
-                const webhookUrl = Deno.env.get('N8N_WEBHOOK_URL_RESET_POOL');
-                if (!webhookUrl) {
-                    console.error('Missing env var: N8N_WEBHOOK_URL_RESET_POOL. Cannot trigger resetPool.');
-                    return;
-                }
-                
-                // Fire and forget fetch to n8n webhook
-                fetch(webhookUrl, {
+            const resetPoolUrl = Deno.env.get('RESET_POOL_API_URL');
+            if (!resetPoolUrl) {
+                console.error('Missing env var: RESET_POOL_API_URL. Cannot trigger resetPool.');
+            } else {
+                // Fire and forget — don't block the response
+                fetch(`${resetPoolUrl}/api/seo/reset-pool`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'resetPool',
-                        listing_id: listing_id,
-                        parameters: parameters
-                    })
-                }).catch(err => console.error("Failed to trigger resetPool webhook:", err));
+                    body: JSON.stringify({ listing_id })
+                }).catch(err => console.error("Failed to trigger resetPool:", err));
             }
         } catch (resetPoolErr) {
             console.error("Error initiating resetPool:", resetPoolErr);
-            // We don't throw here, we still want to return 200 since SEO was saved
         }
     }
 
