@@ -1,9 +1,9 @@
-import { applySEOFilter, KeywordInput, FilterParameters } from './lib/seo/filter-logic';
+import { applySEOFilter, KeywordInput, FilterParameters } from '../lib/seo/filter-logic';
 import fs from 'fs';
 
 function main() {
     console.log('Loading mock data from docs/Filter SEO 2.json...');
-    const rawData = fs.readFileSync('./docs/Filter SEO 2.json', 'utf-8');
+    const rawData = fs.readFileSync('../docs/Filter SEO 2.json', 'utf-8');
     const data = JSON.parse(rawData);
 
     // Extract the mock data from the n8n JSON

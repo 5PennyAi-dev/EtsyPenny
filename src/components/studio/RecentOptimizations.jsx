@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { BarChart2, MoreVertical, ExternalLink, History } from 'lucide-react';
+import { ExternalLink, History } from 'lucide-react';
 import { formatRelative } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Accordion from '../ui/Accordion';

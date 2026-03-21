@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Layout from '../components/Layout';
-import { Sparkles, Save, Store, Link as LinkIcon, AlertCircle, RefreshCw } from 'lucide-react';
+import { Sparkles, Save, Store, Link as LinkIcon, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 

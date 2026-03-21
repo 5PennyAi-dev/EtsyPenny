@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, CheckCircle, Search, Target, Zap, Star } from 'lucide-react';
+import { CheckCircle, Search, Target, Zap, Star } from 'lucide-react';
 import logo from '../assets/pennyseo-logo.png';
 import dashboardPreview from '../assets/dashboard_preview.jpg';
 import fivePennyLogo from '../assets/5pennyAi_logo.png';

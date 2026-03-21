@@ -1,8 +1,8 @@
-import { 
-  Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles, Pencil, RefreshCw, UploadCloud, 
-  ArrowUpDown, ArrowUp, ArrowDown, FileDown, Lightbulb, AlertTriangle, Target, Loader2, 
-  Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart, 
-  Pin, Tag, User, Zap, Swords, DollarSign, Award, ChevronRight, X, UserSearch, FileText, Share2, Printer, Hash, PlayCircle, BarChart3, AlertCircle, Clock, Activity, ArrowRight, LayoutTemplate, Layers, CheckCircle, ListPlus, EyeOff, LayoutPanelLeft, MousePointerClick, History, Folder 
+import {
+  Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles,
+  ArrowUpDown, ArrowUp, ArrowDown, Lightbulb, AlertTriangle, Target, Loader2,
+  Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart,
+  Pin, Tag, User, Zap, Swords, DollarSign, Award, BarChart3, History, Folder
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
