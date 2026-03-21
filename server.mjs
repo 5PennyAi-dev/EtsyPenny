@@ -690,26 +690,6 @@ export function applySEOFilter(keywords, params) {
     return b.opportunity_score - a.opportunity_score;
   });
 
-  const selectedTags = [];
-  const conceptTracker = {};
-  const TAG_COUNT = 200;
-
-  for (const item of processed) {
-    if (selectedTags.length >= TAG_COUNT) break;
-    const rawKeyword = (item.keyword || item.tag || '').toLowerCase();
-    const concept = rawKeyword
-      .replace(/[^\w\s]/g, '') // Remove punctuation
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .join(' ');
-    
-    conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;
-    if (item.is_user_added || conceptTracker[concept] <= params.concept_diversity_limit) {
-      selectedTags.push(item);
-    }
-  }
-
   const WORKING_POOL_LIMIT = params.working_pool_count || 40;
   const AI_SELECTION_LIMIT = params.ai_selection_count || 13;
 
@@ -737,7 +717,32 @@ export function applySEOFilter(keywords, params) {
     }
   }
 
-  // 2. Assign pool and selection flags to the concept-diversity-filtered list
+  // 2. Concept Diversity Filtering for pool visibility.
+  //    Selected keywords (from step 1) always bypass concept diversity — they must
+  //    appear in the output so their is_selection_ia flag gets persisted to DB.
+  const selectedTags = [];
+  const conceptTracker = {};
+  const TAG_COUNT = 200;
+
+  for (const item of processed) {
+    if (selectedTags.length >= TAG_COUNT) break;
+    const rawKeyword = (item.keyword || item.tag || '').toLowerCase();
+    const concept = rawKeyword
+      .replace(/[^\w\s]/g, '')
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .join(' ');
+
+    conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;
+
+    const isSelected = selectionTags.has(rawKeyword);
+    if (isSelected || item.is_user_added || conceptTracker[concept] <= params.concept_diversity_limit) {
+      selectedTags.push(item);
+    }
+  }
+
+  // 3. Assign pool and selection flags
   let poolCount = 0;
 
   return selectedTags.map((item) => {
@@ -748,7 +753,7 @@ export function applySEOFilter(keywords, params) {
     // Visibility Pool (40 limit)
     // Always show user-added/pinned keywords, even if their score pushes them beyond index 40
     let isInPool = false;
-    if (isUserAdded || item.is_pinned) {
+    if (isUserAdded || item.is_pinned || isInTopSelection) {
         isInPool = true;
     } else if (poolCount < WORKING_POOL_LIMIT) {
         isInPool = true;

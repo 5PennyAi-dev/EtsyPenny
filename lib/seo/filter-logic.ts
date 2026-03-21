@@ -152,33 +152,6 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
     return ((b as any).opportunity_score || 0) - ((a as any).opportunity_score || 0);
   });
 
-  // D. Concept Diversity Filtering
-  const selectedTags: typeof processed = [];
-  const conceptTracker: Record<string, number> = {};
-  
-  // We limit the total tags output if needed, but the original logic used a generic tag_count = 200.
-  // We'll process all of them and just enforce concept limits.
-  const TAG_COUNT = 200;
-
-  for (const item of processed) {
-    if (selectedTags.length >= TAG_COUNT) break;
-    
-    // Concept is the first two words of the keyword
-    const rawKeyword = (item.keyword || (item as any).tag || '').toLowerCase();
-    const concept = rawKeyword
-      .replace(/[^\w\s]/g, '') // Remove punctuation
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .join(' ');
-      
-    conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;
-
-    if (item.is_user_added || conceptTracker[concept] <= params.concept_diversity_limit) {
-      selectedTags.push(item);
-    }
-  }
-
   const WORKING_POOL_LIMIT = params.working_pool_count || 40;
   const AI_SELECTION_LIMIT = params.ai_selection_count || 13;
 
@@ -206,10 +179,36 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
     }
   }
 
-  // 2. Assign pool and selection flags to the concept-diversity-filtered list
+  // 2. Concept Diversity Filtering for pool visibility.
+  //    Selected keywords (from step 1) always bypass concept diversity — they must
+  //    appear in the output so their is_selection_ia flag gets persisted to DB.
+  const selectedTagsList: typeof processed = [];
+  const conceptTracker: Record<string, number> = {};
+  const TAG_COUNT = 200;
+
+  for (const item of processed) {
+    if (selectedTagsList.length >= TAG_COUNT) break;
+
+    const rawKeyword = (item.keyword || (item as any).tag || '').toLowerCase();
+    const concept = rawKeyword
+      .replace(/[^\w\s]/g, '')
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .join(' ');
+
+    conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;
+
+    const isSelected = selectionTags.has(rawKeyword);
+    if (isSelected || item.is_user_added || conceptTracker[concept] <= params.concept_diversity_limit) {
+      selectedTagsList.push(item);
+    }
+  }
+
+  // 3. Assign pool and selection flags
   let poolCount = 0;
 
-  return selectedTags.map((item) => {
+  return selectedTagsList.map((item) => {
     const isUserAdded = (item as any).is_user_added === true || (item as any).is_user_added === 'true';
     const tag = ((item as any).keyword || (item as any).tag || '').toLowerCase();
     const isInTopSelection = selectionTags.has(tag);
@@ -217,7 +216,7 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
     // Visibility Pool (40 limit)
     // Always show user-added/pinned keywords, even if their score pushes them beyond index 40
     let isInPool = false;
-    if (isUserAdded || (item as any).is_pinned) {
+    if (isUserAdded || (item as any).is_pinned || isInTopSelection) {
         isInPool = true;
     } else if (poolCount < WORKING_POOL_LIMIT) {
         isInPool = true;
