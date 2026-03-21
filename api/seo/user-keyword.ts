@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const cleanKeyword = keyword.trim().toLowerCase();
-    console.log(`\n📥 [user-keyword] Request for listing: ${listing_id}`);
+    console.info(`[user-keyword] listing=${listing_id}`);
 
     // 1. Fetch listing context
     const { data: listing, error: listingError } = await supabaseAdmin
@@ -79,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     // 3. Enrich + Score the single keyword
-    console.log(`   🔍 Enriching & Scoring: "${cleanKeyword}"`);
+    console.info(`[user-keyword] enriching keyword="${cleanKeyword}"`);
     const stats = await enrichKeywords([cleanKeyword]);
     const scored = await scoreKeywords(stats, ctx);
     const newKw = scored[0];
@@ -156,7 +156,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const finalKw = processedPool.find(k => k.tag === cleanKeyword) || newKw;
 
-    console.log(`   ✅ User keyword added: ${cleanKeyword} (${Date.now() - t0}ms)`);
+    console.info(`[user-keyword] complete keyword="${cleanKeyword}" (${Date.now() - t0}ms)`);
     return res.json({
       success: true,
       listing_strength: strength?.listing_strength || 0,

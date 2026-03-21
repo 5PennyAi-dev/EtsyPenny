@@ -12,7 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const t0 = Date.now();
   const { listing_id, keywords: incomingKeywords } = req.body;
 
-  console.log(`\n⭐ [add-from-favorite] Request for listing: ${listing_id} (${incomingKeywords?.length || 0} keywords)`);
+  console.info(`[add-from-favorite] listing=${listing_id} keywords=${incomingKeywords?.length || 0}`);
 
   if (!listing_id || !incomingKeywords || !Array.isArray(incomingKeywords) || incomingKeywords.length === 0) {
     return res.status(400).json({ error: 'Missing listing_id or keywords array' });
@@ -98,7 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const finalParams = { ...params, ...(req.body.parameters || {}) };
 
     // Step 4: AI Scoring (skips DataForSEO — uses cached metrics)
-    console.log(`   🧠 Scoring ${normalizedKeywords.length} keywords...`);
+    console.info(`[add-from-favorite] scoring ${normalizedKeywords.length} keywords`);
     const statsForScoring = normalizedKeywords.map(kw => ({
       keyword: kw.keyword,
       search_volume: kw.search_volume,
@@ -109,10 +109,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }));
 
     const scoredKeywords = await scoreKeywords(statsForScoring, ctx);
-    console.log(`   ✅ Scoring complete (${Date.now() - t0}ms)`);
+    console.info(`[add-from-favorite] scoring complete (${Date.now() - t0}ms)`);
 
     // Step 5: Bulk Upsert
-    console.log(`   💾 Upserting ${scoredKeywords.length} keywords...`);
+    console.info(`[add-from-favorite] upserting ${scoredKeywords.length} keywords`);
     const upsertPayloads = scoredKeywords.map((scored, i) => {
       const original = normalizedKeywords[i];
       return {
@@ -146,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (upsertError) throw upsertError;
 
     // Step 6: Pool Re-ranking
-    console.log('   🔄 Re-ranking pool...');
+    console.info('[add-from-favorite] re-ranking pool');
     const { data: pool, error: poolError } = await supabaseAdmin
       .from('listing_seo_stats')
       .select('*')
@@ -213,7 +213,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         is_promising: kw.status?.promising || false,
       }));
 
-    console.log(`   ✅ Added ${responseKeywords.length} keywords | LSI: ${strength?.listing_strength ?? 'N/A'} (${Date.now() - t0}ms)\n`);
+    console.info(`[add-from-favorite] complete added=${responseKeywords.length} LSI=${strength?.listing_strength ?? 'N/A'} (${Date.now() - t0}ms)`);
 
     return res.json({
       success: true,

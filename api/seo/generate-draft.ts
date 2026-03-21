@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing listing_id or keywords' });
     }
 
-    console.log(`\n✍️  [generate-draft] Starting for listing ${listing_id} (${keywords.length} keywords)`);
+    console.info(`[generate-draft] listing=${listing_id} keywords=${keywords.length}`);
 
     // Step A: Build SEO brief from keywords
     const seoBrief = keywords.map((item: { keyword: string; status?: { promising?: boolean; trending?: boolean; evergreen?: boolean }; avg_volume?: number; competition?: number }) => {
@@ -142,10 +142,10 @@ Self-validation: Review the output against the instructions. If it fails any con
       .eq('id', listing_id);
 
     if (updateError) {
-      console.error('   ⚠️ DB update failed:', updateError.message);
+      console.error('[generate-draft] DB update failed:', updateError.message);
     }
 
-    console.log(`   ✅ Draft generated for ${listing_id} — title: "${title.substring(0, 50)}..."`);
+    console.info(`[generate-draft] complete listing=${listing_id}`);
     return res.json({ success: true, title, description });
 
   } catch (error: unknown) {

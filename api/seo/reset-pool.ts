@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing listing_id' });
     }
 
-    console.log(`\n🔄 [reset-pool] Starting for listing ${listing_id}`);
+    console.info(`[reset-pool] listing=${listing_id}`);
 
     // 1. Fetch keywords for the listing
     const { data: keywords, error: kwError } = await supabaseAdmin
@@ -112,7 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await persistStrength(listing_id, strength, correctSelectedTags, finalParams);
     }
 
-    console.log(`   ✅ Pool reset complete for ${listing_id}`);
+    console.info(`[reset-pool] complete listing=${listing_id} processed=${filteredKeywords.length}`);
     return res.json({
       success: true,
       processed: filteredKeywords.length,

@@ -123,10 +123,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required fields: listing_id, user_id, and mockup_url' });
     }
 
-    console.log(`\n🔍 [analyze-image] Starting for listing ${listing_id}`);
+    console.info(`[analyze-image] listing=${listing_id}`);
 
     // Step 2: Visual DNA Extraction (Gemini Vision)
-    console.log('   Step 2: Running Gemini Vision...');
     const visualPrompt = PROMPT_VISUAL_ANALYST
       .replace('{{productType}}', product_type)
       .replace('{{description}}', client_description);
@@ -134,10 +133,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const visualRaw = await runVisionModel(visualPrompt, mockup_url);
     const visualData = JSON.parse(extractJson(visualRaw));
     const visualAnalysis = visualData.visual_analysis;
-    console.log('   ✅ Visual analysis done');
 
     // Step 3: Taxonomy Retrieval (Supabase)
-    console.log('   Step 3: Fetching taxonomy...');
     const { createClient } = await import('@supabase/supabase-js');
     const supabaseUrl = process.env.VITE_SUPABASE_URL!;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -152,10 +149,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (nichesResult.error) throw new Error(`Niches: ${nichesResult.error.message}`);
 
     const formattedTaxonomy = formatTaxonomyLists(themesResult.data, nichesResult.data);
-    console.log(`   ✅ Got ${themesResult.data.length} themes, ${nichesResult.data.length} niches`);
 
     // Step 4: Taxonomy Mapping (Gemini Text)
-    console.log('   Step 4: Running Gemini Taxonomy mapping...');
     const visualAnalysisContext = `
 Aesthetic style: ${visualAnalysis.aesthetic_style}
 Typography details: ${visualAnalysis.typography_details}
@@ -178,10 +173,9 @@ Product details: ${client_description}
 
     const taxonomyRaw = await runTextModel(taxonomyPrompt);
     const taxonomyMapping = JSON.parse(extractJson(taxonomyRaw));
-    console.log(`   ✅ Theme: ${taxonomyMapping.theme}, Niche: ${taxonomyMapping.niche}`);
+    console.info(`[analyze-image] theme=${taxonomyMapping.theme} niche=${taxonomyMapping.niche}`);
 
     // Step 5: Merge & Save via Edge Function
-    console.log('   Step 5: Saving via edge function...');
     const finalAnalysis = mergeAnalysisResults(listing_id, visualAnalysis, taxonomyMapping);
 
     const edgeFnUrl = `${supabaseUrl}/functions/v1/save-image-analysis`;
@@ -201,7 +195,7 @@ Product details: ${client_description}
       throw new Error(`Edge function failed (${saveResponse.status}): ${errText}`);
     }
 
-    console.log('   ✅ Saved successfully!\n');
+    console.info(`[analyze-image] complete listing=${listing_id}`);
     return res.json(finalAnalysis);
 
   } catch (error: unknown) {

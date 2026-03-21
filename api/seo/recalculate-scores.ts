@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing listing_id or selected_keywords' });
     }
 
-    console.log(`\n📊 [recalculate-scores] Starting for listing ${listing_id} (${selected_keywords.length} keywords)`);
+    console.info(`[recalculate-scores] listing=${listing_id} keywords=${selected_keywords.length}`);
 
     // 1. Fetch listing owner
     const { data: listing, error: listingError } = await supabaseAdmin
@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const selectedTags = selected_keywords.map((k: { keyword?: string }) => k.keyword);
     await persistStrength(listing_id, strength, selectedTags, params);
 
-    console.log(`   ✅ Recalculate complete for ${listing_id} — LSI: ${strength.listing_strength}`);
+    console.info(`[recalculate-scores] complete listing=${listing_id} LSI=${strength.listing_strength}`);
     return res.json({ success: true, strength });
 
   } catch (error: unknown) {
