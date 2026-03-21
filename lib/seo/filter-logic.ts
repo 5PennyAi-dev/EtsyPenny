@@ -152,71 +152,53 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
     return ((b as any).opportunity_score || 0) - ((a as any).opportunity_score || 0);
   });
 
-  const WORKING_POOL_LIMIT = params.working_pool_count || 40;
-  const AI_SELECTION_LIMIT = params.ai_selection_count || 13;
-
-  // 1. Determine AI selection from the FULL processed list (before concept diversity).
-  //    Pinned first, then top-scored. User-added keywords only get selected if their
-  //    score earns it — concept diversity does NOT affect selection, only pool visibility.
-  const selectionTags = new Set<string>();
-  let aiCount = 0;
-
-  // Pass 1: pinned keywords always selected
-  for (const item of processed) {
-    if ((item as any).is_pinned) {
-      selectionTags.add(((item as any).keyword || (item as any).tag || '').toLowerCase());
-      aiCount++;
-    }
-  }
-
-  // Pass 2: fill remaining slots by score order from full processed list
-  for (const item of processed) {
-    if (aiCount >= AI_SELECTION_LIMIT) break;
-    const tag = ((item as any).keyword || (item as any).tag || '').toLowerCase();
-    if (!selectionTags.has(tag)) {
-      selectionTags.add(tag);
-      aiCount++;
-    }
-  }
-
-  // 2. Concept Diversity Filtering for pool visibility.
-  //    Selected keywords (from step 1) always bypass concept diversity — they must
-  //    appear in the output so their is_selection_ia flag gets persisted to DB.
-  const selectedTagsList: typeof processed = [];
+  // D. Concept Diversity Filtering
+  const selectedTags: typeof processed = [];
   const conceptTracker: Record<string, number> = {};
+  
+  // We limit the total tags output if needed, but the original logic used a generic tag_count = 200.
+  // We'll process all of them and just enforce concept limits.
   const TAG_COUNT = 200;
 
   for (const item of processed) {
-    if (selectedTagsList.length >= TAG_COUNT) break;
-
+    if (selectedTags.length >= TAG_COUNT) break;
+    
+    // Concept is the first two words of the keyword
     const rawKeyword = (item.keyword || (item as any).tag || '').toLowerCase();
     const concept = rawKeyword
-      .replace(/[^\w\s]/g, '')
+      .replace(/[^\w\s]/g, '') // Remove punctuation
       .trim()
       .split(/\s+/)
       .slice(0, 2)
       .join(' ');
-
+      
     conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;
 
-    const isSelected = selectionTags.has(rawKeyword);
-    if (isSelected || item.is_user_added || conceptTracker[concept] <= params.concept_diversity_limit) {
-      selectedTagsList.push(item);
+    if (item.is_user_added || conceptTracker[concept] <= params.concept_diversity_limit) {
+      selectedTags.push(item);
     }
   }
 
-  // 3. Assign pool and selection flags
+  let aiCount = 0;
   let poolCount = 0;
+  const WORKING_POOL_LIMIT = params.working_pool_count || 40;
 
-  return selectedTagsList.map((item) => {
+  return selectedTags.map((item, index) => {
     const isUserAdded = (item as any).is_user_added === true || (item as any).is_user_added === 'true';
-    const tag = ((item as any).keyword || (item as any).tag || '').toLowerCase();
-    const isInTopSelection = selectionTags.has(tag);
+    let isInTopSelection = false;
 
-    // Visibility Pool (40 limit)
+    // 1. AI Selection Quota (13 limit)
+    if ((item as any).is_pinned) {
+        aiCount++; // Pinned explicitly consumes a slot
+    } else if (aiCount < (params.ai_selection_count || 13)) {
+        isInTopSelection = true;
+        aiCount++;
+    }
+
+    // 2. Visibility Pool (40 limit)
     // Always show user-added/pinned keywords, even if their score pushes them beyond index 40
     let isInPool = false;
-    if (isUserAdded || (item as any).is_pinned || isInTopSelection) {
+    if (isUserAdded || (item as any).is_pinned) {
         isInPool = true;
     } else if (poolCount < WORKING_POOL_LIMIT) {
         isInPool = true;
@@ -224,7 +206,7 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
     }
 
     return {
-      ...(item as any),
+      ...(item as any), // Cast to access original properties
       is_selection_ia: isInTopSelection,
       is_current_eval: isInTopSelection ? true : null,
       is_current_pool: isInPool,
