@@ -909,11 +909,12 @@ app.post('/api/seo/reset-pool', async (req, res) => {
     if (updateError) throw updateError;
 
     // 6. Calculate new listing strength and persist
+    // Capture correct selections from applySEOFilter BEFORE selectAndScore mutates them
+    const correctSelectedTags = filteredKeywords.filter(k => k.is_selection_ia).map(k => k.tag);
     const { strength } = selectAndScore(filteredKeywords, finalParams);
 
     if (strength) {
-      const selectedTags = filteredKeywords.filter(k => k.is_selection_ia).map(k => k.tag);
-      await persistStrength(listing_id, seo_mode, strength, selectedTags, finalParams);
+      await persistStrength(listing_id, seo_mode, strength, correctSelectedTags, finalParams);
     }
 
     console.log(`   ✅ Pool reset complete for ${listing_id}`);

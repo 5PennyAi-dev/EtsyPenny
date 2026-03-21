@@ -977,6 +977,7 @@ const ProductStudio = () => {
       await axios.post('/api/seo/reset-pool', payload);
       toast.success('Keywords pool reset successfully!');
       await handleLoadListing(listingId);
+      setResetSelectionKey(k => k + 1);
     } catch (err) {
       console.error('handleResetPool error:', err);
       toast.error('Failed to reset keyword pool.');
@@ -1011,6 +1012,7 @@ const ProductStudio = () => {
       await axios.post('/api/seo/reset-pool', payload);
       toast.success('Strategy update triggered! Your results will refresh in a few seconds.');
       await handleLoadListing(listingId);
+      setResetSelectionKey(k => k + 1);
     } catch (err) {
       console.error('handleApplyStrategy error:', err);
       toast.error('Failed to apply new strategy.');
