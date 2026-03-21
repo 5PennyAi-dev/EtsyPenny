@@ -64,7 +64,7 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
   if (!keywords || keywords.length === 0) return [];
 
   const maxRefCPC = 2.5;
-  const maxVol = Math.max(...keywords.map(k => k.search_volume || 0), 100);
+  const maxVol = Math.max(...keywords.map(k => k.search_volume || (k as any).volume || 0), 100);
 
   // Hard filter limits from old logic (could be made dynamic if needed)
   const MIN_TRANSACTIONAL = 5;
@@ -72,7 +72,7 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
 
   // 1. Processing, Scoring, and Status
   const processed = keywords.map(item => {
-    const vol = item.search_volume || 0;
+    const vol = item.search_volume || (item as any).volume || 0;
     const rawComp = (item.competition !== null && item.competition !== undefined) ? Number(item.competition) : 0.5;
     const txScore = item.transactional_score || 5;
     const nicheScore = item.niche_score || 5;
@@ -97,7 +97,7 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
     );
 
     // Boosts
-    const wordCount = (item.keyword || '').split(' ').filter(w => w.length > 0).length;
+    const wordCount = (item.keyword || (item as any).tag || '').split(' ').filter((w: string) => w.length > 0).length;
     if (wordCount >= 3) finalScore *= 1.1;
 
     // B. Status Detection (History Analysis)

@@ -6,11 +6,11 @@
 interface Keyword {
   keyword?: string;
   tag?: string;
-  search_volume: number;
-  competition: number;
-  cpc: number;
-  niche_score: number;
-  transactional_score: number;
+  search_volume?: number | null;
+  competition?: number | null;
+  cpc?: number | null;
+  niche_score?: number | null;
+  transactional_score?: number | null;
   is_selection_ia?: boolean;
   [key: string]: unknown;
 }
@@ -53,7 +53,7 @@ export function selectAndScore(keywords: Keyword[], params: Params): { keywords:
   const scored = keywords.map(kw => {
     const nS = (kw.niche_score ?? 5) / 10;
     const tS = (kw.transactional_score ?? 5) / 10;
-    const volNorm = Math.log10(Math.max(1, kw.search_volume + 1)) / 7;
+    const volNorm = Math.log10(Math.max(1, (kw.search_volume || 0) + 1)) / 7;
     const compPenalty = kw.competition ?? 0.5;
     const cpcNorm = Math.min(1, (kw.cpc || 0) / 2.5);
     const composite = nS * nicheW + tS * transW + volNorm * volW - compPenalty * compW + cpcNorm * cpcW;
