@@ -720,7 +720,8 @@ export function applySEOFilter(keywords, params) {
 
     // 1. AI Selection Quota (13 limit)
     if (item.is_pinned) {
-        aiCount++; // Pinned explicitly consumes a slot
+        isInTopSelection = true; // Pinned keywords are always selected
+        aiCount++; // and consume a slot
     } else if (aiCount < (params.ai_selection_count || 13)) {
         isInTopSelection = true;
         aiCount++;
