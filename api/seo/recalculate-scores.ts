@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../../lib/supabase/server';
-import { selectAndScore } from '../../lib/seo/select-and-score';
-import { persistStrength } from '../../lib/seo/persist-strength';
+import { supabaseAdmin } from '../../lib/supabase/server.js';
+import { selectAndScore } from '../../lib/seo/select-and-score.js';
+import { persistStrength } from '../../lib/seo/persist-strength.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

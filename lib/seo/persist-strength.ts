@@ -3,7 +3,7 @@
  * Persists strength scores to listings, listing_seo_stats, and listings_global_eval.
  */
 
-import { supabaseAdmin } from '../supabase/server';
+import { supabaseAdmin } from '../supabase/server.js';
 
 interface Strength {
   listing_strength: number;
