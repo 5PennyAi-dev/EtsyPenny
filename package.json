@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n api,vite -c blue,green \"nodemon --env-file=.env server.mjs\" \"vite\"",
+    "dev": "concurrently -n api,vite -c blue,green \"nodemon --env-file=.env --exec tsx server.mjs\" \"vite\"",
     "dev:vite": "vite",
-    "dev:api": "nodemon --env-file=.env server.mjs",
+    "dev:api": "nodemon --env-file=.env --exec tsx server.mjs",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
@@ -43,6 +43,7 @@
     "nodemon": "^3.1.14",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^5.0.10"
   }
