@@ -179,24 +179,36 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
     }
   }
 
-  let aiCount = 0;
-  let poolCount = 0;
   const WORKING_POOL_LIMIT = params.working_pool_count || 40;
+  const AI_SELECTION_LIMIT = params.ai_selection_count || 13;
+
+  // 1. Determine AI selection: pinned first, then top-scored keywords by score
+  //    User-added keywords bypass concept diversity for pool visibility,
+  //    but do NOT get selection priority — only score and pinned status matter.
+  const selectionSet = new Set<number>();
+
+  // Pass 1: pinned keywords always selected
+  for (let i = 0; i < selectedTags.length; i++) {
+    if ((selectedTags[i] as any).is_pinned) {
+      selectionSet.add(i);
+    }
+  }
+
+  // Pass 2: fill remaining slots by score order (selectedTags is already sorted by score)
+  for (let i = 0; i < selectedTags.length && selectionSet.size < AI_SELECTION_LIMIT; i++) {
+    if (!selectionSet.has(i)) {
+      selectionSet.add(i);
+    }
+  }
+
+  // 2. Assign pool and selection flags
+  let poolCount = 0;
 
   return selectedTags.map((item, index) => {
     const isUserAdded = (item as any).is_user_added === true || (item as any).is_user_added === 'true';
-    let isInTopSelection = false;
+    const isInTopSelection = selectionSet.has(index);
 
-    // 1. AI Selection Quota (13 limit)
-    if ((item as any).is_pinned) {
-        isInTopSelection = true; // Pinned keywords are always selected
-        aiCount++; // and consume a slot
-    } else if (aiCount < (params.ai_selection_count || 13)) {
-        isInTopSelection = true;
-        aiCount++;
-    }
-
-    // 2. Visibility Pool (40 limit)
+    // Visibility Pool (40 limit)
     // Always show user-added/pinned keywords, even if their score pushes them beyond index 40
     let isInPool = false;
     if (isUserAdded || (item as any).is_pinned) {
@@ -207,7 +219,7 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
     }
 
     return {
-      ...(item as any), // Cast to access original properties
+      ...(item as any),
       is_selection_ia: isInTopSelection,
       is_current_eval: isInTopSelection ? true : null,
       is_current_pool: isInPool,
