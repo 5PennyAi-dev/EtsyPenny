@@ -137,22 +137,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (batchUpdateError) throw batchUpdateError;
 
-    // 7. Update Listing Strength
+    // 7. Update Listing Strength (scores persisted to listings_global_eval only)
     const { strength } = selectAndScore(processedPool, params);
-    if (strength) {
-      await supabaseAdmin
-        .from('listings')
-        .update({
-          listing_strength: strength.listing_strength,
-          visibility_score: strength.breakdown.visibility,
-          relevance_score: strength.breakdown.relevance,
-          conversion_score: strength.breakdown.conversion,
-          competition_score: strength.breakdown.competition,
-          profit_score: strength.breakdown.profit,
-          est_market_reach: strength.stats.est_market_reach,
-        })
-        .eq('id', listing_id);
-    }
 
     const finalKw = processedPool.find(k => k.tag === cleanKeyword) || newKw;
 

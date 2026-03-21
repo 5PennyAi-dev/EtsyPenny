@@ -1,6 +1,6 @@
 /**
- * Verbatim extract from server.mjs lines 749-813.
- * Persists strength scores to listings, listing_seo_stats, and listings_global_eval.
+ * Persists strength scores to listing_seo_stats and listings_global_eval.
+ * Score data lives in listings_global_eval only (not duplicated to listings).
  */
 
 import { supabaseAdmin } from '../supabase/server.js';
@@ -48,21 +48,7 @@ export async function persistStrength(
       .in('tag', selectedTags);
   }
 
-  // 2. Update listings table with strength scores
-  await supabaseAdmin
-    .from('listings')
-    .update({
-      listing_strength: strength.listing_strength,
-      visibility_score: strength.breakdown.visibility,
-      relevance_score: strength.breakdown.relevance,
-      conversion_score: strength.breakdown.conversion,
-      competition_score: strength.breakdown.competition,
-      profit_score: strength.breakdown.profit,
-      est_market_reach: strength.stats.est_market_reach,
-    })
-    .eq('id', listing_id);
-
-  // 3. Upsert listings_global_eval
+  // 2. Upsert listings_global_eval (single source of truth for scores)
   const { data: existingEvalRows } = await supabaseAdmin
     .from('listings_global_eval')
     .select('id')
@@ -70,7 +56,6 @@ export async function persistStrength(
 
   const evalPayload = {
     listing_id,
-    seo_mode: 'balanced',
     listing_strength: strength.listing_strength,
     listing_visibility: strength.breakdown.visibility,
     listing_conversion: strength.breakdown.conversion,

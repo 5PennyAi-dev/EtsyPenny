@@ -588,7 +588,6 @@ const ProductStudio = () => {
 
         
         // Preserve existing competitor data before clearing state
-        const preservedCompetitorSeed = results?.competitor_seed;
         const preservedCompetitorAnalytics = results?.analytics?.filter(k => k.is_competition) || [];
 
 
@@ -1261,23 +1260,23 @@ const ProductStudio = () => {
             title: listing.generated_title,
             description: listing.generated_description,
             imageUrl: listing.image_url,
-            // Mode-specific Global Data
-            global_strength: activeEvalData?.global_strength ?? listing.global_strength,
-            status_label: activeEvalData?.status_label ?? listing.status_label,
-            strategic_verdict: activeEvalData?.strategic_verdict ?? listing.strategic_verdict,
-            improvement_priority: activeEvalData?.improvement_priority ?? listing.improvement_priority,
-            score_explanation: activeEvalData?.score_explanation ?? listing.score_explanation,
-            
-            listing_strength: activeEvalData?.listing_strength ?? listing.listing_strength,
-            listing_visibility: activeEvalData?.listing_visibility ?? listing.listing_visibility,
-            listing_conversion: activeEvalData?.listing_conversion ?? listing.listing_conversion,
-            listing_relevance: activeEvalData?.listing_relevance ?? listing.listing_relevance,
-            listing_competition: activeEvalData?.listing_competition ?? listing.listing_competition,
-            listing_profit: activeEvalData?.listing_profit ?? listing.listing_profit,
-            listing_raw_visibility_index: activeEvalData?.listing_raw_visibility_index ?? listing.listing_raw_visibility_index,
-            listing_avg_cpc: activeEvalData?.listing_avg_cpc ?? listing.listing_avg_cpc,
-            listing_avg_competition: activeEvalData?.listing_avg_competition ?? listing.listing_avg_competition,
-            listing_est_market_reach: activeEvalData?.listing_est_market_reach ?? listing.listing_est_market_reach,
+            // Global Eval Data (single source of truth: listings_global_eval)
+            global_strength: activeEvalData?.global_strength,
+            status_label: activeEvalData?.status_label,
+            strategic_verdict: activeEvalData?.strategic_verdict,
+            improvement_priority: activeEvalData?.improvement_priority,
+            score_explanation: activeEvalData?.score_explanation,
+
+            listing_strength: activeEvalData?.listing_strength,
+            listing_visibility: activeEvalData?.listing_visibility,
+            listing_conversion: activeEvalData?.listing_conversion,
+            listing_relevance: activeEvalData?.listing_relevance,
+            listing_competition: activeEvalData?.listing_competition,
+            listing_profit: activeEvalData?.listing_profit,
+            listing_raw_visibility_index: activeEvalData?.listing_raw_visibility_index,
+            listing_avg_cpc: activeEvalData?.listing_avg_cpc,
+            listing_avg_competition: activeEvalData?.listing_avg_competition,
+            listing_est_market_reach: activeEvalData?.listing_est_market_reach,
 
             // Dashboard Metrics
             score_justification_visibility: activeEvalData?.score_justification_visibility,
@@ -1289,7 +1288,6 @@ const ProductStudio = () => {
             improvement_plan_primary_action: activeEvalData?.improvement_plan_primary_action,
 
             tags: relevantStats.map(s => s.tag),
-            competitor_seed: listing.competitor_seed,
             analytics: relevantStats.map(s => ({
                 keyword: s.tag,
                 volume: s.search_volume,

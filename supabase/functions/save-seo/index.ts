@@ -204,14 +204,7 @@ serve(async (req) => {
     
     if (generatedTitle) updatePayload.generated_title = generatedTitle;
     if (generatedDescription) updatePayload.generated_description = generatedDescription;
-    if (statusLabelForListing) {
-      updatePayload.status_label = statusLabelForListing;
-      updatePayload.global_status_label = statusLabelForListing; // Keep legacy column in sync
-    }
-    if (strategicVerdictForListing) {
-      updatePayload.strategic_verdict = strategicVerdictForListing;
-      updatePayload.global_strategic_verdict = strategicVerdictForListing; // Keep legacy column in sync
-    }
+    // strategic_verdict and status_label now live in listings_global_eval only
 
     const { error: updateListingError } = await supabaseClient
         .from('listings')
