@@ -1051,14 +1051,24 @@ Migrated all 8 Express API routes from `server.mjs` to Vercel serverless functio
 - Cleaned obsolete n8n env vars from .env (VITE_N8N_WEBHOOK_URL_PROD removed)
 - Updated CLAUDE.md to reflect post-cleanup state
 
-### Architecture Impact
-- `seo_mode` column still exists in `listings_global_eval` with hardcoded `'balanced'` value — can be dropped via migration later
-- `product_type_text` column still exists in `listings` but is no longer referenced in code
-- Multi-mode UI (StrategySwitcher, mode switching) is fully removed
-- Strategy Tuner still works — it adjusts parameter weights without mode switching
+### Phase 2 — server.mjs refactor & column cleanup
+- Refactored server.mjs: replaced 11 duplicate inline functions with imports from lib/ (-501 lines)
+- Added tsx to dev scripts for TypeScript import support in server.mjs
+- Removed redundant score writes to `listings` table — scores now live exclusively in `listings_global_eval`
+- Removed frontend fallbacks that read dropped columns from `listings` (ProductStudio)
+- Migration file created: `20260321_drop_deprecated_listings_columns.sql` (pending view updates)
+- Columns to drop from `listings`: product_type_text, theme_id, niche_id, sub_niche_id, strategic_verdict, improvement_priority, score_explanation, competitor_seed, listing_strength, listing_visibility, listing_conversion, listing_relevance, listing_raw_visibility_index, visibility_score, relevance_score, conversion_score, competition_score, profit_score, est_market_reach
+- Updated save-seo edge function: removed strategic_verdict/status_label writes to listings, replaced n8n webhook with RESET_POOL_API_URL for reset-pool trigger
+
+### Architecture State
+- `seo_mode` column still exists in `listings_global_eval` — save-seo edge function still uses it
+- Score data single source of truth: `listings_global_eval` (no longer duplicated to `listings`)
+- server.mjs imports all shared logic from lib/ (no more inline duplicates)
+- Dev script uses tsx for TypeScript support: `nodemon --env-file=.env --exec tsx server.mjs`
+- Strategy Tuner still works — adjusts parameter weights without mode switching
+- RESET_POOL_API_URL Supabase secret should point to Vercel production URL
 
 ### Next Steps
-1. Run `node pennyseo-audit.mjs` to verify issue count dropped from 179 to ~30-40
-2. Drop `seo_mode` column from `listings_global_eval` via Supabase migration
-3. Drop `product_type_text` column from `listings` via Supabase migration
-4. Refactor server.mjs to import shared helpers from lib/ (reduce duplication)
+1. Update Supabase views that reference dropped columns, then run the migration
+2. Drop `seo_mode` from `listings_global_eval` (requires updating save-seo edge function first)
+3. Clean up save-seo edge function: remove multi-mode loop, simplify to single balanced mode
