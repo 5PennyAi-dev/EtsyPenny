@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-03-20*
+*Dernière mise à jour : 2026-03-21*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -9,7 +9,7 @@
 ## 2. Tech Stack (Source of Truth)
 - **Frontend**: React 19 (Vite), Tailwind CSS, Shadcn/UI, Lucide-React.
 - **Backend**: Supabase (PostgreSQL, Auth, RLS).
-- **API Server**: Local Express (`server.mjs`, port 3001) — primary AI/SEO pipeline.
+- **API Server**: Local Express (`server.mjs`, port 3001) for dev; Vercel serverless functions (`api/`) for production.
 - **Automation**: n8n (legacy, only `analyseShop` remains).
 - **Payment**: Stripe (Hybrid Model: Subscriptions + Credit Packs).
 - **AI**: Gemini 2.0 Flash (Vision & SEO generation via Google Generative AI SDK).
@@ -977,7 +977,61 @@ All remaining n8n webhook actions (except `analyseShop`) have been migrated to l
 - **n8n**: Only `analyseShop` remains (blocked by Etsy scraping issues).
 - **CLAUDE.md**: Updated to reflect current route table, helper functions, and n8n status.
 
+---
+
+## Session: Vercel Serverless Migration (2026-03-21)
+
+### What Was Done
+
+Migrated all 8 Express API routes from `server.mjs` to Vercel serverless functions in `api/`. Each route was extracted one at a time, tested on Vercel preview, then moved to the next. `server.mjs` remains for local development (unchanged).
+
+### New Files Created
+
+| File | Purpose |
+|------|---------|
+| `api/health.ts` | Health check endpoint |
+| `api/seo/recalculate-scores.ts` | Recalculate listing strength from selected keywords |
+| `api/seo/generate-draft.ts` | Generate Etsy title + description via Gemini |
+| `api/seo/reset-pool.ts` | Re-rank keywords with strategy weights + badges |
+| `api/seo/analyze-image.ts` | Gemini Vision analysis + taxonomy mapping |
+| `api/seo/user-keyword.ts` | Add single keyword with DataForSEO + AI scoring |
+| `api/seo/add-from-favorite.ts` | Batch-add favorites with AI scoring (no DataForSEO) |
+| `api/seo/generate-keywords.ts` | Full pipeline: generate → enrich → score → persist |
+| `lib/seo/select-and-score.ts` | Composite scoring + strength calculation |
+| `lib/seo/persist-strength.ts` | DB persistence for strength scores |
+| `lib/ai/extract-json.ts` | Strip markdown fences from Gemini JSON |
+| `lib/seo/enrich-keywords.ts` | Cache check + DataForSEO enrichment |
+| `lib/seo/score-keywords.ts` | Gemini niche + transactional scoring (replaces niche-scoring.ts + transactional-scoring.ts) |
+| `lib/seo/generate-keyword-pool.ts` | 5 parallel Gemini calls for keyword generation |
+| `lib/seo/persist-seo.ts` | Persist SEO results via save-seo edge function |
+| `vercel.json` | Vite framework + SPA fallback rewrites |
+| `tsconfig.server.json` | TypeScript config for api/ and lib/ |
+
+### Infrastructure Changes
+
+- `lib/supabase/server.ts`: Refactored to lazy-init (Proxy pattern) to avoid import-time crashes in serverless
+- `lib/ai/gemini.ts`: Same lazy-init pattern for GoogleGenerativeAI client
+- `lib/seo/filter-logic.ts`: Added `volume`/`tag` field fallbacks to match server.mjs
+- `@vercel/node` and `typescript` added as devDependencies
+
+### Architecture State
+
+- **Local dev**: `npm run dev` → `server.mjs` on port 3001, Vite proxy forwards `/api/*`
+- **Vercel production**: `api/*.ts` serverless functions, Vite SPA with fallback rewrites
+- **Shared logic**: `lib/seo/` and `lib/ai/` used by both serverless functions and (eventually) server.mjs
+- **n8n**: Only `analyseShop` remains
+
+### Known Issues
+
+- **Keyword selection logic**: Pinned and user-added keywords interact incorrectly with concept diversity filtering during pool reset. Reverted to original behavior — needs separate focused session to fix properly.
+
+### Vercel Environment Variables Required
+
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_API_KEY`, `N8N_WEBHOOK_SECRET`, `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD`
+
 ### Next Immediate Steps
-1. **ESLint Configuration**: Initialize a standard ESLint config to resolve `npm run lint` failures.
-2. **Deployment**: Redeploy `save-seo` Edge Function if secrets were updated.
-3. **analyseShop**: Consider alternative approach (Etsy API or manual entry) since scraping is blocked.
+1. **Keyword selection fix**: Resolve pinned/user-added priority in `applySEOFilter` with proper test coverage.
+2. **Refactor server.mjs**: Import from shared `lib/` helpers to eliminate code duplication.
+3. **Edge function cleanup**: Remove `x-api-key` check from Supabase edge functions (n8n auth no longer needed).
+4. **ESLint Configuration**: Initialize a standard ESLint config to resolve `npm run lint` failures.
+5. **analyseShop**: Consider alternative approach (Etsy API or manual entry) since scraping is blocked.
