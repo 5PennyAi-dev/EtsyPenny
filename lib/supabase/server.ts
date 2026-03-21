@@ -1,16 +1,17 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Ensure that the environment variables are set
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Lazy-initialized singleton — avoids crashing at import time in serverless
+let _client: SupabaseClient | null = null;
 
-if (!supabaseUrl) {
-  throw new Error("Missing environment variable VITE_SUPABASE_URL");
-}
-
-if (!supabaseServiceRoleKey) {
-  throw new Error("Missing environment variable SUPABASE_SERVICE_ROLE_KEY");
-}
-
-// Create a singleton Supabase client for server-side operations
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    if (!_client) {
+      const url = process.env.VITE_SUPABASE_URL;
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!url) throw new Error('Missing environment variable VITE_SUPABASE_URL');
+      if (!key) throw new Error('Missing environment variable SUPABASE_SERVICE_ROLE_KEY');
+      _client = createClient(url, key);
+    }
+    return (_client as unknown as Record<string, unknown>)[prop as string];
+  },
+});
