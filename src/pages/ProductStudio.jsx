@@ -64,8 +64,7 @@ const ProductStudio = () => {
   const [results, setResults] = useState(null);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
 
-  const [isInsightLoading, setIsInsightLoading] = useState(false); // false | 'seo' | 'insight'
-  const [isCompetitionLoading, setIsCompetitionLoading] = useState(false);
+  const [isSeoLoading, setIsSeoLoading] = useState(false);
   const [isSniperLoading, setIsSniperLoading] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isResettingPool, setIsResettingPool] = useState(false);
@@ -308,7 +307,7 @@ const ProductStudio = () => {
     const runPostSeoFlow = async () => {
       toast.success("SEO Analysis completed! Loading results...");
       await handleLoadListing(listingId);
-      setIsInsightLoading(false);
+      setIsSeoLoading(false);
       setIsLoading(false);
     };
 
@@ -601,7 +600,7 @@ const ProductStudio = () => {
 
         
         // Show skeleton immediately — user sees loading from the start
-        setIsInsightLoading('seo');
+        setIsSeoLoading(true);
         setIsLoading(false);
         setShowResults(true);
         setIsFormCollapsed(true);
@@ -719,7 +718,7 @@ const ProductStudio = () => {
         // Pipeline complete — load results directly from DB
         toast.success("SEO Analysis completed! Loading results...");
         await handleLoadListing(activeListingId);
-        setIsInsightLoading(false);
+        setIsSeoLoading(false);
 
     } catch (err) {
         console.error("Error in handleAnalyze:", err);
@@ -733,7 +732,7 @@ const ProductStudio = () => {
              toast.error("An error occurred: " + err.message);
         }
         setIsLoading(false);
-        setIsInsightLoading(false);
+        setIsSeoLoading(false);
     }
   };
 
@@ -798,7 +797,7 @@ const ProductStudio = () => {
       }
       setIsGeneratingDraft(true);
 
-      const statsToUse = selectedTags.length > 0 
+      const statsToUse = selectedTags.length > 0
           ? results.analytics.filter(k => selectedTags.includes(k.keyword))
           : results.analytics;
 
@@ -812,104 +811,65 @@ const ProductStudio = () => {
 
         const parsedCustom = listingMeta?.custom_listing ? JSON.parse(listingMeta.custom_listing) : {};
 
-        const payload = {
-            action: 'drafting_seo',
+        const response = await axios.post('/api/seo/generate-draft', {
+            listing_id: listingId,
             keywords: statsToUse.map(k => ({
                 keyword: k.keyword,
                 avg_volume: k.volume,
-                competition: typeof k.competition === 'string' && !isNaN(parseFloat(k.competition)) ? parseFloat(k.competition) : k.competition, 
+                competition: typeof k.competition === 'string' && !isNaN(parseFloat(k.competition)) ? parseFloat(k.competition) : k.competition,
                 opportunity_score: k.score,
-                volumes_history: k.volume_history,
                 status: {
                    trending: k.is_trending,
                    evergreen: k.is_evergreen,
                    promising: k.is_promising
                 }
             })),
-            mockups: [results.imageUrl], 
-            listing_id: listingId,
-            payload: {
-                image_url: results.imageUrl,
-                // Visual analysis fields
-                visual_aesthetic: visualAnalysis.aesthetic,
-                visual_typography: visualAnalysis.typography,
-                visual_graphics: visualAnalysis.graphics,
-                visual_colors: visualAnalysis.colors,
-                visual_target_audience: visualAnalysis.target_audience,
-                visual_overall_vibe: visualAnalysis.overall_vibe,
-                categorization: {
-                    theme: listingMeta?.theme || parsedCustom.theme || null,
-                    niche: listingMeta?.niche || parsedCustom.niche || null,
-                    sub_niche: listingMeta?.sub_niche || parsedCustom.sub_niche || null,
-                    user_description: listingMeta?.user_description || null
-                },
-                product_details: {
-                    product_type: analysisContext.product_type_name || "Product",
-                    tone: analysisContext.tone_name || "Engaging",
-                    client_description: listingMeta?.user_description || analysisContext.context || ""
-                },
-                shop_context: {
-                    shop_name: profile?.shop_name,
-                    shop_bio: profile?.shop_bio,
-                    target_audience: profile?.target_audience,
-                    brand_tone: profile?.brand_tone,
-                    brand_keywords: profile?.brand_keywords,
-                    signature_text: profile?.signature_text
-                }
+            image_url: results.imageUrl,
+            visual_analysis: {
+                aesthetic: visualAnalysis.aesthetic,
+                typography: visualAnalysis.typography,
+                graphics: visualAnalysis.graphics,
+                colors: visualAnalysis.colors,
+                target_audience: visualAnalysis.target_audience,
+                overall_vibe: visualAnalysis.overall_vibe
+            },
+            categorization: {
+                theme: listingMeta?.theme || parsedCustom.theme || null,
+                niche: listingMeta?.niche || parsedCustom.niche || null,
+                sub_niche: listingMeta?.sub_niche || parsedCustom.sub_niche || null,
+                user_description: listingMeta?.user_description || null
+            },
+            product_details: {
+                product_type: analysisContext.product_type_name || "Product",
+                tone: analysisContext.tone_name || "Engaging",
+                client_description: listingMeta?.user_description || analysisContext.context || ""
+            },
+            shop_context: {
+                shop_name: profile?.shop_name,
+                shop_bio: profile?.shop_bio,
+                target_audience: profile?.target_audience,
+                brand_tone: profile?.brand_tone,
+                brand_keywords: profile?.brand_keywords,
+                signature_text: profile?.signature_text
             }
-        };
+        });
 
-        const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-
-
-        const response = await axios.post(
-            webhookUrl,
-            payload
-        );
-
-        let title, description;
-        
-        if (Array.isArray(response.data) && response.data.length > 0) {
-            title = response.data[0].title;
-            description = response.data[0].description;
-        } else {
-            title = response.data.title;
-            description = response.data.description;
-        }
-        
+        const { title, description } = response.data;
         if (!title) throw new Error("Incomplete draft received from AI");
 
         // Update UI
         setResults(prev => ({
             ...prev,
-            title: title,
-            description: description
+            title,
+            description
         }));
 
-        // Update Database
-        if (listingId) {
-             const { error: updateError } = await supabase
-                .from('listings')
-                .update({ 
-                    generated_title: title,
-                    generated_description: description,
-                    status_id: STATUS_IDS.COMPLETE
-                })
-                .eq('id', listingId);
-             
-             if (updateError) {
-                 console.error("Failed to save draft status:", updateError);
-                 toast.error("Draft generated but failed to update status.");
-             } else {
-
-                 toast.success("Magic Draft generated and listing completed!");
-             }
-        }
+        toast.success("Magic Draft generated and listing completed!");
 
       } catch (err) {
           console.error("Draft generation failed:", err);
           if (err.response) {
-               console.error("Webhook Error Response:", err.response.data);
+               console.error("Server Error Response:", err.response.data);
                toast.error(`Draft generation failed: Server returned ${err.response.status}`);
           } else {
                toast.error("Failed to generate draft. Please try again.");
@@ -923,158 +883,58 @@ const ProductStudio = () => {
       if (!user || !listingId) return;
 
       setIsRecalculating(true);
-      toast.info("Sending request to recalculate scores...", { duration: 3000 });
+      toast.info("Recalculating scores...", { duration: 3000 });
 
       try {
-          const payload = {
-              action: 'recalculateScore',
+          const response = await axios.post('/api/seo/recalculate-scores', {
               listing_id: listingId,
-              user_id: user.id,
+              seo_mode: activeMode || 'balanced',
               selected_keywords: selectedKeywordsData.map(k => ({
                   keyword: k.keyword,
-                  search_volume: k.volume, 
-                  intent_label: k.intent_label,
+                  search_volume: k.volume,
                   transactional_score: k.transactional_score,
                   niche_score: k.niche_score,
                   competition: parseFloat(k.competition) || 0,
                   cpc: parseFloat(k.cpc) || 0
               }))
-          };
+          });
 
-          const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-
-          const response = await axios.post(webhookUrl, payload);
-          
-          let rawData = response.data;
-          
-          // Fallback parsing just in case n8n returns stringified JSON
-          if (typeof rawData === 'string') {
-               try { rawData = JSON.parse(rawData); } catch (e) { console.error("Failed to parse recalculate response:", e); }
-          }
-          
-          let unwrapped = Array.isArray(rawData) ? rawData[0] : rawData;
-          
-          const currentMode = activeMode || 'balanced';
-          let newScores = null;
-
-          if (unwrapped && typeof unwrapped === 'object') {
-              if (unwrapped[currentMode]) {
-                  newScores = unwrapped[currentMode];
-              } else if (unwrapped.scores) {
-                  newScores = unwrapped.scores;
-              } else {
-                  // Fallback cases
-                  const firstVal = Object.values(unwrapped)[0];
-                  if (firstVal && (firstVal.listing_strength !== undefined || firstVal.breakdown)) {
-                      newScores = firstVal;
-                  } else if (unwrapped.listing_strength !== undefined || unwrapped.breakdown) {
-                      newScores = unwrapped;
-                  }
-              }
-          }
-          
-          if (!newScores) {
-               console.error("Invalid response format from server:", JSON.stringify(rawData));
-               throw new Error("Invalid response format from server");
-          }
-          console.log("[Recalculate] Raw scores from n8n:", JSON.stringify(newScores, null, 2));
-          
-          // Build payload — strip undefined values so Supabase doesn't silently skip them
-          const rawPayload = {
-               listing_strength: newScores.listing_strength,
-               global_strength: newScores.listing_strength,
-               listing_visibility: newScores.breakdown?.visibility ?? newScores.visibility,
-               listing_conversion: newScores.breakdown?.conversion ?? newScores.conversion,
-               listing_relevance: newScores.breakdown?.relevance ?? newScores.relevance,
-               listing_competition: newScores.breakdown?.competition ?? newScores.competition,
-               listing_profit: newScores.breakdown?.profitability ?? newScores.breakdown?.profit ?? newScores.profitability ?? newScores.profit,
-               listing_raw_visibility_index: newScores.stats?.raw_visibility_index ?? newScores.raw_visibility_index,
-               listing_avg_cpc: newScores.stats?.avg_cpc ?? newScores.avg_cpc,
-               listing_avg_competition: newScores.stats?.best_opportunity_comp ?? newScores.best_opportunity_comp,
-               listing_est_market_reach: newScores.stats?.est_market_reach ?? newScores.est_market_reach,
-               updated_at: new Date().toISOString()
-          };
-          // Remove keys with undefined values
-          const updatePayload = Object.fromEntries(
-              Object.entries(rawPayload).filter(([_, v]) => v !== undefined)
-          );
-          console.log("[Recalculate] DB updatePayload:", JSON.stringify(updatePayload, null, 2));
-
-          // 1. Update Database (listings_global_eval for the activeMode)
-          const { data: existingRows, error: fetchError } = await supabase
-              .from('listings_global_eval')
-              .select('id')
-              .eq('listing_id', listingId)
-              .eq('seo_mode', activeMode);
-
-          if (fetchError) console.error("[Recalculate] Failed to fetch existing eval row:", fetchError);
-          console.log("[Recalculate] Existing rows for mode", activeMode, ":", existingRows);
-
-          if (existingRows?.length > 0) {
-              const { error: updateError } = await supabase
-                  .from('listings_global_eval')
-                  .update(updatePayload)
-                  .eq('id', existingRows[0].id);
-              if (updateError) console.error("[Recalculate] Failed to update in DB:", updateError);
-              else console.log("[Recalculate] Successfully updated row", existingRows[0].id);
-          } else {
-              const { error: insertError } = await supabase
-                  .from('listings_global_eval')
-                  .insert({
-                       listing_id: listingId,
-                       seo_mode: activeMode,
-                       ...updatePayload
-                  });
-              if (insertError) console.error("[Recalculate] Failed to insert in DB:", insertError);
-              else console.log("[Recalculate] Successfully inserted new row");
-          }
-
-          // 2. Update Database (listing_seo_stats for activeMode)
+          const { strength } = response.data;
           const selectedTags = selectedKeywordsData.map(k => k.keyword);
-          
-          // Set all to false first
-          const { error: resetEvalError } = await supabase
-               .from('listing_seo_stats')
-               .update({ is_current_eval: false })
-               .eq('listing_id', listingId);
-               
-          if (resetEvalError) console.error("Failed to reset is_current_eval:", resetEvalError);
-          
-          // Set selected to true
-          if (selectedTags.length > 0) {
-               const { error: setEvalError } = await supabase
-                   .from('listing_seo_stats')
-                   .update({ is_current_eval: true })
-                   .eq('listing_id', listingId)
-                   .in('tag', selectedTags);
-                   
-               if (setEvalError) console.error("Failed to set is_current_eval:", setEvalError);
-          }
 
-          // 3. Update Local State (Results + Global Evals + Seo Stats)
+          // Build update payload from server response
+          const updatePayload = {
+              listing_strength: strength.listing_strength,
+              global_strength: strength.listing_strength,
+              listing_visibility: strength.breakdown.visibility,
+              listing_conversion: strength.breakdown.conversion,
+              listing_relevance: strength.breakdown.relevance,
+              listing_competition: strength.breakdown.competition,
+              listing_profit: strength.breakdown.profit,
+              listing_raw_visibility_index: strength.stats.raw_visibility_index,
+              listing_avg_cpc: strength.stats.avg_cpc,
+              listing_avg_competition: strength.stats.best_opportunity_comp,
+              listing_est_market_reach: strength.stats.est_market_reach,
+              updated_at: new Date().toISOString()
+          };
+
+          // Update Local State (Results + Global Evals + Seo Stats)
           setResults(prev => {
               if (!prev || !prev.analytics) return prev;
-              
-              // Map the analytics array to update `is_current_eval`
               const updatedAnalytics = prev.analytics.map(item => ({
                   ...item,
                   is_current_eval: selectedTags.includes(item.keyword)
               }));
-              
-              return {
-                  ...prev,
-                  ...updatePayload,
-                  analytics: updatedAnalytics
-              };
+              return { ...prev, ...updatePayload, analytics: updatedAnalytics };
           });
-          
+
           setAllSeoStats(prev => prev.map(s => {
               if (s.listing_id === listingId) {
                   return { ...s, is_current_eval: selectedTags.includes(s.tag) };
               }
               return s;
           }));
-          
+
           setGlobalEvals(prev => prev.map(e => {
               if (e.seo_mode === activeMode && e.listing_id === listingId) {
                   return { ...e, ...updatePayload };
@@ -1268,507 +1128,11 @@ const ProductStudio = () => {
       }
   };
 
-  // Generate Insight Handler (auto-triggered after generate_seo or seo_sniper)
-  const handleGenerateInsight = async (formattedResults, formData, activeListingId, fromSniper = false) => {
-    try {
-      const statsToUse = formattedResults.analytics || [];
 
-      const payload = {
-        action: 'generateInsight',
-        listing_id: activeListingId || listingId,
-        keywords: statsToUse.map(k => ({
-          keyword: k.keyword,
-          avg_volume: k.volume,
-          competition: typeof k.competition === 'string' && !isNaN(parseFloat(k.competition)) ? parseFloat(k.competition) : k.competition,
-          opportunity_score: k.score,
-          volumes_history: k.volume_history,
-          status: {
-            trending: k.is_trending,
-            evergreen: k.is_evergreen,
-            promising: k.is_promising
-          },
-          is_sniper_seo: fromSniper,
-          transactional_score: k.transactional_score,
-          intent_label: k.intent_label,
-          niche_score: k.niche_score,
-          relevance_label: k.relevance_label
-        })),
-        mockups: [formattedResults.imageUrl],
-        global_audit: {
-           global_strength: formattedResults.global_strength,
-           status_label: formattedResults.status_label,
-           strategic_verdict: formattedResults.strategic_verdict,
-           improvement_priority: formattedResults.improvement_priority,
-           // New metrics
-           listing_strength: formattedResults.listing_strength,
-           listing_visibility: formattedResults.listing_visibility,
-           listing_conversion: formattedResults.listing_conversion,
-           listing_relevance: formattedResults.listing_relevance,
-           listing_raw_visibility_index: formattedResults.listing_raw_visibility_index
-        },
-        payload: {
-          image_url: formattedResults.imageUrl,
-          visual_aesthetic: visualAnalysis.aesthetic,
-          visual_typography: visualAnalysis.typography,
-          visual_graphics: visualAnalysis.graphics,
-          visual_colors: visualAnalysis.colors,
-          visual_target_audience: visualAnalysis.target_audience,
-          visual_overall_vibe: visualAnalysis.overall_vibe,
-          categorization: formatCategorizationPayload(formData),
-          product_details: {
-            product_type: formData.product_type_name || "Product",
-            tone: formData.tone_name || "Engaging",
-            client_description: formData.context || ""
-          },
-          shop_context: {
-            shop_name: profile?.shop_name,
-            shop_bio: profile?.shop_bio,
-            target_audience: profile?.target_audience,
-            brand_tone: profile?.brand_tone,
-            brand_keywords: profile?.brand_keywords,
-            signature_text: profile?.signature_text
-          }
-        },
-        metadata: {
-          app_version: "1.0.0",
-          timestamp: new Date().toISOString()
-        }
-      };
 
-      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
 
 
-      const response = await axios.post(webhookUrl, payload);
 
-
-      // Parse response (n8n wraps in array)
-      const unwrapped = Array.isArray(response.data) ? response.data[0] : response.data;
-      if (!unwrapped) {
-        console.warn("generateInsight: Empty response");
-        return;
-      }
-
-      const insightListingId = activeListingId || listingId;
-
-      // 1. Get SEO Mode 
-      // PRIORITY: Use valid mode from payload (formData) if available. Failsafe to Ref or 'balanced'.
-      const currentState = optimizationFormRef.current?.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
-      const seoMode = formData?.seo_mode || currentState.seo_mode || 'balanced';
-
-      // 1.1 Update listings table (legacy columns + new metrics for easy access)
-      // Legacy columns update removed - data is now saved to listings_global_eval
-      // We keep the variable extraction if needed for listings_global_eval payload construction
-      
-      // PRIORITY: Use formattedResults (arg1) for fields that come from the FIRST webhook (handleAnalyze)
-      // Fallback to unwrapped (current webhook) if formattedResults is missing them, but strictly prefer formattedResults
-      // because the second webhook often returns these as null/undefined.
-      const globalStrength = formattedResults?.global_strength ?? unwrapped.global_strength ?? unwrapped.global_listing_strength; 
-      const statusLabel = formattedResults?.status_label ?? unwrapped.status_label ?? unwrapped.global_status_label;
-      const strategicVerdict = formattedResults?.strategic_verdict ?? unwrapped.strategic_verdict ?? unwrapped.global_strategic_verdict;
-      const improvementPriority = formattedResults?.improvement_priority ?? unwrapped.improvement_priority;
-      const scoreExplanation = formattedResults?.score_explanation ?? unwrapped.score_explanation;
-
-      // Extract new metric fields (Same priority logic)
-      const listingStrength = formattedResults?.listing_strength ?? unwrapped.listing_strength ?? unwrapped?.global_listing_strength;
-      const listingVisibility = formattedResults?.listing_visibility ?? unwrapped?.breakdown?.visibility ?? unwrapped.listing_visibility;
-      const listingConversion = formattedResults?.listing_conversion ?? unwrapped?.breakdown?.conversion ?? unwrapped.listing_conversion;
-      const listingRelevance = formattedResults?.listing_relevance ?? unwrapped?.breakdown?.relevance ?? unwrapped.listing_relevance;
-      const listingCompetition = formattedResults?.listing_competition ?? unwrapped?.breakdown?.competition ?? unwrapped.listing_competition;
-      const listingProfit = formattedResults?.listing_profit ?? unwrapped?.breakdown?.profitability ?? unwrapped?.breakdown?.profit ?? unwrapped.listing_profit;
-      const listingRawVisibilityIndex = formattedResults?.listing_raw_visibility_index ?? unwrapped?.stats?.raw_visibility_index ?? unwrapped.listing_raw_visibility_index;
-      const listingAvgCpc = formattedResults?.listing_avg_cpc ?? unwrapped?.stats?.avg_cpc ?? unwrapped.listing_avg_cpc;
-      const listingAvgComp = formattedResults?.listing_avg_competition ?? unwrapped?.stats?.best_opportunity_comp ?? unwrapped.listing_avg_competition;
-
-
-      // 1.2 Upsert to listings_global_eval with SEO Mode
-      // This is the new source of truth for multi-strategy evaluation
-      const scoreJustificationVisibility = unwrapped.score_justification_visibility;
-      const scoreJustificationRelevance = unwrapped.score_justification_relevance;
-      const scoreJustificationConversion = unwrapped.score_justification_conversion;
-      const scoreJustificationStrength = unwrapped.score_justification_strength;
-      const improvementPlanRemove = unwrapped.improvement_plan_remove || [];
-      const improvementPlanAdd = unwrapped.improvement_plan_add || [];
-      const improvementPlanPrimaryAction = unwrapped.improvement_plan_primary_action;
-
-
-
-
-
-
-
-
-
-
-
-      const globalEvalPayload = {
-          listing_id: insightListingId,
-          seo_mode: seoMode, // NEW: Save the mode
-          // Persist the fields we (likely) got from Step 1
-          global_strength: globalStrength,
-          // Double-write to legacy and new columns
-          status_label: statusLabel,
-          global_status_label: statusLabel,
-          strategic_verdict: strategicVerdict,
-          global_strategic_verdict: strategicVerdict,
-          improvement_priority: improvementPriority,
-          score_explanation: scoreExplanation,
-          
-          listing_strength: listingStrength,
-          listing_visibility: listingVisibility,
-          listing_conversion: listingConversion,
-          listing_relevance: listingRelevance,
-          listing_competition: listingCompetition,
-          listing_profit: listingProfit,
-          listing_raw_visibility_index: listingRawVisibilityIndex,
-          listing_avg_cpc: listingAvgCpc,
-          listing_avg_competition: listingAvgComp,
-
-          // Add the new fields from Step 2
-          score_justification_visibility: scoreJustificationVisibility,
-          score_justification_relevance: scoreJustificationRelevance,
-          score_justification_conversion: scoreJustificationConversion,
-          score_justification_strength: scoreJustificationStrength,
-          improvement_plan_remove: improvementPlanRemove,
-          improvement_plan_add: improvementPlanAdd,
-          improvement_plan_primary_action: improvementPlanPrimaryAction,
-          
-          updated_at: new Date().toISOString()
-      };
-      
-      // Manual Upsert Logic (Inline)
-      try {
-          const { data: existingRows } = await supabase
-              .from('listings_global_eval')
-              .select('id')
-              .eq('listing_id', globalEvalPayload.listing_id)
-              .eq('seo_mode', globalEvalPayload.seo_mode);
-
-          if (existingRows?.length > 0) {
-               await supabase
-                  .from('listings_global_eval')
-                  .update(globalEvalPayload)
-                  .eq('id', existingRows[0].id);
-          } else {
-               await supabase
-                  .from('listings_global_eval')
-                   .insert(globalEvalPayload);
-          }
-
-          // Sync with local globalEvals state
-          setGlobalEvals(prev => {
-              const updatedList = prev.map(e => {
-                  if (e.seo_mode === seoMode && e.listing_id === insightListingId) {
-                      return { ...e, ...globalEvalPayload };
-                  }
-                  return e;
-              });
-              // If not found (new mode created in this flow?), append it
-              if (!updatedList.find(e => e.seo_mode === seoMode && e.listing_id === insightListingId)) {
-                   return [{...globalEvalPayload, id: existingRows?.[0]?.id || Date.now() }, ...prev]; // Mock ID if insert didn't return it
-              }
-              return updatedList;
-          });
-      } catch (manualErr) {
-          console.error("Manual upsert failed (handleGenerateInsight):", manualErr);
-      }
-
-
-      // 2. Update listing_seo_stats with insight/is_top per keyword
-      const keywordsData = unwrapped.keywords || [];
-      for (const kw of keywordsData) {
-        if (kw.insight !== undefined || kw.is_top !== undefined) {
-          const updateFields = {};
-          if (kw.insight !== undefined) updateFields.insight = kw.insight;
-          if (kw.is_top !== undefined) updateFields.is_top = kw.is_top;
-
-          const { error: kwError } = await supabase
-            .from('listing_seo_stats')
-            .update(updateFields)
-            .eq('listing_id', insightListingId)
-            .eq('tag', kw.keyword);
-
-          if (kwError) {
-            console.error(`Failed to update insight for "${kw.keyword}":`, kwError);
-          }
-        }
-      }
-
-      // Sync with local allSeoStats state
-      setAllSeoStats(prev => {
-           return prev.map(s => {
-               // Find matching update
-               const update = keywordsData.find(k => k.keyword === s.tag && s.listing_id === insightListingId);
-               if (update && (s.evaluation_id === undefined || s.seo_mode === seoMode || true)) { // Simplified matching
-                   // We really should match by evaluation_id but we might not have it here easily without a lookup
-                   // However, s.tag is unique per evaluation. And we know we are updating the current mode.
-                   // Actually, we should try to match the stats that belong to the current mode's evaluation.
-                   // But for now, tag + listing_id is reasonably safe if we assume we just updated the latest one.
-                   return {
-                       ...s,
-                       insight: update.insight ?? s.insight,
-                       is_top: update.is_top ?? s.is_top
-                   };
-               }
-               return s;
-           });
-      });
-
-      // 3. Update UI — use formattedResults as base (works for both normal and sniper flows)
-      const base = formattedResults;
-      const updatedAnalytics = base.analytics.map(existing => {
-        const match = keywordsData.find(kw => kw.keyword === existing.keyword);
-        if (match) {
-          return {
-            ...existing,
-            insight: match.insight ?? existing.insight,
-            is_top: match.is_top ?? existing.is_top,
-            transactional_score: match.transactional_score ?? existing.transactional_score,
-            intent_label: match.intent_label ?? existing.intent_label,
-            niche_score: match.niche_score ?? existing.niche_score,
-            relevance_label: match.relevance_label ?? existing.relevance_label
-          };
-        }
-        return existing;
-      });
-
-      const mergedResults = {
-        ...base,
-        global_strength: globalStrength ?? base.global_strength,
-        status_label: statusLabel ?? base.status_label,
-        strategic_verdict: strategicVerdict ?? base.strategic_verdict,
-        improvement_priority: improvementPriority ?? base.improvement_priority,
-        score_explanation: scoreExplanation ?? base.score_explanation,
-        // Update new metrics in local state
-        listing_strength: listingStrength ?? base.listing_strength,
-        listing_visibility: listingVisibility ?? base.listing_visibility,
-        listing_conversion: listingConversion ?? base.listing_conversion,
-        listing_relevance: listingRelevance ?? base.listing_relevance,
-
-        listing_raw_visibility_index: listingRawVisibilityIndex ?? base.listing_raw_visibility_index,
-        // Global Eval Fields
-        score_justification_visibility: scoreJustificationVisibility,
-        score_justification_relevance: scoreJustificationRelevance,
-        score_justification_conversion: scoreJustificationConversion,
-        score_justification_strength: scoreJustificationStrength,
-        improvement_plan_remove: improvementPlanRemove,
-        improvement_plan_add: improvementPlanAdd,
-        improvement_plan_primary_action: improvementPlanPrimaryAction,
-        analytics: updatedAnalytics
-      };
-
-      // Atomic swap — for sniper flow this is the first time results update
-      setResults(mergedResults);
-      setResetSelectionKey(k => k + 1); // Reset Keyword Selection for fresh insights
-      toast.success("Insights generated ✨");
-
-    } catch (err) {
-      console.error("handleGenerateInsight error:", err);
-      toast.error("Insight generation failed.");
-    } finally {
-      // Clear the correct loading state based on caller
-      if (fromSniper) {
-        setIsSniperLoading(false);
-      } else {
-        setIsInsightLoading(false);
-      }
-    }
-  };
-
-  // Competition Analysis Handler (same payload as generateInsight, different action)
-  const handleCompetitionAnalysis = async () => {
-    if (isCompetitionLoading || !results || !analysisContext) {
-      console.error("Competition Analysis Aborted: Missing prerequisites.");
-      return;
-    }
-    setIsCompetitionLoading(true);
-
-    try {
-      // Only send primary (non-competition) keywords in the payload
-      const primaryStats = (results.analytics || []).filter(k => !k.is_competition);
-
-      const payload = {
-        action: 'competitionAnalysis',
-        listing_id: listingId,
-        keywords: primaryStats.map(k => ({
-          keyword: k.keyword,
-          avg_volume: k.volume,
-          competition: typeof k.competition === 'string' && !isNaN(parseFloat(k.competition)) ? parseFloat(k.competition) : k.competition,
-          opportunity_score: k.score,
-          volumes_history: k.volume_history,
-          status: {
-            trending: k.is_trending,
-            evergreen: k.is_evergreen,
-            promising: k.is_promising
-          },
-          is_sniper_seo: k.is_sniper_seo ?? false,
-          transactional_score: k.transactional_score,
-          intent_label: k.intent_label,
-          niche_score: k.niche_score,
-          relevance_label: k.relevance_label
-        })),
-        mockups: [results.imageUrl],
-        payload: {
-          image_url: results.imageUrl,
-          visual_aesthetic: visualAnalysis.aesthetic,
-          visual_typography: visualAnalysis.typography,
-          visual_graphics: visualAnalysis.graphics,
-          visual_colors: visualAnalysis.colors,
-          visual_target_audience: visualAnalysis.target_audience,
-          visual_overall_vibe: visualAnalysis.overall_vibe,
-          categorization: formatCategorizationPayload(analysisContext),
-          product_details: {
-            product_type: analysisContext.product_type_name || "Product",
-            tone: analysisContext.tone_name || "Engaging",
-            client_description: analysisContext.context || ""
-          },
-          shop_context: {
-            shop_name: profile?.shop_name,
-            shop_bio: profile?.shop_bio,
-            target_audience: profile?.target_audience,
-            brand_tone: profile?.brand_tone,
-            brand_keywords: profile?.brand_keywords,
-            signature_text: profile?.signature_text
-          }
-        },
-        metadata: {
-          app_version: "1.0.0",
-          timestamp: new Date().toISOString()
-        }
-      };
-
-      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST || 'https://n8n.srv840060.hstgr.cloud/webhook-test/9d856f4f-d5ae-4fce-b2da-72f584288dc2';
-
-
-      const response = await axios.post(webhookUrl, payload);
-
-
-
-      // Robust parsing: handle multiple n8n response formats
-      let rawData = response.data;
-      if (typeof rawData === 'string') {
-        try { rawData = JSON.parse(rawData); } catch (e) { console.error("Failed to parse competition response string:", e); }
-      }
-
-      const unwrapped = Array.isArray(rawData) ? rawData[0] : rawData;
-
-
-      if (!unwrapped) {
-        toast.error("Competition Analysis: Empty response");
-        return;
-      }
-
-      // Extract competition keywords — handle multiple response formats
-      // Format 1 (current): [{ competitor_seed: "...", selectedTags: [...] }]
-      // Format 2 (legacy wrapped): [{ keywords: [...] }]
-      // Format 3 (legacy flat): [{keyword: "...", ...}, ...]
-      let competitionKeywords = unwrapped.selectedTags || unwrapped.keywords || [];
-      const competitorSeed = unwrapped.competitor_seed || null;
-
-
-
-      // If unwrapped itself is a keyword object (flat array response), use the full rawData array
-      if (competitionKeywords.length === 0 && unwrapped.keyword && Array.isArray(rawData)) {
-        competitionKeywords = rawData;
-
-      }
-
-      // Handle double-wrapped: unwrapped is itself an array
-      if (competitionKeywords.length === 0 && Array.isArray(unwrapped)) {
-        competitionKeywords = unwrapped;
-
-      }
-
-
-
-      if (competitionKeywords.length === 0) {
-        toast.error("Competition Analysis: No keywords returned");
-        console.error("Competition Analysis: Could not extract keywords. Full response:", rawData);
-        return;
-      }
-
-      // Save competitor_seed to listings table
-      if (competitorSeed && listingId) {
-        const { error: seedError } = await supabase
-          .from('listings')
-          .update({ competitor_seed: competitorSeed })
-          .eq('id', listingId);
-        if (seedError) console.error("Failed to save competitor_seed:", seedError);
-      }
-
-      // Delete old competition keywords for this listing (keep primary keywords intact)
-      const { error: deleteCompError } = await supabase
-        .from('listing_seo_stats')
-        .delete()
-        .eq('listing_id', listingId)
-        .eq('is_competition', true);
-      if (deleteCompError) console.error("Failed to delete old competition stats:", deleteCompError);
-
-      // Insert new competition keywords
-      const compStatsToInsert = competitionKeywords.filter(item => item.keyword).map(item => ({
-        listing_id: listingId,
-        tag: item.keyword,
-        search_volume: item.search_volume || 0,
-        competition: String(item.competition),
-        opportunity_score: item.opportunity_score,
-        volume_history: item.monthly_searches 
-            ? item.monthly_searches.map(m => m.search_volume).reverse() 
-            : (item.volumes_history || []),
-        is_trending: item.status?.trending || false,
-        is_evergreen: item.status?.evergreen || false,
-        is_promising: item.status?.promising || false,
-        insight: item.insight || null,
-        is_top: item.is_top ?? null,
-        transactional_score: item.transactional_score || null,
-        intent_label: item.intent_label || null,
-        niche_score: item.niche_score || null,
-        relevance_label: item.relevance_label || null,
-        is_competition: true
-      }));
-
-      if (compStatsToInsert.length > 0) {
-        const { error: insertError } = await supabase
-          .from('listing_seo_stats')
-          .insert(compStatsToInsert);
-        if (insertError) console.error("Failed to insert competition stats:", insertError);
-      }
-
-      // Build competition analytics for UI
-      const competitionAnalytics = compStatsToInsert.map(s => ({
-        keyword: s.tag,
-        volume: s.search_volume,
-        competition: s.competition,
-        score: s.opportunity_score,
-        volume_history: s.volume_history,
-        is_trending: s.is_trending,
-        is_evergreen: s.is_evergreen,
-        is_promising: s.is_promising,
-        insight: s.insight,
-        is_top: s.is_top,
-        transactional_score: s.transactional_score,
-        intent_label: s.intent_label,
-        niche_score: s.niche_score,
-        relevance_label: s.relevance_label,
-        is_competition: true
-      }));
-
-      // Keep existing primary keywords, replace old competition keywords
-      const existingPrimary = (results.analytics || []).filter(k => !k.is_competition);
-
-      setResults(prev => ({
-        ...prev,
-        competitor_seed: competitorSeed,
-        analytics: [...existingPrimary, ...competitionAnalytics]
-      }));
-
-      toast.success("Competition analysis complete! 📊");
-
-    } catch (err) {
-      console.error("Competition Analysis failed:", err);
-      toast.error("Competition analysis failed. Please try again.");
-    } finally {
-      setIsCompetitionLoading(false);
-    }
-  };
 
 
 
@@ -2035,10 +1399,10 @@ const ProductStudio = () => {
       if (listing.is_generating_seo) {
           isWaitingForSeoRef.current = true;
           seoTriggeredAtRef.current = new Date(Date.now() - 60000).toISOString();
-          setIsInsightLoading('seo');
+          setIsSeoLoading(true);
       } else {
           isWaitingForSeoRef.current = false;
-          setIsInsightLoading(false);
+          setIsSeoLoading(false);
       }
 
         // Scroll to top
@@ -2382,11 +1746,9 @@ const ProductStudio = () => {
       onGenerateDraft={handleGenerateDraft}
       isGeneratingDraft={isGeneratingDraft}
       onRelaunchSEO={handleRelaunchSEO}
-      isInsightLoading={isInsightLoading}
+      isSeoLoading={isSeoLoading}
       onSEOSniper={handleSEOSniper}
       isSniperLoading={isSniperLoading}
-      onCompetitionAnalysis={handleCompetitionAnalysis}
-      isCompetitionLoading={isCompetitionLoading}
       onAddCustomKeyword={handleAddCustomKeyword}
       onAddBatchKeywords={handleAddBatchKeywords}
       isAddingKeyword={isAddingKeyword}

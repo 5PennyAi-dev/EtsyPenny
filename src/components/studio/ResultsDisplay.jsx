@@ -410,7 +410,7 @@ const SidebarSkeleton = ({ phase }) => (
     );
   };
   
-  const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, isInsightLoading,
+  const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, isSeoLoading,
     onAddCustomKeyword,
     onAddBatchKeywords,
     isAddingKeyword,
@@ -810,7 +810,7 @@ const SidebarSkeleton = ({ phase }) => (
                                   Score: {results.listing_strength ?? results.global_strength}
                               </span>
                           )}
-                          {isInsightLoading && (
+                          {isSeoLoading && (
                               <Loader2 size={14} className="text-indigo-500 animate-spin" />
                           )}
                       </div>
@@ -819,7 +819,7 @@ const SidebarSkeleton = ({ phase }) => (
                 <div className="p-4 lg:p-6 space-y-6">
 
                   {/* Hero Audit Header with integrated SEO Sniper */}
-                  {isInsightLoading ? (
+                  {isSeoLoading ? (
                       <AuditSkeleton />
                   ) : (results && (
                       <AuditHeader
@@ -852,10 +852,10 @@ const SidebarSkeleton = ({ phase }) => (
                   )}
 
                   {/* Keyword Performance Table */}
-                  {isInsightLoading ? (
-                      <TableSkeleton 
-                          message={isInsightLoading === 'insight' ? "Insight generation" : "Generating SEO data"}
-                          subMessage={isInsightLoading === 'insight' ? "Analyzing keywords and calculating your listing score." : "Analyzing search volume, competition, and trends."}
+                  {isSeoLoading ? (
+                      <TableSkeleton
+                          message="Generating SEO data"
+                          subMessage="Analyzing search volume, competition, and trends."
                       />
                   ) : (
                 <div className={!results ? "opacity-50 grayscale pointer-events-none" : ""}>

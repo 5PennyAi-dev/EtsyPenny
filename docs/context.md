@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-03-14*
+*Dernière mise à jour : 2026-03-20*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -9,9 +9,11 @@
 ## 2. Tech Stack (Source of Truth)
 - **Frontend**: React 19 (Vite), Tailwind CSS, Shadcn/UI, Lucide-React.
 - **Backend**: Supabase (PostgreSQL, Auth, RLS).
-- **Automation**: n8n (Hosted on Hostinger/Docker - Orchestrator for AI & Logic).
+- **API Server**: Local Express (`server.mjs`, port 3001) — primary AI/SEO pipeline.
+- **Automation**: n8n (legacy, only `analyseShop` remains).
 - **Payment**: Stripe (Hybrid Model: Subscriptions + Credit Packs).
-- **AI**: GPT-4o / Gemini 1.5 Pro (Vision & SEO generation).
+- **AI**: Gemini 2.0 Flash (Vision & SEO generation via Google Generative AI SDK).
+- **SEO Data**: DataForSEO API (keyword metrics: search volume, competition, CPC, volume history).
 
 ## 3. UI & Style Guidelines (Ref: styleguide.md)
 - **Primary Color**: Indigo-600 (#4f46e5).
@@ -948,7 +950,34 @@
   - Fixed favorites star display for both "Add from Favorites" and "Add from Preset" flows.
   - Introduced `refreshFavoritesKey` counter pattern for reliable post-add state sync.
 
+---
+
+## Session: 2026-03-20 — Complete n8n Migration + Cleanup
+
+### n8n → Local Express API Migration
+
+All remaining n8n webhook actions (except `analyseShop`) have been migrated to local Express API routes in `server.mjs`:
+
+- **`recalculateScore` → `POST /api/seo/recalculate-scores`**: Takes user-selected keywords (1-13) from the frontend, calls existing `selectAndScore()` to compute listing strength, and persists via shared `persistStrength()` helper. Frontend simplified from ~175 lines (n8n parsing + DB writes) to ~50 lines (clean API call + state update).
+
+- **`drafting_seo` → `POST /api/seo/generate-draft`**: Builds SEO brief from keywords with status badges, sends the full Etsy copywriter prompt (ported verbatim from n8n) to Gemini via `runTextModel()`, parses `{ title, description }` response, persists to `listings` table with `status_id = COMPLETE`. Frontend simplified similarly.
+
+- **Shared `persistStrength()` helper**: Extracted DB persistence logic (update `listing_seo_stats` `is_current_eval` flags, update `listings` table, upsert `listings_global_eval`) into a shared function used by both `reset-pool` and `recalculate-scores` routes. Single source of truth for strength persistence.
+
+### Abandoned Features Removed
+
+- **`generateInsight`**: Entire handler (~300 lines) removed from `ProductStudio.jsx`. Was an n8n webhook that analyzed keywords for trends/insights — no longer needed.
+- **`competitionAnalysis`**: Entire handler (~200 lines) removed. Same n8n-based pattern.
+- **`isInsightLoading` state**: Replaced with simpler `isSeoLoading` (boolean). Was a tri-state (`false | 'seo' | 'insight'`), now only tracks SEO generation loading. Updated in both `ProductStudio.jsx` and `ResultsDisplay.jsx`.
+- **`isCompetitionLoading` state**: Removed entirely.
+
+### Architecture State
+
+- **Local Express API** (`server.mjs`): Now handles 7 routes — analyze-image, generate-keywords, reset-pool, recalculate-scores, generate-draft, user-keyword, add-from-favorite.
+- **n8n**: Only `analyseShop` remains (blocked by Etsy scraping issues).
+- **CLAUDE.md**: Updated to reflect current route table, helper functions, and n8n status.
+
 ### Next Immediate Steps
 1. **ESLint Configuration**: Initialize a standard ESLint config to resolve `npm run lint` failures.
-2. **Listing Generation Migration**: Finalize migration of title/description generation from n8n to `server.mjs`.
-3. **Deployment**: Redeploy `save-seo` Edge Function if secrets were updated.
+2. **Deployment**: Redeploy `save-seo` Edge Function if secrets were updated.
+3. **analyseShop**: Consider alternative approach (Etsy API or manual entry) since scraping is blocked.

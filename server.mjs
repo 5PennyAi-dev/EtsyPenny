@@ -745,6 +745,73 @@ export function applySEOFilter(keywords, params) {
   });
 }
 
+// ─── SHARED HELPER: Persist strength scores to DB ──────────
+async function persistStrength(listing_id, seo_mode, strength, selectedTags, params) {
+  // 1. Update is_current_eval flags on listing_seo_stats
+  await supabaseAdmin
+    .from('listing_seo_stats')
+    .update({ is_current_eval: false })
+    .eq('listing_id', listing_id);
+
+  if (selectedTags.length > 0) {
+    await supabaseAdmin
+      .from('listing_seo_stats')
+      .update({ is_current_eval: true })
+      .eq('listing_id', listing_id)
+      .in('tag', selectedTags);
+  }
+
+  // 2. Update listings table with strength scores
+  await supabaseAdmin
+    .from('listings')
+    .update({
+      listing_strength: strength.listing_strength,
+      visibility_score: strength.breakdown.visibility,
+      relevance_score: strength.breakdown.relevance,
+      conversion_score: strength.breakdown.conversion,
+      competition_score: strength.breakdown.competition,
+      profit_score: strength.breakdown.profit,
+      est_market_reach: strength.stats.est_market_reach
+    })
+    .eq('id', listing_id);
+
+  // 3. Upsert listings_global_eval for this mode
+  const { data: existingEvalRows } = await supabaseAdmin
+    .from('listings_global_eval')
+    .select('id')
+    .eq('listing_id', listing_id)
+    .eq('seo_mode', seo_mode);
+
+  const evalPayload = {
+    listing_id,
+    seo_mode,
+    listing_strength: strength.listing_strength,
+    listing_visibility: strength.breakdown.visibility,
+    listing_conversion: strength.breakdown.conversion,
+    listing_relevance: Math.round(strength.breakdown.relevance),
+    listing_competition: strength.breakdown.competition,
+    listing_profit: strength.breakdown.profit,
+    listing_est_market_reach: strength.stats.est_market_reach,
+    param_Volume: params.Volume,
+    param_Competition: params.Competition,
+    param_Transaction: params.Transaction,
+    param_Niche: params.Niche,
+    param_cpc: params.CPC,
+    updated_at: new Date().toISOString()
+  };
+
+  if (existingEvalRows?.length > 0) {
+    await supabaseAdmin
+      .from('listings_global_eval')
+      .update(evalPayload)
+      .eq('id', existingEvalRows[0].id);
+  } else {
+    await supabaseAdmin
+      .from('listings_global_eval')
+      .insert(evalPayload);
+  }
+}
+
 // ─── API ROUTE: POST /api/seo/reset-pool ──────────────────
 app.post('/api/seo/reset-pool', async (req, res) => {
   try {
@@ -841,58 +908,12 @@ app.post('/api/seo/reset-pool', async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // 6. Calculate new listing strength using selectAndScore logic as fallback
+    // 6. Calculate new listing strength and persist
     const { strength } = selectAndScore(filteredKeywords, finalParams);
-    
+
     if (strength) {
-      await supabaseAdmin
-        .from('listings')
-        .update({
-           listing_strength: strength.listing_strength,
-           visibility_score: strength.breakdown.visibility,
-           relevance_score: strength.breakdown.relevance,
-           conversion_score: strength.breakdown.conversion,
-           competition_score: strength.breakdown.competition,
-           profit_score: strength.breakdown.profit,
-           est_market_reach: strength.stats.est_market_reach
-        })
-        .eq('id', listing_id);
-
-      // Check if global eval exists for this mode
-      const { data: existingEvalRows } = await supabaseAdmin
-        .from('listings_global_eval')
-        .select('id')
-        .eq('listing_id', listing_id)
-        .eq('seo_mode', seo_mode);
-
-      const evalPayload = {
-        listing_id,
-        seo_mode,
-        listing_strength: strength.listing_strength,
-        listing_visibility: strength.breakdown.visibility,
-        listing_conversion: strength.breakdown.conversion,
-        listing_relevance: Math.round(strength.breakdown.relevance),
-        listing_competition: strength.breakdown.competition,
-        listing_profit: strength.breakdown.profit,
-        listing_est_market_reach: strength.stats.est_market_reach,
-        param_Volume: finalParams.Volume,
-        param_Competition: finalParams.Competition,
-        param_Transaction: finalParams.Transaction,
-        param_Niche: finalParams.Niche,
-        param_cpc: finalParams.CPC,
-        updated_at: new Date().toISOString()
-      };
-
-      if (existingEvalRows?.length > 0) {
-        await supabaseAdmin
-          .from('listings_global_eval')
-          .update(evalPayload)
-          .eq('id', existingEvalRows[0].id);
-      } else {
-        await supabaseAdmin
-          .from('listings_global_eval')
-          .insert(evalPayload);
-      }
+      const selectedTags = filteredKeywords.filter(k => k.is_selection_ia).map(k => k.tag);
+      await persistStrength(listing_id, seo_mode, strength, selectedTags, finalParams);
     }
 
     console.log(`   ✅ Pool reset complete for ${listing_id}`);
@@ -901,6 +922,211 @@ app.post('/api/seo/reset-pool', async (req, res) => {
   } catch (error) {
     console.error('❌ [reset-pool] Error:', error.message || error);
     return res.status(500).json({ error: 'Failed to reset pool.', details: error.message || 'Unknown error' });
+  }
+});
+
+// ─── API ROUTE: POST /api/seo/recalculate-scores ──────────
+app.post('/api/seo/recalculate-scores', async (req, res) => {
+  try {
+    const { listing_id, seo_mode = 'balanced', selected_keywords } = req.body;
+    if (!listing_id || !selected_keywords?.length) {
+      return res.status(400).json({ error: 'Missing listing_id or selected_keywords' });
+    }
+
+    console.log(`\n📊 [recalculate-scores] Starting for listing ${listing_id} (${selected_keywords.length} keywords, mode: ${seo_mode})`);
+
+    // 1. Fetch listing owner
+    const { data: listing, error: listingError } = await supabaseAdmin
+      .from('listings')
+      .select('user_id')
+      .eq('id', listing_id)
+      .single();
+
+    if (listingError || !listing) throw listingError || new Error('Listing not found');
+
+    // 2. Fetch user settings
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from('v_user_seo_active_settings')
+      .select('*')
+      .eq('user_id', listing.user_id)
+      .single();
+
+    if (settingsError || !settings) throw settingsError || new Error('Settings not found');
+
+    const params = {
+      Volume: settings.param_volume ?? 0.25,
+      Competition: settings.param_competition ?? 0.15,
+      Transaction: settings.param_transaction ?? 0.35,
+      Niche: settings.param_niche ?? 0.25,
+      CPC: settings.param_cpc ?? 0,
+      ai_selection_count: selected_keywords.length // treat ALL passed keywords as selected
+    };
+
+    // 3. Calculate strength from user-selected keywords
+    const { strength } = selectAndScore(selected_keywords, params);
+
+    if (!strength) {
+      return res.status(400).json({ error: 'Could not calculate strength from provided keywords' });
+    }
+
+    // 4. Persist to DB
+    const selectedTags = selected_keywords.map(k => k.keyword);
+    await persistStrength(listing_id, seo_mode, strength, selectedTags, params);
+
+    console.log(`   ✅ Recalculate complete for ${listing_id} — LSI: ${strength.listing_strength}`);
+    return res.json({ success: true, strength });
+
+  } catch (error) {
+    console.error('❌ [recalculate-scores] Error:', error.message || error);
+    return res.status(500).json({ error: 'Failed to recalculate scores.', details: error.message || 'Unknown error' });
+  }
+});
+
+// ─── API ROUTE: POST /api/seo/generate-draft ──────────
+const STATUS_COMPLETE = '28a11ca0-bcfc-42e0-971d-efc320f78424';
+
+app.post('/api/seo/generate-draft', async (req, res) => {
+  try {
+    const { listing_id, keywords, image_url, visual_analysis, categorization, product_details, shop_context } = req.body;
+
+    if (!listing_id || !keywords?.length) {
+      return res.status(400).json({ error: 'Missing listing_id or keywords' });
+    }
+
+    console.log(`\n✍️  [generate-draft] Starting for listing ${listing_id} (${keywords.length} keywords)`);
+
+    // Step A: Build SEO brief from keywords (replicates n8n "Prepare SEO brief" node)
+    const seoBrief = keywords.map(item => {
+      const badges = [];
+      if (item.status?.promising) badges.push('Promising 💎');
+      if (item.status?.trending) badges.push('Trending 🔥');
+      if (item.status?.evergreen) badges.push('Evergreen 🌲');
+      const badgeText = badges.length > 0 ? badges.join(' + ') : 'Standard';
+      return `- Keyword: "${item.keyword}" | Status: ${badgeText} | Volume: ${item.avg_volume} | Comp: ${item.competition}`;
+    }).join('\n');
+
+    const nicheInfo = [categorization?.theme, categorization?.niche, categorization?.sub_niche].filter(Boolean).join(' > ');
+
+    // Step B: Build the full prompt (ported from n8n workflow)
+    const prompt = `# Role
+You are an expert Etsy Copywriter acting as the voice of **${shop_context?.shop_name || 'the shop'}**.
+Your goal is to write a product listing that feels authentic to the brand's identity, speaks directly to its target audience, and maintains high SEO performance.
+
+# Brand Identity (Context)
+- **Shop Bio/Mission:** ${shop_context?.shop_bio || 'N/A'}
+- **Brand Tone:** ${shop_context?.brand_tone || 'Engaging'}
+- **Target Audience:** ${shop_context?.target_audience || 'General'}
+- **Brand Keywords:** ${Array.isArray(shop_context?.brand_keywords) ? shop_context.brand_keywords.join(', ') : (shop_context?.brand_keywords || 'N/A')}
+
+# Input Data
+- **Strategic SEO Brief:**
+${seoBrief}
+
+- **Product Details:**
+- **Product Type:** ${product_details?.product_type || 'Product'}
+- **Theme:** ${categorization?.theme || 'N/A'}
+- **Niche:** ${categorization?.niche || 'N/A'}
+- **Sub-Niche:** ${categorization?.sub_niche || 'N/A'}
+- **Product Description:** ${product_details?.client_description || categorization?.user_description || 'N/A'}
+
+# 2. Visual & Marketing Data (Input from Image Analysis)
+- **Aesthetic/Style:** ${visual_analysis?.aesthetic || 'N/A'}
+- **Typography:** ${visual_analysis?.typography || 'N/A'}
+- **Graphic Elements:** ${visual_analysis?.graphics || 'N/A'}
+- **Color Palette:** ${visual_analysis?.colors || 'N/A'}
+- **Target Audience:** ${visual_analysis?.target_audience || 'N/A'}
+- **Overall_vibe:** ${visual_analysis?.overall_vibe || 'N/A'}
+
+# Task 1: Strategic Etsy Title (140 chars max)
+- **Structure Logic:** 1. **Primary Hook:** Start immediately with the [Product Type] + [Main Subject] (e.g., "Funny Math T-Shirt" or "Grumpy Cat Teacher Shirt").
+    2. **High-Value Keywords:** Follow with the most "Promising" keywords provided.
+    3. **Target Audience/Occasion:** Include who it's for or the event (e.g., "Gift for Math Teacher", "Back to School").
+    4. **Specific Details:** End with "Trending" keywords or specific visual elements (e.g., "Cat with Pencil").
+
+- **Content Rules:**
+    - The first 40 characters MUST clearly define the product type and main theme.
+    - Avoid "artistic" descriptions (like "Playful Academic") unless they are proven high-volume search terms.
+    - Use variations of the product type (e.g., use both "T-Shirt" and "Shirt" if space permits).
+    - Avoid repeating the exact same word more than twice.
+
+- **Formatting (CRITICAL):** - Use ONLY plain text.
+    - NO bolding, NO italics, NO Markdown in the output string.
+    - NO emojis.
+    - Use " | " as separators with a space before and after the bar.
+
+- **Goal:** A high-conversion title where the most searchable terms are in the first 60 characters.
+
+# Task 2: Natural "Story & Specs" Description
+Write a description tailored for **${shop_context?.target_audience || 'the target audience'}** using a **${shop_context?.brand_tone || 'Engaging'}** tone.
+
+1. **The Emotional Hook (The Story):**
+   - **ANTI-AI RULE:** Do NOT use clichés like "Let's face it," "Look no further," "In a world where," or "Introducing...".
+   - **OPENING VARIETY:** Randomly select ONE of these styles for your first sentence:
+     - *The Direct Question:* (e.g., "Searching for a [Sub-niche] that actually feels like you?")
+     - *The Sensory Approach:* (e.g., "There's a certain [Brand Tone] charm in the way this [Visual Aesthetic] design comes together.")
+     - *The Occasion Hook:* (e.g., "Whether you're gearing up for [Target Audience Occasion] or just treating yourself...")
+     - *The Relatable Vibe:* (e.g., "Finding a [Product Type] that matches your exact style shouldn't be a struggle.")
+   - Write 2-3 fluid sentences describing the product.
+   - **VISUAL PROOF:** Mention at least one specific detail from the 'Visual & Marketing Data' (specific color, texture, or font vibe).
+   - **SEO INTEGRATION:** Naturally weave in 4-6 tags (prioritize Trending and Promising).
+   - **NO FORMATTING:** Under NO circumstances use bold (**keyword**) or italics for keywords in this narrative section.
+   - **NATURAL FLOW:** Keywords must fit so perfectly into the grammar that a reader wouldn't know they are SEO tags.
+
+2. **The "Why You'll Love It" Section (The Specs):**
+   - **DYNAMIC HEADING:** Vary the title of this section (e.g., "Why It's a Must-Have," "The Details You'll Adore," "Fresh Finds & Features").
+   - Use a bulleted list to highlight quality.
+   - Integrate "Evergreen 🌲" tags here.
+   - Use all parameters to explain why the person will love it.
+
+3. **Brand Signature (Call to Action):**
+   - Strictly end the listing with this exact text: "${shop_context?.signature_text || ''}"
+
+# Constraints
+- **Tone Consistency:** Strictly adhere to the **${shop_context?.brand_tone || 'Engaging'}** brand voice.
+- **Format:** Strictly JSON output.
+- **Formatting:** Use Markdown only for the description (headings/bullets), but NEVER for keywords in the story.
+
+IMPORTANT: **DO NOT** use bold text (keyword) for SEO tags.
+
+Self-validation: Review the output against the instructions. If it fails any condition, correct it before responding.
+
+# Output Format
+{
+  "title": "...",
+  "description": "..."
+}`;
+
+    // Step C: Call Gemini
+    const rawResponse = await runTextModel(prompt);
+
+    // Step D: Parse response
+    const parsed = JSON.parse(extractJson(rawResponse));
+    const { title, description } = parsed;
+
+    if (!title) {
+      throw new Error('Gemini returned no title');
+    }
+
+    // Step E: Persist to DB
+    const { error: updateError } = await supabaseAdmin
+      .from('listings')
+      .update({
+        generated_title: title,
+        generated_description: description,
+        status_id: STATUS_COMPLETE
+      })
+      .eq('id', listing_id);
+
+    if (updateError) {
+      console.error('   ⚠️ DB update failed:', updateError.message);
+    }
+
+    console.log(`   ✅ Draft generated for ${listing_id} — title: "${title.substring(0, 50)}..."`);
+    return res.json({ success: true, title, description });
+
+  } catch (error) {
+    console.error('❌ [generate-draft] Error:', error.message || error);
+    return res.status(500).json({ error: 'Failed to generate draft.', details: error.message || 'Unknown error' });
   }
 });
 
@@ -1317,6 +1543,8 @@ app.listen(PORT, () => {
   console.log(`   POST /api/seo/analyze-image`);
   console.log(`   POST /api/seo/generate-keywords`);
   console.log(`   POST /api/seo/reset-pool`);
+  console.log(`   POST /api/seo/recalculate-scores`);
+  console.log(`   POST /api/seo/generate-draft`);
   console.log(`   POST /api/seo/user-keyword`);
   console.log(`   POST /api/seo/add-from-favorite`);
   console.log(`   GET  /api/health\n`);
