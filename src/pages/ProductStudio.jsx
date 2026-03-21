@@ -1211,7 +1211,7 @@ const ProductStudio = () => {
             sub_niche: listing.sub_niche || parsedCustom.sub_niche || listing.sub_niches?.name || "",
 
             // Product Type: dynamically fetched from view, with fallback to legacy text
-            product_type_name: fetchedProductTypeName || listing.product_type_text || "",
+            product_type_name: fetchedProductTypeName || "",
             product_type_id: listing.product_type_id || null,
             tone_name: listing.tones?.name || "Engaging",
             

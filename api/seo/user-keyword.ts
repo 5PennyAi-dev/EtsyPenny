@@ -30,8 +30,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (listingError || !listing) throw new Error('Listing not found');
 
-    let productTypeName = listing.product_type_text || '';
-    if (!productTypeName && listing.product_type_id) {
+    let productTypeName = '';
+    if (listing.product_type_id) {
       const { data: ptRow } = await supabaseAdmin
         .from('v_combined_product_types')
         .select('name')

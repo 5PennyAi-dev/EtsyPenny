@@ -1153,8 +1153,8 @@ app.post('/api/seo/user-keyword', async (req, res) => {
     if (listingError || !listing) throw new Error("Listing not found");
 
     // Resolve product type name from v_combined_product_types
-    let productTypeName = listing.product_type_text || '';
-    if (!productTypeName && listing.product_type_id) {
+    let productTypeName = '';
+    if (listing.product_type_id) {
       const { data: ptRow } = await supabaseAdmin
         .from('v_combined_product_types')
         .select('name')
@@ -1352,8 +1352,8 @@ app.post('/api/seo/add-from-favorite', async (req, res) => {
     if (listingError || !listing) throw new Error('Listing not found');
 
     // Resolve product type name from v_combined_product_types
-    let productTypeName = listing.product_type_text || '';
-    if (!productTypeName && listing.product_type_id) {
+    let productTypeName = '';
+    if (listing.product_type_id) {
       const { data: ptRow } = await supabaseAdmin
         .from('v_combined_product_types')
         .select('name')

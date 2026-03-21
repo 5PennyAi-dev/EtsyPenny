@@ -702,7 +702,7 @@ const SidebarSkeleton = ({ phase }) => (
                     .insert([{
                         user_id: user.id,
                         tag: tag,
-                        product_type: currentListing?.product_types?.name || currentListing?.product_type_text || null,
+                        product_type: currentListing?.product_types?.name || null,
                         theme: currentListing?.theme || null,
                         niche: currentListing?.niche || null,
                         sub_niche: currentListing?.sub_niche || null,

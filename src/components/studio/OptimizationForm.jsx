@@ -104,9 +104,9 @@ const OptimizationForm = forwardRef(({ onAnalyze, onSaveDraft, isImageSelected, 
           if (initialValues.product_type_id) {
             setProductTypeId(initialValues.product_type_id);
             setProductTypeName(initialValues.product_type_name || "");
-          } else if (initialValues.product_type_text || initialValues.product_type_name) {
+          } else if (initialValues.product_type_name) {
             setProductTypeId(null);
-            setProductTypeName(initialValues.product_type_text || initialValues.product_type_name);
+            setProductTypeName(initialValues.product_type_name);
           }
 
           if (contextRef.current) {

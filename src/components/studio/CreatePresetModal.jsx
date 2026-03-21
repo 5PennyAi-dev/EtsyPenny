@@ -180,7 +180,7 @@ const CreatePresetModal = ({ isOpen, onClose, user, userKeywordBank: externalBan
             toInsert.push({
               user_id: user.id,
               tag: item.tag,
-              product_type: currentListing?.product_types?.name || currentListing?.product_type_text || null,
+              product_type: currentListing?.product_types?.name || null,
               theme: currentListing?.theme || null,
               niche: currentListing?.niche || null,
               sub_niche: currentListing?.sub_niche || null,
