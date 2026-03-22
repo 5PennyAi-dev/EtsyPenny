@@ -1664,7 +1664,7 @@ const SEOLab = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left table-fixed">
               <thead className="bg-slate-50 border-b border-slate-200">
-                <tr className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
+                <tr className="text-[11px] tracking-wider text-slate-400 font-medium">
                   <th className="w-[32px] pl-3 pr-1 py-3">
                     <input
                       type="checkbox"
