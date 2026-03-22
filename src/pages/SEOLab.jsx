@@ -1395,10 +1395,10 @@ const SEOLab = () => {
         {view === 'keywords' ? (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
+              <table className="w-full text-sm text-left table-fixed">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
-                  <th className="w-8 px-1 py-3">
+                  <th className="w-[32px] px-1 py-3">
                     <input
                       type="checkbox"
                       checked={paginatedKeywords.length > 0 && paginatedKeywords.every(kw => selectedIds.has(kw.id))}
@@ -1406,48 +1406,48 @@ const SEOLab = () => {
                       className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                     />
                   </th>
-                  <th className="py-3 px-1">
+                  <th className="w-[22%] py-3 px-1">
                     <button onClick={() => toggleSort('tag')} className="inline-flex items-center gap-1 hover:text-slate-600 transition-colors">
                       Tag <SortIcon field="tag" />
                     </button>
                   </th>
-                  <th className="w-14 py-3 text-center">
+                  <th className="w-[52px] py-3 text-center">
                     <button onClick={() => toggleSort('_score')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-600 transition-colors">
                       Score <SortIcon field="_score" />
                     </button>
                   </th>
-                  <th className="w-[200px] py-3 px-2">
+                  <th className="w-[18%] py-3 px-2">
                     <button onClick={() => toggleSort('theme')} className="inline-flex items-center gap-1 hover:text-slate-600 transition-colors">
                       Niche <SortIcon field="theme" />
                     </button>
                   </th>
-                  <th className="w-20 py-3 text-right pr-3">
+                  <th className="w-[72px] py-3 text-right pr-3">
                     <button onClick={() => toggleSort('last_volume')} className="inline-flex items-center gap-1 justify-end w-full hover:text-slate-600 transition-colors">
                       Volume <SortIcon field="last_volume" />
                     </button>
                   </th>
-                  <th className="w-16 py-3 text-center">
+                  <th className="w-[60px] py-3 text-center">
                     <button onClick={() => toggleSort('last_competition')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-600 transition-colors">
                       Comp. <SortIcon field="last_competition" />
                     </button>
                   </th>
-                  <th className="w-16 py-3 text-center">
+                  <th className="w-[56px] py-3 text-center">
                     <button onClick={() => toggleSort('last_cpc')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-600 transition-colors">
                       CPC <SortIcon field="last_cpc" />
                     </button>
                   </th>
-                  <th className="w-14 py-3 text-center">
+                  <th className="w-[48px] py-3 text-center">
                     <button onClick={() => toggleSort('_used_in_count')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-600 transition-colors">
                       Used <SortIcon field="_used_in_count" />
                     </button>
                   </th>
-                  <th className="w-20 py-3 text-center">Trend</th>
-                  <th className="w-16 py-3 text-center">
+                  <th className="w-[80px] py-3 text-center">Trend</th>
+                  <th className="w-[56px] py-3 text-center">
                     <button onClick={() => toggleSort('last_sync_at')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-600 transition-colors">
                       Fresh <SortIcon field="last_sync_at" />
                     </button>
                   </th>
-                  <th className="w-10 py-3 text-center">Actions</th>
+                  <th className="w-[40px] py-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1489,7 +1489,7 @@ const SEOLab = () => {
                     return (
                       <tr key={kw.id} className={`hover:bg-slate-50/60 transition-colors group ${selectedIds.has(kw.id) ? 'bg-indigo-50/40' : ''}`}>
                         {/* Checkbox */}
-                        <td className="w-8 px-1">
+                        <td className="px-1">
                           <input
                             type="checkbox"
                             checked={selectedIds.has(kw.id)}
@@ -1499,10 +1499,10 @@ const SEOLab = () => {
                         </td>
 
                         {/* Tag (with star) */}
-                        <td className="py-2.5 px-1">
-                          <div className="flex items-center gap-1.5">
+                        <td className="py-2.5 px-1 overflow-hidden">
+                          <div className="flex items-center gap-1.5 min-w-0">
                             <Star size={13} className="fill-amber-400 text-amber-400 shrink-0" />
-                            <span className="font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors px-2.5 py-0.5 rounded-full text-xs cursor-default truncate max-w-[200px]" title={kw.tag}>
+                            <span className="font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors px-2.5 py-0.5 rounded-full text-xs cursor-default truncate" title={kw.tag}>
                                 {kw.tag}
                             </span>
                             {isGem(kw) && (
@@ -1524,7 +1524,7 @@ const SEOLab = () => {
                         </td>
 
                         {/* Score */}
-                        <td className="w-14 py-2.5 text-center">
+                        <td className="py-2.5 text-center">
                           <span className={`inline-flex items-center justify-center w-8 h-6 rounded text-[10px] font-bold border ${
                             kw._score >= 70 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                             : kw._score >= 40 ? 'bg-amber-50 text-amber-700 border-amber-100'
@@ -1535,7 +1535,7 @@ const SEOLab = () => {
                         </td>
 
                         {/* Niche (merged Theme › Niche › Sub-niche) */}
-                        <td className="w-[200px] max-w-[200px] py-2.5 px-2">
+                        <td className="py-2.5 px-2 overflow-hidden">
                           <div className="text-xs truncate" title={nichePath || '—'}>
                             {kw.theme && <span className="text-slate-600">{kw.theme}</span>}
                             {kw.niche && <><span className="text-slate-300 mx-1">›</span><span className="text-slate-400">{kw.niche}</span></>}
@@ -1545,12 +1545,12 @@ const SEOLab = () => {
                         </td>
 
                         {/* Volume */}
-                        <td className="w-20 py-2.5 text-right pr-3 text-slate-600 font-mono text-xs">
+                        <td className="py-2.5 text-right pr-3 text-slate-600 text-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           {(kw.last_volume || 0).toLocaleString()}
                         </td>
 
                         {/* Competition */}
-                        <td className="w-16 py-2.5 text-center">
+                        <td className="py-2.5 text-center">
                           {isNaN(comp) || kw.last_competition == null ? (
                             <span className="text-slate-300 text-xs">N/A</span>
                           ) : (
@@ -1567,7 +1567,7 @@ const SEOLab = () => {
                         </td>
 
                         {/* CPC */}
-                        <td className="w-16 py-2.5 text-center">
+                        <td className="py-2.5 text-center">
                           {isNaN(cpc) || cpc === 0 || kw.last_cpc == null ? (
                             <span className="text-slate-300 text-xs">N/A</span>
                           ) : (() => {
@@ -1583,7 +1583,7 @@ const SEOLab = () => {
                         </td>
 
                         {/* Used In */}
-                        <td className="w-14 py-2.5 text-center">
+                        <td className="py-2.5 text-center">
                           {kw._used_in_count === 0 ? (
                             <span className="text-slate-300 text-xs leading-none">—</span>
                           ) : (
@@ -1598,22 +1598,22 @@ const SEOLab = () => {
                         </td>
 
                         {/* Trend */}
-                        <td className="w-20 py-2.5">
+                        <td className="py-2.5">
                           <div className="flex justify-center">
                             <Sparkline data={kw.volume_history} />
                           </div>
                         </td>
 
                         {/* Freshness — show date, colored by recency */}
-                        <td className="w-16 py-2.5 text-center">
+                        <td className="py-2.5 text-center">
                           {!syncDate ? (
                             <span className="text-xs text-slate-300" title="Never synced">—</span>
                           ) : isFresh ? (
-                            <span className="text-xs text-emerald-500 font-medium" title={`Last synced: ${syncDate.toLocaleDateString()}`}>
+                            <span className="text-xs text-slate-400 font-medium" title={`Last synced: ${syncDate.toLocaleDateString()}`}>
                               {shortDate}
                             </span>
                           ) : (
-                            <span className="text-xs text-slate-400 group-hover:hidden font-medium" title={`Stale — last synced: ${syncDate.toLocaleDateString()}`}>
+                            <span className="text-xs text-amber-500 group-hover:hidden font-medium" title={`Stale — last synced: ${syncDate.toLocaleDateString()}`}>
                               {shortDate}
                             </span>
                           )}
@@ -1625,7 +1625,7 @@ const SEOLab = () => {
                         </td>
 
                         {/* Actions (dropdown menu) */}
-                        <td className="w-10 py-2.5 text-center relative">
+                        <td className="py-2.5 text-center relative">
                           <button
                             onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === kw.id ? null : kw.id); }}
                             className="p-1 rounded hover:bg-slate-100 transition-colors"
