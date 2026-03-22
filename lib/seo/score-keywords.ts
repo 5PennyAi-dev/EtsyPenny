@@ -4,22 +4,7 @@
  * Replaces the separate niche-scoring.ts and transactional-scoring.ts.
  */
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
-
-const scoringConfig = {
-  temperature: 0.1,
-  topP: 1,
-  topK: 1,
-  maxOutputTokens: 8192,
-  responseMimeType: 'application/json',
-};
-
-const safetySettings = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-];
+import { runAI } from '../ai/provider-router.js';
 
 interface ScoringContext {
   product_type: string;
@@ -46,16 +31,6 @@ interface ScoredKeyword extends EnrichedKeyword {
   is_selection_ia: boolean;
   is_user_added: boolean;
   is_pinned: boolean;
-}
-
-let _genAI: GoogleGenerativeAI | null = null;
-function getGenAI(): GoogleGenerativeAI {
-  if (!_genAI) {
-    const apiKey = process.env.GOOGLE_API_KEY;
-    if (!apiKey) throw new Error('Missing environment variable GOOGLE_API_KEY');
-    _genAI = new GoogleGenerativeAI(apiKey);
-  }
-  return _genAI;
 }
 
 export async function scoreKeywords(stats: EnrichedKeyword[], ctx: ScoringContext): Promise<ScoredKeyword[]> {
@@ -111,28 +86,22 @@ For each keyword provided, assign a **Niche Score**. This ensures the listing re
   const batches: string[][] = [];
   for (let i = 0; i < kws.length; i += BATCH) batches.push(kws.slice(i, i + BATCH));
 
-  const genAI = getGenAI();
-
-  const runScoring = async (systemPrompt: string, batchList: string[][]) => {
+  const runScoring = async (taskKey: string, systemPrompt: string, batchList: string[][]) => {
     const results: Array<{ keyword?: string; niche_score?: number; transactional_score?: number }> = [];
     for (const batch of batchList) {
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
-        generationConfig: scoringConfig,
-        safetySettings,
-        systemInstruction: systemPrompt,
+      const { text } = await runAI(taskKey, `# Keywords to Analyze:\n${JSON.stringify(batch)}`, {
+        systemPrompt,
       });
-      const raw = await model.generateContent(`# Keywords to Analyze:\n${JSON.stringify(batch)}`);
-      const text = raw.response.text().replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
-      const parsed = JSON.parse(text);
+      const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+      const parsed = JSON.parse(cleaned);
       results.push(...(parsed.keywords ?? []));
     }
     return results;
   };
 
   const [nicheResults, transResults] = await Promise.all([
-    runScoring(nicheSystem, batches),
-    runScoring(transSystem, batches),
+    runScoring('niche_scoring', nicheSystem, batches),
+    runScoring('transactional_scoring', transSystem, batches),
   ]);
 
   const VALID = new Set([10, 7, 4, 1]);

@@ -3,7 +3,7 @@
  * 5 parallel Gemini calls to generate keyword pool across segments.
  */
 
-import { runTextModel } from '../ai/gemini.js';
+import { runAI } from '../ai/provider-router.js';
 import { extractJson } from '../ai/extract-json.js';
 
 const KEYWORD_SEGMENTS = [
@@ -29,7 +29,7 @@ export async function generateKeywordPool(ctx: KeywordContext): Promise<string[]
   const results = await Promise.allSettled(
     KEYWORD_SEGMENTS.map(async (seg) => {
       const prompt = `# Role\nYou are an expert Etsy SEO Specialist.\n\n# Task\nGenerate 50 high-intent keywords for: ${seg.name}\n${seg.name}: ${seg.description}\n\n# Context\n- Product Type: ${ctx.product_type}\n- Theme: ${ctx.theme}\n- Niche: ${ctx.niche}\n- Sub-niche: ${ctx.sub_niche}\n- Description: ${ctx.client_description}\n\n# Visual & Marketing Data\n- Aesthetic/Style: ${ctx.visual_aesthetic}\n- Target Audience: ${ctx.visual_target_audience}\n- Overall Vibe: ${ctx.visual_overall_vibe}\n\n# Rules\n- Max 20 characters per keyword (CRITICAL for Etsy tags).\n- Max 3 words per phrase.\n- No duplicates, no trademarks, lowercase only.\n- Include product type in keywords at least 75% of the time.\n- Format: JSON object {"keywords": ["keyword1", "keyword2", ...]}`;
-      const raw = await runTextModel(prompt);
+      const { text: raw } = await runAI('keyword_generation', prompt);
       const parsed = JSON.parse(extractJson(raw));
       const kws = parsed.keywords ?? parsed.output?.keywords ?? [];
       return (kws as string[]).filter(k => typeof k === 'string' && k.length > 0).map(k => k.toLowerCase().trim()).filter(k => k.length <= 20);

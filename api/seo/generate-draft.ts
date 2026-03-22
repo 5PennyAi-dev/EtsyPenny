@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
-import { runTextModel } from '../../lib/ai/gemini.js';
+import { runAI } from '../../lib/ai/provider-router.js';
 import { extractJson } from '../../lib/ai/extract-json.js';
 
 const STATUS_COMPLETE = '28a11ca0-bcfc-42e0-971d-efc320f78424';
@@ -121,7 +121,7 @@ Self-validation: Review the output against the instructions. If it fails any con
 }`;
 
     // Step C: Call Gemini
-    const rawResponse = await runTextModel(prompt);
+    const { text: rawResponse } = await runAI('draft_generation', prompt);
 
     // Step D: Parse response
     const parsed = JSON.parse(extractJson(rawResponse));

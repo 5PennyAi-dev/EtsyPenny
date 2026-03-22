@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { runVisionModel, runTextModel } from '../../lib/ai/gemini.js';
+import { runAI } from '../../lib/ai/provider-router.js';
 import { extractJson } from '../../lib/ai/extract-json.js';
 
 // Verbatim from server.mjs lines 64-123
@@ -130,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .replace('{{productType}}', product_type)
       .replace('{{description}}', client_description);
 
-    const visualRaw = await runVisionModel(visualPrompt, mockup_url);
+    const { text: visualRaw } = await runAI('vision_analysis', visualPrompt, { imageUrl: mockup_url });
     const visualData = JSON.parse(extractJson(visualRaw));
     const visualAnalysis = visualData.visual_analysis;
 
@@ -171,7 +171,7 @@ Product details: ${client_description}
       .replace('{{formattedTaxonomyReport}}', formattedTaxonomy)
       .replace('# Visual analysis:', `${productDetailsContext}\n# Visual analysis:`);
 
-    const taxonomyRaw = await runTextModel(taxonomyPrompt);
+    const { text: taxonomyRaw } = await runAI('taxonomy_mapping', taxonomyPrompt);
     const taxonomyMapping = JSON.parse(extractJson(taxonomyRaw));
     console.info(`[analyze-image] theme=${taxonomyMapping.theme} niche=${taxonomyMapping.niche}`);
 

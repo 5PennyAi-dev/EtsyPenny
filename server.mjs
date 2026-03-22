@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // ─── SHARED LIB IMPORTS (same modules used by Vercel api/) ──
 import { extractJson } from './lib/ai/extract-json.ts';
-import { runVisionModel, runTextModel } from './lib/ai/gemini.ts';
+import { runAI } from './lib/ai/provider-router.ts';
 import { generateKeywordPool } from './lib/seo/generate-keyword-pool.ts';
 import { enrichKeywords } from './lib/seo/enrich-keywords.ts';
 import { scoreKeywords } from './lib/seo/score-keywords.ts';
@@ -159,7 +159,7 @@ app.post('/api/seo/analyze-image', async (req, res) => {
       .replace('{{productType}}', product_type)
       .replace('{{description}}', client_description);
 
-    const visualRaw = await runVisionModel(visualPrompt, mockup_url);
+    const { text: visualRaw } = await runAI('vision_analysis', visualPrompt, { imageUrl: mockup_url });
     const visualData = JSON.parse(extractJson(visualRaw));
     const visualAnalysis = visualData.visual_analysis;
     console.log('   ✅ Visual analysis done');
@@ -201,7 +201,7 @@ Product details: ${client_description}
 
     console.log("Taxonomy Prompt:", taxonomyPrompt);
 
-    const taxonomyRaw = await runTextModel(taxonomyPrompt);
+    const { text: taxonomyRaw } = await runAI('taxonomy_mapping', taxonomyPrompt);
     const taxonomyMapping = JSON.parse(extractJson(taxonomyRaw));
     console.log("Taxonomy Mapping Output:", taxonomyMapping);
     console.log(`   ✅ Theme: ${taxonomyMapping.theme}, Niche: ${taxonomyMapping.niche}`);
@@ -617,8 +617,8 @@ Self-validation: Review the output against the instructions. If it fails any con
   "description": "..."
 }`;
 
-    // Step C: Call Gemini
-    const rawResponse = await runTextModel(prompt);
+    // Step C: Call AI
+    const { text: rawResponse } = await runAI('draft_generation', prompt);
 
     // Step D: Parse response
     const parsed = JSON.parse(extractJson(rawResponse));
