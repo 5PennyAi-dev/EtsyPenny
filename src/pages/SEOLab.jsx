@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { FlaskConical, Star, Search, RefreshCw, Trash2, Pencil, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Gem, Settings2, X, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, ChevronLeft, Folder, Plus, Filter, Flame, Leaf, BarChart3, Clock, Target, AlertCircle, Tag, MoreHorizontal, Copy, Check, FolderPlus, Download } from 'lucide-react';
+import { FlaskConical, Star, Search, RefreshCw, Trash2, Pencil, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Gem, Settings2, X, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, ChevronLeft, Folder, Plus, Filter, Flame, Leaf, BarChart3, Clock, Target, AlertCircle, Tag, MoreHorizontal, Copy, Check, FolderPlus, Download, List, LayoutList } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Layout from '../components/Layout';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import axios from 'axios';
 import CreatePresetModal from '../components/studio/CreatePresetModal';
 
 // --- Sparkline (copied from ResultsDisplay for self-containment) ---
@@ -525,6 +527,107 @@ function ActionMenuItem({ icon, label, onClick, disabled, danger }) {
   );
 }
 
+// --- Niche Group Accordion (for grouped view) ---
+function NicheGroupAccordion({ group, selectedIds, onToggleSelect, refreshingIds, openMenuId, setOpenMenuId, isGem, isKeywordStale, onRefresh, onDelete, onAddToPreset, paginatedKeywords }) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+      >
+        {isOpen ? <ChevronDown size={16} className="text-slate-400 shrink-0" /> : <ChevronRight size={16} className="text-slate-400 shrink-0" />}
+
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="text-sm font-medium text-slate-700 truncate">{group.key}</span>
+          <span className="text-[11px] text-slate-400 bg-slate-200 px-2 py-0.5 rounded-full font-medium shrink-0">{group.count}</span>
+          {group.gemsCount > 0 && (
+            <span className="flex items-center gap-1 text-[11px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0">
+              <Gem size={11} /> {group.gemsCount}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-4 text-[11px] text-slate-400 shrink-0">
+          <span>Avg vol: <span className="text-slate-600 font-medium">{group.avgVolume.toLocaleString()}</span></span>
+          <span>Avg comp: <span className={`font-medium ${group.avgCompetition < 0.5 ? 'text-emerald-600' : group.avgCompetition < 0.9 ? 'text-amber-600' : 'text-rose-600'}`}>{group.avgCompetition}</span></span>
+          <span>In use: <span className="text-slate-600 font-medium">{group.totalUsed}/{group.count}</span></span>
+        </div>
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <table className="w-full table-fixed text-sm">
+              <tbody className="divide-y divide-slate-100">
+                {group.keywords.map(kw => {
+                  const comp = parseFloat(kw.last_competition);
+                  const cpc = parseFloat(kw.last_cpc);
+                  return (
+                    <tr key={kw.id} className={`hover:bg-slate-50/50 transition-colors group ${selectedIds.has(kw.id) ? 'bg-indigo-50/40' : ''} ${refreshingIds.has(kw.id) ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <td className="w-[32px] pl-3 pr-1 py-2">
+                        <input type="checkbox" checked={selectedIds.has(kw.id)} onChange={() => onToggleSelect(kw.id)} className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                      </td>
+                      <td className="py-2 px-1 overflow-hidden">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Star size={13} className="fill-amber-400 text-amber-400 shrink-0" />
+                          <span className="font-semibold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-full text-xs truncate" title={kw.tag}>{kw.tag}</span>
+                          {isGem(kw) && <Gem size={12} className="text-indigo-500 shrink-0" />}
+                          {kw._is_trending && <Flame size={12} className="text-rose-500 shrink-0" />}
+                          {kw._is_evergreen && <Leaf size={12} className="text-emerald-500 shrink-0" />}
+                        </div>
+                      </td>
+                      <td className="w-[72px] py-2 text-right pr-3 text-slate-600 text-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {refreshingIds.has(kw.id) ? <RefreshCw size={14} className="text-indigo-400 animate-spin ml-auto" /> : (kw.last_volume || 0).toLocaleString()}
+                      </td>
+                      <td className="w-[60px] py-2 text-center">
+                        {isNaN(comp) || kw.last_competition == null ? <span className="text-slate-300 text-xs">N/A</span> : (
+                          <span className={`text-xs font-medium ${comp < 0.3 ? 'text-emerald-600' : comp < 0.7 ? 'text-amber-600' : 'text-rose-600'}`}>{comp.toFixed(2)}</span>
+                        )}
+                      </td>
+                      <td className="w-[56px] py-2 text-center text-xs">
+                        {isNaN(cpc) || cpc === 0 ? <span className="text-slate-300">N/A</span> : <span className={cpc >= 1.5 ? 'text-emerald-600 font-medium' : 'text-slate-500'}>${cpc.toFixed(2)}</span>}
+                      </td>
+                      <td className="w-[48px] py-2 text-center">
+                        {(kw._used_in_count || 0) > 0 ? (
+                          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full">{kw._used_in_count}</span>
+                        ) : <span className="text-xs text-slate-300">—</span>}
+                      </td>
+                      <td className="w-[40px] py-2 text-center relative">
+                        <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === kw.id ? null : kw.id); }} className="p-1 rounded hover:bg-slate-100 transition-colors">
+                          <MoreHorizontal size={16} className="text-slate-400" />
+                        </button>
+                        {openMenuId === kw.id && (
+                          <div data-action-menu className="absolute right-0 z-30 w-48 bg-white rounded-lg border border-slate-200 shadow-lg py-1 top-8">
+                            <ActionMenuItem icon={<Copy size={14} />} label="Copy keyword" onClick={() => { navigator.clipboard.writeText(kw.tag); toast.success('Copied!'); setOpenMenuId(null); }} />
+                            <ActionMenuItem icon={<FolderPlus size={14} />} label="Add to preset" onClick={() => { onAddToPreset(kw.id); setOpenMenuId(null); }} />
+                            {isKeywordStale(kw) && (
+                              <ActionMenuItem icon={<RefreshCw size={14} className={refreshingIds.has(kw.id) ? 'animate-spin' : ''} />} label="Refresh data" disabled={refreshingIds.has(kw.id)} onClick={() => { onRefresh(kw); setOpenMenuId(null); }} />
+                            )}
+                            <div className="border-t border-slate-100 my-1" />
+                            <ActionMenuItem icon={<Trash2 size={14} />} label="Remove from bank" onClick={() => { onDelete(kw.id, kw.tag); setOpenMenuId(null); }} danger />
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // --- Main Page ---
 const SEOLab = () => {
   const { user } = useAuth();
@@ -555,11 +658,17 @@ const SEOLab = () => {
   // Usage data from v_keyword_usage_count
   const [usageMap, setUsageMap] = useState({});
 
+  // View mode: 'list' (flat table) | 'grouped' (by niche)
+  const [viewMode, setViewMode] = useState('list');
+
   // Selection & action menu
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [openMenuId, setOpenMenuId] = useState(null);
   const [bulkPresetIds, setBulkPresetIds] = useState(new Set());
   const [copiedId, setCopiedId] = useState(null);
+
+  // Refresh stale keywords
+  const [refreshingIds, setRefreshingIds] = useState(new Set());
 
   const gemSettingsRef = useRef(null);
 
@@ -878,6 +987,42 @@ const SEOLab = () => {
       ))
     : presets;
 
+  // Stale check helper
+  const isKeywordStale = (kw) => {
+    if (!kw.last_sync_at) return true;
+    const days = (Date.now() - new Date(kw.last_sync_at).getTime()) / (1000 * 60 * 60 * 24);
+    return days > STALE_DAYS;
+  };
+
+  // Grouped view: keywords grouped by Theme › Niche
+  const groupedKeywords = useMemo(() => {
+    if (viewMode !== 'grouped' || view !== 'keywords') return null;
+
+    const groups = {};
+    filtered.forEach(kw => {
+      const theme = kw.theme || 'Uncategorized';
+      const niche = kw.niche || '';
+      const groupKey = niche ? `${theme} › ${niche}` : theme;
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = { key: groupKey, theme, niche, keywords: [] };
+      }
+      groups[groupKey].keywords.push(kw);
+    });
+
+    Object.values(groups).forEach(group => {
+      const kws = group.keywords;
+      group.count = kws.length;
+      group.avgVolume = Math.round(kws.reduce((s, k) => s + (k.last_volume || 0), 0) / kws.length);
+      group.avgCompetition = +(kws.reduce((s, k) => s + (parseFloat(k.last_competition) || 0), 0) / kws.length).toFixed(2);
+      group.totalUsed = kws.filter(k => (k._used_in_count || 0) > 0).length;
+      group.gemsCount = kws.filter(k => isGem(k)).length;
+      group.keywords.sort((a, b) => (b.last_volume || 0) - (a.last_volume || 0));
+    });
+
+    return Object.values(groups).sort((a, b) => b.count - a.count);
+  }, [filtered, viewMode, view, gemThresholds]);
+
   // Sort toggle: null → asc → desc → null
   const toggleSort = (field) => {
     let nextSortField;
@@ -1036,6 +1181,110 @@ const SEOLab = () => {
     toast.success(`Deleted ${count} keyword${count > 1 ? 's' : ''}`);
   }
 
+  // Refresh stale keyword(s) via DataForSEO
+  async function handleRefreshKeyword(kw) {
+    setRefreshingIds(prev => new Set([...prev, kw.id]));
+    try {
+      const res = await axios.post('/api/seo/refresh-keyword-bank', {
+        keyword_bank_ids: [kw.id],
+        tags: [kw.tag],
+      });
+      if (res.data?.results) {
+        const fresh = res.data.results.find(r => r.tag === kw.tag);
+        if (fresh && !fresh.error) {
+          setKeywords(prev => prev.map(k => k.id !== kw.id ? k : {
+            ...k,
+            last_volume: fresh.last_volume ?? fresh.search_volume ?? k.last_volume,
+            last_competition: fresh.last_competition ?? fresh.competition ?? k.last_competition,
+            last_cpc: fresh.last_cpc ?? fresh.cpc ?? k.last_cpc,
+            volume_history: fresh.volume_history || k.volume_history,
+            last_sync_at: fresh.last_sync_at || new Date().toISOString(),
+          }));
+          toast.success(`Refreshed "${kw.tag}"`);
+        }
+      }
+    } catch (err) {
+      console.error('Refresh failed:', err);
+      toast.error(`Failed to refresh "${kw.tag}"`);
+    } finally {
+      setRefreshingIds(prev => { const n = new Set(prev); n.delete(kw.id); return n; });
+    }
+  }
+
+  async function handleBulkRefresh() {
+    const staleSelected = enrichedKeywords.filter(kw => selectedIds.has(kw.id) && isKeywordStale(kw));
+    if (staleSelected.length === 0) return;
+    if (staleSelected.length > 20) {
+      toast.error('Maximum 20 keywords per refresh. Select fewer keywords.');
+      return;
+    }
+    setRefreshingIds(prev => new Set([...prev, ...staleSelected.map(k => k.id)]));
+    try {
+      const res = await axios.post('/api/seo/refresh-keyword-bank', {
+        keyword_bank_ids: staleSelected.map(k => k.id),
+        tags: staleSelected.map(k => k.tag),
+      });
+      if (res.data?.results) {
+        const freshMap = {};
+        res.data.results.forEach(r => { if (!r.error) freshMap[r.tag] = r; });
+        setKeywords(prev => prev.map(k => {
+          const f = freshMap[k.tag];
+          if (!f) return k;
+          return {
+            ...k,
+            last_volume: f.last_volume ?? f.search_volume ?? k.last_volume,
+            last_competition: f.last_competition ?? f.competition ?? k.last_competition,
+            last_cpc: f.last_cpc ?? f.cpc ?? k.last_cpc,
+            volume_history: f.volume_history || k.volume_history,
+            last_sync_at: f.last_sync_at || new Date().toISOString(),
+          };
+        }));
+        toast.success(`Refreshed ${Object.keys(freshMap).length} keywords`);
+      }
+    } catch (err) {
+      toast.error('Bulk refresh failed');
+    } finally {
+      setRefreshingIds(new Set());
+    }
+  }
+
+  async function handleRefreshAllStale() {
+    const allStale = filtered.filter(kw => isKeywordStale(kw));
+    if (allStale.length === 0) return;
+    if (allStale.length > 50) {
+      toast.error(`Too many stale keywords (${allStale.length}). Use bulk select to refresh in batches of 20.`);
+      return;
+    }
+    setRefreshingIds(prev => new Set([...prev, ...allStale.map(k => k.id)]));
+    try {
+      const res = await axios.post('/api/seo/refresh-keyword-bank', {
+        keyword_bank_ids: allStale.map(k => k.id),
+        tags: allStale.map(k => k.tag),
+      });
+      if (res.data?.results) {
+        const freshMap = {};
+        res.data.results.forEach(r => { if (!r.error) freshMap[r.tag] = r; });
+        setKeywords(prev => prev.map(k => {
+          const f = freshMap[k.tag];
+          if (!f) return k;
+          return {
+            ...k,
+            last_volume: f.last_volume ?? f.search_volume ?? k.last_volume,
+            last_competition: f.last_competition ?? f.competition ?? k.last_competition,
+            last_cpc: f.last_cpc ?? f.cpc ?? k.last_cpc,
+            volume_history: f.volume_history || k.volume_history,
+            last_sync_at: f.last_sync_at || new Date().toISOString(),
+          };
+        }));
+        toast.success(`Refreshed ${Object.keys(freshMap).length} stale keywords`);
+      }
+    } catch (err) {
+      toast.error('Refresh all stale failed');
+    } finally {
+      setRefreshingIds(new Set());
+    }
+  }
+
   // Close action menu on outside click
   useEffect(() => {
     if (!openMenuId) return;
@@ -1184,6 +1433,18 @@ const SEOLab = () => {
                 </button>
               );
             })}
+
+            {/* Refresh all stale button — only when Stale pill is active */}
+            {activePills.includes('stale') && (pillCounts.stale || 0) > 0 && (
+              <button
+                onClick={handleRefreshAllStale}
+                disabled={refreshingIds.size > 0}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={12} className={refreshingIds.size > 0 ? 'animate-spin' : ''} />
+                Refresh all {pillCounts.stale} stale
+              </button>
+            )}
           </div>
         )}
 
@@ -1220,8 +1481,36 @@ const SEOLab = () => {
                 )}
               </button>
             )}
+
+            {/* View mode toggle: List vs Grouped */}
+            {view === 'keywords' && (
+              <div className="flex items-center gap-0.5 border border-slate-200 rounded-lg p-0.5 shadow-sm">
+                <button
+                  onClick={() => { setViewMode('list'); setSelectedIds(new Set()); }}
+                  className={`p-2 rounded-md transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-indigo-100 text-indigo-600'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                  title="List view"
+                >
+                  <List size={16} />
+                </button>
+                <button
+                  onClick={() => { setViewMode('grouped'); setSelectedIds(new Set()); }}
+                  className={`p-2 rounded-md transition-colors ${
+                    viewMode === 'grouped'
+                      ? 'bg-indigo-100 text-indigo-600'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                  title="Group by niche"
+                >
+                  <LayoutList size={16} />
+                </button>
+              </div>
+            )}
           </div>
-          
+
           {view === 'keywords' ? (
             <div className="relative" ref={gemSettingsRef}>
             <button
@@ -1370,6 +1659,7 @@ const SEOLab = () => {
 
         {/* Dynamic Table Content */}
         {view === 'keywords' ? (
+          viewMode === 'list' ? (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left table-fixed">
@@ -1459,7 +1749,7 @@ const SEOLab = () => {
                       : '—';
 
                     return (
-                      <tr key={kw.id} className={`hover:bg-slate-50/60 transition-colors group ${selectedIds.has(kw.id) ? 'bg-indigo-50/40' : ''}`}>
+                      <tr key={kw.id} className={`hover:bg-slate-50/60 transition-colors group ${selectedIds.has(kw.id) ? 'bg-indigo-50/40' : ''} ${refreshingIds.has(kw.id) ? 'opacity-50 pointer-events-none' : ''}`}>
                         {/* Checkbox */}
                         <td className="pl-3 pr-1">
                           <input
@@ -1507,7 +1797,11 @@ const SEOLab = () => {
 
                         {/* Volume */}
                         <td className="py-2.5 text-right pr-3 text-slate-600 text-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                          {(kw.last_volume || 0).toLocaleString()}
+                          {refreshingIds.has(kw.id) ? (
+                            <RefreshCw size={14} className="text-indigo-400 animate-spin ml-auto" />
+                          ) : (
+                            (kw.last_volume || 0).toLocaleString()
+                          )}
                         </td>
 
                         {/* Competition */}
@@ -1613,6 +1907,14 @@ const SEOLab = () => {
                                 label="Add to preset"
                                 onClick={() => { setBulkPresetIds(new Set([kw.id])); setIsCreateModalOpen(true); setOpenMenuId(null); }}
                               />
+                              {isKeywordStale(kw) && (
+                                <ActionMenuItem
+                                  icon={<RefreshCw size={14} className={refreshingIds.has(kw.id) ? 'animate-spin' : ''} />}
+                                  label="Refresh data"
+                                  disabled={refreshingIds.has(kw.id)}
+                                  onClick={() => { handleRefreshKeyword(kw); setOpenMenuId(null); }}
+                                />
+                              )}
                               <div className="border-t border-slate-100 my-1" />
                               <ActionMenuItem
                                 icon={<Trash2 size={14} />}
@@ -1654,6 +1956,18 @@ const SEOLab = () => {
                   <Download size={14} />
                   Export CSV
                 </button>
+
+                {/* Refresh stale — only when selected keywords include stale ones */}
+                {enrichedKeywords.filter(kw => selectedIds.has(kw.id) && isKeywordStale(kw)).length > 0 && (
+                  <button
+                    onClick={handleBulkRefresh}
+                    disabled={refreshingIds.size > 0}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw size={14} className={refreshingIds.size > 0 ? 'animate-spin' : ''} />
+                    Refresh stale ({enrichedKeywords.filter(kw => selectedIds.has(kw.id) && isKeywordStale(kw)).length})
+                  </button>
+                )}
 
                 <button
                   onClick={handleBulkDelete}
@@ -1718,6 +2032,62 @@ const SEOLab = () => {
             </div>
           )}
         </div>
+          ) : (
+          /* ── Grouped view ── */
+          <div className="space-y-2">
+            {(!groupedKeywords || groupedKeywords.length === 0) ? (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center text-slate-400 text-sm">
+                {isLoading ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 size={24} className="text-indigo-500 animate-spin" />
+                    <span>Loading your keyword bank...</span>
+                  </div>
+                ) : 'No keywords match the current filters.'}
+              </div>
+            ) : (
+              groupedKeywords.map(group => (
+                <NicheGroupAccordion
+                  key={group.key}
+                  group={group}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelectOne}
+                  refreshingIds={refreshingIds}
+                  openMenuId={openMenuId}
+                  setOpenMenuId={setOpenMenuId}
+                  isGem={isGem}
+                  isKeywordStale={isKeywordStale}
+                  onRefresh={handleRefreshKeyword}
+                  onDelete={handleDelete}
+                  onAddToPreset={(kwId) => { setBulkPresetIds(new Set([kwId])); setIsCreateModalOpen(true); }}
+                />
+              ))
+            )}
+
+            {/* Bulk Action Bar (shared with list view) */}
+            {selectedIds.size > 0 && (
+              <div className="sticky bottom-0 z-10 bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3 shadow-sm">
+                <span className="text-sm font-medium text-slate-700">{selectedIds.size} selected</span>
+                <div className="flex items-center gap-2 ml-4">
+                  <button onClick={handleBulkAddToPreset} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+                    <FolderPlus size={14} /> Add to preset
+                  </button>
+                  <button onClick={handleBulkExportCSV} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+                    <Download size={14} /> Export CSV
+                  </button>
+                  {enrichedKeywords.filter(kw => selectedIds.has(kw.id) && isKeywordStale(kw)).length > 0 && (
+                    <button onClick={handleBulkRefresh} disabled={refreshingIds.size > 0} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50">
+                      <RefreshCw size={14} className={refreshingIds.size > 0 ? 'animate-spin' : ''} /> Refresh stale ({enrichedKeywords.filter(kw => selectedIds.has(kw.id) && isKeywordStale(kw)).length})
+                    </button>
+                  )}
+                  <button onClick={handleBulkDelete} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors">
+                    <Trash2 size={14} /> Delete
+                  </button>
+                </div>
+                <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-slate-400 hover:text-slate-600 transition-colors">Clear selection</button>
+              </div>
+            )}
+          </div>
+          )
         ) : (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
              <div className="overflow-x-auto">
