@@ -651,6 +651,46 @@ Self-validation: Review the output against the instructions. If it fails any con
   }
 });
 
+// ─── API ROUTE: POST /api/seo/refresh-keyword-bank ────────────
+app.post('/api/seo/refresh-keyword-bank', async (req, res) => {
+  try {
+    const { keyword_bank_ids, tags } = req.body;
+    if (!tags?.length) return res.status(400).json({ error: 'tags array required' });
+    if (tags.length > 50) return res.status(400).json({ error: 'Max 50 keywords' });
+
+    console.log(`\n📥 [refresh-keyword-bank] Refreshing ${tags.length} keywords`);
+    const enriched = await enrichKeywords(tags);
+
+    const results = [];
+    for (let i = 0; i < tags.length; i++) {
+      const tag = tags[i];
+      const bankId = keyword_bank_ids?.[i];
+      const data = enriched.find(e => e.tag === tag || e.keyword === tag);
+
+      if (data && bankId) {
+        const payload = {
+          last_volume: data.search_volume || 0,
+          last_competition: data.competition || 0,
+          last_cpc: data.cpc || 0,
+          volume_history: data.volume_history || [],
+          last_sync_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        await supabaseAdmin.from('user_keyword_bank').update(payload).eq('id', bankId);
+        results.push({ tag, ...payload });
+      } else {
+        results.push({ tag, error: 'No data found' });
+      }
+    }
+
+    console.log(`   ✅ Refreshed ${results.filter(r => !r.error).length}/${tags.length} keywords`);
+    res.json({ success: true, results, refreshed_count: results.filter(r => !r.error).length });
+  } catch (err) {
+    console.error('[refresh-keyword-bank] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── API ROUTE: POST /api/seo/user-keyword ────────────
 app.post('/api/seo/user-keyword', async (req, res) => {
   const t0 = Date.now();
