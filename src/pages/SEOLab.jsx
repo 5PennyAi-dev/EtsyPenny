@@ -45,13 +45,15 @@ const Sparkline = ({ data }) => {
   );
 };
 
+// --- Stale threshold (days) — single source of truth for filter pill + date color ---
+const STALE_DAYS = 21;
+
 // --- Freshness Helper ---
 const getFreshnessStatus = (date) => {
-  if (!date) return { label: 'Unknown', color: 'text-slate-400 bg-slate-50 border-slate-100' };
+  if (!date) return { label: 'Stale', color: 'text-amber-600 bg-amber-50 border-amber-100' };
   const diff = (new Date() - new Date(date)) / (1000 * 60 * 60 * 24);
-  if (diff < 7) return { label: 'Fresh', color: 'text-emerald-600 bg-emerald-50 border-emerald-100' };
-  if (diff < 30) return { label: 'Stale', color: 'text-amber-600 bg-amber-50 border-amber-100' };
-  return { label: 'Expired', color: 'text-rose-600 bg-rose-50 border-rose-100' };
+  if (diff <= STALE_DAYS) return { label: 'Fresh', color: 'text-emerald-600 bg-emerald-50 border-emerald-100' };
+  return { label: 'Stale', color: 'text-amber-600 bg-amber-50 border-amber-100' };
 };
 
 // --- Inline Editable Cell ---
@@ -837,7 +839,7 @@ const SEOLab = () => {
             case 'highVolume':     if ((kw.last_volume || 0) < 5000) return false; break;
             case 'lowCompetition': { const c = parseFloat(kw.last_competition); if (isNaN(c) || c >= 0.5) return false; break; }
             case 'unused':         if (kw._used_in_count > 0) return false; break;
-            case 'stale':          if (getFreshnessStatus(kw.last_sync_at).label !== 'Expired') return false; break;
+            case 'stale':          if (getFreshnessStatus(kw.last_sync_at).label !== 'Stale') return false; break;
           }
         }
       }
@@ -1104,7 +1106,7 @@ const SEOLab = () => {
           case 'highVolume':     return (kw.last_volume || 0) >= 5000;
           case 'lowCompetition': { const c = parseFloat(kw.last_competition); return !isNaN(c) && c < 0.5; }
           case 'unused':         return kw._used_in_count === 0;
-          case 'stale':          return getFreshnessStatus(kw.last_sync_at).label === 'Expired';
+          case 'stale':          return getFreshnessStatus(kw.last_sync_at).label === 'Stale';
           default: return true;
         }
       }).length;
@@ -1451,7 +1453,7 @@ const SEOLab = () => {
                     const nichePath = [kw.theme, kw.niche, kw.sub_niche].filter(Boolean).join(' › ');
                     const syncDate = kw.last_sync_at ? new Date(kw.last_sync_at) : null;
                     const daysSinceSync = syncDate ? (Date.now() - syncDate.getTime()) / (1000 * 60 * 60 * 24) : Infinity;
-                    const isFresh = daysSinceSync < 30;
+                    const isStale = daysSinceSync > STALE_DAYS;
                     const shortDate = syncDate
                       ? syncDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                       : '—';
@@ -1567,7 +1569,7 @@ const SEOLab = () => {
                         <td className="py-2.5 text-center">
                           {!syncDate ? (
                             <span className="text-xs text-slate-300" title="Never synced">—</span>
-                          ) : daysSinceSync > 30 ? (
+                          ) : isStale ? (
                             <>
                               <span className="text-xs text-amber-500 group-hover:hidden font-medium" title={`Stale — last synced: ${syncDate.toLocaleDateString()}`}>
                                 {shortDate}
