@@ -929,10 +929,10 @@ const SEOLab = () => {
 
   // Sort icon helper
   const SortIcon = ({ field }) => {
-    if (sortField !== field) return <ChevronsUpDown size={12} className="text-slate-300" />;
+    if (sortField !== field) return <ChevronsUpDown size={10} className="text-slate-300 shrink-0" />;
     return sortDirection === 'asc'
-      ? <ChevronUp size={12} className="text-indigo-600" />
-      : <ChevronDown size={12} className="text-indigo-600" />;
+      ? <ChevronUp size={10} className="text-indigo-600 shrink-0" />
+      : <ChevronDown size={10} className="text-indigo-600 shrink-0" />;
   };
 
   // Extract unique options for dropdowns
@@ -1398,7 +1398,7 @@ const SEOLab = () => {
               <table className="w-full text-sm text-left table-fixed">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
-                  <th className="w-[32px] px-1 py-3">
+                  <th className="w-[32px] pl-3 pr-1 py-3">
                     <input
                       type="checkbox"
                       checked={paginatedKeywords.length > 0 && paginatedKeywords.every(kw => selectedIds.has(kw.id))}
@@ -1489,7 +1489,7 @@ const SEOLab = () => {
                     return (
                       <tr key={kw.id} className={`hover:bg-slate-50/60 transition-colors group ${selectedIds.has(kw.id) ? 'bg-indigo-50/40' : ''}`}>
                         {/* Checkbox */}
-                        <td className="px-1">
+                        <td className="pl-3 pr-1">
                           <input
                             type="checkbox"
                             checked={selectedIds.has(kw.id)}
@@ -1608,18 +1608,22 @@ const SEOLab = () => {
                         <td className="py-2.5 text-center">
                           {!syncDate ? (
                             <span className="text-xs text-slate-300" title="Never synced">—</span>
-                          ) : isFresh ? (
-                            <span className="text-xs text-slate-400 font-medium" title={`Last synced: ${syncDate.toLocaleDateString()}`}>
+                          ) : daysSinceSync > 30 ? (
+                            <>
+                              <span className="text-xs text-amber-500 group-hover:hidden font-medium" title={`Stale — last synced: ${syncDate.toLocaleDateString()}`}>
+                                {shortDate}
+                              </span>
+                              <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-full font-bold hidden group-hover:inline-flex" title={`Last synced: ${syncDate.toLocaleDateString()}`}>
+                                Stale
+                              </span>
+                            </>
+                          ) : daysSinceSync > 21 ? (
+                            <span className="text-xs text-amber-400 font-medium" title={`Getting stale — last synced: ${syncDate.toLocaleDateString()}`}>
                               {shortDate}
                             </span>
                           ) : (
-                            <span className="text-xs text-amber-500 group-hover:hidden font-medium" title={`Stale — last synced: ${syncDate.toLocaleDateString()}`}>
+                            <span className="text-xs text-slate-400 font-medium" title={`Last synced: ${syncDate.toLocaleDateString()}`}>
                               {shortDate}
-                            </span>
-                          )}
-                          {syncDate && !isFresh && (
-                            <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-full font-bold hidden group-hover:inline-flex" title={`Last synced: ${syncDate.toLocaleDateString()}`}>
-                              Stale
                             </span>
                           )}
                         </td>
