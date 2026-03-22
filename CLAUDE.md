@@ -32,7 +32,7 @@ npm run preview   # Preview production build
 - **Vercel Serverless Functions** (`api/`) — production backend for all SEO operations
 - **Local Express API** (`server.mjs`, port 3001) — dev-only mirror of Vercel functions, used via Vite proxy
 - **n8n** webhook — only used for `analyseShop` (auto-fill brand profile from Etsy shop URL)
-- **Google Generative AI** (Gemini 2.0 Flash) for vision analysis and keyword scoring
+- **Multi-provider AI** (Gemini, Anthropic, OpenAI) via configurable provider router — admin assigns any model to any task at runtime via `system_ai_config` table
 - **DataForSEO** API for keyword enrichment (search volume, competition, CPC, volume history)
 - **Framer Motion** for animations
 - **Sonner** for toast notifications
@@ -46,7 +46,7 @@ npm run preview   # Preview production build
 - `src/pages/` — Full page components (ProductStudio, Dashboard, HistoryPage, BrandProfilePage, LoginPage, AdminSystemPage, UserSettings, SEOLab, LandingPage)
 - `src/components/studio/` — SEO Listings sub-components (OptimizationForm, ResultsDisplay, ImageUpload, StrategyTuner, FavoritesPickerModal, CreatePresetModal, SeoBadge, ProductTypeCombobox, etc.)
 - `src/components/dashboard/` — Dashboard widgets (PerformanceCard, MarketInsights, RadialGauge)
-- `src/components/admin/` — Admin panel components (TaxonomyManagement, ProductTypeManagement)
+- `src/components/admin/` — Admin panel components (TaxonomyManagement, ProductTypeManagement, AIModelConfig)
 - `src/components/settings/` — User settings components (UserTaxonomyManagement — custom themes/niches CRUD)
 - `src/components/ui/` — Reusable UI primitives (Accordion, ConfirmationModal)
 - `src/components/pdf/` — PDF export (ListingPDFDocument using @react-pdf/renderer)
@@ -55,8 +55,9 @@ npm run preview   # Preview production build
 - `api/` — Vercel serverless functions (production backend): `analyze-image`, `generate-keywords`, `reset-pool`, `recalculate-scores`, `generate-draft`, `user-keyword`, `add-from-favorite`, `health`
 - `server.mjs` — Local Express dev server (mirrors Vercel functions for local development)
 - `vercel.json` — Vercel deployment config (rewrites `/api/*` to serverless functions)
-- `lib/seo/` — Shared backend logic imported by both `server.mjs` and `api/`: `niche-scoring.ts`, `transactional-scoring.ts`, `filter-logic.ts`
-- `lib/ai/gemini.ts` — Gemini API wrapper
+- `lib/seo/` — Shared backend logic imported by both `server.mjs` and `api/`: `score-keywords.ts`, `generate-keyword-pool.ts`, `filter-logic.ts`, `enrich-keywords.ts`, `select-and-score.ts`, `persist-seo.ts`, `persist-strength.ts`
+- `lib/ai/` — AI abstraction layer: `provider-router.ts` (main `runAI()` entry point), `types.ts`, `adapters/` (gemini, anthropic, openai)
+- `lib/ai/gemini.ts` — Legacy Gemini wrapper (only used by test files)
 - `lib/supabase/server.ts` — Server-side Supabase admin client
 - `supabase/functions/save-seo/` — Deno edge function to persist SEO results
 - `supabase/functions/save-image-analysis/` — Deno edge function to persist image analysis
@@ -86,13 +87,14 @@ npm run preview   # Preview production build
 | `POST /api/seo/add-from-favorite` | Batch-add keywords from Favorites bank (skips DataForSEO, uses cached metrics) |
 | `GET /api/health` | Health check |
 
-**Key helper functions in server.mjs:**
-- `runVisionModel()` / `runTextModel()` — Gemini API wrappers
-- `enrichKeywords()` — Cache check + DataForSEO API enrichment
-- `scoreKeywords()` — Batch niche + transactional scoring via Gemini
-- `selectAndScore()` — Composite scoring, top-N selection, strength breakdown
-- `persistStrength()` — Shared DB persistence for strength scores (used by reset-pool + recalculate-scores)
-- `applySEOFilter()` — Opportunity scores, trending/evergreen flags, pool ranking
+**Key shared modules (in `lib/`):**
+- `lib/ai/provider-router.ts` — `runAI(taskKey, prompt, options)` — reads task→model config from `system_ai_config` (60s cache), routes to correct adapter
+- `lib/seo/generate-keyword-pool.ts` — 5 parallel AI calls to generate keyword pool
+- `lib/seo/enrich-keywords.ts` — Cache check + DataForSEO API enrichment
+- `lib/seo/score-keywords.ts` — Batch niche + transactional scoring via AI
+- `lib/seo/select-and-score.ts` — Composite scoring, top-N selection, strength breakdown
+- `lib/seo/persist-strength.ts` — Shared DB persistence for strength scores
+- `lib/seo/filter-logic.ts` — Opportunity scores, trending/evergreen flags, pool ranking
 
 ### n8n Webhook (Single Remaining Use)
 
@@ -119,6 +121,8 @@ Only one action still uses the n8n webhook (`VITE_N8N_WEBHOOK_URL_TEST`):
 - **`keyword_presets`** — Named keyword groupings (keyword_ids[] referencing user_keyword_bank)
 - **`user_settings`** — User preferences including Smart Badge thresholds and gem settings
 - **`system_seo_constants`** — System-wide SEO constants and labels
+- **`system_ai_models`** — Catalog of available AI models (id, provider, display_name, supports_vision, cost_tier)
+- **`system_ai_config`** — Task→model assignments (task_key, provider, model_id, temperature, max_tokens, is_vision)
 - **`system_themes`** / **`system_niches`** — Global taxonomy (admin-managed)
 - **`user_custom_themes`** / **`user_custom_niches`** — Per-user custom taxonomy (RLS enabled)
 - **`user_custom_product_types`** — Per-user custom product types (RLS enabled)
@@ -143,7 +147,9 @@ VITE_N8N_WEBHOOK_URL_TEST  # n8n webhook endpoint (for remaining n8n actions)
 
 # Server-side only (used by server.mjs and edge functions)
 SUPABASE_SERVICE_ROLE_KEY  # Admin Supabase key (bypasses RLS)
-GOOGLE_API_KEY             # Gemini API key
+GOOGLE_API_KEY             # Gemini API key (required)
+ANTHROPIC_API_KEY          # Anthropic API key (optional — needed if tasks assigned to Anthropic)
+OPENAI_API_KEY             # OpenAI API key (optional — needed if tasks assigned to OpenAI)
 DATAFORSEO_LOGIN           # DataForSEO API login
 DATAFORSEO_PASSWORD        # DataForSEO API password
 N8N_WEBHOOK_SECRET         # Shared secret for edge function auth (x-api-key header)

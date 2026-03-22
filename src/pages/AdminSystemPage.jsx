@@ -434,7 +434,7 @@ export default function AdminSystemPage() {
 
           {/* Table Area 1: SEO Strategy Weights */}
           <Accordion
-            defaultOpen={true}
+            defaultOpen={false}
             title={
               <div className="flex items-center justify-between w-full pr-4">
                 <div className="flex items-center gap-3">

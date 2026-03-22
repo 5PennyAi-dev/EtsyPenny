@@ -12,7 +12,7 @@
 - **API Server**: Local Express (`server.mjs`, port 3001) for dev; Vercel serverless functions (`api/`) for production.
 - **Automation**: n8n (legacy, only `analyseShop` remains).
 - **Payment**: Stripe (Hybrid Model: Subscriptions + Credit Packs).
-- **AI**: Gemini 2.0 Flash (Vision & SEO generation via Google Generative AI SDK).
+- **AI**: Multi-provider (Gemini, Anthropic, OpenAI) via configurable provider router. Default: Gemini 2.5 Flash. Admin can reassign any model to any task at runtime.
 - **SEO Data**: DataForSEO API (keyword metrics: search volume, competition, CPC, volume history).
 
 ## 3. UI & Style Guidelines (Ref: styleguide.md)
@@ -1072,3 +1072,34 @@ Migrated all 8 Express API routes from `server.mjs` to Vercel serverless functio
 1. Update Supabase views that reference dropped columns, then run the migration
 2. Drop `seo_mode` from `listings_global_eval` (requires updating save-seo edge function first)
 3. Clean up save-seo edge function: remove multi-mode loop, simplify to single balanced mode
+
+## Session: 2026-03-22 — Multi-Provider AI Configuration
+
+### Changes
+- Implemented multi-provider AI model configuration system (branch: `ai-provider-config`)
+- Created `system_ai_models` table (catalog of 7 models: Gemini, Anthropic, OpenAI)
+- Created `system_ai_config` table (6 task→model assignments with temperature, max_tokens, is_vision)
+- Built provider abstraction layer:
+  - `lib/ai/types.ts` — shared `AICallParams` + `AIResponse` interfaces
+  - `lib/ai/adapters/gemini-adapter.ts` — preserves safety settings, JSON response mode, systemInstruction, URL-to-base64 vision
+  - `lib/ai/adapters/anthropic-adapter.ts` — lazy-init, clear error on missing key
+  - `lib/ai/adapters/openai-adapter.ts` — lazy-init, clear error on missing key
+  - `lib/ai/provider-router.ts` — `runAI(taskKey, prompt, options)` with 60s in-memory config cache
+- Migrated all production AI calls to `runAI()`:
+  - `api/seo/analyze-image.ts` → `vision_analysis` + `taxonomy_mapping`
+  - `api/seo/generate-draft.ts` → `draft_generation`
+  - `lib/seo/generate-keyword-pool.ts` → `keyword_generation`
+  - `lib/seo/score-keywords.ts` → `niche_scoring` + `transactional_scoring`
+  - `server.mjs` → all three AI call sites
+- Deleted dead code: `lib/seo/niche-scoring.ts`, `lib/seo/transactional-scoring.ts` (superseded by `score-keywords.ts`)
+- Added Admin UI: `AIModelConfig.jsx` component as 5th accordion in AdminSystemPage
+- Installed `@anthropic-ai/sdk` and `openai` SDKs
+- All admin accordions now collapsed by default
+
+### Architecture State
+- All AI calls route through `runAI()` → reads `system_ai_config` → selects adapter → returns unified `AIResponse`
+- Config cached 60s in-memory; `clearAIConfigCache()` available for admin saves
+- Gemini works immediately (GOOGLE_API_KEY already configured)
+- Anthropic/OpenAI adapters exist but throw helpful errors until API keys are added
+- `lib/ai/gemini.ts` still exists for test files but is no longer imported by production code
+- Default model for all tasks: `gemini-2.5-flash`
