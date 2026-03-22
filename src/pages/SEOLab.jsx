@@ -1576,10 +1576,6 @@ const SEOLab = () => {
                                 Stale
                               </span>
                             </>
-                          ) : daysSinceSync > 21 ? (
-                            <span className="text-xs text-amber-400 font-medium" title={`Getting stale — last synced: ${syncDate.toLocaleDateString()}`}>
-                              {shortDate}
-                            </span>
                           ) : (
                             <span className="text-xs text-slate-400 font-medium" title={`Last synced: ${syncDate.toLocaleDateString()}`}>
                               {shortDate}
