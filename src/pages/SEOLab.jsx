@@ -523,29 +523,6 @@ function ActionMenuItem({ icon, label, onClick, disabled, danger }) {
   );
 }
 
-// --- Opportunity Score ---
-function computeKeywordScore(kw, isTrending, isEvergreen) {
-  const volume = kw.last_volume || 0;
-  const competition = parseFloat(kw.last_competition) || 0;
-  const cpc = parseFloat(kw.last_cpc) || 0;
-
-  // Volume score (0-35 points) — logarithmic scale
-  const volScore = volume > 0
-    ? Math.min(35, Math.round((Math.log10(volume) / Math.log10(50000)) * 35))
-    : 0;
-
-  // Competition score (0-35 points) — inverted, lower = better
-  const compScore = Math.round((1 - Math.min(competition, 1)) * 35);
-
-  // CPC score (0-20 points) — higher = more commercial value
-  const cpcScore = Math.min(20, Math.round((Math.min(cpc, 3) / 3) * 20));
-
-  // Trend bonus (0-10 points)
-  const trendBonus = isTrending ? 10 : (isEvergreen ? 5 : 0);
-
-  return Math.min(100, volScore + compScore + cpcScore + trendBonus);
-}
-
 // --- Main Page ---
 const SEOLab = () => {
   const { user } = useAuth();
@@ -559,7 +536,7 @@ const SEOLab = () => {
   const [showGemSettings, setShowGemSettings] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPresetForKeywords, setEditingPresetForKeywords] = useState(null); // stores the full preset object when editing
-  const [sortField, setSortField] = useState('_score'); // default: best keywords first
+  const [sortField, setSortField] = useState('last_volume'); // default: most popular first
   const [sortDirection, setSortDirection] = useState('desc'); // 'asc' | 'desc'
   
   // Pagination State
@@ -837,7 +814,6 @@ const SEOLab = () => {
         _used_in_count: usage.listing_count || 0,
         _is_trending: isTrending,
         _is_evergreen: isEvergreen,
-        _score: computeKeywordScore(kw, isTrending, isEvergreen),
       };
     });
   }, [keywords, usageMap]);
@@ -1008,9 +984,9 @@ const SEOLab = () => {
   // Bulk export CSV
   function handleBulkExportCSV() {
     const selected = enrichedKeywords.filter(kw => selectedIds.has(kw.id));
-    const headers = ['Tag', 'Score', 'Theme', 'Niche', 'Sub-niche', 'Volume', 'Competition', 'CPC', 'Used In'];
+    const headers = ['Tag', 'Theme', 'Niche', 'Sub-niche', 'Volume', 'Competition', 'CPC', 'Used In'];
     const rows = selected.map(kw => [
-      kw.tag, kw._score || '', kw.theme || '', kw.niche || '', kw.sub_niche || '',
+      kw.tag, kw.theme || '', kw.niche || '', kw.sub_niche || '',
       kw.last_volume || '', kw.last_competition || '', kw.last_cpc || '', kw._used_in_count || 0,
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
@@ -1088,7 +1064,6 @@ const SEOLab = () => {
         case 'last_volume': return kw.last_volume || 0;
         case 'last_competition': return parseFloat(kw.last_competition) || 0;
         case 'last_cpc': return parseFloat(kw.last_cpc) || 0;
-        case '_score': return kw._score || 0;
         case '_used_in_count': return kw._used_in_count || 0;
         case 'last_sync_at': return kw.last_sync_at ? new Date(kw.last_sync_at).getTime() : 0;
         default: return '';
@@ -1411,11 +1386,6 @@ const SEOLab = () => {
                       Tag <SortIcon field="tag" />
                     </button>
                   </th>
-                  <th className="w-[52px] py-3 text-center">
-                    <button onClick={() => toggleSort('_score')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-600 transition-colors">
-                      Score <SortIcon field="_score" />
-                    </button>
-                  </th>
                   <th className="w-[18%] py-3 px-2">
                     <button onClick={() => toggleSort('theme')} className="inline-flex items-center gap-1 hover:text-slate-600 transition-colors">
                       Niche <SortIcon field="theme" />
@@ -1453,7 +1423,7 @@ const SEOLab = () => {
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
                   <tr>
-                    <td colSpan="11" className="px-4 py-12 text-center">
+                    <td colSpan="10" className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <Loader2 size={24} className="text-indigo-500 animate-spin" />
                         <span className="text-sm text-slate-400">Loading your keyword bank...</span>
@@ -1462,7 +1432,7 @@ const SEOLab = () => {
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan="11" className="px-4 py-12 text-center">
+                    <td colSpan="10" className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center gap-2">
                         <Star size={28} className="text-slate-200" />
                         <p className="text-sm text-slate-400 font-medium">
@@ -1521,17 +1491,6 @@ const SEOLab = () => {
                               </span>
                             )}
                           </div>
-                        </td>
-
-                        {/* Score */}
-                        <td className="py-2.5 text-center">
-                          <span className={`inline-flex items-center justify-center w-8 h-6 rounded text-[10px] font-bold border ${
-                            kw._score >= 70 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                            : kw._score >= 40 ? 'bg-amber-50 text-amber-700 border-amber-100'
-                            : 'bg-slate-50 text-slate-500 border-slate-100'
-                          }`}>
-                            {kw._score}
-                          </span>
                         </td>
 
                         {/* Niche (merged Theme › Niche › Sub-niche) */}
