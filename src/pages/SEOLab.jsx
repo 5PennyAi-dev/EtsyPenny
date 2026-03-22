@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { FlaskConical, Star, Search, RefreshCw, Trash2, Pencil, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Gem, Settings2, X, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, ChevronLeft, Folder, Plus, Filter } from 'lucide-react';
+import { FlaskConical, Star, Search, RefreshCw, Trash2, Pencil, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Gem, Settings2, X, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, ChevronLeft, Folder, Plus, Filter, Flame, Leaf, BarChart3, Clock, Target, AlertCircle, Tag } from 'lucide-react';
 import Layout from '../components/Layout';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -485,6 +485,49 @@ const EditPresetKeywordsModal = ({ preset, isOpen, onClose, userKeywordBank, onS
   );
 };
 
+// --- Filter Pill Config ---
+const FILTER_PILL_CONFIG = [
+  { key: 'all',            label: 'All',              icon: Tag,          color: 'slate' },
+  { key: 'gems',           label: 'Gems',             icon: Gem,          color: 'emerald' },
+  { key: 'trending',       label: 'Trending',         icon: Flame,        color: 'amber' },
+  { key: 'highVolume',     label: 'High Volume',      icon: BarChart3,    color: 'blue' },
+  { key: 'lowCompetition', label: 'Low Competition',  icon: Target,       color: 'teal' },
+  { key: 'unused',         label: 'Unused',           icon: AlertCircle,  color: 'rose' },
+  { key: 'stale',          label: 'Stale',            icon: Clock,        color: 'slate' },
+];
+
+const FILTER_COLORS = {
+  slate:   { active: 'bg-slate-100 text-slate-700 border-slate-300',     badge: 'bg-slate-200 text-slate-800' },
+  emerald: { active: 'bg-emerald-100 text-emerald-700 border-emerald-300', badge: 'bg-emerald-200 text-emerald-800' },
+  amber:   { active: 'bg-amber-100 text-amber-700 border-amber-300',     badge: 'bg-amber-200 text-amber-800' },
+  blue:    { active: 'bg-blue-100 text-blue-700 border-blue-300',        badge: 'bg-blue-200 text-blue-800' },
+  teal:    { active: 'bg-teal-100 text-teal-700 border-teal-300',        badge: 'bg-teal-200 text-teal-800' },
+  rose:    { active: 'bg-rose-100 text-rose-700 border-rose-300',        badge: 'bg-rose-200 text-rose-800' },
+};
+
+// --- Opportunity Score ---
+function computeKeywordScore(kw, isTrending, isEvergreen) {
+  const volume = kw.last_volume || 0;
+  const competition = parseFloat(kw.last_competition) || 0;
+  const cpc = parseFloat(kw.last_cpc) || 0;
+
+  // Volume score (0-35 points) — logarithmic scale
+  const volScore = volume > 0
+    ? Math.min(35, Math.round((Math.log10(volume) / Math.log10(50000)) * 35))
+    : 0;
+
+  // Competition score (0-35 points) — inverted, lower = better
+  const compScore = Math.round((1 - Math.min(competition, 1)) * 35);
+
+  // CPC score (0-20 points) — higher = more commercial value
+  const cpcScore = Math.min(20, Math.round((Math.min(cpc, 3) / 3) * 20));
+
+  // Trend bonus (0-10 points)
+  const trendBonus = isTrending ? 10 : (isEvergreen ? 5 : 0);
+
+  return Math.min(100, volScore + compScore + cpcScore + trendBonus);
+}
+
 // --- Main Page ---
 const SEOLab = () => {
   const { user } = useAuth();
@@ -498,8 +541,8 @@ const SEOLab = () => {
   const [showGemSettings, setShowGemSettings] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPresetForKeywords, setEditingPresetForKeywords] = useState(null); // stores the full preset object when editing
-  const [sortField, setSortField] = useState(null); // null = no sort (default order)
-  const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
+  const [sortField, setSortField] = useState('_score'); // default: best keywords first
+  const [sortDirection, setSortDirection] = useState('desc'); // 'asc' | 'desc'
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -508,7 +551,13 @@ const SEOLab = () => {
   // Advanced Filters
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ theme: '', niche: '', subNiche: '' });
-  
+
+  // Filter pills
+  const [activePills, setActivePills] = useState([]);
+
+  // Usage data from v_keyword_usage_count
+  const [usageMap, setUsageMap] = useState({});
+
   const gemSettingsRef = useRef(null);
 
   // Gem thresholds with Supabase persistence
@@ -615,6 +664,23 @@ const SEOLab = () => {
       setIsPresetsLoading(false);
     };
     fetchBankAndPresets();
+  }, [user?.id]);
+
+  // Fetch keyword usage counts + trending/evergreen flags
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchUsage = async () => {
+      const { data, error } = await supabase
+        .from('v_keyword_usage_count')
+        .select('tag, listing_count, is_trending, is_evergreen')
+        .eq('user_id', user.id);
+      if (!error && data) {
+        const map = {};
+        data.forEach(r => { map[r.tag.toLowerCase()] = r; });
+        setUsageMap(map);
+      }
+    };
+    fetchUsage();
   }, [user?.id]);
 
   // Inline update handler
@@ -736,24 +802,54 @@ const SEOLab = () => {
     }
   };
 
+  // Enrich keywords with computed fields
+  const enrichedKeywords = useMemo(() => {
+    return keywords.map(kw => {
+      const usage = usageMap[kw.tag?.toLowerCase()] || {};
+      const isTrending = usage.is_trending || false;
+      const isEvergreen = usage.is_evergreen || false;
+      return {
+        ...kw,
+        _used_in_count: usage.listing_count || 0,
+        _is_trending: isTrending,
+        _is_evergreen: isEvergreen,
+        _score: computeKeywordScore(kw, isTrending, isEvergreen),
+      };
+    });
+  }, [keywords, usageMap]);
+
   // Filtered keywords
   const filtered = useMemo(() => {
     if (view === 'presets') {
-      return presets.filter(p => !searchQuery || 
+      return presets.filter(p => !searchQuery ||
         p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.niche && p.niche.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
 
-    return keywords.filter(kw => {
-      // Base search
-      const matchesSearch = !searchQuery || 
+    return enrichedKeywords.filter(kw => {
+      // 1. Filter pills (AND logic)
+      if (activePills.length > 0) {
+        for (const pill of activePills) {
+          switch (pill) {
+            case 'gems':           if (!isGem(kw)) return false; break;
+            case 'trending':       if (!kw._is_trending) return false; break;
+            case 'highVolume':     if ((kw.last_volume || 0) < 5000) return false; break;
+            case 'lowCompetition': { const c = parseFloat(kw.last_competition); if (isNaN(c) || c >= 0.5) return false; break; }
+            case 'unused':         if (kw._used_in_count > 0) return false; break;
+            case 'stale':          if (getFreshnessStatus(kw.last_sync_at).label !== 'Expired') return false; break;
+          }
+        }
+      }
+
+      // 2. Base search
+      const matchesSearch = !searchQuery ||
         kw.tag.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (kw.theme && kw.theme.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (kw.niche && kw.niche.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (kw.sub_niche && kw.sub_niche.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      // Gem filtering
+      // 3. Gem panel filtering
       const checkComp = kw.last_competition != null ? parseFloat(kw.last_competition) : Infinity;
       const checkCpc = kw.last_cpc != null ? parseFloat(kw.last_cpc) : 0;
       const matchesGem = !showGemSettings || (
@@ -762,14 +858,14 @@ const SEOLab = () => {
         checkCpc >= gemThresholds.minCpc
       );
 
-      // Advanced Category Filters
+      // 4. Advanced Category Filters
       const matchesTheme = !filters.theme || kw.theme === filters.theme;
       const matchesNiche = !filters.niche || kw.niche === filters.niche;
       const matchesSubNiche = !filters.subNiche || kw.sub_niche === filters.subNiche;
 
       return matchesSearch && matchesGem && matchesTheme && matchesNiche && matchesSubNiche;
     });
-  }, [keywords, presets, searchQuery, view, showGemSettings, gemThresholds, filters]);
+  }, [enrichedKeywords, presets, searchQuery, view, showGemSettings, gemThresholds, filters, activePills]);
     
   // Filtered presets
   const filteredPresets = view === 'presets' && searchQuery.trim()
@@ -849,6 +945,20 @@ const SEOLab = () => {
     setCurrentPage(1);
   };
 
+  // Toggle filter pill
+  const togglePill = (key) => {
+    if (key === 'all') {
+      setActivePills([]);
+    } else {
+      setActivePills(prev =>
+        prev.includes(key)
+          ? prev.filter(k => k !== key)
+          : [...prev, key]
+      );
+    }
+    setCurrentPage(1);
+  };
+
   // Sorted data
   const sorted = (() => {
     if (!sortField) return filtered;
@@ -861,6 +971,8 @@ const SEOLab = () => {
         case 'last_volume': return kw.last_volume || 0;
         case 'last_competition': return parseFloat(kw.last_competition) || 0;
         case 'last_cpc': return parseFloat(kw.last_cpc) || 0;
+        case '_score': return kw._score || 0;
+        case '_used_in_count': return kw._used_in_count || 0;
         case 'last_sync_at': return kw.last_sync_at ? new Date(kw.last_sync_at).getTime() : 0;
         case 'updated_at': return kw.updated_at ? new Date(kw.updated_at).getTime() : 0;
         default: return '';
@@ -878,10 +990,10 @@ const SEOLab = () => {
     });
   })();
 
-  // Reset pagination on search, sort, or view change
+  // Reset pagination on search, sort, filter, or view change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, sortField, sortDirection, view, filters]);
+  }, [searchQuery, sortField, sortDirection, view, filters, activePills]);
 
   // Pagination Logic
   const startIndex = (currentPage - 1) * pageSize;
@@ -889,10 +1001,25 @@ const SEOLab = () => {
   const paginatedKeywords = sorted.slice(startIndex, endIndex);
   const totalPages = Math.ceil(sorted.length / pageSize) || 1;
 
-  // Stats
-  const totalCount = keywords.length;
-  const highPotentialCount = keywords.filter(k => isGem(k)).length;
-  const oldDataCount = keywords.filter(k => getFreshnessStatus(k.last_sync_at).label === 'Expired').length;
+  // Pill counts (computed from enriched keywords for accurate counts)
+  const pillCounts = useMemo(() => {
+    const counts = {};
+    FILTER_PILL_CONFIG.forEach(f => {
+      if (f.key === 'all') { counts.all = enrichedKeywords.length; return; }
+      counts[f.key] = enrichedKeywords.filter(kw => {
+        switch (f.key) {
+          case 'gems':           return isGem(kw);
+          case 'trending':       return kw._is_trending;
+          case 'highVolume':     return (kw.last_volume || 0) >= 5000;
+          case 'lowCompetition': { const c = parseFloat(kw.last_competition); return !isNaN(c) && c < 0.5; }
+          case 'unused':         return kw._used_in_count === 0;
+          case 'stale':          return getFreshnessStatus(kw.last_sync_at).label === 'Expired';
+          default: return true;
+        }
+      }).length;
+    });
+    return counts;
+  }, [enrichedKeywords, gemThresholds]);
 
   return (
     <Layout>
@@ -937,37 +1064,34 @@ const SEOLab = () => {
           </button>
         </div>
 
-        {/* Stats Cards - Only on keywords view */}
+        {/* Filter Pills - Only on keywords view */}
         {view === 'keywords' && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-indigo-50">
-              <Star size={20} className="text-indigo-600" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Keywords</p>
-              <p className="text-2xl font-black text-slate-900">{totalCount}</p>
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {FILTER_PILL_CONFIG.map(({ key, label, icon: Icon, color }) => {
+              const isActive = key === 'all' ? activePills.length === 0 : activePills.includes(key);
+              const colors = FILTER_COLORS[color];
+              const count = pillCounts[key] || 0;
+              return (
+                <button
+                  key={key}
+                  onClick={() => togglePill(key)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    isActive
+                      ? colors.active
+                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {Icon && <Icon size={13} />}
+                  {label}
+                  <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                    isActive ? colors.badge : 'bg-slate-100 text-slate-400'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-emerald-50">
-              <TrendingUp size={20} className="text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">High Potential</p>
-              <p className="text-2xl font-black text-slate-900">{highPotentialCount}</p>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-rose-50">
-              <RefreshCw size={20} className="text-rose-600" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Old Data (&gt;30d)</p>
-              <p className="text-2xl font-black text-slate-900">{oldDataCount}</p>
-            </div>
-          </div>
-        </div>
         )}
 
         {/* Search Bar + Gem Settings / Create Preset */}
@@ -1158,59 +1282,69 @@ const SEOLab = () => {
               <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3 font-semibold w-[20%]">
+                  <th className="px-4 py-3 font-semibold w-[16%]">
                     <button onClick={() => toggleSort('tag')} className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors">
                       Tag <SortIcon field="tag" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 font-semibold w-[12%]">
+                  <th className="px-3 py-3 text-center font-semibold w-[5%]">
+                    <button onClick={() => toggleSort('_score')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-700 transition-colors">
+                      Score <SortIcon field="_score" />
+                    </button>
+                  </th>
+                  <th className="px-3 py-3 font-semibold w-[10%]">
                     <button onClick={() => toggleSort('theme')} className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors">
                       Theme <SortIcon field="theme" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 font-semibold w-[12%]">
+                  <th className="px-3 py-3 font-semibold w-[10%]">
                     <button onClick={() => toggleSort('niche')} className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors">
                       Niche <SortIcon field="niche" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 font-semibold w-[12%]">
+                  <th className="px-3 py-3 font-semibold w-[10%]">
                     <button onClick={() => toggleSort('sub_niche')} className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors">
                       Sub-niche <SortIcon field="sub_niche" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 text-center font-semibold w-[8%]">
+                  <th className="px-3 py-3 text-center font-semibold w-[7%]">
                     <button onClick={() => toggleSort('last_volume')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-700 transition-colors">
                       Volume <SortIcon field="last_volume" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 text-center font-semibold w-[9%]">
+                  <th className="px-3 py-3 text-center font-semibold w-[8%]">
                     <button onClick={() => toggleSort('last_competition')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-700 transition-colors">
-                      Competition <SortIcon field="last_competition" />
+                      Comp. <SortIcon field="last_competition" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 text-center font-semibold w-[7%]">
+                  <th className="px-3 py-3 text-center font-semibold w-[6%]">
                     <button onClick={() => toggleSort('last_cpc')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-700 transition-colors">
                       CPC <SortIcon field="last_cpc" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 text-center font-semibold w-[10%]">Trend</th>
-                  <th className="px-3 py-3 text-center font-semibold w-[8%]">
+                  <th className="px-3 py-3 text-center font-semibold w-[5%]">
+                    <button onClick={() => toggleSort('_used_in_count')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-700 transition-colors">
+                      Used <SortIcon field="_used_in_count" />
+                    </button>
+                  </th>
+                  <th className="px-3 py-3 text-center font-semibold w-[8%]">Trend</th>
+                  <th className="px-3 py-3 text-center font-semibold w-[6%]">
                     <button onClick={() => toggleSort('last_sync_at')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-700 transition-colors">
-                      Freshness <SortIcon field="last_sync_at" />
+                      Fresh <SortIcon field="last_sync_at" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 text-center font-semibold w-[10%]">
+                  <th className="px-3 py-3 text-center font-semibold w-[8%]">
                     <button onClick={() => toggleSort('updated_at')} className="inline-flex items-center gap-1 justify-center w-full hover:text-slate-700 transition-colors">
-                      Last Updated <SortIcon field="updated_at" />
+                      Updated <SortIcon field="updated_at" />
                     </button>
                   </th>
-                  <th className="px-3 py-3 text-center font-semibold w-[8%]">Actions</th>
+                  <th className="px-3 py-3 text-center font-semibold w-[6%]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
                   <tr>
-                    <td colSpan="10" className="px-4 py-12 text-center">
+                    <td colSpan="13" className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <Loader2 size={24} className="text-indigo-500 animate-spin" />
                         <span className="text-sm text-slate-400">Loading your keyword bank...</span>
@@ -1219,7 +1353,7 @@ const SEOLab = () => {
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="px-4 py-12 text-center">
+                    <td colSpan="13" className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center gap-2">
                         <Star size={28} className="text-slate-200" />
                         <p className="text-sm text-slate-400 font-medium">
@@ -1241,17 +1375,38 @@ const SEOLab = () => {
                       <tr key={kw.id} className="hover:bg-slate-50/60 transition-colors group">
                         {/* Tag */}
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <Star size={14} className="fill-amber-400 text-amber-400 shrink-0" />
-                            <span className="font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors px-3 py-1 rounded-full text-xs cursor-default truncate max-w-[200px]" title={kw.tag}>
+                            <span className="font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors px-3 py-1 rounded-full text-xs cursor-default truncate max-w-[180px]" title={kw.tag}>
                                 {kw.tag}
                             </span>
                             {isGem(kw) && (
                               <span title="Meets your High Potential criteria">
-                                <Gem size={14} className="text-indigo-500 shrink-0" />
+                                <Gem size={13} className="text-indigo-500 shrink-0" />
+                              </span>
+                            )}
+                            {kw._is_trending && (
+                              <span title="Trending across your listings">
+                                <Flame size={13} className="text-rose-500 shrink-0" />
+                              </span>
+                            )}
+                            {kw._is_evergreen && (
+                              <span title="Evergreen keyword">
+                                <Leaf size={13} className="text-emerald-500 shrink-0" />
                               </span>
                             )}
                           </div>
+                        </td>
+
+                        {/* Score */}
+                        <td className="px-3 py-3 text-center">
+                          <span className={`inline-flex items-center justify-center w-8 h-6 rounded text-[10px] font-bold border ${
+                            kw._score >= 70 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                            : kw._score >= 40 ? 'bg-amber-50 text-amber-700 border-amber-100'
+                            : 'bg-slate-50 text-slate-500 border-slate-100'
+                          }`}>
+                            {kw._score}
+                          </span>
                         </td>
 
                         {/* Theme (editable) */}
@@ -1317,6 +1472,21 @@ const SEOLab = () => {
                               </span>
                             );
                           })()}
+                        </td>
+
+                        {/* Used In */}
+                        <td className="px-3 py-3 text-center">
+                          {kw._used_in_count === 0 ? (
+                            <span className="text-slate-300 text-xs">—</span>
+                          ) : (
+                            <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              kw._used_in_count >= 3
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                            }`}>
+                              {kw._used_in_count}
+                            </span>
+                          )}
                         </td>
 
                         {/* Trend */}
