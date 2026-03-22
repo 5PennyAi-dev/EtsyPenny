@@ -1103,3 +1103,35 @@ Migrated all 8 Express API routes from `server.mjs` to Vercel serverless functio
 - Anthropic/OpenAI adapters exist but throw helpful errors until API keys are added
 - `lib/ai/gemini.ts` still exists for test files but is no longer imported by production code
 - Default model for all tasks: `gemini-2.5-flash`
+
+## Session: 2026-03-22 — Dashboard Rebuild (Status-Driven Pipeline)
+
+### Changes
+- Complete dashboard rebuild: replaced basic metrics dashboard with action-oriented, status-driven pipeline dashboard (branch: `feat/dashboard-rebuild`)
+- Created 4 new Supabase views via migration:
+  - `v_listing_status` — computes listing status (NEW/ANALYZED/SEO_READY/DRAFT_READY/OPTIMIZED) dynamically from actual data (not status_id column)
+  - `v_dashboard_status_counts` — aggregated status counts + avg scores per user
+  - `v_dashboard_listings` — listings with computed status + action priority ordering
+  - `v_dashboard_trending` — trending/promising keywords across user's listings
+- Created `src/lib/listingStatuses.js` — shared status config (colors, icons, labels, actions, barColors) + STATUS_PIPELINE array
+- Created 7 new dashboard components:
+  - `QuickStats.jsx` — 4 metric cards (total listings, avg SEO score, fully optimized, credits)
+  - `PipelineBar.jsx` — horizontal stacked bar with proportional segments per status
+  - `NextActions.jsx` — action queue showing what to do next, with "needs work" warning
+  - `ShopHealth.jsx` — RadialGauge + 2x2 sub-metrics (reuses existing RadialGauge)
+  - `KeywordBankStats.jsx` — keyword bank summary (saved, presets, gems) + link to SEO Lab
+  - `ListingsTable.jsx` — priority-sorted table with thumbnails, score pills, status pills, action buttons
+  - `TrendingKeywords.jsx` — trending keyword cards with volume/competition metrics
+- Removed old components: `PerformanceCard.jsx`, `MarketInsights.jsx`
+- Kept `RadialGauge.jsx` unchanged (reused by ShopHealth)
+- Dashboard.jsx features: loading skeleton, empty state for new users, Etsy connection banner placeholder
+- Visual polish pass: font-semibold for numbers, uppercase section labels, consistent card styling, score threshold corrections
+- All action buttons navigate to Product Studio with listing ID
+- Created test user (christian.couillard@gmail.com) with mock data: 30 listings across all 5 pipeline statuses + 48 keyword bank entries + 3 presets
+- Created `scripts/seed-dashboard-mock.sql` and `scripts/cleanup-dashboard-mock.sql`
+
+### Architecture State
+- Dashboard queries 4 new views + keyword bank counts in parallel via Promise.all
+- Computed status logic is view-based (no new columns needed) — derives from: has generated_title+description → OPTIMIZED, has 13+ is_current_eval → DRAFT_READY, has is_current_pool → SEO_READY, is_image_analysed → ANALYZED, else NEW
+- Old views (`view_user_performance_stats`, `view_listing_scores`) kept for backward compatibility
+- Navigation pattern: `navigate('/studio', { state: { listingId } })` matches existing ProductStudio location.state handling

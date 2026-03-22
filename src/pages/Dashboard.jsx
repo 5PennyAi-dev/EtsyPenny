@@ -1,231 +1,242 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import Layout from '../components/Layout';
-import PerformanceCard from '../components/dashboard/PerformanceCard';
-import MarketInsights from '../components/dashboard/MarketInsights';
-import { 
-  Plus, 
-  ShoppingBag,
-  ArrowRight,
-  Package
-} from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+import Layout from '@/components/Layout';
+import QuickStats from '@/components/dashboard/QuickStats';
+import PipelineBar from '@/components/dashboard/PipelineBar';
+import NextActions from '@/components/dashboard/NextActions';
+import ShopHealth from '@/components/dashboard/ShopHealth';
+import KeywordBankStats from '@/components/dashboard/KeywordBankStats';
+import ListingsTable from '@/components/dashboard/ListingsTable';
+import TrendingKeywords from '@/components/dashboard/TrendingKeywords';
+import { Plus, Sparkles } from 'lucide-react';
 
-const Dashboard = () => {
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-5">
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white border border-slate-200 rounded-xl p-4">
+            <div className="h-3 bg-slate-200 rounded animate-pulse w-20 mb-2" />
+            <div className="h-6 bg-slate-200 rounded animate-pulse w-12" />
+          </div>
+        ))}
+      </div>
+      {/* Pipeline bar */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4">
+        <div className="h-6 bg-slate-200 rounded-lg animate-pulse mb-3" />
+        <div className="flex gap-2">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-5 bg-slate-200 rounded-full animate-pulse w-16" />
+          ))}
+        </div>
+      </div>
+      {/* Next actions */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <div className="w-7 h-7 bg-slate-200 rounded-lg animate-pulse" />
+            <div className="h-4 bg-slate-200 rounded animate-pulse flex-1" />
+            <div className="h-6 bg-slate-200 rounded animate-pulse w-16" />
+          </div>
+        ))}
+      </div>
+      {/* Two-col */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-white border border-slate-200 rounded-xl p-6 h-48 animate-pulse" />
+        <div className="bg-white border border-slate-200 rounded-xl p-6 h-48 animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
+export default function Dashboard() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [recentListings, setRecentListings] = useState([]);
-  const [performanceStats, setPerformanceStats] = useState(null);
-  const [statsLoading, setStatsLoading] = useState(true);
+  const [statusCounts, setStatusCounts] = useState(null);
+  const [listings, setListings] = useState([]);
+  const [trending, setTrending] = useState([]);
+  const [bankStats, setBankStats] = useState({ keywords: 0, presets: 0, gems: 0 });
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (!user) return;
-
-      try {
-        setLoading(true);
-
-        // Fetch Recent Listings
-        const { data: listingsData, error: listingsError } = await supabase
-          .from('view_listing_scores')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        if (listingsError) throw listingsError;
-        setRecentListings(listingsData || []);
-
-        // Fetch Performance Stats
-        const { data: statsData, error: statsError } = await supabase
-          .from('view_user_performance_stats')
-          .select('avg_strength, avg_visibility, avg_relevance, avg_conversion, avg_competition, avg_competition_all, avg_competition2, avg_profit, avg_cpc, avg_raw_visibility_index, listings_needing_fix, total_listings')
-          .eq('user_id', user.id)
-          .single();
-
-        if (statsError && statsError.code !== 'PGRST116') {
-          console.error('Error fetching performance stats:', statsError);
-        }
-        setPerformanceStats(statsData);
-
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setLoading(false);
-        setStatsLoading(false);
-      }
-    };
-
+    if (!user) return;
     fetchDashboardData();
   }, [user]);
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center h-screen bg-slate-50">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-        </div>
-      </Layout>
-    );
+  async function fetchDashboardData() {
+    setLoading(true);
+    try {
+      const [countsRes, listingsRes, trendingRes, bankRes, presetsRes, gemsRes] = await Promise.all([
+        supabase
+          .from('v_dashboard_status_counts')
+          .select('*')
+          .eq('user_id', user.id)
+          .single(),
+        supabase
+          .from('v_dashboard_listings')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('action_priority', { ascending: true })
+          .order('listing_strength', { ascending: true, nullsFirst: true })
+          .limit(10),
+        supabase
+          .from('v_dashboard_trending')
+          .select('*')
+          .eq('user_id', user.id)
+          .limit(6),
+        supabase
+          .from('user_keyword_bank')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+        supabase
+          .from('keyword_presets')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+        supabase
+          .from('user_keyword_bank')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .gte('last_volume', 1000)
+          .lte('last_competition', 0.4)
+          .gte('last_cpc', 1.0),
+      ]);
+
+      setStatusCounts(countsRes.data || {});
+      setListings(listingsRes.data || []);
+      setTrending(trendingRes.data || []);
+      setBankStats({
+        keywords: bankRes.count || 0,
+        presets: presetsRes.count || 0,
+        gems: gemsRes.count || 0,
+      });
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleListingAction(listingId, status) {
+    if (listingId) {
+      navigate('/studio', { state: { listingId, fromDashboard: true } });
+    } else {
+      navigate('/studio');
+    }
+  }
+
+  function handleNewListing() {
+    navigate('/studio', { state: { newListing: true } });
   }
 
   return (
     <Layout>
-      <div className="min-h-screen bg-slate-50 p-8">
-        <div className="max-w-7xl mx-auto space-y-8">
-          
-          {/* 1. Welcome Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="min-h-screen bg-slate-50 px-6 lg:px-8 py-6">
+        <div className="space-y-5">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-5">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-                Welcome back, {profile?.shop_name || profile?.full_name || 'Entrepreneur'} ! 👋
+              <p className="text-sm text-slate-500">Dashboard</p>
+              <h1 className="text-2xl font-medium text-slate-800">
+                Hello, {(profile?.full_name || 'there').replace(/\s*\(Test\)\s*/, '')}!
               </h1>
-              <p className="text-slate-500 mt-1">
-                Here's how your shop is performing today.
+            </div>
+            <button
+              onClick={handleNewListing}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              New listing
+            </button>
+          </div>
+
+          {loading ? (
+            <DashboardSkeleton />
+          ) : (statusCounts?.total_listings || 0) === 0 ? (
+            /* Empty state */
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mb-4">
+                <Sparkles className="w-8 h-8 text-indigo-600" />
+              </div>
+              <h2 className="text-xl font-medium text-slate-800 mb-2">Welcome to PennySEO</h2>
+              <p className="text-slate-500 mb-6 max-w-md">
+                Upload your first product mockup to get AI-powered SEO keywords,
+                optimized titles, and descriptions for your Etsy listings.
               </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link 
-                to="/studio" 
-                state={{ newListing: true }}
-                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg shadow-sm hover:bg-indigo-700 hover:shadow-md transition-all active:scale-95"
+              <button
+                onClick={handleNewListing}
+                className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition-colors"
               >
-                <Plus size={18} />
-                New Listing ✨
-              </Link>
+                Create your first listing
+              </button>
             </div>
-          </div>
-
-          {/* 2. Performance Card (Shop Health) */}
-          <PerformanceCard stats={performanceStats} loading={statsLoading} />
-
-          {/* 3. Market Insights */}
-          <MarketInsights stats={performanceStats} />
-
-          {/* 3. Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            {/* Recent Activity (Col-span 8) */}
-            <div className="lg:col-span-8 space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900">Recent Optimizations</h2>
-                <Link to="/history" className="text-sm font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
-                  View all <ArrowRight size={14} />
-                </Link>
+          ) : (
+            <>
+              {/* Etsy connection banner */}
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-sm text-slate-600">Etsy shop not connected</span>
+                <span className="ml-auto text-sm text-slate-400 font-medium">
+                  Coming soon
+                </span>
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                {recentListings.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead className="bg-slate-50 border-b border-slate-100">
-                        <tr>
-                          <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Listing</th>
-                          <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Niche</th>
-                          <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Score</th>
-                          <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {recentListings.map((listing) => (
-                          <tr 
-                            key={listing.listing_id} 
-                            className="hover:bg-slate-50/50 transition-colors group cursor-pointer" 
-                            onClick={() => navigate('/studio', { state: { listingId: listing.listing_id } })}
-                          >
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                {listing.image_url ? (
-                                  <img src={listing.image_url} alt="" className="w-10 h-10 rounded-lg object-cover bg-slate-100 border border-slate-200" />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
-                                    <ShoppingBag size={18} />
-                                  </div>
-                                )}
-                                <div>
-                                  <p className={`text-sm font-medium max-w-[200px] truncate ${
-                                    listing.status === 'New' ? 'text-slate-500' : 'text-slate-900'
-                                  }`} title={listing.title}>
-                                    {listing.title || 'Untitled Listing'}
-                                  </p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                {listing.niche_name || 'General'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-bold 
-                                ${(listing.listing_score || 0) >= 80 ? 'bg-emerald-100 text-emerald-700' :
-                                  (listing.listing_score || 0) >= 50 ? 'bg-indigo-100 text-indigo-700' :
-                                  (listing.listing_score || 0) > 0 ? 'bg-amber-100 text-amber-700' :
-                                  'bg-slate-100 text-slate-500'}`}>
-                                {listing.listing_score ? Math.round(listing.listing_score) : 'N/A'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                                listing.status === 'Listing completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                listing.status === 'SEO analysis completed' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                                'bg-slate-100 text-slate-600 border-slate-200'
-                              }`}>
-                                {listing.status || 'New'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="p-12 text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 text-slate-400 mb-4">
-                      <Package size={32} />
-                    </div>
-                    <h3 className="text-lg font-medium text-slate-900">Welcome to PennySEO!</h3>
-                    <p className="text-slate-500 mt-2 max-w-sm mx-auto">
-                      Your dashboard is ready. Launch your first analysis to see your stats appear.
-                    </p>
-                    <Link 
-                      to="/studio" 
-                      state={{ newListing: true }}
-                      className="inline-flex items-center gap-2 px-4 py-2 mt-6 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                      <Plus size={16} />
-                      Create my first listing
-                    </Link>
-                  </div>
-                )}
+              <QuickStats
+                totalListings={statusCounts?.total_listings || 0}
+                createdThisMonth={statusCounts?.created_this_month || 0}
+                avgScore={statusCounts?.avg_seo_score}
+                optimizedCount={statusCounts?.count_optimized || 0}
+                creditsBalance={profile?.credits_balance || 0}
+                subscriptionCredits={profile?.subscription_credits_balance || 0}
+                bonusCredits={profile?.bonus_credits_balance || 0}
+              />
+
+              <PipelineBar
+                counts={{
+                  NEW: statusCounts?.count_new || 0,
+                  ANALYZED: statusCounts?.count_analyzed || 0,
+                  SEO_READY: statusCounts?.count_seo_ready || 0,
+                  DRAFT_READY: statusCounts?.count_draft_ready || 0,
+                  OPTIMIZED: statusCounts?.count_optimized || 0,
+                }}
+                total={statusCounts?.total_listings || 0}
+              />
+
+              <NextActions
+                counts={statusCounts}
+                onNavigate={handleListingAction}
+                onNewListing={handleNewListing}
+              />
+
+              {/* Two-column row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <ShopHealth
+                  avgScore={statusCounts?.avg_seo_score}
+                  avgVisibility={statusCounts?.avg_visibility}
+                  avgRelevance={statusCounts?.avg_relevance}
+                  avgConversion={statusCounts?.avg_conversion}
+                  avgCompetition={statusCounts?.avg_competition}
+                  listingsBelow50={statusCounts?.listings_below_50 || 0}
+                />
+                <KeywordBankStats
+                  keywords={bankStats.keywords}
+                  presets={bankStats.presets}
+                  gems={bankStats.gems}
+                />
               </div>
-            </div>
 
-            {/* Pro Tip Sidebar (Col-span 4) */}
-            <div className="lg:col-span-4 space-y-6">
-              <div className="bg-indigo-900 p-6 rounded-2xl shadow-sm text-white relative overflow-hidden">
-                <div className="relative z-10">
-                  <h3 className="font-bold text-lg mb-2">Pro Tip 💡</h3>
-                  <p className="text-indigo-100 text-sm leading-relaxed mb-4">
-                    Listings with descriptions over 150 words are 23% more likely to appear on the first page of Etsy search results.
-                  </p>
-                  <Link to="/studio" className="text-xs font-bold text-white uppercase tracking-wider border-b border-white/30 hover:border-white pb-0.5 transition-colors">
-                    Optimize now
-                  </Link>
-                </div>
-                {/* Decorative Blob */}
-                <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-indigo-500 rounded-full blur-2xl opacity-50"></div>
-              </div>
-            </div>
+              <ListingsTable
+                listings={listings}
+                onAction={handleListingAction}
+              />
 
-          </div>
-
+              <TrendingKeywords keywords={trending} />
+            </>
+          )}
         </div>
       </div>
     </Layout>
   );
-};
-
-export default Dashboard;
+}

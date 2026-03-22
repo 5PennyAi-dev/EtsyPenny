@@ -45,7 +45,8 @@ npm run preview   # Preview production build
 ### Key Directories
 - `src/pages/` — Full page components (ProductStudio, Dashboard, HistoryPage, BrandProfilePage, LoginPage, AdminSystemPage, UserSettings, SEOLab, LandingPage)
 - `src/components/studio/` — SEO Listings sub-components (OptimizationForm, ResultsDisplay, ImageUpload, StrategyTuner, FavoritesPickerModal, CreatePresetModal, SeoBadge, ProductTypeCombobox, etc.)
-- `src/components/dashboard/` — Dashboard widgets (PerformanceCard, MarketInsights, RadialGauge)
+- `src/components/dashboard/` — Dashboard widgets (QuickStats, PipelineBar, NextActions, ShopHealth, KeywordBankStats, ListingsTable, TrendingKeywords, RadialGauge)
+- `src/lib/listingStatuses.js` — Listing status config (LISTING_STATUSES, STATUS_PIPELINE, getStatusAction)
 - `src/components/admin/` — Admin panel components (TaxonomyManagement, ProductTypeManagement, AIModelConfig)
 - `src/components/settings/` — User settings components (UserTaxonomyManagement — custom themes/niches CRUD)
 - `src/components/ui/` — Reusable UI primitives (Accordion, ConfirmationModal)
@@ -131,7 +132,11 @@ Only one action still uses the n8n webhook (`VITE_N8N_WEBHOOK_URL_TEST`):
 - **`v_combined_product_types`** — Union view of system + user custom product types
 - **`v_combined_themes`** / **`v_combined_niches`** — Union views of system + user taxonomy
 - **`listings_global_info`** — View joining listings, statuses, and evaluations (used by HistoryPage)
-- **`view_user_performance_stats`** — Aggregated user-level performance metrics (used by Dashboard)
+- **`view_user_performance_stats`** — Aggregated user-level performance metrics (legacy, kept for safety)
+- **`v_listing_status`** — Computed listing status (NEW/ANALYZED/SEO_READY/DRAFT_READY/OPTIMIZED) from actual data
+- **`v_dashboard_status_counts`** — Aggregated status counts per user (used by Dashboard)
+- **`v_dashboard_listings`** — Individual listings with computed status and action priority (used by Dashboard)
+- **`v_dashboard_trending`** — Trending/promising keywords across user's listings (used by Dashboard)
 - **`v_user_seo_active_settings`** — View returning resolved user settings for API payloads
 
 ### Listing Status Flow
