@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-03-21*
+*Dernière mise à jour : 2026-03-22*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -1135,3 +1135,52 @@ Migrated all 8 Express API routes from `server.mjs` to Vercel serverless functio
 - Computed status logic is view-based (no new columns needed) — derives from: has generated_title+description → OPTIMIZED, has 13+ is_current_eval → DRAFT_READY, has is_current_pool → SEO_READY, is_image_analysed → ANALYZED, else NEW
 - Old views (`view_user_performance_stats`, `view_listing_scores`) kept for backward compatibility
 - Navigation pattern: `navigate('/studio', { state: { listingId } })` matches existing ProductStudio location.state handling
+
+---
+
+### March 22nd, 2026 — SEO Lab Phases 1-3: Filter Pills, Bulk Actions, Grouped View, Refresh Stale
+
+#### Phase 1: Smart Filter Pills & Data Enrichment
+- Replaced 3 static stat cards (Total Keywords, High Potential, Old Data) with 7 interactive filter pills: All, Gems, Trending, High Volume, Low Competition, Unused, Stale
+- Filter pills stack with AND logic — multiple pills can be active simultaneously
+- Added `v_keyword_usage_count` Supabase view (migration applied) — counts how many active listings use each keyword tag per user, plus aggregated `is_trending`/`is_evergreen` flags from `listing_seo_stats`
+- Added "Used In" column showing listing usage count per keyword (indigo pill for 1-2, emerald for 3+)
+- Added Trending (Flame icon) and Evergreen (Leaf icon) indicators in the Tag cell
+- Tailwind dynamic class purging handled via static `FILTER_COLORS` mapping object
+
+#### Phase 2: Bulk Actions, Column Consolidation, Enriched Actions
+- Merged Theme + Niche + Sub-niche → single "Niche" column with breadcrumb display (`Theme › Niche › Sub-niche`) and full path tooltip
+- Merged Freshness + Last Updated → single "Freshness" column showing date with Stale pill on hover
+- Added checkbox column with per-row and header select-all (operates on current page only, selection persists across pages)
+- Sticky bulk action bar with: Add to Preset, Export CSV, Refresh Stale, Delete
+- Added `preSelectedIds` prop to `CreatePresetModal` for pre-selecting keywords from bulk action
+- Replaced Refresh/Delete action icons with MoreHorizontal dropdown menu: Copy keyword, Add to preset, Refresh data (stale only), Remove from bank
+- Table layout: `table-fixed` with explicit column widths, `tabular-nums` for volume alignment
+
+#### Phase 3: Grouped View & Refresh Stale Keywords
+- **View Toggle**: List/Grouped segmented toggle next to search bar. Grouped view displays keywords in collapsible accordion sections organized by Theme › Niche
+- **Grouped View**: Per-group aggregate stats (avg volume, avg competition, gem count, usage ratio). Groups sorted by keyword count DESC, keywords within by volume DESC. No pagination. Framer Motion collapse/expand animation
+- **Refresh Stale Keywords**: New `POST /api/seo/refresh-keyword-bank` endpoint (Vercel serverless + server.mjs mirror). Calls `enrichKeywords()` from `lib/seo/enrich-keywords.ts` for fresh DataForSEO data, updates `user_keyword_bank` rows. Max 50 keywords per request
+- **Refresh UI**: Single keyword refresh via action menu, bulk refresh button in bulk bar, "Refresh all N stale" button when Stale filter pill is active. Loading state: row opacity + spinner in volume cell
+
+#### Key Constants & Patterns
+- `STALE_DAYS = 21` — single source of truth for stale threshold, used by filter pill and date color
+- `FILTER_PILL_CONFIG` + `FILTER_COLORS` — centralized filter pill definitions with static Tailwind classes
+- `enrichedKeywords` useMemo — enriches keywords with `_used_in_count`, `_is_trending`, `_is_evergreen` from `v_keyword_usage_count` view
+- Score column was added in Phase 1 then removed — opportunity score depends on listing context, not appropriate for context-free keyword bank
+
+#### Files Modified
+- `src/pages/SEOLab.jsx` — All 3 phases (filter pills, bulk actions, grouped view, refresh)
+- `src/components/studio/CreatePresetModal.jsx` — Added `preSelectedIds` prop
+- `api/seo/refresh-keyword-bank.ts` — New Vercel serverless function
+- `server.mjs` — Added mirror route for local dev
+- Supabase migration: `v_keyword_usage_count` view
+
+### Session Handover
+- **Branch**: `feat/seolab-phase1-filters-score` (11 commits ahead of main)
+- **Status**: All 3 phases implemented, build passes, all features working
+- **Next Steps**:
+  1. Test refresh stale flow end-to-end with real DataForSEO data
+  2. Consider adding keyword bank refresh to a scheduled job
+  3. SEO Lab Phase 4 (if planned): keyword suggestions, competitor analysis
+  4. ESLint configuration still missing (pre-existing issue)

@@ -1078,6 +1078,7 @@ app.listen(PORT, () => {
   console.log(`   POST /api/seo/reset-pool`);
   console.log(`   POST /api/seo/recalculate-scores`);
   console.log(`   POST /api/seo/generate-draft`);
+  console.log(`   POST /api/seo/refresh-keyword-bank`);
   console.log(`   POST /api/seo/user-keyword`);
   console.log(`   POST /api/seo/add-from-favorite`);
   console.log(`   GET  /api/health\n`);

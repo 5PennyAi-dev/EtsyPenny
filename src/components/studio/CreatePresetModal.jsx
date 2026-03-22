@@ -3,7 +3,7 @@ import { Folder, Search, X, Loader2, Filter } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 
-const CreatePresetModal = ({ isOpen, onClose, user, userKeywordBank: externalBank, onSuccess, initialTheme, initialNiche, initialSubNiche, initialKeywordTags, currentListing }) => {
+const CreatePresetModal = ({ isOpen, onClose, user, userKeywordBank: externalBank, onSuccess, initialTheme, initialNiche, initialSubNiche, initialKeywordTags, preSelectedIds, currentListing }) => {
   const [title, setTitle] = useState('');
   const [theme, setTheme] = useState('');
   const [niche, setNiche] = useState('');
@@ -90,10 +90,13 @@ const CreatePresetModal = ({ isOpen, onClose, user, userKeywordBank: externalBan
       } else {
         setSelectedIds([]);
       }
+    } else if (preSelectedIds?.length > 0) {
+      // Bank mode with pre-selected IDs (from SEO Lab bulk action)
+      setSelectedIds(preSelectedIds.slice(0, 10));
     } else {
       setSelectedIds([]);
     }
-  }, [isOpen, initialTheme, initialNiche, initialSubNiche, initialKeywordTags, externalBank, isPerformanceMode]);
+  }, [isOpen, initialTheme, initialNiche, initialSubNiche, initialKeywordTags, externalBank, isPerformanceMode, preSelectedIds]);
 
   // Filters (mainly for bank mode, but search works in both)
   const uniqueThemes = useMemo(() => {
