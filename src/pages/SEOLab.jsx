@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import axios from 'axios';
 import CreatePresetModal from '../components/studio/CreatePresetModal';
+import ApplyPresetModal from '../components/studio/ApplyPresetModal';
 
 // --- Sparkline (copied from ResultsDisplay for self-containment) ---
 const Sparkline = ({ data }) => {
@@ -116,7 +117,7 @@ const EditableCell = ({ value, onSave, placeholder = "—" }) => {
 };
 
 // --- Preset Components ---
-const PresetRow = ({ preset, bankKeywords, onDelete, onUpdate, onRemoveKeyword, onEditKeywords }) => {
+const PresetRow = ({ preset, bankKeywords, onDelete, onUpdate, onRemoveKeyword, onEditKeywords, onApplyToListing }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
   // Resolve keywords from the IDs
@@ -276,7 +277,11 @@ const PresetRow = ({ preset, bankKeywords, onDelete, onUpdate, onRemoveKeyword, 
                 </tbody>
               </table>
               <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
-                 <button className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors mr-2 opacity-50 cursor-not-allowed">
+                 <button
+                   onClick={() => onApplyToListing && onApplyToListing(preset, linkedKeywords)}
+                   disabled={linkedKeywords.length === 0}
+                   className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors mr-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
                    Apply to Listing →
                  </button>
               </div>
@@ -667,6 +672,12 @@ const SEOLab = () => {
   const [bulkPresetIds, setBulkPresetIds] = useState(new Set());
   const [copiedId, setCopiedId] = useState(null);
 
+  // Preset sorting
+  const [presetSort, setPresetSort] = useState({ key: 'title', dir: 'asc' });
+
+  // Apply preset to listing modal
+  const [applyPreset, setApplyPreset] = useState(null); // { preset, keywords }
+
   // Refresh stale keywords
   const [refreshingIds, setRefreshingIds] = useState(new Set());
 
@@ -914,6 +925,24 @@ const SEOLab = () => {
     }
   };
 
+  const handleApplyPresetToListing = async (listingId, kws) => {
+    const response = await axios.post('/api/seo/add-from-favorite', {
+      listing_id: listingId,
+      keywords: kws.map(kw => ({
+        tag: kw.tag,
+        last_volume: kw.last_volume,
+        last_competition: kw.last_competition,
+        last_cpc: kw.last_cpc,
+        volume_history: kw.volume_history || [],
+      })),
+    });
+    if (response.data?.success) {
+      toast.success(`Added ${kws.length} keywords to listing`);
+    } else {
+      toast.error('Failed to apply preset');
+    }
+  };
+
   // Enrich keywords with computed fields
   const enrichedKeywords = useMemo(() => {
     return keywords.map(kw => {
@@ -986,6 +1015,42 @@ const SEOLab = () => {
         p.theme?.toLowerCase().includes(searchQuery.toLowerCase())
       ))
     : presets;
+
+  // Pre-compute aggregates and sort presets
+  const sortedPresets = useMemo(() => {
+    const withAgg = filteredPresets.map(p => {
+      const linked = (p.keyword_ids || []).map(id => keywords.find(k => k.id === id)).filter(Boolean);
+      const validComp = linked.filter(k => !isNaN(parseFloat(k.last_competition)));
+      const validCpc = linked.filter(k => !isNaN(parseFloat(k.last_cpc)));
+      return {
+        ...p,
+        _totalVolume: linked.reduce((s, k) => s + (k.last_volume || 0), 0),
+        _avgCompetition: validComp.length ? validComp.reduce((s, k) => s + parseFloat(k.last_competition), 0) / validComp.length : 0,
+        _avgCpc: validCpc.length ? validCpc.reduce((s, k) => s + parseFloat(k.last_cpc), 0) / validCpc.length : 0,
+      };
+    });
+    return [...withAgg].sort((a, b) => {
+      let aVal, bVal;
+      switch (presetSort.key) {
+        case 'title': aVal = a.title?.toLowerCase() || ''; bVal = b.title?.toLowerCase() || ''; break;
+        case 'composition': aVal = a.keyword_ids?.length || 0; bVal = b.keyword_ids?.length || 0; break;
+        case 'totalVolume': aVal = a._totalVolume; bVal = b._totalVolume; break;
+        case 'avgCompetition': aVal = a._avgCompetition; bVal = b._avgCompetition; break;
+        case 'avgCpc': aVal = a._avgCpc; bVal = b._avgCpc; break;
+        default: aVal = a.title?.toLowerCase() || ''; bVal = b.title?.toLowerCase() || '';
+      }
+      if (aVal < bVal) return presetSort.dir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return presetSort.dir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredPresets, keywords, presetSort]);
+
+  function handlePresetSort(key) {
+    setPresetSort(prev => ({
+      key,
+      dir: prev.key === key && prev.dir === 'asc' ? 'desc' : 'asc',
+    }));
+  }
 
   // Stale check helper
   const isKeywordStale = (kw) => {
@@ -2094,12 +2159,37 @@ const SEOLab = () => {
                <table className="w-full text-sm text-left">
                  <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                    <tr>
-                     <th className="px-4 py-3 font-semibold w-[25%]">Preset Name</th>
+                     <th className="px-4 py-3 font-semibold w-[25%] cursor-pointer hover:text-slate-700 select-none" onClick={() => handlePresetSort('title')}>
+                       <div className="flex items-center gap-1">
+                         Preset Name
+                         {presetSort.key === 'title' && (presetSort.dir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                       </div>
+                     </th>
                      <th className="px-3 py-3 font-semibold w-[30%]">Context</th>
-                     <th className="px-3 py-3 font-semibold w-[10%]">Composition</th>
-                     <th className="px-3 py-3 font-semibold w-[10%] text-center">Total Volume</th>
-                     <th className="px-3 py-3 font-semibold w-[10%] text-center">Avg. Competition</th>
-                     <th className="px-3 py-3 font-semibold w-[10%] text-center">Avg. CPC</th>
+                     <th className="px-3 py-3 font-semibold w-[10%] cursor-pointer hover:text-slate-700 select-none" onClick={() => handlePresetSort('composition')}>
+                       <div className="flex items-center gap-1">
+                         Composition
+                         {presetSort.key === 'composition' && (presetSort.dir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                       </div>
+                     </th>
+                     <th className="px-3 py-3 font-semibold w-[10%] text-center cursor-pointer hover:text-slate-700 select-none" onClick={() => handlePresetSort('totalVolume')}>
+                       <div className="flex items-center justify-center gap-1">
+                         Total Volume
+                         {presetSort.key === 'totalVolume' && (presetSort.dir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                       </div>
+                     </th>
+                     <th className="px-3 py-3 font-semibold w-[10%] text-center cursor-pointer hover:text-slate-700 select-none" onClick={() => handlePresetSort('avgCompetition')}>
+                       <div className="flex items-center justify-center gap-1">
+                         Avg. Competition
+                         {presetSort.key === 'avgCompetition' && (presetSort.dir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                       </div>
+                     </th>
+                     <th className="px-3 py-3 font-semibold w-[10%] text-center cursor-pointer hover:text-slate-700 select-none" onClick={() => handlePresetSort('avgCpc')}>
+                       <div className="flex items-center justify-center gap-1">
+                         Avg. CPC
+                         {presetSort.key === 'avgCpc' && (presetSort.dir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                       </div>
+                     </th>
                      <th className="px-3 py-3 font-semibold w-[5%] text-center">Actions</th>
                    </tr>
                  </thead>
@@ -2113,7 +2203,7 @@ const SEOLab = () => {
                           </div>
                         </td>
                       </tr>
-                    ) : filteredPresets.length === 0 ? (
+                    ) : sortedPresets.length === 0 ? (
                       <tr>
                         <td colSpan="7" className="px-4 py-12 text-center">
                           <div className="flex flex-col items-center gap-2">
@@ -2128,24 +2218,25 @@ const SEOLab = () => {
                         </td>
                       </tr>
                     ) : (
-                      filteredPresets.map(preset => (
-                         <PresetRow 
-                            key={preset.id} 
-                            preset={preset} 
-                            bankKeywords={keywords} 
+                      sortedPresets.map(preset => (
+                         <PresetRow
+                            key={preset.id}
+                            preset={preset}
+                            bankKeywords={keywords}
                             onDelete={handleDeletePreset}
                             onUpdate={handleUpdatePresetField}
                             onRemoveKeyword={handleRemoveKeywordFromPreset}
                             onEditKeywords={setEditingPresetForKeywords}
+                            onApplyToListing={(p, kws) => setApplyPreset({ preset: p, keywords: kws })}
                          />
                       ))
                     )}
                  </tbody>
                </table>
              </div>
-             {!isPresetsLoading && filteredPresets.length > 0 && (
+             {!isPresetsLoading && sortedPresets.length > 0 && (
                 <div className="bg-slate-50/50 border-t border-slate-100 px-4 py-3 text-xs text-slate-400 text-center">
-                  Showing {filteredPresets.length} of {presets.length} presets
+                  Showing {sortedPresets.length} of {presets.length} presets
                 </div>
               )}
           </div>
@@ -2158,9 +2249,20 @@ const SEOLab = () => {
          isOpen={isCreateModalOpen}
          onClose={() => { setIsCreateModalOpen(false); setBulkPresetIds(new Set()); }}
          user={user}
-         userKeywordBank={keywords}
+         userKeywordBank={enrichedKeywords}
          preSelectedIds={bulkPresetIds.size > 0 ? Array.from(bulkPresetIds) : undefined}
          onSuccess={(newPreset) => setPresets(prev => [newPreset, ...prev])}
+         existingPresets={presets}
+         gemThresholds={gemThresholds}
+      />
+
+      {/* Apply Preset to Listing Modal */}
+      <ApplyPresetModal
+         isOpen={!!applyPreset}
+         onClose={() => setApplyPreset(null)}
+         preset={applyPreset?.preset}
+         presetKeywords={applyPreset?.keywords}
+         onApply={handleApplyPresetToListing}
       />
 
       {/* Edit Keywords Modal */}

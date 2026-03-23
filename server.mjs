@@ -69,6 +69,8 @@ app.post('/api/seo/analyze-image', async (req, res) => {
       .replace('{{productType}}', product_type)
       .replace('{{description}}', client_description);
 
+    console.log("Visual Prompt:", visualPrompt);
+
     const { text: visualRaw } = await runAI('vision_analysis', visualPrompt, { imageUrl: mockup_url });
     const visualData = JSON.parse(extractJson(visualRaw));
     const visualAnalysis = visualData.visual_analysis;

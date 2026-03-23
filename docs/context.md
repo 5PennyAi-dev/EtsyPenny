@@ -1205,11 +1205,34 @@ The taxonomy mapping prompt (used during image analysis to classify products int
 - `docs/analyse-image-logic.ts` — Removed `final_positioning` from docs copy
 - `lib/seo/enrich-keywords.ts` — Added diagnostic logging for DataForSEO enrichment
 
+### SEO Lab Presets Improvements (2026-03-23)
+
+#### Changes
+- **Column sorting on presets table**: Sortable headers (Preset Name, Composition, Total Volume, Avg. Competition, Avg. CPC) with ChevronUp/ChevronDown indicators. Pre-computes aggregates in a `sortedPresets` useMemo to avoid recalculation in the sort comparator.
+- **Apply to Listing modal**: New `ApplyPresetModal.jsx` — listing picker that fetches from `v_dashboard_listings`, shows thumbnail/title/score/status/breadcrumb, single-select, calls existing `/api/seo/add-from-favorite` endpoint. Activated the previously disabled "Apply to Listing →" button in expanded preset rows.
+- **CreatePresetModal enrichment**:
+  - Theme/Niche fields converted from free-text inputs to `<select>` dropdowns with `<optgroup>` separation (My Themes / PennySEO Themes). Fetches from `system_themes`, `system_niches`, `user_custom_themes`, `user_custom_niches` on modal open. Backward-compatible: legacy values not in dropdown render as custom `<option>`.
+  - Filter pills (All, Gems, High Volume, Low Competition) above keyword grid in bank mode. Reuses same thresholds as Favorite Tags tab. `gemThresholds` passed as prop from SEOLab.
+  - "Used in" count (`N×` badge) on keyword chips — enabled by passing `enrichedKeywords` (with `_used_in_count`) instead of raw `keywords` from SEOLab.
+  - Live summary stats bar (avg volume, avg competition color-coded, avg CPC) below keyword grid when keywords are selected.
+- **Duplicate name protection**: Client-side `isDuplicate` check with inline error + red border on title input, disabled Save button. Server-side `ilike` fallback check in handleSubmit.
+- **10-keyword limit tooltip**: Info icon next to subtitle with hover tooltip explaining Etsy's 13-tag limit and why presets cap at 10 for keyword diversity.
+- **Visual prompt console logging**: Added `console.log("Visual Prompt:", visualPrompt)` in `server.mjs` for debugging image analysis prompts.
+
+#### Files Created
+- `src/components/studio/ApplyPresetModal.jsx` — Listing picker modal for applying preset keywords
+
+#### Files Modified
+- `src/pages/SEOLab.jsx` — Preset sorting, apply-to-listing wiring, enrichedKeywords + gemThresholds + existingPresets props passed to CreatePresetModal
+- `src/components/studio/CreatePresetModal.jsx` — Taxonomy dropdowns, filter pills, used-in count, summary stats, duplicate protection, tooltip
+- `server.mjs` — Added visual prompt console.log
+
 ### Session Handover
-- **Branch**: `feat/seolab-phase1-filters-score`
-- **Status**: All SEO Lab phases + taxonomy prompt overhaul implemented, build passes
+- **Branch**: `main`
+- **Status**: All SEO Lab preset improvements + taxonomy prompt overhaul implemented, build passes
 - **Next Steps**:
-  1. Test refresh stale flow end-to-end with real DataForSEO data
-  2. Consider adding keyword bank refresh to a scheduled job
-  3. SEO Lab Phase 4 (if planned): keyword suggestions, competitor analysis
-  4. ESLint configuration still missing (pre-existing issue)
+  1. Test Apply to Listing flow end-to-end (verify keywords appear in listing's keyword pool)
+  2. Test refresh stale flow end-to-end with real DataForSEO data
+  3. Consider adding keyword bank refresh to a scheduled job
+  4. SEO Lab Phase 4 (if planned): keyword suggestions, competitor analysis
+  5. ESLint configuration still missing (pre-existing issue)
