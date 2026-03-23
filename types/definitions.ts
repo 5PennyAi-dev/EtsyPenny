@@ -15,7 +15,6 @@ export interface TaxonomyMapping {
   theme: string;
   niche: string;
   sub_niche: string;
-  final_positioning: string;
 }
 
 export interface FinalAnalysisOutput {

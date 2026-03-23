@@ -48,6 +48,7 @@ export async function enrichKeywords(keywords: string[]): Promise<EnrichedKeywor
 
   // B2: DataForSEO for uncached
   const uncached = keywords.filter(kw => !cachedTags.has(kw));
+  console.log(`   🔍 Uncached keywords to enrich: ${uncached.length}`);
   let fromAPI: EnrichedKeyword[] = [];
   if (uncached.length > 0 && DATAFORSEO_LOGIN && !DATAFORSEO_LOGIN.startsWith('your_')) {
     try {
@@ -62,6 +63,7 @@ export async function enrichKeywords(keywords: string[]): Promise<EnrichedKeywor
       if (dfsRes.ok) {
         const dfsData = await dfsRes.json();
         const items = dfsData?.tasks?.[0]?.result || [];
+        console.log(`   🔍 DataForSEO status: ${dfsData?.tasks?.[0]?.status_code} ${dfsData?.tasks?.[0]?.status_message} | items: ${items.length}`);
         fromAPI = items.map((item: { keyword: string; search_volume?: number; competition?: number; cpc?: number; monthly_searches?: Array<{ search_volume?: number }> }) => ({
           keyword: item.keyword,
           search_volume: getEtsyVolume(item.search_volume || 0),
@@ -72,8 +74,13 @@ export async function enrichKeywords(keywords: string[]): Promise<EnrichedKeywor
             : new Array(12).fill(0),
           fromCache: false,
         }));
+      } else {
+        const errBody = await dfsRes.text().catch(() => 'unable to read body');
+        console.warn(`   ⚠️ DataForSEO HTTP ${dfsRes.status}: ${errBody.slice(0, 300)}`);
       }
     } catch (e: unknown) { console.warn('   ⚠️ DataForSEO failed:', (e as Error).message); }
+  } else if (uncached.length > 0) {
+    console.warn(`   ⚠️ DataForSEO skipped: LOGIN=${DATAFORSEO_LOGIN ? 'set' : 'MISSING'}`);
   }
 
   // B3: Zero-fill missing

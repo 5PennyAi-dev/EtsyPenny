@@ -1176,9 +1176,38 @@ Migrated all 8 Express API routes from `server.mjs` to Vercel serverless functio
 - `server.mjs` — Added mirror route for local dev
 - Supabase migration: `v_keyword_usage_count` view
 
+### Taxonomy Mapping Prompt Overhaul (2026-03-23)
+
+#### Problem
+The taxonomy mapping prompt (used during image analysis to classify products into Theme/Niche/Sub-niche) produced suboptimal classifications:
+- AI role was "Database Architect" — primed for categorization, not Etsy buyer behavior
+- Classified by message/topic instead of visual aesthetic (theme) and buyer intent (niche)
+- No calibration examples, no classification rules
+- Wasted tokens on unused `final_positioning` field
+- Referenced removed "Others" theme as fallback
+- Prompt was duplicated across `server.mjs` and `api/seo/analyze-image.ts`
+
+#### Changes
+- **Extracted shared module**: `lib/logic/analyse-image-logic.ts` is now the single source of truth for prompts (`PROMPT_VISUAL_ANALYST`, `PROMPT_TAXONOMY_MAPPING`), formatting helpers (`formatTaxonomyLists`, `buildVisualAnalysisContext`, `buildTaxonomyPrompt`), and merge logic (`mergeAnalysisResults`). Both `server.mjs` and `api/seo/analyze-image.ts` import from it — no more duplication.
+- **New taxonomy prompt**: Role = "Etsy search behavior specialist". Theme = visual aesthetic, Niche = target buyer, Sub-niche = real Etsy search phrase. 7 classification rules, 6 calibration examples. Separate sections for user custom vs PennySEO system themes/niches.
+- **Removed `final_positioning`**: Ghost field that was parsed from AI but never persisted. Removed from prompt output, `TaxonomyMapping` interface, and docs.
+- **`formatTaxonomyLists()` refactored**: Now returns 4 separate strings (`userThemes`, `systemThemes`, `userNiches`, `systemNiches`) with empty-list fallbacks like "(No custom themes defined)".
+- **Added DataForSEO diagnostic logging** in `lib/seo/enrich-keywords.ts`: logs uncached count, API response status, and error details when enrichment fails silently.
+
+#### Test Results
+- Taxonomy mapping for "CUTERUS" enamel pin correctly returned: Theme = "Sarcastic & Funny", Niche = "Nursing & Healthcare", Sub-niche = "Funny Anatomy Pins" — matching calibration examples.
+
+#### Files Modified
+- `lib/logic/analyse-image-logic.ts` — Rewritten as shared module (single source of truth)
+- `api/seo/analyze-image.ts` — Imports from shared module, removed inline prompts/helpers
+- `server.mjs` — Imports from shared module, removed ~100 lines of duplicated code
+- `types/definitions.ts` — Removed `final_positioning` from `TaxonomyMapping`
+- `docs/analyse-image-logic.ts` — Removed `final_positioning` from docs copy
+- `lib/seo/enrich-keywords.ts` — Added diagnostic logging for DataForSEO enrichment
+
 ### Session Handover
-- **Branch**: `feat/seolab-phase1-filters-score` (11 commits ahead of main)
-- **Status**: All 3 phases implemented, build passes, all features working
+- **Branch**: `feat/seolab-phase1-filters-score`
+- **Status**: All SEO Lab phases + taxonomy prompt overhaul implemented, build passes
 - **Next Steps**:
   1. Test refresh stale flow end-to-end with real DataForSEO data
   2. Consider adding keyword bank refresh to a scheduled job
