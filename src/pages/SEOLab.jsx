@@ -529,7 +529,7 @@ function ActionMenuItem({ icon, label, onClick, disabled, danger }) {
 
 // --- Niche Group Accordion (for grouped view) ---
 function NicheGroupAccordion({ group, selectedIds, onToggleSelect, refreshingIds, openMenuId, setOpenMenuId, isGem, isKeywordStale, onRefresh, onDelete, onAddToPreset, paginatedKeywords }) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
