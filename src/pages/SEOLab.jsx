@@ -1002,10 +1002,10 @@ const SEOLab = () => {
     filtered.forEach(kw => {
       const theme = kw.theme || 'Uncategorized';
       const niche = kw.niche || '';
-      const groupKey = niche ? `${theme} › ${niche}` : theme;
+      const groupKey = theme;
 
       if (!groups[groupKey]) {
-        groups[groupKey] = { key: groupKey, theme, niche, keywords: [] };
+        groups[groupKey] = { key: groupKey, theme, keywords: [] };
       }
       groups[groupKey].keywords.push(kw);
     });
