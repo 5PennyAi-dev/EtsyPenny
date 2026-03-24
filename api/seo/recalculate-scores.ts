@@ -36,10 +36,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const params = {
       Volume: settings.param_volume ?? 0.25,
-      Competition: settings.param_competition ?? 0.15,
-      Transaction: settings.param_transaction ?? 0.35,
-      Niche: settings.param_niche ?? 0.25,
-      CPC: settings.param_cpc ?? 0,
+      Competition: settings.param_competition ?? 0.10,
+      Transaction: settings.param_transaction ?? 0.25,
+      Niche: settings.param_niche ?? 0.20,
+      CPC: settings.param_cpc ?? 0.20,
       ai_selection_count: selected_keywords.length,
     };
 

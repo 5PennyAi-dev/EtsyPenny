@@ -27,7 +27,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const ctx = { product_type, theme, niche, sub_niche, client_description, visual_aesthetic, visual_target_audience, visual_overall_vibe, visual_colors, visual_graphics };
-    const params = { Volume: 5, Competition: 5, Transaction: 5, Niche: 5, CPC: 5, ai_selection_count: 13, ...parameters };
+
+    // Fetch user settings (same pattern as reset-pool / recalculate-scores)
+    const { data: settings } = await supabaseAdmin
+      .from('v_user_seo_active_settings')
+      .select('*')
+      .eq('user_id', user_id)
+      .single();
+
+    const params = {
+      Volume: settings?.param_volume ?? 0.25,
+      Competition: settings?.param_competition ?? 0.10,
+      Transaction: settings?.param_transaction ?? 0.25,
+      Niche: settings?.param_niche ?? 0.20,
+      CPC: settings?.param_cpc ?? 0.20,
+      ai_selection_count: settings?.ai_selection_count || 13,
+      ...parameters,
+    };
 
     console.info(`[generate-keywords] listing=${listing_id} product=${product_type} taxonomy=${theme}>${niche}>${sub_niche}`);
 

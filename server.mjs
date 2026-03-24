@@ -165,7 +165,23 @@ app.post('/api/seo/generate-keywords', async (req, res) => {
     }
 
     const ctx = { product_type, theme, niche, sub_niche, client_description, visual_aesthetic, visual_target_audience, visual_overall_vibe, visual_colors, visual_graphics };
-    const params = { Volume: 5, Competition: 5, Transaction: 5, Niche: 5, CPC: 5, ai_selection_count: 13, ...parameters };
+
+    // Fetch user settings (same pattern as reset-pool / recalculate-scores)
+    const { data: settings } = await supabaseAdmin
+      .from('v_user_seo_active_settings')
+      .select('*')
+      .eq('user_id', user_id)
+      .single();
+
+    const params = {
+      Volume: settings?.param_volume ?? 0.25,
+      Competition: settings?.param_competition ?? 0.10,
+      Transaction: settings?.param_transaction ?? 0.25,
+      Niche: settings?.param_niche ?? 0.20,
+      CPC: settings?.param_cpc ?? 0.20,
+      ai_selection_count: settings?.ai_selection_count || 13,
+      ...parameters,
+    };
 
     console.log(`\n🔍 [generate-keywords] Starting for listing ${listing_id}`);
     console.log(`   Product: ${product_type} | ${theme} > ${niche} > ${sub_niche}`);
@@ -278,10 +294,10 @@ app.post('/api/seo/reset-pool', async (req, res) => {
 
     const params = {
       Volume: settings.param_volume ?? 0.25,
-      Competition: settings.param_competition ?? 0.15,
-      Transaction: settings.param_transaction ?? 0.35,
-      Niche: settings.param_niche ?? 0.25,
-      CPC: settings.param_cpc ?? 0,
+      Competition: settings.param_competition ?? 0.10,
+      Transaction: settings.param_transaction ?? 0.25,
+      Niche: settings.param_niche ?? 0.20,
+      CPC: settings.param_cpc ?? 0.20,
       evergreen_stability_ratio: settings.evergreen_stability_ratio ?? 4,
       evergreen_minimum_volume: settings.evergreen_minimum_volume ?? 0.3,
       evergreen_avg_volume: settings.evergreen_avg_volume ?? 50,
@@ -381,10 +397,10 @@ app.post('/api/seo/recalculate-scores', async (req, res) => {
 
     const params = {
       Volume: settings.param_volume ?? 0.25,
-      Competition: settings.param_competition ?? 0.15,
-      Transaction: settings.param_transaction ?? 0.35,
-      Niche: settings.param_niche ?? 0.25,
-      CPC: settings.param_cpc ?? 0,
+      Competition: settings.param_competition ?? 0.10,
+      Transaction: settings.param_transaction ?? 0.25,
+      Niche: settings.param_niche ?? 0.20,
+      CPC: settings.param_cpc ?? 0.20,
       ai_selection_count: selected_keywords.length // treat ALL passed keywords as selected
     };
 
@@ -650,10 +666,10 @@ app.post('/api/seo/user-keyword', async (req, res) => {
 
     const params = {
       Volume: settings.param_volume ?? 0.25,
-      Competition: settings.param_competition ?? 0.15,
-      Transaction: settings.param_transaction ?? 0.35,
-      Niche: settings.param_niche ?? 0.25,
-      CPC: settings.param_cpc ?? 0,
+      Competition: settings.param_competition ?? 0.10,
+      Transaction: settings.param_transaction ?? 0.25,
+      Niche: settings.param_niche ?? 0.20,
+      CPC: settings.param_cpc ?? 0.20,
       evergreen_stability_ratio: settings.evergreen_stability_ratio ?? 4,
       evergreen_minimum_volume: settings.evergreen_minimum_volume ?? 0.3,
       evergreen_avg_volume: settings.evergreen_avg_volume ?? 50,
@@ -835,10 +851,10 @@ app.post('/api/seo/add-from-favorite', async (req, res) => {
 
     const params = {
       Volume: settings.param_volume ?? 0.25,
-      Competition: settings.param_competition ?? 0.15,
-      Transaction: settings.param_transaction ?? 0.35,
-      Niche: settings.param_niche ?? 0.25,
-      CPC: settings.param_cpc ?? 0,
+      Competition: settings.param_competition ?? 0.10,
+      Transaction: settings.param_transaction ?? 0.25,
+      Niche: settings.param_niche ?? 0.20,
+      CPC: settings.param_cpc ?? 0.20,
       evergreen_stability_ratio: settings.evergreen_stability_ratio ?? 4,
       evergreen_minimum_volume: settings.evergreen_minimum_volume ?? 0.3,
       evergreen_avg_volume: settings.evergreen_avg_volume ?? 50,
