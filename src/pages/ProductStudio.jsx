@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { DEFAULT_STRATEGY_SELECTIONS, getStrategyValues, getSelectionsFromValues } from '../components/studio/StrategyTuner';
 import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Wand2, Sparkles, Shirt, ChevronUp, ChevronRight, Palette, Type, LayoutTemplate, Heart, Target, Save, Zap } from 'lucide-react';
+import { Wand2, Sparkles, Shirt, ChevronUp, ChevronDown, ChevronRight, Palette, Type, LayoutTemplate, Heart, Save, Zap, Package, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ImageUpload from '../components/studio/ImageUpload';
-import OptimizationForm from '../components/studio/OptimizationForm';
+import ProductTypeCombobox from '../components/studio/ProductTypeCombobox';
+import Accordion from '../components/ui/Accordion';
 import ResultsDisplay from '../components/studio/ResultsDisplay';
 import RecentOptimizations from '../components/studio/RecentOptimizations';
 import { supabase } from '../lib/supabase';
@@ -103,16 +104,21 @@ const ProductStudio = () => {
   // SEO Analysis Accordion open/close state
   const [isSeoAnalysisOpen, setIsSeoAnalysisOpen] = useState(false);
 
-  // No changes to imports
+  // Form fields (migrated from OptimizationForm)
+  const [themeName, setThemeName] = useState("");
+  const [themeId, setThemeId] = useState("");
+  const [nicheName, setNicheName] = useState("");
+  const [nicheId, setNicheId] = useState("");
+  const [subNicheName, setSubNicheName] = useState("");
+  const [productTypeName, setProductTypeName] = useState("");
+  const [productTypeId, setProductTypeId] = useState(null);
+  const [themes, setThemes] = useState([]);
+  const [niches, setNiches] = useState([]);
+  const [groupedProductTypes, setGroupedProductTypes] = useState([]);
+  const contextRef = useRef(null);
 
-  // ... (keep useEffect for realtime as a backup or removal? Let's keep it but focusing on the direct response)
-  // Actually, if we handle it here, we might double-fetch if realtime also triggers. 
-  // But since the Status won't change to 'completed' until WE do it here, the realtime won't fire early.
-  // Let's rely on the direct response for speed and reliability if N8N returns data.
-  // Auto-resize visual analysis textareas when values change programmatically
-
-  // Ref for OptimizationForm to access its state
-  const optimizationFormRef = useRef(null);
+  // Block 2 — AI Classification accordion state
+  const [classificationOpen, setClassificationOpen] = useState(false);
 
   useEffect(() => {
     const fetchUserDefaults = async () => {
@@ -145,6 +151,156 @@ const ProductStudio = () => {
 
     fetchUserDefaults();
   }, [user]);
+
+  // Fetch product types and taxonomy (migrated from OptimizationForm)
+  useEffect(() => {
+    const fetchFormData = async () => {
+      if (!user) return;
+      const [categoriesRes, customTypesRes, themesRes, nichesRes] = await Promise.all([
+        supabase.from('product_categories').select('id, name, product_types(id, name)').order('name'),
+        supabase.from('user_custom_product_types').select('id, name').eq('user_id', user.id).order('name'),
+        supabase.from('v_combined_themes')
+            .select('id, name, description, origin, user_id, is_active')
+            .or(`user_id.eq.${user.id},origin.eq.system`)
+            .eq('is_active', true)
+            .order('origin', { ascending: false })
+            .order('name', { ascending: true }),
+        supabase.from('v_combined_niches')
+            .select('id, name, description, origin, user_id, is_active')
+            .or(`user_id.eq.${user.id},origin.eq.system`)
+            .eq('is_active', true)
+            .order('origin', { ascending: false })
+            .order('name', { ascending: true })
+      ]);
+
+      let allGrouped = [];
+      if (customTypesRes.data && customTypesRes.data.length > 0) {
+        allGrouped.push({
+          category: 'My Custom Types',
+          isCustomGroup: true,
+          types: customTypesRes.data.map(t => ({ ...t, origin: 'custom' }))
+        });
+      }
+      if (categoriesRes.data) {
+        const systemGrouped = categoriesRes.data
+          .map((cat) => ({
+            category: cat.name,
+            isCustomGroup: false,
+            types: (cat.product_types || [])
+              .map(t => ({ ...t, origin: 'system' }))
+              .sort((a, b) => a.name.localeCompare(b.name))
+          }))
+          .filter((g) => g.types.length > 0);
+        allGrouped = [...allGrouped, ...systemGrouped];
+      }
+      setGroupedProductTypes(allGrouped);
+      if (themesRes.data) setThemes(themesRes.data);
+      if (nichesRes.data) setNiches(nichesRes.data);
+    };
+    fetchFormData();
+  }, [user]);
+
+  // Hydrate form fields from analysisContext (replaces OptimizationForm's initialValues effect)
+  useEffect(() => {
+    if (analysisContext) {
+      setThemeName(analysisContext.theme_name || analysisContext.theme || analysisContext.custom_theme || "");
+      setNicheName(analysisContext.niche_name || analysisContext.niche || analysisContext.custom_niche || "");
+      setSubNicheName(analysisContext.sub_niche_name || analysisContext.sub_niche || analysisContext.custom_sub_niche || "");
+      if (analysisContext.product_type_id) {
+        setProductTypeId(analysisContext.product_type_id);
+        setProductTypeName(analysisContext.product_type_name || "");
+      } else if (analysisContext.product_type_name) {
+        setProductTypeId(null);
+        setProductTypeName(analysisContext.product_type_name);
+      }
+      if (contextRef.current) {
+        contextRef.current.value = analysisContext.context || "";
+      }
+    }
+  }, [analysisContext]);
+
+  // Resolve product type name from ID once data loads
+  useEffect(() => {
+    if (productTypeId && groupedProductTypes.length > 0 && !productTypeName) {
+      for (const group of groupedProductTypes) {
+        const found = group.types.find((t) => t.id === productTypeId);
+        if (found) { setProductTypeName(found.name); break; }
+      }
+    }
+  }, [productTypeId, groupedProductTypes]);
+
+  // Resolve theme/niche IDs from names
+  useEffect(() => {
+    if (themeName && themes.length > 0 && !themeId) {
+      const found = themes.find(t => t.name === themeName);
+      if (found) setThemeId(found.id);
+    }
+  }, [themeName, themes, themeId]);
+
+  useEffect(() => {
+    if (nicheName && niches.length > 0 && !nicheId) {
+      const found = niches.find(n => n.name === nicheName);
+      if (found) setNicheId(found.id);
+    }
+  }, [nicheName, niches, nicheId]);
+
+  // Form field handlers (migrated from OptimizationForm)
+  const MAX_TAGS_LIMIT = 13;
+
+  const handleProductTypeChange = (id, name) => {
+    setProductTypeId(id);
+    setProductTypeName(name);
+  };
+
+  const handleThemeChange = (e) => {
+    const selectedId = e.target.value;
+    setThemeId(selectedId);
+    const themeObj = themes.find(t => t.id === selectedId);
+    setThemeName(themeObj ? themeObj.name : selectedId);
+  };
+
+  const handleNicheChange = (e) => {
+    const selectedId = e.target.value;
+    setNicheId(selectedId);
+    const nicheObj = niches.find(n => n.id === selectedId);
+    setNicheName(nicheObj ? nicheObj.name : selectedId);
+  };
+
+  const getFormData = () => {
+    if (!productTypeName) {
+      toast.error("Please select a Product Type.");
+      return null;
+    }
+    if (!themeName && !nicheName && !subNicheName) {
+      toast.error("Please enter at least one categorization field (Theme, Niche, or Sub-niche).");
+      return null;
+    }
+    return {
+      theme_name: themeName,
+      niche_name: nicheName,
+      sub_niche_name: subNicheName,
+      custom_theme: themeName,
+      custom_niche: nicheName,
+      custom_sub_niche: subNicheName,
+      product_type_id: productTypeId,
+      product_type_name: productTypeName,
+      tone_id: null,
+      tone_name: 'Auto-detect',
+      ton_name: 'Auto-detect',
+      tag_count: MAX_TAGS_LIMIT,
+      context: contextRef.current?.value || ""
+    };
+  };
+
+  const getCurrentFormState = () => ({
+    product_type_id: productTypeId,
+    product_type_name: productTypeName,
+    tone_name: 'Auto-detect',
+    context: contextRef.current?.value || "",
+    theme_name: themeName,
+    niche_name: nicheName,
+    sub_niche_name: subNicheName
+  });
 
   // Helper to extract Smart Badge thresholds for payloads
   const getSmartBadgePayload = () => {
@@ -264,7 +420,7 @@ const ProductStudio = () => {
         });
 
         // Capture current form state to avoid overwriting typed input
-        const currentFormData = optimizationFormRef.current?.getCurrentState() || {};
+        const currentFormData = getCurrentFormState();
 
         // Update form context while preserving user description/type
         setAnalysisContext(prev => ({
@@ -277,6 +433,7 @@ const ProductStudio = () => {
 
         setIsImageAnalyzedState(true);
         setIsAnalyzingDesign(false);
+        setClassificationOpen(true);
         toast.success("Visual analysis complete! ✨");
     };
 
@@ -371,7 +528,7 @@ const ProductStudio = () => {
           }
 
           // Capture current form state (Product Type, Instructions) to send in payload and save later
-          const currentFormData = optimizationFormRef.current?.getCurrentState() || {};
+          const currentFormData = getCurrentFormState();
 
           // Auto-save form data before analyzing image
           let currentListingId = listingId;
@@ -1144,9 +1301,16 @@ const ProductStudio = () => {
     });
     setIsImageAnalyzedState(false); // Reset: new listing has no image analysis yet
     setIsAnalyzingDesign(false);    // Also clear any in-progress spinner
-    setFormKey(prev => prev + 1);   // Reset form state
+    setFormKey(prev => prev + 1);   // Reset ImageUpload
     setIsNewListingActive(true);    // Manually activate the form for a new session
     setIsSeoAnalysisOpen(false);    // Collapse SEO Analysis accordion for fresh start
+    setClassificationOpen(false);   // Collapse AI Classification accordion
+    // Reset form fields
+    setThemeName(""); setThemeId("");
+    setNicheName(""); setNicheId("");
+    setSubNicheName("");
+    setProductTypeName(""); setProductTypeId(null);
+    if (contextRef.current) contextRef.current.value = "";
   };
 
   const handleLoadListing = async (listingId) => {
@@ -1238,19 +1402,7 @@ const ProductStudio = () => {
         // Hydrate visual fields in form if empty
         // (Optional: depending on verify logic)
 
-        // Hydrate Form State (Refs)
-        // We use a small timeout to let the form mount if it wasn't
-        setTimeout(() => {
-             if (optimizationFormRef.current) {
-                 optimizationFormRef.current.setFormState({
-                     theme: listing.theme || listing.themes?.name || "",
-                     niche: listing.niche || listing.niches?.name || "",
-                     sub_niche: listing.sub_niche || listing.sub_niches?.name || "",
-                     tone: listing.tone || "Auto-detect",
-                     max_tags: listing.max_tags || 13
-                 });
-             }
-        }, 100);
+        // Form fields are now hydrated via the analysisContext useEffect above
 
         // Construct Results Object
         const activeEvalData = evalData;
@@ -1349,6 +1501,7 @@ const ProductStudio = () => {
       setShowResults(true);
       setIsFormCollapsed(true);
       setIsSeoAnalysisOpen(true); // Auto-expand SEO Analysis accordion when loading a listing
+      setClassificationOpen(true); // Auto-expand AI Classification accordion
       setIsLoading(false);
 
       // Check for pending Image Analysis to resume polling and spinner
@@ -1575,8 +1728,8 @@ const ProductStudio = () => {
   const handleSEOSniper = async () => {
       setIsSniperLoading(true);
       try {
-          const formData = optimizationFormRef.current?.getCurrentState ? optimizationFormRef.current.getCurrentState() : {};
-          await handleAnalyze(formData);
+          const formData = getFormData();
+          if (formData) await handleAnalyze(formData);
       } finally {
           setIsSniperLoading(false);
       }
@@ -1725,10 +1878,8 @@ const ProductStudio = () => {
                        <button
                            onClick={(e) => {
                                e.stopPropagation();
-                               if (optimizationFormRef.current) {
-                                    const data = optimizationFormRef.current.getCurrentState();
-                                    if (data) handleSaveDraft(data);
-                               }
+                               const data = getFormData();
+                               if (data) handleSaveDraft(data);
                            }}
                            disabled={isLoading}
                            className="bg-transparent border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1758,8 +1909,10 @@ const ProductStudio = () => {
                   transition={{ duration: 0.4, ease: "easeInOut" }}
                   style={{ overflow: 'hidden' }}
               >
-                    <div className={`p-4 transition-all duration-300 ${!isNewListingActive && !listingId && !selectedImage && !results ? 'opacity-40 pointer-events-none grayscale' : ''}`}>
-                       <div className="mb-3">
+                    <div className={`p-4 transition-all duration-300 space-y-4 ${!isNewListingActive && !listingId && !selectedImage && !results ? 'opacity-40 pointer-events-none grayscale' : ''}`}>
+
+                       {/* Listing Name */}
+                       <div>
                            <label htmlFor="listingName" className="block text-xs font-medium text-slate-700 mb-1">Listing name</label>
                            <input
                               type="text"
@@ -1769,139 +1922,267 @@ const ProductStudio = () => {
                               placeholder="e.g. Vintage Floral T-Shirt"
                               className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 text-slate-900 text-sm"
                            />
-                        </div>
+                       </div>
 
-                        {/* NEW 2-Column Grid Layout */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            
-                            {/* Left Column: Image Area */}
-                            <div className="md:col-span-1 flex flex-col gap-4">
-                                <div className={`relative rounded-xl overflow-hidden transition-all flex-1 ${isAnalyzingDesign ? 'ring-4 ring-indigo-500/20' : ''}`}>
-                                    <ImageUpload 
-                                        key={`img-${formKey}`} 
-                                        onFileSelect={setSelectedImage} 
-                                        initialImage={results?.imageUrl}
-                                        className="h-full"
-                                    />
-                                    {isAnalyzingDesign && (
-                                        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-10">
-                                             <div className="flex flex-col items-center">
-                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
-                                                <span className="text-xs font-bold text-indigo-700 animate-pulse">Analyzing...</span>
-                                             </div>
-                                        </div>
-                                    )}
-                                </div>
-                                <button
-                                    onClick={handleAnalyzeDesign}
-                                    disabled={!selectedImage && !results?.imageUrl || isAnalyzingDesign}
-                                    className="w-full py-2.5 px-4 rounded-xl border-2 border-indigo-600 text-indigo-600 font-bold text-sm hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
-                                >
-                                    <Sparkles size={16} className="group-hover:animate-pulse" />
-                                    Analyze Design
-                                </button>
-                            </div>
+                       {/* ═══ BLOCK 1: PRODUCT SETUP ═══ */}
+                       <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                           {/* Left Column: Image + Analyse Design */}
+                           <div className="md:col-span-1 flex flex-col gap-3">
+                             <div className={`relative rounded-xl overflow-hidden transition-all flex-1 ${isAnalyzingDesign ? 'ring-4 ring-indigo-500/20' : ''}`}>
+                               <ImageUpload
+                                 key={`img-${formKey}`}
+                                 onFileSelect={setSelectedImage}
+                                 initialImage={results?.imageUrl}
+                                 className="h-full"
+                               />
+                               {isAnalyzingDesign && (
+                                 <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-10">
+                                   <div className="flex flex-col items-center">
+                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
+                                     <span className="text-xs font-bold text-indigo-700 animate-pulse">Analyzing...</span>
+                                   </div>
+                                 </div>
+                               )}
+                             </div>
+                             <button
+                               onClick={handleAnalyzeDesign}
+                               disabled={(!selectedImage && !results?.imageUrl) || isAnalyzingDesign}
+                               className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-indigo-300 text-indigo-600 font-medium text-sm hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
+                             >
+                               <Sparkles size={16} className="group-hover:animate-pulse" />
+                               Analyse Design
+                             </button>
+                           </div>
 
-                            {/* Right Column: Visual Analysis Fields */}
-                            <div className="md:col-span-2 bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <Wand2 size={16} className="text-indigo-500" />
-                                    <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Visual Analysis</h3>
-                                </div>
-                                
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    <div className="group">
-                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                                            <Palette size={12} />
-                                            Aesthetic Style
-                                        </label>
-                                        <AutoResizeTextarea 
-                                            value={visualAnalysis.aesthetic}
-                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, aesthetic: e.target.value})}
-                                            placeholder="e.g. Minimalist, Boho..."
-                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        />
-                                    </div>
-                                    
-                                    <div className="group">
-                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                                            <Type size={12} />
-                                            Typography
-                                        </label>
-                                        <AutoResizeTextarea 
-                                            value={visualAnalysis.typography}
-                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, typography: e.target.value})}
-                                            placeholder="e.g. Bold Serif..."
-                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        />
-                                    </div>
+                           {/* Right Column: Product Type + Description */}
+                           <div className="md:col-span-2 space-y-3">
+                             <div className="flex items-center gap-2 mb-1">
+                               <Package size={16} className="text-indigo-500" />
+                               <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Product Details</h3>
+                             </div>
+                             <div>
+                               <ProductTypeCombobox
+                                 groupedOptions={groupedProductTypes}
+                                 value={productTypeName}
+                                 onChange={handleProductTypeChange}
+                                 disabled={false}
+                               />
+                             </div>
+                             <div className="space-y-1">
+                               <label htmlFor="context" className="text-sm font-medium text-slate-700">Description / Instructions</label>
+                               <textarea
+                                 ref={contextRef}
+                                 id="context"
+                                 rows="3"
+                                 placeholder="Describe your product, its unique features, target audience, or any specific keywords you want to target..."
+                                 className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 resize-none"
+                                 defaultValue={analysisContext?.context || ""}
+                               />
+                             </div>
+                           </div>
+                         </div>
+                       </div>
 
-                                    <div className="group">
-                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                                            <LayoutTemplate size={12} />
-                                            Graphic Elements
-                                        </label>
-                                        <AutoResizeTextarea 
-                                            value={visualAnalysis.graphics}
-                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, graphics: e.target.value})}
-                                            placeholder="e.g. Geometric shapes..."
-                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        />
-                                    </div>
+                       {/* ═══ BLOCK 2: AI CLASSIFICATION (Accordion) ═══ */}
+                       {(visualAnalysis.aesthetic || analysisContext?.theme_name) && (
+                         <Accordion
+                           title={
+                             <div className="flex items-center gap-2">
+                               <Wand2 size={16} className="text-indigo-500" />
+                               <span className="text-sm font-bold text-slate-900">Product Classification</span>
+                             </div>
+                           }
+                           headerActions={
+                             <span className="text-[11px] text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                               <Sparkles className="w-3 h-3" /> AI-suggested
+                             </span>
+                           }
+                           isOpen={classificationOpen}
+                           onToggle={setClassificationOpen}
+                         >
+                           <div className="px-5 pb-5">
+                             {/* Theme / Niche / Sub-niche */}
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                               <div className="space-y-1 relative">
+                                 <label htmlFor="theme" className="text-sm font-medium text-slate-700">Theme</label>
+                                 <div className="relative">
+                                   <select
+                                     id="theme"
+                                     value={themeId || themeName}
+                                     onChange={handleThemeChange}
+                                     className={`w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all appearance-none text-sm ${!themeId && !themeName ? 'text-slate-400' : 'text-slate-700'}`}
+                                   >
+                                     <option value="">Select a Theme...</option>
+                                     {themes.some(t => t.origin === 'custom') && (
+                                       <optgroup label="My Themes">
+                                         {themes.filter(t => t.origin === 'custom').map(t => (
+                                           <option key={t.id} value={t.id} title={t.description || ''}>{t.name}</option>
+                                         ))}
+                                       </optgroup>
+                                     )}
+                                     {themes.some(t => t.origin === 'system') && (
+                                       <optgroup label="PennySEO Themes">
+                                         {themes.filter(t => t.origin === 'system').map(t => (
+                                           <option key={t.id} value={t.id} title={t.description || ''}>{t.name}</option>
+                                         ))}
+                                       </optgroup>
+                                     )}
+                                     {themeName && !themes.some(t => t.name === themeName) && (
+                                       <option value={themeName}>{themeName}</option>
+                                     )}
+                                   </select>
+                                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                 </div>
+                               </div>
 
-                                    <div className="group">
-                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                                            <Palette size={12} />
-                                            Color Palette
-                                        </label>
-                                        <AutoResizeTextarea 
-                                            value={visualAnalysis.colors}
-                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, colors: e.target.value})}
-                                            placeholder="e.g. Earth tones..."
-                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        />
-                                    </div>
-                                    
-                                    {/* Full width items */}
-                                    <div className="sm:col-span-2">
-                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                                            <Target size={12} />
-                                            Target Audience
-                                        </label>
-                                        <AutoResizeTextarea 
-                                            value={visualAnalysis.target_audience}
-                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, target_audience: e.target.value})}
-                                            placeholder="Who is this for? e.g. Gen Z..."
-                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        />
-                                    </div>
-                                    
-                                     <div className="sm:col-span-2">
-                                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                                            <Heart size={12} />
-                                            Overall Vibe
-                                        </label>
-                                        <AutoResizeTextarea 
-                                            value={visualAnalysis.overall_vibe}
-                                            onChange={(e) => setVisualAnalysis({...visualAnalysis, overall_vibe: e.target.value})}
-                                            placeholder="e.g. Cozy, energetic, professional..."
-                                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-   <OptimizationForm 
-       ref={optimizationFormRef}
-       key={`form-${formKey}`} 
-       onAnalyze={handleAnalyze} 
-       onSaveDraft={handleSaveDraft}
-       isImageSelected={!!selectedImage || (!!results && !!results.imageUrl)}
-       isImageAnalysed={results?.is_imageAnalysed || isImageAnalyzedState}
-       isLoading={isLoading} 
-       onCancel={results ? handleCancel : null} 
-       initialValues={analysisContext}
-   />
+                               <div className="space-y-1 relative">
+                                 <label htmlFor="niche" className="text-sm font-medium text-slate-700">Niche</label>
+                                 <div className="relative">
+                                   <select
+                                     id="niche"
+                                     value={nicheId || nicheName}
+                                     onChange={handleNicheChange}
+                                     className={`w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all appearance-none text-sm ${!nicheId && !nicheName ? 'text-slate-400' : 'text-slate-700'}`}
+                                   >
+                                     <option value="">Select a Niche...</option>
+                                     {niches.some(n => n.origin === 'custom') && (
+                                       <optgroup label="My Niches">
+                                         {niches.filter(n => n.origin === 'custom').map(n => (
+                                           <option key={n.id} value={n.id} title={n.description || ''}>{n.name}</option>
+                                         ))}
+                                       </optgroup>
+                                     )}
+                                     {niches.some(n => n.origin === 'system') && (
+                                       <optgroup label="PennySEO Niches">
+                                         {niches.filter(n => n.origin === 'system').map(n => (
+                                           <option key={n.id} value={n.id} title={n.description || ''}>{n.name}</option>
+                                         ))}
+                                       </optgroup>
+                                     )}
+                                     {nicheName && !niches.some(n => n.name === nicheName) && (
+                                       <option value={nicheName}>{nicheName}</option>
+                                     )}
+                                   </select>
+                                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                 </div>
+                               </div>
+
+                               <div className="space-y-1">
+                                 <label htmlFor="subNiche" className="text-sm font-medium text-slate-700">Sub-niche</label>
+                                 <input
+                                   type="text"
+                                   id="subNiche"
+                                   value={subNicheName}
+                                   onChange={(e) => setSubNicheName(e.target.value)}
+                                   placeholder="e.g. Bridesmaid Gift"
+                                   className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 text-sm"
+                                 />
+                               </div>
+                             </div>
+
+                             {/* Visual Analysis Fields */}
+                             <div className="mt-4 pt-4 border-t border-slate-100">
+                               <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-3">Visual Analysis</p>
+                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                 <div className="group">
+                                   <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                     <Palette size={12} /> Aesthetic Style
+                                   </label>
+                                   <AutoResizeTextarea
+                                     value={visualAnalysis.aesthetic}
+                                     onChange={(e) => setVisualAnalysis({...visualAnalysis, aesthetic: e.target.value})}
+                                     placeholder="e.g. Minimalist, Boho..."
+                                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                   />
+                                 </div>
+                                 <div className="group">
+                                   <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                     <Type size={12} /> Typography
+                                   </label>
+                                   <AutoResizeTextarea
+                                     value={visualAnalysis.typography}
+                                     onChange={(e) => setVisualAnalysis({...visualAnalysis, typography: e.target.value})}
+                                     placeholder="e.g. Bold Serif..."
+                                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                   />
+                                 </div>
+                                 <div className="group">
+                                   <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                     <LayoutTemplate size={12} /> Graphic Elements
+                                   </label>
+                                   <AutoResizeTextarea
+                                     value={visualAnalysis.graphics}
+                                     onChange={(e) => setVisualAnalysis({...visualAnalysis, graphics: e.target.value})}
+                                     placeholder="e.g. Geometric shapes..."
+                                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                   />
+                                 </div>
+                                 <div className="group">
+                                   <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                     <Palette size={12} /> Color Palette
+                                   </label>
+                                   <AutoResizeTextarea
+                                     value={visualAnalysis.colors}
+                                     onChange={(e) => setVisualAnalysis({...visualAnalysis, colors: e.target.value})}
+                                     placeholder="e.g. Earth tones..."
+                                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                   />
+                                 </div>
+                                 <div className="sm:col-span-2">
+                                   <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                     <Users size={12} /> Target Audience
+                                   </label>
+                                   <AutoResizeTextarea
+                                     value={visualAnalysis.target_audience}
+                                     onChange={(e) => setVisualAnalysis({...visualAnalysis, target_audience: e.target.value})}
+                                     placeholder="Who is this for? e.g. Gen Z..."
+                                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                   />
+                                 </div>
+                                 <div className="sm:col-span-2">
+                                   <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                     <Heart size={12} /> Overall Vibe
+                                   </label>
+                                   <AutoResizeTextarea
+                                     value={visualAnalysis.overall_vibe}
+                                     onChange={(e) => setVisualAnalysis({...visualAnalysis, overall_vibe: e.target.value})}
+                                     placeholder="e.g. Cozy, energetic, professional..."
+                                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                   />
+                                 </div>
+                               </div>
+                             </div>
+                           </div>
+                         </Accordion>
+                       )}
+
+                       {/* ═══ BLOCK 3: GENERATE ACTION ═══ */}
+                       <div>
+                         <button
+                           onClick={() => { const data = getFormData(); if (data) handleAnalyze(data); }}
+                           disabled={isLoading || !(selectedImage || results?.imageUrl) || !isImageAnalyzedState || !productTypeName}
+                           className={`w-full py-3 rounded-xl font-bold shadow-lg transition-all transform flex items-center justify-center gap-2
+                             ${isLoading || !(selectedImage || results?.imageUrl) || !isImageAnalyzedState || !productTypeName
+                               ? 'bg-indigo-400 cursor-not-allowed shadow-none translate-y-0 opacity-70'
+                               : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5'
+                             }`}
+                         >
+                           <Sparkles size={20} className={isLoading ? 'animate-spin' : ''} />
+                           {isLoading === 'uploading' && 'UPLOADING...'}
+                           {isLoading === 'saving' && 'SAVING...'}
+                           {isLoading === 'triggering' && 'STARTING...'}
+                           {isLoading === true && 'ANALYZING...'}
+                           {!isLoading && (
+                             !(selectedImage || results?.imageUrl) ? 'SELECT AN IMAGE FIRST' :
+                             !isImageAnalyzedState ? 'ANALYZE IMAGE FIRST' :
+                             !productTypeName ? 'SELECT PRODUCT TYPE' :
+                             'ANALYZE (1 Credit)'
+                           )}
+                           {!isLoading && isImageAnalyzedState && productTypeName && <span className="text-indigo-200">🚀</span>}
+                         </button>
+                       </div>
+
                     </div>
               </motion.div>
            </motion.div>

@@ -1300,13 +1300,27 @@ Complete overhaul of all AI prompts in the SEO keyword generation and scoring pi
 #### Files Created
 - `nodemon.json` — Watch `.ts` files in lib/ and api/ for dev auto-reload
 
+### Product Studio 3-Block Reorganization (2026-03-24)
+- **Goal**: Reorganize the Product Studio top section from a confusing 2-column layout into 3 clear blocks with proper information hierarchy: user inputs first, AI outputs second, action last.
+- **Implementation**:
+  - **Block 1 — Product Setup** (always visible): Image upload + Analyse Design button on left (1/3), Product Type combobox + Description textarea on right (2/3). User-provided data only.
+  - **Block 2 — AI Classification** (collapsible Accordion): Theme/Niche/Sub-niche dropdowns + 6 visual analysis fields. Hidden until analysis is performed. Auto-expands on analysis complete or listing load from history. Auto-collapses on "New Listing". Uses controlled `<Accordion>` component with "AI-suggested" badge.
+  - **Block 3 — Generate Action** (always visible): The ANALYZE button with same validation (image + product type required). Disabled states show contextual labels.
+- **Architecture Change**: `OptimizationForm.jsx` was fully absorbed into `ProductStudio.jsx`. All state (themes, niches, product types, form fields), data-fetching useEffects, hydration logic, and handlers were migrated inline. The component was only used in one place, and the 3-block layout required rendering its fields across 3 separate DOM locations — impossible with a single React component instance.
+- **New State**: `classificationOpen` boolean controls Block 2 accordion. Wired to `handleImageAnalysisDone`, `handleLoadListing`, and `handleNewAnalysis`.
+- **Removed**: `optimizationFormRef`, `formKey` on OptimizationForm (kept for ImageUpload), `setFormState` setTimeout hack in `handleLoadListing`.
+
+#### Files Modified
+- `src/pages/ProductStudio.jsx` — Absorbed OptimizationForm logic, restructured JSX into 3 blocks, new state/handlers/useEffects
+#### Files Deleted
+- `src/components/studio/OptimizationForm.jsx` — Fully absorbed into ProductStudio
+
 ### Session Handover
 - **Branch**: `main`
-- **Status**: All prompt improvements implemented and ready for testing
-- **Temporary logs**: Console.info logs in analyze-image, generate-keyword-pool, and score-keywords — remove after validating 3-5 products
+- **Status**: 3-block layout implemented. Build succeeds. Ready for manual testing.
 - **Next Steps**:
-  1. Test full pipeline end-to-end with 3 product types (text-heavy, no-text, lifestyle mockup)
-  2. Validate score distributions match targets (10-15% / 50-60% / 20-25% / 5-10%)
-  3. Validate scoring wall time improvement (~120s → ~20-30s)
-  4. Remove temporary console.info logs after validation
-  5. Consider improving the test file (`tests/test-analyze-image.mjs`) to import from shared logic instead of hardcoding prompts
+  1. Test fresh page → upload image → Analyse Design → verify Block 2 appears
+  2. Test loading listing from history → verify all fields hydrated, Block 2 expanded
+  3. Test New Listing → verify all fields clear, Block 2 hidden
+  4. Test Generate SEO Keywords end-to-end
+  5. Test Save button reads form state correctly
