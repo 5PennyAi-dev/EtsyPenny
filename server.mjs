@@ -75,6 +75,8 @@ app.post('/api/seo/analyze-image', async (req, res) => {
     const visualData = JSON.parse(extractJson(visualRaw));
     const visualAnalysis = visualData.visual_analysis;
     console.log('   ✅ Visual analysis done');
+    // TEMPORARY — remove after validating new prompt outputs
+    console.log('[analyze-image] Visual analysis result:', JSON.stringify(visualAnalysis, null, 2));
 
     // Step 3: Taxonomy Retrieval (Supabase)
     console.log('   Step 3: Fetching taxonomy...');
@@ -154,6 +156,7 @@ app.post('/api/seo/generate-keywords', async (req, res) => {
     const {
       listing_id, user_id, product_type = '', theme = '', niche = '', sub_niche = '',
       client_description = '', visual_aesthetic = '', visual_target_audience = '', visual_overall_vibe = '',
+      visual_colors = '', visual_graphics = '',
       parameters = {},
     } = req.body;
 
@@ -161,7 +164,7 @@ app.post('/api/seo/generate-keywords', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields: listing_id and user_id' });
     }
 
-    const ctx = { product_type, theme, niche, sub_niche, client_description, visual_aesthetic, visual_target_audience, visual_overall_vibe };
+    const ctx = { product_type, theme, niche, sub_niche, client_description, visual_aesthetic, visual_target_audience, visual_overall_vibe, visual_colors, visual_graphics };
     const params = { Volume: 5, Competition: 5, Transaction: 5, Niche: 5, CPC: 5, ai_selection_count: 13, ...parameters };
 
     console.log(`\n🔍 [generate-keywords] Starting for listing ${listing_id}`);

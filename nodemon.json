@@ -1,0 +1,4 @@
+{
+  "watch": ["server.mjs", "lib/", "api/"],
+  "ext": "mjs,ts,json"
+}

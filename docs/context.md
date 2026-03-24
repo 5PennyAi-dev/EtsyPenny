@@ -1236,3 +1236,77 @@ The taxonomy mapping prompt (used during image analysis to classify products int
   3. Consider adding keyword bank refresh to a scheduled job
   4. SEO Lab Phase 4 (if planned): keyword suggestions, competitor analysis
   5. ESLint configuration still missing (pre-existing issue)
+
+---
+
+## SEO Pipeline Prompt Overhaul (2026-03-23)
+
+### Summary
+Complete overhaul of all AI prompts in the SEO keyword generation and scoring pipeline. Every prompt was rewritten for conciseness, SEO-orientation, and better score differentiation. Scoring batches were parallelized for performance.
+
+### Changes
+
+#### 1. Visual Analysis Prompt (`lib/logic/analyse-image-logic.ts`)
+- Replaced verbose "Senior Visual Trend Analyst" prompt with concise "Etsy product listing specialist" prompt
+- Added word count constraints per field (2-4 words for aesthetic_style, under 15 words for typography, etc.)
+- Added good/bad examples for each field to guide output quality
+- JSON output structure unchanged — no downstream parsing changes needed
+
+#### 2. Keyword Generation Segments (`lib/seo/generate-keyword-pool.ts`)
+- Replaced 5 near-identical segment prompts with strongly differentiated versions:
+  - **Core Product** (40 kw): product type must appear in 100% of keywords
+  - **Style & Aesthetic** (30 kw): exploits visual data, ~50% pure style terms
+  - **Buyer & Occasion** (30 kw): gift scenarios, recipients, seasonal timing
+  - **Niche & Adjacent** (30 kw): adjacent categories, room/location terms
+  - **Long-Tail & Specific** (30 kw): micro-niche combinations, low-competition
+- Each segment has explicit "What NOT to generate" boundaries to minimize overlap
+- Total requested: 160 (down from 250) with similar unique count (~130-140) due to less duplication
+- Added `buildSegmentContext()` and `SHARED_RULES` for DRY prompt assembly
+- Threaded `visual_colors` and `visual_graphics` through the full pipeline (frontend → API → prompt)
+
+#### 3. Niche Scoring Prompt (`lib/seo/score-keywords.ts`)
+- Replaced 100 generic calibration examples (gothic skull planter, etc.) with dynamic product-specific examples via `generateScoringExamples()`
+- Added `extractAestheticTerms()` to inject style/color/theme keywords into scoring rules
+- New scoring philosophy: Score 10 requires "DOUBLE specificity" (product type + defining characteristic), Score 7 is the expected norm (~50-60%)
+- Added explicit distribution guidance: 10-15% Score 10, 50-60% Score 7, 20-25% Score 4, 5-10% Score 1
+- Now includes all visual data fields (color palette, graphic elements, description)
+
+#### 4. Transactional Scoring Prompt (`lib/seo/score-keywords.ts`)
+- Replaced 7-line mechanical prompt with behavior-based version using dynamic examples via `generateTransactionalExamples()`
+- Score 10 requires occasion/recipient/urgency trigger (not just product + attribute)
+- Score 7 = product + attribute (the expected norm for well-targeted keywords)
+- Score 4 = bare product type or broad category terms
+- Added same distribution guidance to prevent flat scoring
+
+#### 5. Scoring Performance (`lib/seo/score-keywords.ts`)
+- Parallelized scoring batches: changed sequential `for` loop to `Promise.all` over all 25-keyword batches
+- Expected improvement: ~120s → ~20-30s for scoring phase
+- Added timing log and missing keyword detection (fills dropped keywords with default score 4)
+
+#### 6. Pipeline Data Flow
+- `visual_colors` and `visual_graphics` now threaded from frontend (`ProductStudio.jsx`) through both API routes (`api/seo/generate-keywords.ts`, `server.mjs`) into `KeywordContext` and `ScoringContext`
+- Added `nodemon.json` to watch `.ts` files in `lib/` and `api/` for auto-reload during dev
+
+#### Files Modified
+- `lib/logic/analyse-image-logic.ts` — Visual analysis prompt rewrite
+- `lib/seo/generate-keyword-pool.ts` — 5 differentiated keyword segment prompts
+- `lib/seo/score-keywords.ts` — Niche + transactional scoring prompts, parallel batching
+- `api/seo/analyze-image.ts` — Temporary validation log
+- `api/seo/generate-keywords.ts` — Thread visual_colors/visual_graphics
+- `server.mjs` — Thread visual_colors/visual_graphics
+- `src/pages/ProductStudio.jsx` — Add visual_colors/visual_graphics to keywordsPayload
+- `tests/test-analyze-image.mjs` — Updated hardcoded prompt copy
+
+#### Files Created
+- `nodemon.json` — Watch `.ts` files in lib/ and api/ for dev auto-reload
+
+### Session Handover
+- **Branch**: `main`
+- **Status**: All prompt improvements implemented and ready for testing
+- **Temporary logs**: Console.info logs in analyze-image, generate-keyword-pool, and score-keywords — remove after validating 3-5 products
+- **Next Steps**:
+  1. Test full pipeline end-to-end with 3 product types (text-heavy, no-text, lifestyle mockup)
+  2. Validate score distributions match targets (10-15% / 50-60% / 20-25% / 5-10%)
+  3. Validate scoring wall time improvement (~120s → ~20-30s)
+  4. Remove temporary console.info logs after validation
+  5. Consider improving the test file (`tests/test-analyze-image.mjs`) to import from shared logic instead of hardcoding prompts

@@ -37,6 +37,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { text: visualRaw } = await runAI('vision_analysis', visualPrompt, { imageUrl: mockup_url });
     const visualData = JSON.parse(extractJson(visualRaw));
     const visualAnalysis = visualData.visual_analysis;
+    // TEMPORARY — remove after validating new prompt outputs
+    console.info('[analyze-image] Visual analysis result:', JSON.stringify(visualAnalysis, null, 2));
 
     // Step 3: Taxonomy Retrieval (Supabase)
     const { createClient } = await import('@supabase/supabase-js');

@@ -18,6 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const {
       listing_id, user_id, product_type = '', theme = '', niche = '', sub_niche = '',
       client_description = '', visual_aesthetic = '', visual_target_audience = '', visual_overall_vibe = '',
+      visual_colors = '', visual_graphics = '',
       parameters = {},
     } = req.body;
 
@@ -25,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required fields: listing_id and user_id' });
     }
 
-    const ctx = { product_type, theme, niche, sub_niche, client_description, visual_aesthetic, visual_target_audience, visual_overall_vibe };
+    const ctx = { product_type, theme, niche, sub_niche, client_description, visual_aesthetic, visual_target_audience, visual_overall_vibe, visual_colors, visual_graphics };
     const params = { Volume: 5, Competition: 5, Transaction: 5, Niche: 5, CPC: 5, ai_selection_count: 13, ...parameters };
 
     console.info(`[generate-keywords] listing=${listing_id} product=${product_type} taxonomy=${theme}>${niche}>${sub_niche}`);

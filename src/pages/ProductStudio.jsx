@@ -691,6 +691,8 @@ const ProductStudio = () => {
             visual_aesthetic: visualAnalysis.aesthetic,
             visual_target_audience: visualAnalysis.target_audience,
             visual_overall_vibe: visualAnalysis.overall_vibe,
+            visual_colors: visualAnalysis.colors,
+            visual_graphics: visualAnalysis.graphics,
             parameters: {
                 ...(userDefaults ? {
                     Volume: userDefaults.param_volume,
