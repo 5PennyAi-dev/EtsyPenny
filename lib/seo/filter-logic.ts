@@ -63,12 +63,12 @@ export interface KeywordOutput extends KeywordInput {
 export function applySEOFilter(keywords: KeywordInput[], params: FilterParameters): KeywordOutput[] {
   if (!keywords || keywords.length === 0) return [];
 
-  const maxRefCPC = 2.5;
+  const maxRefCPC = 1.5;
   const maxVol = Math.max(...keywords.map(k => k.search_volume || (k as any).volume || 0), 100);
 
   // Hard filter limits from old logic (could be made dynamic if needed)
   const MIN_TRANSACTIONAL = 5;
-  const MIN_NICHE = 2;
+  const MIN_NICHE = 5;
 
   // 1. Processing, Scoring, and Status
   const processed = keywords.map(item => {
@@ -95,10 +95,6 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
       Math.pow(N || 0.01, params.Niche) *
       Math.pow(E || 0.01, params.CPC)
     );
-
-    // Boosts
-    const wordCount = (item.keyword || (item as any).tag || '').split(' ').filter((w: string) => w.length > 0).length;
-    if (wordCount >= 3) finalScore *= 1.1;
 
     // B. Status Detection (History Analysis)
     const history = [...(item.volume_history || [])];

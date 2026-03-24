@@ -1094,7 +1094,7 @@ const SidebarSkeleton = ({ phase }) => (
                               <AnimatePresence initial={false}>
                                 {visibleAnalytics.map((row, i) => {
                                     const isLowVolume = (row.volume || 0) < 10;
-                                    const isHighVolume = (row.volume || 0) >= 1000000;
+                                    const isHighVolume = (row.volume || 0) >= 50000;
                                     const isSelected = selectedTags.includes(row.keyword);
                                     
                                     // Count how many selected rows appear BEFORE this row in the currently sorted view
@@ -1263,7 +1263,7 @@ const SidebarSkeleton = ({ phase }) => (
                                         {isLowVolume
                                             ? <span className="text-slate-400 font-medium text-xs">&lt; 10</span>
                                             : isHighVolume
-                                                ? <span className="font-bold text-indigo-600">&gt; 1M</span>
+                                                ? <span className="font-bold text-indigo-600">&gt; 50K</span>
                                                 : (row.volume || 0).toLocaleString()
                                         }
                                     </td>

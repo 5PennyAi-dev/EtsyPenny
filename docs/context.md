@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-03-22*
+*Dernière mise à jour : 2026-03-24*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -1315,12 +1315,59 @@ Complete overhaul of all AI prompts in the SEO keyword generation and scoring pi
 #### Files Deleted
 - `src/components/studio/OptimizationForm.jsx` — Fully absorbed into ProductStudio
 
+### Etsy API Compliance — Legal Pages & Landing Page (2026-03-24)
+- **Goal**: Prepare pennyseo.ai for Etsy API application by adding required legal pages and landing page updates.
+- **Implementation**:
+  - Created `/privacy` (PrivacyPage.jsx) and `/terms` (TermsPage.jsx) as public routes (no auth required), using LandingPage's nav/footer wrapper.
+  - Added "How It Works" 4-step section on LandingPage (Upload → Connect Shop → Get Tags → Publish).
+  - Added Etsy trademark disclaimer in footer, links to Privacy/Terms pages.
+  - Removed "Etsy" from all prominent headings (H1, badge) per Etsy API Terms of Use.
+
+#### Files Created
+- `src/pages/PrivacyPage.jsx`, `src/pages/TermsPage.jsx`
+#### Files Modified
+- `src/pages/LandingPage.jsx` — How It Works section, footer updates, heading text changes
+- `src/App.jsx` — Added `/privacy` and `/terms` public routes
+
+### ResultsDisplay UI Improvements (2026-03-24)
+- **Goal**: Improve keyword table readability with contextual guidance, column consolidation, and informational tooltips.
+- **Implementation**:
+  - **Actionable Insight Banner**: Rule-based banner below Audit Header showing weakest metric (< 60) with specific advice. Amber for visibility/relevance/conversion, rose for competition.
+  - **Status badges merged into Tag column**: Trending/Evergreen/Promising icons now render inline after keyword pill. Removed standalone Status column.
+  - **Score tooltip**: Info icon on Score header explaining composite score formula.
+  - **"13/25 selected" tooltip**: Info icon explaining Etsy's 13-tag limit.
+  - **"Profit potential" rename**: EST. VALUE → Profit potential with tooltip explaining CPC-based value.
+  - **Column headers renamed**: Conv. Intent → "Buy intent", Relevance → "Product fit" (display only, no code changes).
+  - **Table spacing**: Consistent py-3 on all cells, min-width constraints, tabular-nums on volume, gap-1.5 in tag cell.
+- **Final column layout (12 cols)**: Star | Pin | Checkbox | Tag (+status) | Score | Buy intent | Product fit | Avg. Vol | Trend | Competition | CPC | Delete
+
+#### Files Modified
+- `src/components/studio/ResultsDisplay.jsx` — All UI improvements
+- `src/components/studio/SeoBadge.jsx` — Added `compact` prop (available but not currently used)
+
+### SEO Formula Calibration (2026-03-24)
+- **Goal**: Fix volume conversion formula and Opportunity Score calibration for Etsy-realistic values.
+- **Volume formula** (`lib/seo/enrich-keywords.ts`): Changed `getEtsyVolume()` from `22 × vol^0.9` to `3 × vol^0.75`. Old formula amplified web volumes (100 web → 1,388 Etsy); new formula reduces them realistically (100 web → 95 Etsy). Applied to both current volume and volume_history array.
+- **High volume threshold** (`ResultsDisplay.jsx`): Lowered from 1M to 50K, label changed to "> 50K".
+- **Opportunity Score** (`lib/seo/filter-logic.ts`):
+  - CPC cap: `maxRefCPC` 2.5 → 1.5 (Etsy CPC range is $0.30–$1.50, not Google Ads scale)
+  - Removed +10% long-tail boost (redundant — good long-tails score high naturally)
+  - Niche filter: `MIN_NICHE` 2 → 5 (now filters out niche scores 1 and 4, matching transactional filter symmetry)
+  - `is_user_added` and `is_pinned` bypasses confirmed intact.
+
+#### Files Modified
+- `lib/seo/enrich-keywords.ts` — Volume formula
+- `lib/seo/filter-logic.ts` — CPC cap, long-tail boost removal, niche filter
+- `src/components/studio/ResultsDisplay.jsx` — High volume threshold
+- `tests/test-generate-keywords.mjs` — Volume formula sync
+
 ### Session Handover
 - **Branch**: `main`
-- **Status**: 3-block layout implemented. Build succeeds. Ready for manual testing.
+- **Status**: All changes implemented and build passing. Uncommitted: volume formula fix + opportunity score optimization.
 - **Next Steps**:
-  1. Test fresh page → upload image → Analyse Design → verify Block 2 appears
-  2. Test loading listing from history → verify all fields hydrated, Block 2 expanded
-  3. Test New Listing → verify all fields clear, Block 2 hidden
-  4. Test Generate SEO Keywords end-to-end
-  5. Test Save button reads form state correctly
+  1. Deploy to Vercel and verify landing page, /privacy, /terms
+  2. Submit Etsy API application using preparation kit
+  3. Test SEO generation end-to-end with new volume formula — verify realistic Etsy volumes
+  4. Test keyword pool ranking with new Opportunity Score calibration
+  5. Future: Adjust downstream formulas (Visibility, Competition, Profit) for new volume scale
+  6. Future: Adjust Smart Badge thresholds for new scoring distribution

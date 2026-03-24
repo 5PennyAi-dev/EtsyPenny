@@ -6,7 +6,7 @@
 // server.mjs lines 268-271
 export function getEtsyVolume(webVol: number): number {
   if (!webVol || webVol <= 0) return 0;
-  return Math.round(22 * Math.pow(webVol, 0.9));
+  return Math.round(3 * Math.pow(webVol, 0.75));
 }
 
 interface EnrichedKeyword {

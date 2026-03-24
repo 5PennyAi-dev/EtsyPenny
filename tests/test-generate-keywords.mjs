@@ -70,7 +70,7 @@ async function runTextModel(prompt, config = genConfig) {
 
 function getEtsyVolume(webVol) {
   if (!webVol || webVol <= 0) return 0;
-  return Math.round(22 * Math.pow(webVol, 0.9));
+  return Math.round(3 * Math.pow(webVol, 0.75));
 }
 
 // ─── SEGMENTS ──────────────────────────────────────────────
