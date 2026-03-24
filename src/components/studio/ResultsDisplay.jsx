@@ -2,7 +2,7 @@ import {
   Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles,
   ArrowUpDown, ArrowUp, ArrowDown, Lightbulb, AlertTriangle, Target, Loader2,
   Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart,
-  Pin, Tag, User, Zap, Swords, DollarSign, Award, BarChart3, History, Folder
+  Pin, Tag, User, Zap, Swords, DollarSign, Award, BarChart3, History, Folder, Shield
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -385,7 +385,16 @@ const SidebarSkeleton = ({ phase }) => (
 
         {/* SECTION C: Business Potential (Profitability) */}
         <div className="lg:w-auto lg:flex-shrink-0 p-6 xl:px-10 lg:p-8 hover:bg-slate-50/30 transition-colors flex flex-col items-center justify-center border-l border-slate-100">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Est. Value</span>
+            <div className="flex items-center justify-center gap-1 mb-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Profit potential</span>
+                <div className="relative group">
+                    <Info className="w-3 h-3 text-slate-400 cursor-help" />
+                    <div className="absolute right-0 top-full mt-1 px-3 py-2 bg-slate-800 text-white text-[11px] rounded-lg w-52 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed">
+                        Estimated commercial value based on your keywords' average CPC and market demand. Higher = more valuable buyer traffic.
+                        <div className="absolute bottom-full right-4 border-4 border-transparent border-b-slate-800" />
+                    </div>
+                </div>
+            </div>
             
             <div className="flex items-center justify-center gap-1 mb-2">
                 {[1, 2, 3, 4, 5].map((index) => (
@@ -409,7 +418,46 @@ const SidebarSkeleton = ({ phase }) => (
       </div>
     );
   };
-  
+
+  function getActionableInsight(results) {
+    if (!results) return null;
+
+    const metrics = [
+      {
+        key: 'visibility',
+        value: results.listing_visibility ?? 0,
+        Icon: TrendingUp,
+        text: 'Low visibility — consider adding higher-volume keywords from the Suggestions below.',
+        color: 'amber',
+      },
+      {
+        key: 'relevance',
+        value: results.listing_relevance ?? 0,
+        Icon: Target,
+        text: 'Low relevance — swap generic terms for keywords more specific to your product.',
+        color: 'amber',
+      },
+      {
+        key: 'conversion',
+        value: results.listing_conversion ?? 0,
+        Icon: ShoppingCart,
+        text: 'Low conversion intent — add keywords with occasions (gift, birthday) or recipients (for mom, for teacher).',
+        color: 'amber',
+      },
+      {
+        key: 'competition',
+        value: 100 - (results.listing_competition ?? 0),
+        Icon: Shield,
+        text: 'High competition — replace saturated keywords with long-tail alternatives from Suggestions.',
+        color: 'rose',
+      },
+    ];
+
+    const weakest = metrics.reduce((w, m) => m.value < w.value ? m : w);
+    if (weakest.value >= 60) return null;
+    return weakest;
+  }
+
   const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, isSeoLoading,
     onAddCustomKeyword,
     onAddBatchKeywords,
@@ -836,6 +884,29 @@ const SidebarSkeleton = ({ phase }) => (
                       />
                   ))}
 
+                  {/* Actionable Insight Banner */}
+                  {(() => {
+                    const insight = getActionableInsight(results);
+                    if (!insight) return null;
+                    const InsightIcon = insight.Icon;
+                    return (
+                      <div className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border ${
+                        insight.color === 'rose'
+                          ? 'bg-rose-50 border-rose-200'
+                          : 'bg-amber-50 border-amber-200'
+                      }`}>
+                        <InsightIcon className={`w-4 h-4 flex-shrink-0 ${
+                          insight.color === 'rose' ? 'text-rose-500' : 'text-amber-500'
+                        }`} />
+                        <p className={`text-xs font-medium ${
+                          insight.color === 'rose' ? 'text-rose-700' : 'text-amber-700'
+                        }`}>
+                          {insight.text}
+                        </p>
+                      </div>
+                    );
+                  })()}
+
                   {/* Strategy Tuner — between AuditHeader and Keyword Table */}
                   {results && (
                       <StrategyTuner
@@ -870,13 +941,22 @@ const SidebarSkeleton = ({ phase }) => (
                             />
                          )}
                          {results && (
-                            <span className={`text-xs font-normal px-2 py-0.5 rounded-full ml-1 border transition-colors ${
-                                selectedTags.length === 13 
-                                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200 font-medium' 
-                                    : 'text-rose-600 bg-rose-50 border-rose-200 font-semibold shadow-sm'
-                            }`}>
-                                {selectedTags.length} / {results.analytics?.length || 0} selected
-                            </span>
+                            <div className="flex items-center gap-1.5 ml-1">
+                                <span className={`text-xs font-normal px-2 py-0.5 rounded-full border transition-colors ${
+                                    selectedTags.length === 13
+                                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200 font-medium'
+                                        : 'text-rose-600 bg-rose-50 border-rose-200 font-semibold shadow-sm'
+                                }`}>
+                                    {selectedTags.length} / {results.analytics?.length || 0} selected
+                                </span>
+                                <div className="relative group/seltip">
+                                    <Info className="w-3 h-3 text-slate-400 cursor-help" />
+                                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-3 py-2 bg-slate-800 text-white text-[11px] rounded-lg w-48 opacity-0 group-hover/seltip:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed font-normal">
+                                        Etsy allows 13 tags per listing. Select exactly 13 keywords for optimal SEO performance.
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-800" />
+                                    </div>
+                                </div>
+                            </div>
                          )}
                     </div>
                 }
@@ -930,7 +1010,7 @@ const SidebarSkeleton = ({ phase }) => (
                 }
             >
                 <div className="border-t border-slate-100">
-                    <table className="w-full text-sm text-left">
+                    <table className="w-full text-sm text-left" style={{ borderSpacing: 0 }}>
                         <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                             <tr>
                                 <th className="pl-3 pr-1 py-2 w-8 text-center" title="Favorite">
@@ -954,51 +1034,59 @@ const SidebarSkeleton = ({ phase }) => (
                                         className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
                                     />
                                 </th>
-                                <th className="px-3 py-2 font-semibold text-left w-[18%]">Tag / Keyword</th>
-                                <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[8%]"
+                                <th className="px-3 py-2 font-semibold text-left min-w-[180px]">Tag / Keyword</th>
+                                <th
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors min-w-[52px]"
                                     onClick={() => requestSort('score')}
                                 >
-                                    Score <SortIcon columnKey="score" />
+                                    <div className="flex items-center justify-center gap-1">
+                                        Score <SortIcon columnKey="score" />
+                                        <div className="relative group/scoretip">
+                                            <Info className="w-3 h-3 text-slate-400 cursor-help" />
+                                            <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-3 py-2 bg-slate-800 text-white text-[11px] rounded-lg w-52 opacity-0 group-hover/scoretip:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed font-normal normal-case tracking-normal">
+                                                Composite score combining keyword volume, competition, conversion intent, and niche relevance. Higher = better overall keyword quality for your listing.
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-800" />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[10%]">
-                                    Conv. Intent.
+                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap min-w-[85px]">
+                                    Buy intent
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[10%]">
-                                    Relevance
+                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap min-w-[85px]">
+                                    Product fit
                                 </th>
-                                <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[8%]"
+                                <th
+                                    className="px-2 py-2 text-right font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors min-w-[75px]"
                                     onClick={() => requestSort('volume')}
                                 >
                                     Avg. Vol <SortIcon columnKey="volume" />
                                 </th>
-                                <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[8%]"
+                                <th
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors min-w-[80px]"
                                     onClick={() => requestSort('trend')}
                                 >
                                     Trend <SortIcon columnKey="trend" />
                                 </th>
-                                <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[8%]"
+                                <th
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors min-w-[72px]"
                                     onClick={() => requestSort('competition')}
                                 >
                                     Competition <SortIcon columnKey="competition" />
                                 </th>
-                                <th 
-                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors w-[6%]"
+                                <th
+                                    className="px-2 py-2 text-center font-semibold cursor-pointer select-none group hover:bg-slate-100 transition-colors min-w-[56px]"
                                     onClick={() => requestSort('cpc')}
                                 >
                                     CPC <SortIcon columnKey="cpc" />
                                 </th>
-                                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[7%]">Status</th>
                                 <th className="px-2 py-2 text-center font-semibold whitespace-nowrap w-[5%]"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {!results ? (
                                 <tr>
-                                    <td colSpan="13" className="px-4 py-8 text-center text-slate-400 italic">
+                                    <td colSpan="12" className="px-4 py-8 text-center text-slate-400 italic">
                                         No analysis results yet. Start a new listing analysis.
                                     </td>
                                 </tr>
@@ -1029,7 +1117,7 @@ const SidebarSkeleton = ({ phase }) => (
                                       <React.Fragment key={row.keyword}>
                                         {showLimitDivider && (
                                           <tr className="bg-rose-50/50 border-y border-rose-200">
-                                            <td colSpan="13" className="px-4 py-2">
+                                            <td colSpan="12" className="px-4 py-2">
                                               <div className="flex items-center gap-3">
                                                 <div className="h-px flex-1 bg-rose-200" />
                                                 <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-700 rounded-full shadow-sm border border-rose-200">
@@ -1043,7 +1131,7 @@ const SidebarSkeleton = ({ phase }) => (
                                         )}
                                         {showDivider && (
                                           <tr className="border-t-2 border-slate-200">
-                                            <td colSpan="13" className="px-4 py-1.5 bg-slate-50">
+                                            <td colSpan="12" className="px-4 py-1.5 bg-slate-50">
                                               <div className="flex items-center gap-2">
                                                 <div className="h-px flex-1 bg-slate-200" />
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Suggestions & Discovery</span>
@@ -1112,8 +1200,8 @@ const SidebarSkeleton = ({ phase }) => (
                                             title={row.is_pinned ? "Pinned keywords are always selected" : undefined}
                                         />
                                     </td>
-                                    <td className="px-3 py-3 font-medium relative">
-                                        <div className="flex items-center gap-2">
+                                    <td className="px-3 py-3 font-medium relative min-w-[180px]">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
                                                 {row.keyword}
                                             </span>
@@ -1143,26 +1231,35 @@ const SidebarSkeleton = ({ phase }) => (
                                             {row.is_selection_ia && (
                                                 <Sparkles size={14} className="text-amber-500 shrink-0 cursor-help" title="AI Selected Keyword" />
                                             )}
+                                            {row.is_trending && (
+                                                <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500/20 shrink-0" title="Trending" />
+                                            )}
+                                            {row.is_evergreen && (
+                                                <Leaf className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500/20 shrink-0" title="Evergreen" />
+                                            )}
+                                            {row.is_promising && (
+                                                <Award className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20 shrink-0" title="Promising" />
+                                            )}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 text-center">
+                                    <td className="px-3 py-3 text-center min-w-[52px]">
                                         <div className="font-bold text-slate-700">{row.score}</div>
                                     </td>
-                                    <td className="px-4 py-3 text-center">
-                                        <SeoBadge 
-                                            score={row.transactional_score} 
-                                            type="intent" 
+                                    <td className="px-3 py-3 text-center min-w-[85px]">
+                                        <SeoBadge
+                                            score={row.transactional_score}
+                                            type="intent"
                                             onUpdate={(newScore) => onUpdateScore && onUpdateScore(row.keyword, 'intent', newScore)}
                                         />
                                     </td>
-                                    <td className="px-4 py-3 text-center">
-                                        <SeoBadge 
-                                            score={row.niche_score} 
-                                            type="relevance" 
-                                            onUpdate={(newScore) => onUpdateScore && onUpdateScore(row.keyword, 'relevance', newScore)} 
+                                    <td className="px-3 py-3 text-center min-w-[85px]">
+                                        <SeoBadge
+                                            score={row.niche_score}
+                                            type="relevance"
+                                            onUpdate={(newScore) => onUpdateScore && onUpdateScore(row.keyword, 'relevance', newScore)}
                                         />
                                     </td>
-                                    <td className="px-4 py-3 text-center text-slate-700">
+                                    <td className="px-3 py-3 text-right text-slate-700 tabular-nums min-w-[75px]">
                                         {isLowVolume
                                             ? <span className="text-slate-400 font-medium text-xs">&lt; 10</span>
                                             : isHighVolume
@@ -1170,7 +1267,7 @@ const SidebarSkeleton = ({ phase }) => (
                                                 : (row.volume || 0).toLocaleString()
                                         }
                                     </td>
-                                    <td className="px-4 py-3">
+                                    <td className="px-3 py-3 min-w-[80px]">
                                         <div className="flex justify-center">
                                             {isLowVolume
                                                 ? <span className="text-slate-300 font-medium text-sm">—</span>
@@ -1178,7 +1275,7 @@ const SidebarSkeleton = ({ phase }) => (
                                             }
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 text-center">
+                                    <td className="px-3 py-3 text-center min-w-[72px]">
                                         {(() => {
                                             if (isLowVolume) {
                                                 return <span className="text-slate-300 font-medium text-xs">N/A</span>;
@@ -1200,7 +1297,7 @@ const SidebarSkeleton = ({ phase }) => (
                                             );
                                         })()}
                                     </td>
-                                    <td className="px-4 py-3 text-center">
+                                    <td className="px-3 py-3 text-center min-w-[56px]">
                                         {(() => {
                                             const numVal = parseFloat(row.cpc);
                                             if (isNaN(numVal) || numVal === 0 || row.cpc === null || row.cpc === undefined) {
@@ -1220,14 +1317,6 @@ const SidebarSkeleton = ({ phase }) => (
                                                 </span>
                                             );
                                         })()}
-                                    </td>
-                                    <td className="px-4 py-3 text-center">
-                                        <div className="flex items-center justify-center gap-1.5">
-                                            {row.is_trending && <Flame size={16} className="text-orange-500 fill-orange-500/20" title="Trending" />}
-                                            {row.is_evergreen && <Leaf size={16} className="text-emerald-500 fill-emerald-500/20" title="Evergreen" />}
-                                            {row.is_promising && <Award size={16} className="text-amber-400 fill-amber-400/20" title="Promising" />}
-                                            {(!row.is_trending && !row.is_evergreen && !row.is_promising) && <span className="text-slate-300">-</span>}
-                                        </div>
                                     </td>
                                     <td className="px-2 py-3 text-center">
                                         <button 
@@ -1263,7 +1352,7 @@ const SidebarSkeleton = ({ phase }) => (
                                             className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 opacity-50"
                                         />
                                     </td>
-                                    <td className="px-3 py-3" colSpan="10">
+                                    <td className="px-3 py-3" colSpan="9">
                                         <input
                                             ref={addInputRef}
                                             type="text"

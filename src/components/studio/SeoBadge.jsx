@@ -33,7 +33,7 @@ const SORTED_OPTIONS = [
     SCORE_OPTIONS.labels[1]
 ];
 
-const SeoBadge = ({ score, type, onUpdate }) => {
+const SeoBadge = ({ score, type, onUpdate, compact = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   
   // Map continuous score to discrete levels initially
@@ -99,11 +99,11 @@ const SeoBadge = ({ score, type, onUpdate }) => {
   }
 
   return (
-    <div className="relative inline-flex items-center justify-center min-w-[75px] group" ref={dropdownRef}>
+    <div className={`relative inline-flex items-center justify-center ${compact ? 'min-w-[60px]' : 'min-w-[75px]'} group`} ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         title={tooltipText}
-        className={`w-full px-2.5 py-0.5 rounded-full text-[11px] uppercase tracking-wider font-bold border cursor-pointer transition-all hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 hover:opacity-90 ${labelConfig.classes}`}
+        className={`w-full rounded-full uppercase tracking-wider font-bold border cursor-pointer transition-all hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 hover:opacity-90 ${compact ? 'px-1.5 py-0 text-[10px]' : 'px-2.5 py-0.5 text-[11px]'} ${labelConfig.classes}`}
       >
         {labelConfig.label}
       </button>
