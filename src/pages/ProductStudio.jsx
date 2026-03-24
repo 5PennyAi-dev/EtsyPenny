@@ -1107,7 +1107,7 @@ const ProductStudio = () => {
             ...getSmartBadgePayload(),
             ai_selection_count: userDefaults?.ai_selection_count ?? 13,
             working_pool_count: userDefaults?.working_pool_count ?? 40,
-            concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
+            concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 2,
         }
       };
       await axios.post('/api/seo/reset-pool', payload);
@@ -1141,7 +1141,7 @@ const ProductStudio = () => {
             ...getSmartBadgePayload(),
             ai_selection_count: userDefaults?.ai_selection_count ?? 13,
             working_pool_count: userDefaults?.working_pool_count ?? 40,
-            concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 3,
+            concept_diversity_limit: userDefaults?.concept_diversity_limit ?? 2,
         }
       };
       await axios.post('/api/seo/reset-pool', payload);

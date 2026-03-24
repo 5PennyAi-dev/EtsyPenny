@@ -64,7 +64,7 @@ async function testSupabaseIntegration() {
       promising_competition: settings.promising_competition ?? settings.promosing_competition ?? 0.4,
       ai_selection_count: settings.ai_selection_count || 13,
       working_pool_count: settings.working_pool_count || 40,
-      concept_diversity_limit: settings.concept_diversity_limit || 5
+      concept_diversity_limit: settings.concept_diversity_limit || 2
     };
     console.log('✅ Fetched settings mapped to params:', JSON.stringify(params, null, 2));
 

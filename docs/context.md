@@ -1361,13 +1361,62 @@ Complete overhaul of all AI prompts in the SEO keyword generation and scoring pi
 - `src/components/studio/ResultsDisplay.jsx` — High volume threshold
 - `tests/test-generate-keywords.mjs` — Volume formula sync
 
+### SEO Strength Formula Recalibration (2026-03-24)
+
+Complete recalibration of all listing-level strength formulas in `select-and-score.ts` to match Etsy's data scale (post volume formula change). Also added scoring retry logic and fixed a HistoryPage color bug.
+
+#### 1. Visibility Formula (`lib/seo/select-and-score.ts`)
+- **DesirabilityWeight range widened**: `0.8 + nS/20 + tS/20` → `0.4 + nS/10 + tS/10` (range 0.9–1.8 → 0.6–2.6, 4.3× factor). AI quality scores now meaningfully compete with raw volume.
+- **Log ceiling lowered**: 10M → 500K. With new volume formula, scores now spread across ~50–95 instead of clustering in 45–65.
+
+#### 2. Conversion Formula
+- **Rebalanced 50/50 → 60/40** (transactional/CPC). On Etsy, transactional intent is more predictive than CPC.
+- **CPC ceiling**: $2.50 → $1.50 (Etsy range, not Google Ads).
+
+#### 3. Profit Formula
+- **Rebalanced 35/40/25 → 35/30/35** (visibility/CPC/transactional). CPC was over-weighted at 40%.
+- **CPC ceiling**: $2.50 → $1.50 everywhere (composite scoring, conversion, profit).
+
+#### 4. Competition Formula
+- **Exponent**: 0.3 → 0.5. An 80% competition market now scores 45 (red) instead of 62 (amber). Honest feedback about saturated niches.
+
+#### 5. HistoryPage Competition Color Bug Fix
+- `MetricCell` for `listing_competition` had `inverted` prop — double-inverting colors (high score = red, wrong). Removed `inverted` so high=green (correct).
+
+#### 6. Scoring Retry Logic (`lib/seo/score-keywords.ts`)
+- Added retry (2 attempts) around `JSON.parse` of AI scoring responses. Intermittent malformed JSON from AI models no longer crashes the pipeline.
+
+#### 7. Concept Diversity Overhaul
+- **New module**: `lib/seo/concept-diversity.ts` — `getCanonicalConcept()` replaces the old "first two words" logic with synonym normalization (facial→face, personalized→custom, etc.), product-type word removal, and alphabetical sorting. Handles permutations ("dry face brush" = "face dry brush") and product flooding.
+- **Upstream dedup** in `generate-keyword-pool.ts` — canonical dedup runs before DataForSEO enrichment, saving API calls on permutation duplicates.
+- **Filter logic updated**: `applySEOFilter()` now accepts `productTypeWords` parameter, uses canonical concept keys.
+- **All API routes updated**: `reset-pool`, `user-keyword`, `add-from-favorite` (and `server.mjs` mirrors) now resolve product type name and pass `productTypeWords` to filter logic.
+- **Unified defaults**: `concept_diversity_limit` fallback standardized to 2 everywhere (was DB=2, Frontend=3, Backend=5).
+
+#### Files Created
+- `lib/seo/concept-diversity.ts` — Canonical concept key utility (synonym map, product type extraction, concept computation)
+
+#### Files Modified
+- `lib/seo/select-and-score.ts` — Visibility, conversion, profit, competition formulas + CPC ceiling
+- `lib/seo/score-keywords.ts` — Retry logic for JSON parse failures
+- `lib/seo/filter-logic.ts` — Canonical concept keys, `productTypeWords` param
+- `lib/seo/generate-keyword-pool.ts` — Upstream canonical dedup before enrichment
+- `api/seo/reset-pool.ts` — Product type resolution, concept diversity, default=2
+- `api/seo/user-keyword.ts` — Product type passthrough, default=2
+- `api/seo/add-from-favorite.ts` — Product type passthrough, default=2
+- `server.mjs` — All 3 route mirrors updated
+- `src/pages/HistoryPage.jsx` — Competition color bug fix
+- `src/pages/ProductStudio.jsx` — Concept diversity default 3→2
+- `src/pages/UserSettings.jsx` — Concept diversity default 3→2
+- `tests/test-generate-keywords.mjs` — Formula sync
+- `tests/test-reset-pool.ts` — Default sync
+
 ### Session Handover
 - **Branch**: `main`
-- **Status**: All changes implemented and build passing. Uncommitted: volume formula fix + opportunity score optimization.
+- **Status**: All SEO strength formulas recalibrated, concept diversity overhauled, scoring retry added.
 - **Next Steps**:
-  1. Deploy to Vercel and verify landing page, /privacy, /terms
-  2. Submit Etsy API application using preparation kit
-  3. Test SEO generation end-to-end with new volume formula — verify realistic Etsy volumes
-  4. Test keyword pool ranking with new Opportunity Score calibration
-  5. Future: Adjust downstream formulas (Visibility, Competition, Profit) for new volume scale
-  6. Future: Adjust Smart Badge thresholds for new scoring distribution
+  1. Test full SEO generation end-to-end — verify visibility/conversion/profit/competition scores in realistic ranges
+  2. Test concept diversity with different product types — verify permutation dedup and pool quality
+  3. Deploy to Vercel and verify all serverless functions
+  4. Future: Adjust Smart Badge thresholds for new scoring distribution
+  5. Future: Consider adding more synonyms to `ETSY_SYNONYM_MAP` based on real data

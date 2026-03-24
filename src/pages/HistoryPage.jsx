@@ -340,7 +340,7 @@ const HistoryPage = () => {
                                             <td className="px-2 py-3 text-center"><MetricCell value={item.listing_raw_visibility_index} /></td>
                                             <td className="px-2 py-3 text-center"><MetricCell value={item.listing_relevance} /></td>
                                             <td className="px-2 py-3 text-center"><MetricCell value={item.listing_conversion} /></td>
-                                            <td className="px-2 py-3 text-center"><MetricCell value={item.listing_competition} inverted /></td>
+                                            <td className="px-2 py-3 text-center"><MetricCell value={item.listing_competition} /></td>
                                             <td className="px-2 py-3 text-center"><MetricCell value={item.listing_profit} /></td>
                                             <td className="px-2 py-3 text-center">
                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${statusColor}`}>

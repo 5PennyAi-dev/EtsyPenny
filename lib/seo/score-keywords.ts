@@ -336,15 +336,26 @@ export async function scoreKeywords(stats: EnrichedKeyword[], ctx: ScoringContex
 
   console.info(`[scoring] Scoring ${kws.length} keywords in ${batches.length} parallel batches per scorer`);
 
+  const MAX_RETRIES = 2;
+
   const runScoring = async (taskKey: string, systemPrompt: string, batchList: string[][]) => {
     const batchResults = await Promise.all(
       batchList.map(async (batch) => {
-        const { text } = await runAI(taskKey, `# Keywords to Analyze:\n${JSON.stringify(batch)}`, {
-          systemPrompt,
-        });
-        const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
-        const parsed = JSON.parse(cleaned);
-        return (parsed.keywords ?? []) as Array<{ keyword?: string; niche_score?: number; transactional_score?: number }>;
+        let lastError: unknown;
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const { text } = await runAI(taskKey, `# Keywords to Analyze:\n${JSON.stringify(batch)}`, {
+              systemPrompt,
+            });
+            const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+            const parsed = JSON.parse(cleaned);
+            return (parsed.keywords ?? []) as Array<{ keyword?: string; niche_score?: number; transactional_score?: number }>;
+          } catch (err) {
+            lastError = err;
+            console.warn(`[scoring] ${taskKey} batch parse failed (attempt ${attempt}/${MAX_RETRIES}): ${(err as Error).message}`);
+          }
+        }
+        throw new Error(`[scoring] ${taskKey} batch failed after ${MAX_RETRIES} attempts: ${(lastError as Error).message}`);
       })
     );
     return batchResults.flat();

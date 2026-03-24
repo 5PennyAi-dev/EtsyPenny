@@ -5,6 +5,7 @@
 
 import { runAI } from '../ai/provider-router.js';
 import { extractJson } from '../ai/extract-json.js';
+import { getCanonicalConcept, extractProductTypeWords } from './concept-diversity.js';
 
 // ─── TYPES ───────────────────────────────────────────────
 
@@ -247,6 +248,15 @@ export async function generateKeywordPool(ctx: KeywordContext): Promise<string[]
   }
 
   const unique = [...new Set(pool)];
-  console.info(`[generate-keywords] Total: ${pool.length} → ${unique.length} unique`);
-  return unique;
+
+  // Canonical dedup: eliminate permutations and synonym variants before enrichment
+  const ptWords = extractProductTypeWords(ctx.product_type);
+  const seen = new Map<string, string>();
+  const deduped: string[] = [];
+  for (const kw of unique) {
+    const key = getCanonicalConcept(kw, ptWords);
+    if (!seen.has(key)) { seen.set(key, kw); deduped.push(kw); }
+  }
+  console.info(`[generate-keywords] Total: ${pool.length} → ${unique.length} unique → ${deduped.length} after concept dedup`);
+  return deduped;
 }

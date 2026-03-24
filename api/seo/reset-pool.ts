@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { applySEOFilter } from '../../lib/seo/filter-logic.js';
 import { selectAndScore } from '../../lib/seo/select-and-score.js';
 import { persistStrength } from '../../lib/seo/persist-strength.js';
+import { extractProductTypeWords } from '../../lib/seo/concept-diversity.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -28,14 +29,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'No keywords found for this listing' });
     }
 
-    // 2. Fetch the listing owner
+    // 2. Fetch the listing owner and product type
     const { data: listing, error: listingError } = await supabaseAdmin
       .from('listings')
-      .select('user_id')
+      .select('user_id, product_type_id')
       .eq('id', listing_id)
       .single();
 
     if (listingError || !listing) throw listingError || new Error('Listing not found');
+
+    // Resolve product type name for concept diversity
+    let productTypeName = '';
+    if (listing.product_type_id) {
+      const { data: pt } = await supabaseAdmin
+        .from('v_combined_product_types')
+        .select('name')
+        .eq('id', listing.product_type_id)
+        .single();
+      productTypeName = pt?.name || '';
+    }
 
     // 3. Fetch user settings from view
     const { data: settings, error: settingsError } = await supabaseAdmin
@@ -62,7 +74,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       promising_competition: settings.promising_competition ?? settings.promosing_competition ?? 0.4,
       ai_selection_count: settings.ai_selection_count || 13,
       working_pool_count: settings.working_pool_count || 40,
-      concept_diversity_limit: settings.concept_diversity_limit || 5,
+      concept_diversity_limit: settings.concept_diversity_limit || 2,
+      productTypeWords: extractProductTypeWords(productTypeName),
     };
 
     // Override with incoming parameters

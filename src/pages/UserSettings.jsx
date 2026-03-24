@@ -58,7 +58,7 @@ export default function UserSettings() {
     
     ai_selection_count: 13,
     working_pool_count: 40,
-    concept_diversity_limit: 3
+    concept_diversity_limit: 2
   });
 
 

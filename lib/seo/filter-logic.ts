@@ -1,3 +1,5 @@
+import { getCanonicalConcept } from './concept-diversity.js';
+
 export interface KeywordInput {
   keyword: string;
   search_volume?: number | null;
@@ -37,6 +39,9 @@ export interface FilterParameters {
   ai_selection_count: number;
   working_pool_count: number;
   concept_diversity_limit: number;
+
+  // Concept diversity — product type words to exclude from concept keys
+  productTypeWords?: string[];
 }
 
 export interface KeywordOutput extends KeywordInput {
@@ -159,14 +164,8 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
   for (const item of processed) {
     if (selectedTags.length >= TAG_COUNT) break;
     
-    // Concept is the first two words of the keyword
     const rawKeyword = (item.keyword || (item as any).tag || '').toLowerCase();
-    const concept = rawKeyword
-      .replace(/[^\w\s]/g, '') // Remove punctuation
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .join(' ');
+    const concept = getCanonicalConcept(rawKeyword, params.productTypeWords || []);
       
     conceptTracker[concept] = (conceptTracker[concept] || 0) + 1;
 

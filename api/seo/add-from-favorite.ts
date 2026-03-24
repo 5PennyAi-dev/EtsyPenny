@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { scoreKeywords } from '../../lib/seo/score-keywords.js';
 import { applySEOFilter } from '../../lib/seo/filter-logic.js';
 import { selectAndScore } from '../../lib/seo/select-and-score.js';
+import { extractProductTypeWords } from '../../lib/seo/concept-diversity.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -92,7 +93,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       promising_competition: settings.promising_competition ?? 0.4,
       ai_selection_count: settings.ai_selection_count || 13,
       working_pool_count: settings.working_pool_count || 40,
-      concept_diversity_limit: settings.concept_diversity_limit || 5,
+      concept_diversity_limit: settings.concept_diversity_limit || 2,
+      productTypeWords: extractProductTypeWords(productTypeName),
     };
 
     const finalParams = { ...params, ...(req.body.parameters || {}) };

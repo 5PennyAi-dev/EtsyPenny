@@ -336,7 +336,7 @@ function stepD(keywords) {
     const tS = (kw.transactional_score ?? 5) / 10;
     const volNorm = Math.log10(Math.max(1, kw.search_volume + 1)) / 7;
     const compPenalty = kw.competition ?? 0.5;
-    const cpcNorm = Math.min(1, (kw.cpc || 0) / 2.5);
+    const cpcNorm = Math.min(1, (kw.cpc || 0) / 1.5);
     const composite = nS * nicheW + tS * transW + volNorm * volW - compPenalty * compW + cpcNorm * cpcW;
     return { kw, composite };
   });
@@ -356,26 +356,26 @@ function stepD(keywords) {
       const vol = Math.min(1000000, kw.search_volume || 0);
       const nS = kw.niche_score ?? 5;
       const tS = kw.transactional_score ?? 5;
-      const dw = 0.8 + (nS / 20) + (tS / 20);
+      const dw = 0.4 + (nS / 10) + (tS / 10);
       totalMarketReach += vol * dw;
       totalPowerIndex += Math.sqrt(vol) * dw;
     });
 
-    const ceil = 10000000;
+    const ceil = 500000;
     const visibility = Math.min(100, Math.round((Math.log10(Math.max(1, totalMarketReach)) / Math.log10(ceil)) * 100));
     const avgTrans = selected.reduce((a, k) => a + (k.transactional_score || 5), 0) / selected.length;
     const avgCPC = selected.reduce((a, k) => a + (k.cpc || 0), 0) / selected.length;
-    const cpcS = Math.min(10, (avgCPC / 2.5) * 10);
-    const conversion = (avgTrans * 5) + (cpcS * 5);
+    const cpcS = Math.min(10, (avgCPC / 1.5) * 10);
+    const conversion = (avgTrans * 6) + (cpcS * 4);
     const avgNiche = selected.reduce((a, k) => a + (k.niche_score || 5), 0) / selected.length;
     const relevance = avgNiche * 10;
     const sorted = [...selected].sort((a, b) => (a.competition || 1) - (b.competition || 1));
     const top5 = sorted.slice(0, 5);
     const avgBestComp = top5.reduce((a, k) => a + (k.competition || 0.9), 0) / top5.length;
-    const competition = Math.round(Math.pow(1 - Math.min(0.99, avgBestComp), 0.3) * 100);
-    const cpcAll = Math.min(100, (avgCPC / 2.5) * 100);
+    const competition = Math.round(Math.pow(1 - Math.min(0.99, avgBestComp), 0.5) * 100);
+    const cpcAll = Math.min(100, (avgCPC / 1.5) * 100);
     const transS = avgTrans * 10;
-    const profit = Math.round((visibility * 0.35) + (cpcAll * 0.40) + (transS * 0.25));
+    const profit = Math.round((visibility * 0.35) + (cpcAll * 0.30) + (transS * 0.35));
     const lsi = Math.round((visibility * 0.25) + (conversion * 0.35) + (relevance * 0.25) + (competition * 0.15));
 
     strength = {
