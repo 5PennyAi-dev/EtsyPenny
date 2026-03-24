@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { CheckCircle, Search, Target, Zap, Star } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CheckCircle, Search, Target, Zap, Star, Upload, Store, Sparkles, TrendingUp } from 'lucide-react';
 import logo from '../assets/pennyseo-logo.png';
 import dashboardPreview from '../assets/dashboard_preview.jpg';
 import fivePennyLogo from '../assets/5pennyAi_logo.png';
@@ -35,10 +36,10 @@ const LandingPage = () => {
       <section className="max-w-7xl mx-auto px-6 py-12 md:py-20 grid lg:grid-cols-2 gap-12 items-center">
         <div>
           <span className="inline-block px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-sm font-bold mb-6">
-            🚀 Coming Soon to Etsy Sellers
+            🚀 Coming Soon for Marketplace Sellers
           </span>
           <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight mb-6">
-            Etsy SEO is no longer a <span className="text-indigo-600">guessing game.</span>
+            Product SEO is no longer a <span className="text-indigo-600">guessing game.</span>
           </h1>
           <p className="text-xl text-slate-600 mb-8 leading-relaxed">
             The first AI-powered tool that <span className="font-bold text-slate-800">sees</span> your product mockups to predict market trends. Rank higher, save time, and sell more.
@@ -80,6 +81,28 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* How It Works */}
+      <section className="max-w-7xl mx-auto px-6 py-20">
+        <h2 className="text-3xl font-extrabold text-center mb-12">How PennySEO Works</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {[
+            { icon: Upload, title: 'Upload Your Product Image', desc: 'Upload a mockup or product photo. Our AI analyzes visual elements like colors, typography, and style.' },
+            { icon: Store, title: 'Connect Your Shop', desc: 'Link your shop profile to personalize SEO recommendations to match your brand voice and identity.' },
+            { icon: Sparkles, title: 'Get Optimized SEO Tags', desc: 'Receive AI-generated titles, descriptions, and keyword tags scored by volume, competition, and buyer intent.' },
+            { icon: TrendingUp, title: 'Publish & Rank Higher', desc: 'Apply the optimized tags to your listings and watch your visibility grow.' },
+          ].map(({ icon: Icon, title, desc }, i) => (
+            <div key={i} className="text-center space-y-4">
+              <div className="w-14 h-14 mx-auto bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
+                <Icon size={28} />
+              </div>
+              <div className="text-sm font-bold text-indigo-600">Step {i + 1}</div>
+              <h3 className="text-lg font-bold">{title}</h3>
+              <p className="text-slate-600 text-sm">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Features Grid */}
       <section className="bg-white py-20 border-y border-slate-100">
         <div className="max-w-7xl mx-auto px-6">
@@ -112,7 +135,14 @@ const LandingPage = () => {
       {/* Footer */}
       <footer className="py-12 text-center text-slate-400 text-sm">
         © 2026 5PennyAi. All rights reserved. <br />
-        <span className="italic">Designed for Etsy Sellers, by AI Enthusiasts.</span>
+        <span className="italic">Designed for Online Sellers, by AI Enthusiasts.</span>
+        <div className="mt-4 space-x-4">
+          <Link to="/privacy" className="hover:text-slate-600 underline">Privacy Policy</Link>
+          <Link to="/terms" className="hover:text-slate-600 underline">Terms of Service</Link>
+        </div>
+        <p className="text-xs text-slate-400 mt-3">
+          The term "Etsy" is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.
+        </p>
       </footer>
     </div>
   );
