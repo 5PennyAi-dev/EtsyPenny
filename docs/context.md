@@ -1420,3 +1420,36 @@ Complete recalibration of all listing-level strength formulas in `select-and-sco
   3. Deploy to Vercel and verify all serverless functions
   4. Future: Adjust Smart Badge thresholds for new scoring distribution
   5. Future: Consider adding more synonyms to `ETSY_SYNONYM_MAP` based on real data
+
+## Session: 2026-03-24 — ESM Import Fix + Login Page Redesign
+
+### ESM Import Fix (Vercel Production)
+All Vercel serverless API routes were failing with `ERR_MODULE_NOT_FOUND` because relative imports in `lib/ai/` lacked `.js` extensions required by Vercel's ESM runtime. Fixed in:
+- `lib/ai/provider-router.ts` — 5 imports (`../supabase/server`, adapters, types)
+- `lib/ai/adapters/gemini-adapter.ts`, `anthropic-adapter.ts`, `openai-adapter.ts` — types import
+
+### Login Page Redesign
+Replaced the old login page with a new 50/50 split editorial design:
+- **Left panel**: Dark indigo gradient background with subtle grid overlay, PennySEO logo (white-inverted PNG), Instrument Serif italic headline with orange gradient text ("Your listings deserve to be found."), 3 animated stat cards (Vision AI, Keywords, Market Data)
+- **Right panel**: Clean auth form on slate-50 background — Google OAuth, email/password with visibility toggle, forgot password link, sign-in/sign-up toggle
+- **Fonts**: Added DM Sans + Instrument Serif (Google Fonts) to `index.html`
+- **Centering fix**: Added `min-height: 100vh` to `html, body, #root` in `index.css` to ensure flex centering propagates correctly
+- **No fake testimonials** — replaced with real product value props
+- All existing auth logic preserved (Supabase OAuth, email sign-up/sign-in, email confirmation, redirect from `location.state`)
+
+#### Files Modified
+- `src/pages/LoginPage.jsx` — Complete redesign
+- `src/index.css` — Root `min-height: 100vh` rule
+- `index.html` — Google Fonts preload links
+- `lib/ai/provider-router.ts` — ESM `.js` extensions
+- `lib/ai/adapters/gemini-adapter.ts` — ESM `.js` extension
+- `lib/ai/adapters/anthropic-adapter.ts` — ESM `.js` extension
+- `lib/ai/adapters/openai-adapter.ts` — ESM `.js` extension
+
+### Session Handover
+- **Branch**: `main`
+- **Status**: Login page redesigned, Vercel ESM imports fixed, all API routes operational.
+- **Next Steps**:
+  1. Verify login page centering on different viewport sizes
+  2. Test forgot password flow (currently a placeholder `#` link — needs wiring to Supabase `resetPasswordForEmail`)
+  3. Consider mobile-only branding (left panel hidden on mobile, only form shown)
