@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-03-24*
+*Dernière mise à jour : 2026-03-25*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -1453,3 +1453,52 @@ Replaced the old login page with a new 50/50 split editorial design:
   1. Verify login page centering on different viewport sizes
   2. Test forgot password flow (currently a placeholder `#` link — needs wiring to Supabase `resetPasswordForEmail`)
   3. Consider mobile-only branding (left panel hidden on mobile, only form shown)
+
+## Session: 2026-03-25 — UI Compact Redesign + Draft Prompt Rewrite
+
+### Strategy Tuner Compact Redesign
+Compressed the Advanced SEO Strategy Tuner from ~350px to ~140px vertical space:
+- **Grid**: 2-column → 3+2 grid (`grid-cols-2 md:grid-cols-3`) with Apply button inline in 6th cell
+- **Labels simplified**: Removed parenthetical jargon (e.g. "Market Reach (Volume)" → "Market reach")
+- **Level badges removed**: Redundant — the selected segment already shows the level
+- **Descriptions → tooltips**: Moved helper text into Info icon hover tooltips (dark `bg-slate-800` style)
+- **Segmented buttons**: "Aggressive" abbreviated to "Aggr." for 3-col fit, height reduced (`py-1.5`)
+- **Button**: "Apply New Strategy" → "Apply strategy" with Sparkles icon
+
+#### Files Modified
+- `src/components/studio/StrategyTuner.jsx` — Complete layout rewrite
+
+### Listing Info Sidebar Redesign
+Complete redesign of the right-panel sidebar in ResultsDisplay:
+- **Empty state**: Dashed border card with FileText icon and guidance ("Select 13 keywords, then click Optimize with AI")
+- **Title quality bar**: Color-coded progress bar (green ≥120 chars, amber 80-119, red <80) with contextual hints
+- **Tags pills**: Compact display of selected keywords with expand/collapse (first 5 shown, "+N more" toggle)
+- **Etsy search preview**: Mini card showing how listing appears in Etsy search (thumbnail + title + placeholder price/stars)
+- **Copy buttons**: On title, description, and tags (reuses existing `CopyButton` component)
+- **Save button**: Primary indigo "Save listing" replacing old outline-style "Save Info"
+- **PDF export removed**: Removed from sidebar (still available in HistoryPage)
+
+#### Files Modified
+- `src/components/studio/ResultsDisplay.jsx` — Sidebar section rewrite, removed PDF imports
+
+### Generate-Draft Prompt Rewrite
+Complete replacement of the AI prompt for title/description generation:
+- **Product-first context**: Product details and visual analysis are now primary; shop identity is secondary (sign-off only)
+- **Clean SEO brief**: Removed emoji status badges (💎🔥🌲) → plain text labels (Promising/Trending/Evergreen)
+- **Server-side opening rotation**: `openingStyles[Date.now() % 4]` instead of asking AI to "randomly select"
+- **Title rules**: Good/bad examples instead of rigid 4-step structure; added "word order doesn't matter on Etsy"
+- **Description limits**: Explicit 150-200 word cap; expanded anti-cliché list (6 examples)
+- **Conditional sections**: Shop identity omitted when no shop name; sign-off omitted when no signature
+- **Debug logging**: Console.log of interpolated prompt for dev inspection
+
+#### Files Modified
+- `api/seo/generate-draft.ts` — New prompt template + preprocessing
+- `server.mjs` — Mirror of above for local dev
+
+### Session Handover
+- **Branch**: `main`
+- **Status**: Strategy Tuner compacted, Listing Info sidebar redesigned, draft prompt rewritten
+- **Next Steps**:
+  1. Test draft generation with various product types to validate new prompt quality
+  2. Verify tooltip visibility on different screen sizes (Strategy Tuner)
+  3. Consider removing debug console.log before production deploy

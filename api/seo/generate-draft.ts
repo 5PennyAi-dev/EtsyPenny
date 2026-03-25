@@ -19,106 +19,107 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.info(`[generate-draft] listing=${listing_id} keywords=${keywords.length}`);
 
-    // Step A: Build SEO brief from keywords
-    const seoBrief = keywords.map((item: { keyword: string; status?: { promising?: boolean; trending?: boolean; evergreen?: boolean }; avg_volume?: number; competition?: number }) => {
-      const badges: string[] = [];
-      if (item.status?.promising) badges.push('Promising 💎');
-      if (item.status?.trending) badges.push('Trending 🔥');
-      if (item.status?.evergreen) badges.push('Evergreen 🌲');
-      const badgeText = badges.length > 0 ? badges.join(' + ') : 'Standard';
-      return `- Keyword: "${item.keyword}" | Status: ${badgeText} | Volume: ${item.avg_volume} | Comp: ${item.competition}`;
-    }).join('\n');
+    // Step A: Build clean SEO brief from keywords (no emoji, capped at 13)
+    const statusClean = (item: { status?: { promising?: boolean; trending?: boolean; evergreen?: boolean } }) => {
+      if (item.status?.promising) return 'Promising';
+      if (item.status?.trending) return 'Trending';
+      if (item.status?.evergreen) return 'Evergreen';
+      return 'Standard';
+    };
 
-    const nicheInfo = [categorization?.theme, categorization?.niche, categorization?.sub_niche].filter(Boolean).join(' > ');
+    const briefLines = keywords
+      .slice(0, 13)
+      .map((item: { keyword: string; status?: { promising?: boolean; trending?: boolean; evergreen?: boolean }; avg_volume?: number; competition?: number }) =>
+        `- "${item.keyword}" [${statusClean(item)}] vol:${item.avg_volume || 0} comp:${item.competition || 'N/A'}`)
+      .join('\n');
 
-    // Step B: Build the full prompt (ported from n8n workflow)
-    const prompt = `# Role
-You are an expert Etsy Copywriter acting as the voice of **${shop_context?.shop_name || 'the shop'}**.
-Your goal is to write a product listing that feels authentic to the brand's identity, speaks directly to its target audience, and maintains high SEO performance.
+    // Rotate opening style server-side for variety
+    const openingStyles = ['question', 'sensory', 'occasion', 'relatable'];
+    const openingStyle = openingStyles[Date.now() % openingStyles.length];
 
-# Brand Identity (Context)
-- **Shop Bio/Mission:** ${shop_context?.shop_bio || 'N/A'}
-- **Brand Tone:** ${shop_context?.brand_tone || 'Engaging'}
-- **Target Audience:** ${shop_context?.target_audience || 'General'}
-- **Brand Keywords:** ${Array.isArray(shop_context?.brand_keywords) ? shop_context.brand_keywords.join(', ') : (shop_context?.brand_keywords || 'N/A')}
+    // Step B: Build the prompt
+    const prompt = `You are an Etsy listing copywriter. Write a title and description for this product.
 
-# Input Data
-- **Strategic SEO Brief:**
-${seoBrief}
+# PRODUCT CONTEXT (primary — use this for tone and audience)
+- Product type: ${product_details?.product_type || 'Product'}
+- Theme: ${categorization?.theme || 'N/A'}
+- Niche: ${categorization?.niche || 'N/A'}
+- Sub-niche: ${categorization?.sub_niche || ''}
+- Seller's notes: ${product_details?.client_description || categorization?.user_description || ''}
 
-- **Product Details:**
-- **Product Type:** ${product_details?.product_type || 'Product'}
-- **Theme:** ${categorization?.theme || 'N/A'}
-- **Niche:** ${categorization?.niche || 'N/A'}
-- **Sub-Niche:** ${categorization?.sub_niche || 'N/A'}
-- **Product Description:** ${product_details?.client_description || categorization?.user_description || 'N/A'}
+# VISUAL DETAILS (from AI image analysis)
+- Style: ${visual_analysis?.aesthetic || 'N/A'}
+- Colors: ${visual_analysis?.colors || 'N/A'}
+- Graphics: ${visual_analysis?.graphics || 'N/A'}
+- Typography: ${visual_analysis?.typography || 'N/A'}
+- Target buyers: ${visual_analysis?.target_audience || 'N/A'}
+- Vibe: ${visual_analysis?.overall_vibe || 'N/A'}
 
-# 2. Visual & Marketing Data (Input from Image Analysis)
-- **Aesthetic/Style:** ${visual_analysis?.aesthetic || 'N/A'}
-- **Typography:** ${visual_analysis?.typography || 'N/A'}
-- **Graphic Elements:** ${visual_analysis?.graphics || 'N/A'}
-- **Color Palette:** ${visual_analysis?.colors || 'N/A'}
-- **Target Audience:** ${visual_analysis?.target_audience || 'N/A'}
-- **Overall_vibe:** ${visual_analysis?.overall_vibe || 'N/A'}
+# SEO KEYWORDS (ranked by priority — use as many as possible)
+${briefLines}
+${shop_context?.shop_name ? `
+# SHOP IDENTITY (secondary — use for sign-off only, NOT for tone)
+- Shop: ${shop_context.shop_name}${shop_context?.brand_tone ? `\n- Brand tone: ${shop_context.brand_tone}` : ''}${shop_context?.signature_text ? `\n- Sign-off: ${shop_context.signature_text}` : ''}` : ''}
 
-# Task 1: Strategic Etsy Title (140 chars max)
-- **Structure Logic:** 1. **Primary Hook:** Start immediately with the [Product Type] + [Main Subject] (e.g., "Funny Math T-Shirt" or "Grumpy Cat Teacher Shirt").
-    2. **High-Value Keywords:** Follow with the most "Promising" keywords provided.
-    3. **Target Audience/Occasion:** Include who it's for or the event (e.g., "Gift for Math Teacher", "Back to School").
-    4. **Specific Details:** End with "Trending" keywords or specific visual elements (e.g., "Cat with Pencil").
+---
 
-- **Content Rules:**
-    - The first 40 characters MUST clearly define the product type and main theme.
-    - Avoid "artistic" descriptions (like "Playful Academic") unless they are proven high-volume search terms.
-    - Use variations of the product type (e.g., use both "T-Shirt" and "Shirt" if space permits).
-    - Avoid repeating the exact same word more than twice.
+# TASK 1: TITLE (max 140 characters)
 
-- **Formatting (CRITICAL):** - Use ONLY plain text.
-    - NO bolding, NO italics, NO Markdown in the output string.
-    - NO emojis.
-    - Use " | " as separators with a space before and after the bar.
+Write a search-optimized Etsy title.
 
-- **Goal:** A high-conversion title where the most searchable terms are in the first 60 characters.
+Rules:
+- First 40 chars: product type + main theme (what a buyer sees in search results)
+- Pack in as many SEO keywords as possible without sounding robotic
+- Use " | " as separator between keyword groups
+- Plain text only — no bold, no italics, no emoji, no markdown
+- Don't repeat the exact same word more than twice
+- On Etsy, word ORDER doesn't affect search ranking — focus on including the right words, not their position
 
-# Task 2: Natural "Story & Specs" Description
-Write a description tailored for **${shop_context?.target_audience || 'the target audience'}** using a **${shop_context?.brand_tone || 'Engaging'}** tone.
+Good examples:
+- "Cyberpunk Gamer iPhone Case | Neon Sci-Fi Phone Cover | Gaming Gift for Him"
+- "Funny Math Teacher Shirt | Pi Day T-Shirt Gift | Nerdy School Tee for Her"
+- "Personalized Dog Mom Mug | Custom Pet Name Coffee Cup | Birthday Gift for Dog Lover"
 
-1. **The Emotional Hook (The Story):**
-   - **ANTI-AI RULE:** Do NOT use clichés like "Let's face it," "Look no further," "In a world where," or "Introducing...".
-   - **OPENING VARIETY:** Randomly select ONE of these styles for your first sentence:
-     - *The Direct Question:* (e.g., "Searching for a [Sub-niche] that actually feels like you?")
-     - *The Sensory Approach:* (e.g., "There's a certain [Brand Tone] charm in the way this [Visual Aesthetic] design comes together.")
-     - *The Occasion Hook:* (e.g., "Whether you're gearing up for [Target Audience Occasion] or just treating yourself...")
-     - *The Relatable Vibe:* (e.g., "Finding a [Product Type] that matches your exact style shouldn't be a struggle.")
-   - Write 2-3 fluid sentences describing the product.
-   - **VISUAL PROOF:** Mention at least one specific detail from the 'Visual & Marketing Data' (specific color, texture, or font vibe).
-   - **SEO INTEGRATION:** Naturally weave in 4-6 tags (prioritize Trending and Promising).
-   - **NO FORMATTING:** Under NO circumstances use bold (**keyword**) or italics for keywords in this narrative section.
-   - **NATURAL FLOW:** Keywords must fit so perfectly into the grammar that a reader wouldn't know they are SEO tags.
+Bad examples:
+- "Durable Iphone Case Gamer Iphone Case Gaming Iphone Case Neon" (keyword stuffing, no flow)
+- "The Ultimate Cyberpunk Gaming Experience Phone Case" (wastes chars on filler words)
+- "Beautiful Handmade Premium Quality Case" (generic, no searchable terms)
 
-2. **The "Why You'll Love It" Section (The Specs):**
-   - **DYNAMIC HEADING:** Vary the title of this section (e.g., "Why It's a Must-Have," "The Details You'll Adore," "Fresh Finds & Features").
-   - Use a bulleted list to highlight quality.
-   - Integrate "Evergreen 🌲" tags here.
-   - Use all parameters to explain why the person will love it.
+# TASK 2: DESCRIPTION (150-200 words)
 
-3. **Brand Signature (Call to Action):**
-   - Strictly end the listing with this exact text: "${shop_context?.signature_text || ''}"
+Write a 2-section description.
 
-# Constraints
-- **Tone Consistency:** Strictly adhere to the **${shop_context?.brand_tone || 'Engaging'}** brand voice.
-- **Format:** Strictly JSON output.
-- **Formatting:** Use Markdown only for the description (headings/bullets), but NEVER for keywords in the story.
+## Section 1: Product story (1 short paragraph, 3-4 sentences)
+- Opening style for this listing: "${openingStyle}"
+  - "question" → Start with a direct question to the buyer
+  - "sensory" → Start by describing the look/feel of the design
+  - "occasion" → Start with a use case or gifting scenario
+  - "relatable" → Start with a relatable statement about finding the right product
+- Mention at least ONE specific visual detail (a color, graphic element, or design feature)
+- Weave in 4-6 SEO keywords naturally — they must read as normal English, not forced insertions
+- Do NOT bold or italicize any keywords
+- Do NOT use clichés: "Let's face it", "Look no further", "In a world where", "Introducing", "Say hello to", "Meet your new favorite"
 
-IMPORTANT: **DO NOT** use bold text (keyword) for SEO tags.
+## Section 2: Key features (bulleted list, 4-6 bullets)
+- Use a heading like "Why you'll love it" or "The details" (vary it)
+- Format: markdown bullets (- or •)
+- Include product quality, material, design details, and who it's perfect for
+- Weave in remaining SEO keywords here
+${shop_context?.signature_text ? `
+## Sign-off
+End with exactly: "${shop_context.signature_text}"` : ''}
 
-Self-validation: Review the output against the instructions. If it fails any condition, correct it before responding.
-
-# Output Format
+# OUTPUT FORMAT
+Respond with ONLY this JSON, no other text:
 {
-  "title": "...",
-  "description": "..."
+  "title": "your title here",
+  "description": "your description here with markdown bullets"
 }`;
+
+    // Log the interpolated prompt for debugging
+    console.log('\n========== GENERATE-DRAFT PROMPT ==========\n');
+    console.log(prompt);
+    console.log('\n========== END PROMPT ==========\n');
 
     // Step C: Call Gemini
     const { text: rawResponse } = await runAI('draft_generation', prompt);

@@ -1,13 +1,12 @@
 import {
   Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles,
   ArrowUpDown, ArrowUp, ArrowDown, Lightbulb, AlertTriangle, Target, Loader2,
-  Info, Plus, Minus, Save, Download, ArrowUpRight, ArrowDownRight, ShoppingCart,
-  Pin, Tag, User, Zap, Swords, DollarSign, Award, BarChart3, History, Folder, Shield
+  Info, Plus, Minus, Save, ArrowUpRight, ArrowDownRight, ShoppingCart,
+  Pin, Tag, User, Zap, Swords, DollarSign, Award, BarChart3, History, Folder, Shield,
+  FileText, Image as ImageIcon
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import ListingPDFDocument from '../pdf/ListingPDFDocument';
 import Accordion from '../ui/Accordion';
 import StrategyTuner from './StrategyTuner';
 import FavoritesPickerModal from './FavoritesPickerModal';
@@ -491,7 +490,8 @@ const SidebarSkeleton = ({ phase }) => (
     // Local state for sorting
     const [sortConfig, setSortConfig] = useState({ key: 'score', direction: 'desc' });
     const [selectedTags, setSelectedTags] = useState([]);
-  
+    const [showAllTags, setShowAllTags] = useState(false);
+
     const [showAll, setShowAll] = useState(false);
   
     // --- Inline Add Keyword State Management ---
@@ -1468,115 +1468,155 @@ const SidebarSkeleton = ({ phase }) => (
                             </div>
                         </div>
                     ) : (
-                        <div className="flex-1 flex flex-col space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            {/* Title Input */}
-                            <div className="space-y-1.5">
-                                <div className="flex justify-between items-center">
-                                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                        Title 
-                                        <CopyButton text={displayedTitle} label="Copy Title" />
-                                    </label>
-                                    <span className={`text-xs font-bold ${displayedTitle.length > 140 ? 'text-rose-500' : 'text-slate-400'}`}>{displayedTitle.length}/140</span>
+                        <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            {!displayedTitle && !displayedDescription ? (
+                                /* Empty State */
+                                <div className="flex-1 flex items-center justify-center">
+                                    <div className="border border-dashed border-slate-300 rounded-lg p-6 text-center bg-slate-50 w-full">
+                                        <FileText size={28} className="mx-auto text-slate-300 mb-2" strokeWidth={1.5} />
+                                        <p className="text-sm font-medium text-slate-500 mb-1">No listing generated yet</p>
+                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                            Select 13 keywords, then click<br/>"Optimize with AI" above
+                                        </p>
+                                    </div>
                                 </div>
-                                <textarea 
-                                    value={displayedTitle}
-                                    onChange={(e) => setDisplayedTitle(e.target.value)}
-                                    placeholder="Product title will appear here..."
-                                    className={`w-full px-3 py-2 text-sm text-slate-700 bg-slate-50/50 border rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none transition-all
-                                        ${displayedTitle.length > 140 ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-200'}`}
-                                    rows={3}
-                                />
-                            </div>
-
-                            {/* Description Input */}
-                            <div className="space-y-1.5 flex-grow flex flex-col">
-                                <div className="flex items-center gap-2">
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Description</label>
-                                    <CopyButton text={displayedDescription} label="Copy Description" />
-                                </div>
-                                <textarea 
-                                    ref={descriptionRef}
-                                    value={displayedDescription}
-                                    onChange={(e) => setDisplayedDescription(e.target.value)}
-                                    placeholder="Product description will appear here..."
-                                    className="w-full px-3 py-2 text-sm text-slate-700 bg-slate-50/50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none transition-all custom-scrollbar flex-grow overflow-hidden min-h-[300px]"
-                                />
-                            </div>
-
-                                {/* Save Info & Export Buttons */}
-                                <div className="flex flex-col gap-2 pt-2">
-                                {results ? (
-                                <button
-                                    onClick={() => onSaveListingInfo(displayedTitle, displayedDescription)}
-                                    className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-lg border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center justify-center gap-2 shadow-sm"
-                                >
-                                    <Save size={16} />
-                                    <span className="font-bold">Save Info</span>
-                                </button>
-                                ) : (
-                                    <button disabled className="w-full py-2.5 bg-slate-100 text-slate-400 text-sm font-medium rounded-lg border border-slate-200 cursor-not-allowed flex items-center justify-center gap-2">
-                                        <Save size={16} />
-                                        <span className="font-bold">Save Info</span>
-                                    </button>
-                                )}
-
-                                {results && (
-                                    <PDFDownloadLink
-                                        key={`pdf-${displayedTitle}-${selectedTags.length}-version6`}
-                                        document={
-                                            <ListingPDFDocument 
-                                                listing={{
-                                                    title: displayedTitle,
-                                                    description: displayedDescription,
-                                                    imageUrl: results.imageUrl,
-                                                    global_strength: results.global_strength ?? null,
-                                                    status_label: results.status_label ?? null,
-                                                    strategic_verdict: results.strategic_verdict ?? null,
-                                                    productName: displayedTitle.split(' ').slice(0, 5).join(' ') + '...', // Simple truncated name
-                                                    tags: (results.analytics || [])
-                                                        .filter(k => selectedTags.includes(k.keyword))
-                                                        .map(k => {
-                                                            // Calculate Trend %
-                                                            let trend = 0;
-                                                            if (k.volume_history?.length > 0) {
-                                                                const first = k.volume_history[k.volume_history.length - 1] || 1;
-                                                                const last = k.volume_history[0] || 0;
-                                                                trend = Math.round(((last - first) / first) * 100);
-                                                            }
-                                                            
-                                                            return {
-                                                                keyword: k.keyword,
-                                                                volume: k.volume,
-                                                                competition: k.competition, 
-                                                                score: k.score,
-                                                                trend: trend,
-                                                                is_trending: k.is_trending,
-                                                                is_evergreen: k.is_evergreen,
-                                                                is_promising: k.is_promising
-                                                            };
-                                                        })
-                                                }} 
-                                                fileName={`${displayedTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_analysis.pdf`}
+                            ) : (
+                                /* Populated State */
+                                <div className="space-y-4">
+                                    {/* Title Input with Quality Bar */}
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-xs font-medium text-slate-500 tracking-wider uppercase">Title</span>
+                                                <CopyButton text={displayedTitle} label="Copy Title" />
+                                            </div>
+                                            <span className={`text-xs font-bold ${displayedTitle.length >= 120 ? 'text-emerald-600' : displayedTitle.length >= 80 ? 'text-amber-500' : 'text-rose-500'}`}>
+                                                {displayedTitle.length}/140
+                                            </span>
+                                        </div>
+                                        <textarea
+                                            value={displayedTitle}
+                                            onChange={(e) => setDisplayedTitle(e.target.value)}
+                                            placeholder="Product title will appear here..."
+                                            className={`w-full px-3 py-2 text-sm text-slate-700 bg-slate-50/50 border rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none transition-all
+                                                ${displayedTitle.length > 140 ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-200'}`}
+                                            rows={3}
+                                        />
+                                        {/* Quality bar */}
+                                        <div className="h-[3px] bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full transition-all ${
+                                                    displayedTitle.length >= 120 ? 'bg-emerald-500' :
+                                                    displayedTitle.length >= 80 ? 'bg-amber-500' : 'bg-rose-500'
+                                                }`}
+                                                style={{ width: `${Math.min(100, (displayedTitle.length / 140) * 100)}%` }}
                                             />
-                                        }
-                                        className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold rounded-lg border border-transparent transition-all flex items-center justify-center gap-2 shadow-sm"
-                                    >
-                                        {({ blob, url, loading, error }) =>
-                                            loading ? (
-                                                <>
-                                                    <Loader2 size={16} className="animate-spin" />
-                                                    <span>Preparing PDF...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Download size={16} />
-                                                    <span>Export PDF Report</span>
-                                                </>
-                                            )
-                                        }
-                                    </PDFDownloadLink>
+                                        </div>
+                                        {/* Contextual hint */}
+                                        {displayedTitle.length > 0 && displayedTitle.length < 120 && (
+                                            <p className="text-[10px] text-amber-500 mt-1">
+                                                {displayedTitle.length < 80
+                                                    ? `${140 - displayedTitle.length} chars remaining — add more keywords for better visibility`
+                                                    : `Almost there! ${140 - displayedTitle.length} chars left to maximize reach`
+                                                }
+                                            </p>
+                                        )}
+                                        {displayedTitle.length >= 120 && (
+                                            <p className="text-[10px] text-emerald-600 mt-1">Great length — optimal for Etsy search</p>
+                                        )}
+                                    </div>
+
+                                    {/* Description Input */}
+                                    <div>
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <span className="text-xs font-medium text-slate-500 tracking-wider uppercase">Description</span>
+                                            <CopyButton text={displayedDescription} label="Copy Description" />
+                                        </div>
+                                        <textarea
+                                            ref={descriptionRef}
+                                            value={displayedDescription}
+                                            onChange={(e) => setDisplayedDescription(e.target.value)}
+                                            placeholder="Product description will appear here..."
+                                            className="w-full px-3 py-2 text-sm text-slate-700 bg-slate-50/50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none transition-all custom-scrollbar overflow-hidden min-h-[200px]"
+                                        />
+                                    </div>
+
+                                    {/* Tags Pills */}
+                                    {selectedTags.length > 0 && (
+                                        <div>
+                                            <div className="flex justify-between items-center mb-1.5">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-xs font-medium text-slate-500 tracking-wider uppercase">Tags</span>
+                                                    <span className="text-[10px] text-slate-400">{selectedTags.length}/13</span>
+                                                </div>
+                                                <CopyButton text={selectedTags.join(', ')} label="Copy all tags" />
+                                            </div>
+                                            <div className="flex flex-wrap gap-1">
+                                                {selectedTags.slice(0, 5).map(tag => (
+                                                    <span key={tag} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                                                        {tag}
+                                                    </span>
+                                                ))}
+                                                {selectedTags.length > 5 && (
+                                                    <button
+                                                        onClick={() => setShowAllTags(!showAllTags)}
+                                                        className="text-[10px] bg-slate-100 text-indigo-600 px-2 py-0.5 rounded-full hover:bg-indigo-50 transition-colors"
+                                                    >
+                                                        {showAllTags ? 'Show less' : `+${selectedTags.length - 5} more`}
+                                                    </button>
+                                                )}
+                                                {showAllTags && selectedTags.slice(5).map(tag => (
+                                                    <span key={tag} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                                                        {tag}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
                                     )}
+
+                                    {/* Etsy Search Preview */}
+                                    {displayedTitle && (
+                                        <div>
+                                            <span className="text-xs font-medium text-slate-500 tracking-wider uppercase block mb-1.5">Etsy Preview</span>
+                                            <div className="border border-slate-200 rounded-lg p-2.5 bg-white">
+                                                <div className="flex gap-2.5">
+                                                    {/* Thumbnail */}
+                                                    <div className="w-14 h-14 rounded-md bg-slate-100 flex-shrink-0 overflow-hidden">
+                                                        {results?.imageUrl ? (
+                                                            <img src={results.imageUrl} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center">
+                                                                <ImageIcon size={20} className="text-slate-300" strokeWidth={1.5} />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {/* Content */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-medium text-slate-800 leading-snug line-clamp-2">
+                                                            {displayedTitle}
+                                                        </p>
+                                                        <div className="flex items-center gap-1.5 mt-1">
+                                                            <span className="text-sm font-medium text-slate-800">$--</span>
+                                                            <span className="text-[10px] text-emerald-600">★★★★★</span>
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-400 mt-0.5">Free shipping</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Save Button */}
+                                    <button
+                                        onClick={() => onSaveListingInfo(displayedTitle, displayedDescription)}
+                                        disabled={!results}
+                                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <Save size={14} />
+                                        Save listing
+                                    </button>
                                 </div>
+                            )}
                         </div>
                     )}
              </div>
