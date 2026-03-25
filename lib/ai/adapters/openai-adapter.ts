@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { AICallParams, AIResponse } from '../types';
+import type { AICallParams, AIResponse } from '../types.js';
 
 let client: OpenAI;
 function getClient() {

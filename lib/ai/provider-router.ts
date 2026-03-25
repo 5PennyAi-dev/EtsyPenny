@@ -1,8 +1,8 @@
-import { supabaseAdmin } from '../supabase/server';
-import { callGemini } from './adapters/gemini-adapter';
-import { callAnthropic } from './adapters/anthropic-adapter';
-import { callOpenAI } from './adapters/openai-adapter';
-import type { AICallParams, AIResponse } from './types';
+import { supabaseAdmin } from '../supabase/server.js';
+import { callGemini } from './adapters/gemini-adapter.js';
+import { callAnthropic } from './adapters/anthropic-adapter.js';
+import { callOpenAI } from './adapters/openai-adapter.js';
+import type { AICallParams, AIResponse } from './types.js';
 
 // In-memory cache for task configs
 let configCache: Record<string, any> = {};
