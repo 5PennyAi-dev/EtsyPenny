@@ -19,6 +19,8 @@ import { toast } from 'sonner';
 
 const IMAGE_ANALYSIS_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 const IMAGE_ANALYSIS_CANCEL_VISIBLE_MS = 30 * 1000; // Show cancel link after 30s
+const SEO_GENERATION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const SEO_CANCEL_VISIBLE_MS = 60 * 1000; // Show cancel link after 60s
 
 const STATUS_IDS = {
   NEW: 'ac083a90-43fa-4ff5-a62d-5cd6bb5edbcc',
@@ -80,6 +82,7 @@ const ProductStudio = () => {
   const [analysisContext, setAnalysisContext] = useState(null);
   const [listingName, setListingName] = useState("");
   const [isImageAnalyzedState, setIsImageAnalyzedState] = useState(false);
+  const [seoGenerationCount, setSeoGenerationCount] = useState(0);
   const [resetSelectionKey, setResetSelectionKey] = useState(0);
   const [refreshFavoritesKey, setRefreshFavoritesKey] = useState(0);
   const [userDefaults, setUserDefaults] = useState(null);
@@ -87,6 +90,7 @@ const ProductStudio = () => {
   // Visual Analysis State
   const [isAnalyzingDesign, setIsAnalyzingDesign] = useState(false);
   const [showAnalysisCancel, setShowAnalysisCancel] = useState(false);
+  const [showSeoCancelLink, setShowSeoCancelLink] = useState(false);
   const [visualAnalysis, setVisualAnalysis] = useState({
       aesthetic: "",
       typography: "",
@@ -357,6 +361,7 @@ const ProductStudio = () => {
       if (!isWaitingForSeoRef.current) return; // Already handled
       isWaitingForSeoRef.current = false;
       seoTriggeredAtRef.current = null;
+      setShowSeoCancelLink(false);
       setPostSeoTrigger(t => t + 1); // Delegate to post-SEO effect (has fresh state)
     };
 
@@ -424,6 +429,26 @@ const ProductStudio = () => {
       }
     }, IMAGE_ANALYSIS_CANCEL_VISIBLE_MS);
 
+    // 5. Timeout — auto-cancel if SEO generation takes too long
+    const seoTimeout = setTimeout(() => {
+      if (isWaitingForSeoRef.current) {
+        isWaitingForSeoRef.current = false;
+        seoTriggeredAtRef.current = null;
+        setIsSeoLoading(false);
+        setShowSeoCancelLink(false);
+        // Best-effort DB flag reset
+        supabase.from('listings').update({ is_generating_seo: false }).eq('id', listingId);
+        toast.error("SEO generation timed out. You can re-launch it.");
+      }
+    }, SEO_GENERATION_TIMEOUT_MS);
+
+    // 6. Show SEO cancel link after 60s of waiting
+    const seoCancelVisibleTimeout = setTimeout(() => {
+      if (isWaitingForSeoRef.current) {
+        setShowSeoCancelLink(true);
+      }
+    }, SEO_CANCEL_VISIBLE_MS);
+
     // Shared handler for Image Analysis completion
     const handleImageAnalysisDone = async (data) => {
         if (!isWaitingForImageAnalysisRef.current) return;
@@ -478,6 +503,8 @@ const ProductStudio = () => {
       clearInterval(pollInterval);
       clearTimeout(analysisTimeout);
       clearTimeout(cancelVisibleTimeout);
+      clearTimeout(seoTimeout);
+      clearTimeout(seoCancelVisibleTimeout);
     };
   }, [listingId]);
 
@@ -929,6 +956,17 @@ const ProductStudio = () => {
     }
   };
 
+  const handleCancelSeoGeneration = async () => {
+      isWaitingForSeoRef.current = false;
+      seoTriggeredAtRef.current = null;
+      setIsSeoLoading(false);
+      setShowSeoCancelLink(false);
+      if (listingId) {
+          await supabase.from('listings').update({ is_generating_seo: false }).eq('id', listingId);
+      }
+      toast.info("SEO generation cancelled. You can re-launch it.");
+  };
+
   const handleRelaunchSEO = () => {
       if (!analysisContext || !results?.imageUrl) return;
       
@@ -1261,6 +1299,7 @@ const ProductStudio = () => {
           } else {
               toast.error(err.response?.data?.error || err.message || "Failed to add keyword.");
           }
+          if (onSuccess) onSuccess(); // Close the input row on error too
       } finally {
           setIsAddingKeyword(false);
       }
@@ -1359,6 +1398,7 @@ const ProductStudio = () => {
         overall_vibe: ""
     });
     setIsImageAnalyzedState(false); // Reset: new listing has no image analysis yet
+    setSeoGenerationCount(0);       // Reset: new listing has no SEO generations
     setIsAnalyzingDesign(false);    // Also clear any in-progress spinner
     setFormKey(prev => prev + 1);   // Reset ImageUpload
     setIsNewListingActive(true);    // Manually activate the form for a new session
@@ -1542,8 +1582,12 @@ const ProductStudio = () => {
         }
 
       // Sync local state for the form button
-      const isAnalysed = listing.is_image_analysed || false;
+      // Derive from flag OR actual data — covers legacy listings where flag wasn't set
+      const hasVisualData = !!(listing.visual_aesthetic || listing.visual_colors || listing.visual_overall_vibe);
+      const hasSeoResults = !!(stats && stats.length > 0);
+      const isAnalysed = listing.is_image_analysed || hasVisualData || hasSeoResults;
       setIsImageAnalyzedState(isAnalysed);
+      setSeoGenerationCount(listing.seo_generation_count || 0);
 
       setListingId(listingId);
     
@@ -1583,9 +1627,19 @@ const ProductStudio = () => {
 
       // Check for pending SEO Analysis to resume polling and skeleton
       if (listing.is_generating_seo) {
-          isWaitingForSeoRef.current = true;
-          seoTriggeredAtRef.current = new Date(Date.now() - 60000).toISOString();
-          setIsSeoLoading(true);
+          const updatedAgo = Date.now() - new Date(listing.updated_at).getTime();
+          if (updatedAgo < 5 * 60 * 1000) {
+              // Generation likely still in progress (updated < 5 min ago)
+              isWaitingForSeoRef.current = true;
+              seoTriggeredAtRef.current = new Date(Date.now() - 60000).toISOString();
+              setIsSeoLoading(true);
+          } else {
+              // Generation likely failed long ago — reset flag, don't show spinner
+              isWaitingForSeoRef.current = false;
+              setIsSeoLoading(false);
+              supabase.from('listings').update({ is_generating_seo: false }).eq('id', listing.id);
+              toast.warning("Previous SEO generation didn't complete. You can re-launch it.");
+          }
       } else {
           isWaitingForSeoRef.current = false;
           setIsSeoLoading(false);
@@ -1816,6 +1870,8 @@ const ProductStudio = () => {
       isGeneratingDraft={isGeneratingDraft}
       onRelaunchSEO={handleRelaunchSEO}
       isSeoLoading={isSeoLoading}
+      showSeoCancelLink={showSeoCancelLink}
+      onCancelSeoGeneration={handleCancelSeoGeneration}
       onSEOSniper={handleSEOSniper}
       isSniperLoading={isSniperLoading}
       onAddCustomKeyword={handleAddCustomKeyword}
@@ -2258,10 +2314,10 @@ const ProductStudio = () => {
                              !(selectedImage || results?.imageUrl) ? 'SELECT AN IMAGE FIRST' :
                              !isImageAnalyzedState ? 'ANALYZE IMAGE FIRST' :
                              !productTypeName ? 'SELECT PRODUCT TYPE' :
-                             'GENERATE SEO'
+                             seoGenerationCount > 0 ? 'RE-GENERATE SEO' : 'GENERATE SEO'
                            )}
                            {!isLoading && isImageAnalyzedState && productTypeName && (
-                             <span className="ml-1 text-xs bg-indigo-500/30 text-indigo-100 px-1.5 py-0.5 rounded-full">8 tokens</span>
+                             <span className="ml-1 text-xs bg-indigo-500/30 text-indigo-100 px-1.5 py-0.5 rounded-full">{seoGenerationCount > 0 ? '4' : '8'} tokens</span>
                            )}
                          </button>
                        </div>

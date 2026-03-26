@@ -115,7 +115,7 @@ const AuditSkeleton = () => (
 );
 
 // Reusable Loading Spinner with Message
-const LoadingSpinner = ({ message, subMessage }) => (
+const LoadingSpinner = ({ message, subMessage, showCancel, onCancel }) => (
     <div className="flex flex-col items-center justify-center p-12 text-center animate-in fade-in duration-500">
         <div className="relative mb-6">
             <div className="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin" />
@@ -129,10 +129,18 @@ const LoadingSpinner = ({ message, subMessage }) => (
         <p className="text-slate-500 text-sm max-w-xs mx-auto leading-relaxed">
             {subMessage || 'Please wait while we analyze your data.'}
         </p>
+        {showCancel && onCancel && (
+            <button
+                onClick={onCancel}
+                className="mt-3 text-xs text-slate-500 hover:text-indigo-600 underline transition-colors"
+            >
+                Taking too long? Cancel
+            </button>
+        )}
     </div>
 );
 
-const TableSkeleton = ({ message, subMessage }) => (
+const TableSkeleton = ({ message, subMessage, showCancel, onCancel }) => (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-8 relative overflow-hidden">
         {/* Header Skeleton */}
         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center opacity-50">
@@ -160,7 +168,7 @@ const TableSkeleton = ({ message, subMessage }) => (
 
             {/* Centered Loading Spinner */}
             <div className="absolute inset-0 flex items-center justify-center backdrop-blur-[1px]">
-                  <LoadingSpinner message={message} subMessage={subMessage} />
+                  <LoadingSpinner message={message} subMessage={subMessage} showCancel={showCancel} onCancel={onCancel} />
             </div>
         </div>
     </div>
@@ -458,6 +466,8 @@ const SidebarSkeleton = ({ phase }) => (
   }
 
   const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, isSeoLoading,
+    showSeoCancelLink,
+    onCancelSeoGeneration,
     onAddCustomKeyword,
     onAddBatchKeywords,
     isAddingKeyword,
@@ -923,6 +933,8 @@ const SidebarSkeleton = ({ phase }) => (
                       <TableSkeleton
                           message="Generating SEO data"
                           subMessage="Analyzing search volume, competition, and trends."
+                          showCancel={showSeoCancelLink}
+                          onCancel={onCancelSeoGeneration}
                       />
                   ) : (
                 <div className={!results ? "opacity-50 grayscale pointer-events-none" : ""}>

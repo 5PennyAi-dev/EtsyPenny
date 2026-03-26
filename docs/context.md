@@ -1597,3 +1597,39 @@ Implemented a complete token-based billing system with Stripe integration across
   2. Add Stripe webhook endpoint URL in Stripe Dashboard → Developers → Webhooks
   3. Test end-to-end: checkout flow, token deduction, webhook events, billing portal
   4. Update old `credits_balance` / `subscription_credits_balance` / `bonus_credits_balance` UI references (Dashboard QuickStats) to use new token fields
+
+## Session: 2026-03-26 — SEO Generation Stuck Spinner Recovery + UX Fixes
+
+### SEO Generation Stuck Spinner Recovery
+Mirrored the image analysis recovery pattern for SEO generation — previously had no timeout or recovery mechanism, causing infinite spinners when the backend failed silently.
+
+- **5-minute timeout**: Added `SEO_GENERATION_TIMEOUT_MS` (5 min) and `SEO_CANCEL_VISIBLE_MS` (60s) constants. Auto-cancels stuck SEO generation after 5 minutes, resets DB flag, shows error toast.
+- **Cancel escape hatch**: "Taking too long? Cancel" link appears in the `TableSkeleton` loading spinner after 60 seconds of waiting.
+- **Age-based stale detection**: When loading a listing with `is_generating_seo: true` and `updated_at` older than 5 minutes, the spinner is skipped, the DB flag is silently reset, and a warning toast is shown.
+- **handleSeoDone cleanup**: `showSeoCancelLink` state is cleared on successful SEO completion.
+- **LoadingSpinner/TableSkeleton extended**: Both components now accept optional `showCancel`/`onCancel` props for the cancel link.
+
+#### Files Modified
+- `src/pages/ProductStudio.jsx` — Constants, state, timeout/cancel in realtime effect, age-based detection in `handleLoadListing`, `handleCancelSeoGeneration` function, new props to ResultsDisplay
+- `src/components/studio/ResultsDisplay.jsx` — `LoadingSpinner` and `TableSkeleton` accept cancel props, SEO skeleton passes them through
+
+### Custom Keyword Input Not Closing on 402 Error
+When adding a custom keyword with insufficient tokens, dismissing the quota modal left the keyword input row open.
+- **Fix**: Added `onSuccess()` call in the `catch` block of `handleAddCustomKeyword` so the inline input row closes on error too.
+
+#### Files Modified
+- `src/pages/ProductStudio.jsx` — `handleAddCustomKeyword` catch block
+
+### Generate SEO Button: Dynamic Label & Token Cost
+The Generate SEO button now shows context-appropriate label and token cost based on `seo_generation_count` from the `listings` table:
+- **First generation** (`seo_generation_count === 0`): "GENERATE SEO" / "8 tokens"
+- **Re-generation** (`seo_generation_count > 0`): "RE-GENERATE SEO" / "4 tokens"
+- Added `seoGenerationCount` state, hydrated from `listing.seo_generation_count` in `handleLoadListing`, reset to 0 in `handleNewAnalysis`.
+
+### Image Analysis State Detection Fix
+Fixed a bug where listings with completed image analysis (visual fields populated, SEO results present) could show the button stuck on "ANALYZE IMAGE FIRST".
+- **Root cause**: `isImageAnalyzedState` relied solely on `listing.is_image_analysed` DB flag, which could be `false` for legacy listings.
+- **Fix**: Now derives from three sources: `is_image_analysed` flag OR visual data fields populated OR existing SEO results.
+
+#### Files Modified
+- `src/pages/ProductStudio.jsx` — `seoGenerationCount` state, `isImageAnalyzedState` derivation, button label logic
