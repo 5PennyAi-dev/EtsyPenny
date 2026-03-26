@@ -15,6 +15,9 @@ import { useAuth } from '../context/AuthContext';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { toast } from 'sonner';
 
+const IMAGE_ANALYSIS_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+const IMAGE_ANALYSIS_CANCEL_VISIBLE_MS = 30 * 1000; // Show cancel link after 30s
+
 const STATUS_IDS = {
   NEW: 'ac083a90-43fa-4ff5-a62d-5cd6bb5edbcc',
   SEO_DONE: '35660e24-94bb-4586-aa5a-a5027546b4a1',
@@ -81,6 +84,7 @@ const ProductStudio = () => {
   
   // Visual Analysis State
   const [isAnalyzingDesign, setIsAnalyzingDesign] = useState(false);
+  const [showAnalysisCancel, setShowAnalysisCancel] = useState(false);
   const [visualAnalysis, setVisualAnalysis] = useState({
       aesthetic: "",
       typography: "",
@@ -392,9 +396,27 @@ const ProductStudio = () => {
           await handleImageAnalysisDone(data);
         }
       } catch (e) {
-        // Silently ignore poll errors
+        console.warn("Listing poll error:", e);
       }
     }, 5000);
+
+    // 3. Timeout — auto-cancel if image analysis takes too long
+    const analysisTimeout = setTimeout(() => {
+      if (isWaitingForImageAnalysisRef.current) {
+        isWaitingForImageAnalysisRef.current = false;
+        imageAnalysisTriggeredAtRef.current = null;
+        setIsAnalyzingDesign(false);
+        setShowAnalysisCancel(false);
+        toast.error("Image analysis timed out. Please try again.");
+      }
+    }, IMAGE_ANALYSIS_TIMEOUT_MS);
+
+    // 4. Show cancel link after 30s of waiting
+    const cancelVisibleTimeout = setTimeout(() => {
+      if (isWaitingForImageAnalysisRef.current) {
+        setShowAnalysisCancel(true);
+      }
+    }, IMAGE_ANALYSIS_CANCEL_VISIBLE_MS);
 
     // Shared handler for Image Analysis completion
     const handleImageAnalysisDone = async (data) => {
@@ -433,6 +455,7 @@ const ProductStudio = () => {
 
         setIsImageAnalyzedState(true);
         setIsAnalyzingDesign(false);
+        setShowAnalysisCancel(false);
         setClassificationOpen(true);
         toast.success("Visual analysis complete! ✨");
     };
@@ -447,6 +470,8 @@ const ProductStudio = () => {
     return () => {
       supabase.removeChannel(channel);
       clearInterval(pollInterval);
+      clearTimeout(analysisTimeout);
+      clearTimeout(cancelVisibleTimeout);
     };
   }, [listingId]);
 
@@ -505,6 +530,7 @@ const ProductStudio = () => {
       }
 
       setIsAnalyzingDesign(true);
+      setShowAnalysisCancel(false);
 
       try {
           // Upload if fresh image
@@ -1506,10 +1532,17 @@ const ProductStudio = () => {
 
       // Check for pending Image Analysis to resume polling and spinner
       if (listing.image_url && !isAnalysed) {
-          isWaitingForImageAnalysisRef.current = true;
-          // Set to a past date so the > trigger check bypasses safely, or rely on our new 'true' override
-          imageAnalysisTriggeredAtRef.current = new Date(Date.now() - 60000).toISOString(); 
-          setIsAnalyzingDesign(true);
+          const updatedAgo = Date.now() - new Date(listing.updated_at).getTime();
+          if (updatedAgo < 5 * 60 * 1000) {
+              // Analysis likely still in progress (updated < 5 min ago)
+              isWaitingForImageAnalysisRef.current = true;
+              imageAnalysisTriggeredAtRef.current = new Date(Date.now() - 60000).toISOString();
+              setIsAnalyzingDesign(true);
+          } else {
+              // Analysis likely failed long ago — don't show spinner
+              isWaitingForImageAnalysisRef.current = false;
+              setIsAnalyzingDesign(false);
+          }
       } else {
           isWaitingForImageAnalysisRef.current = false;
           setIsAnalyzingDesign(false);
@@ -1941,6 +1974,20 @@ const ProductStudio = () => {
                                    <div className="flex flex-col items-center">
                                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
                                      <span className="text-xs font-bold text-indigo-700 animate-pulse">Analyzing...</span>
+                                     {showAnalysisCancel && (
+                                       <button
+                                         onClick={() => {
+                                           isWaitingForImageAnalysisRef.current = false;
+                                           imageAnalysisTriggeredAtRef.current = null;
+                                           setIsAnalyzingDesign(false);
+                                           setShowAnalysisCancel(false);
+                                           toast.info("Analysis cancelled. You can retry with the Analyse Design button.");
+                                         }}
+                                         className="mt-2 text-xs text-slate-500 hover:text-indigo-600 underline transition-colors"
+                                       >
+                                         Taking too long? Cancel
+                                       </button>
+                                     )}
                                    </div>
                                  </div>
                                )}

@@ -69,7 +69,7 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
   if (!keywords || keywords.length === 0) return [];
 
   const maxRefCPC = 1.5;
-  const maxVol = Math.max(...keywords.map(k => k.search_volume || (k as any).volume || 0), 100);
+  const VOLUME_CEILING = 50_000;
 
   // Hard filter limits from old logic (could be made dynamic if needed)
   const MIN_TRANSACTIONAL = 5;
@@ -87,12 +87,15 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
     if (!item.is_user_added && (txScore < MIN_TRANSACTIONAL || nicheScore < MIN_NICHE)) return null;
 
     // A. Normalization & Scoring
-    const V = Math.log(vol + 1) / Math.log(maxVol + 1);
+    const V = Math.log(vol + 1) / Math.log(VOLUME_CEILING + 1);
     const C = 1 - rawComp;
-    const T = Math.pow(txScore / 10, 2);
-    const N = Math.pow(nicheScore / 10, 2);
+    const T = txScore / 10;
+    const N = nicheScore / 10;
     const E = Math.min(1, rawCPC / maxRefCPC);
 
+    // opportunity_score: geometric mean of 5 factors (0-100)
+    // V: volume vs 50K ceiling | C: 1-competition | T: transactional/10
+    // N: niche/10 | E: cpc/1.5 capped at 1
     let finalScore = 100 * (
       Math.pow(V || 0.01, params.Volume) *
       Math.pow(C || 0.01, params.Competition) *

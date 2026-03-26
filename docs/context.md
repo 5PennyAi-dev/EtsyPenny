@@ -1495,10 +1495,30 @@ Complete replacement of the AI prompt for title/description generation:
 - `api/seo/generate-draft.ts` — New prompt template + preprocessing
 - `server.mjs` — Mirror of above for local dev
 
+### Image Analysis Stuck Spinner Fix
+Added timeout and recovery mechanisms to prevent listings from getting permanently stuck in "Analyzing..." state:
+- **3-minute timeout**: Auto-cancels the spinner with error toast if analysis hasn't completed
+- **Stale detection on reload**: Listings with `updated_at` older than 5 minutes no longer resume the spinner (assumes analysis failed)
+- **Cancel escape hatch**: "Taking too long? Cancel" link appears after 30 seconds of waiting
+- **Polling error logging**: Replaced silent `catch` with `console.warn` for debuggability
+
+#### Files Modified
+- `src/pages/ProductStudio.jsx` — Timeout logic in realtime/polling useEffect, stale guard in `handleLoadListing`, cancel UI in spinner overlay
+
+### Smart Badge Formula Fix (Opportunity Score)
+Fixed the opportunity score calculation in `applySEOFilter()` that powers the Promising badge:
+- **Volume normalization**: Replaced pool-relative `maxVol` with fixed `VOLUME_CEILING = 50,000` — scores are now stable regardless of pool composition
+- **Linear T & N scores**: Changed `Math.pow(x/10, 2)` → `x/10` for transactional and niche factors — a 7/10 score now contributes 0.70 instead of 0.49 (quadratic was too punishing for the 4-tier system)
+- **CPC ceiling**: Already aligned at $1.50, no change needed
+
+#### Files Modified
+- `lib/seo/filter-logic.ts` — Opportunity score formula in `applySEOFilter()`
+
 ### Session Handover
 - **Branch**: `main`
-- **Status**: Strategy Tuner compacted, Listing Info sidebar redesigned, draft prompt rewritten
+- **Status**: Image analysis stuck spinner fixed, opportunity score formula recalibrated
 - **Next Steps**:
-  1. Test draft generation with various product types to validate new prompt quality
-  2. Verify tooltip visibility on different screen sizes (Strategy Tuner)
-  3. Consider removing debug console.log before production deploy
+  1. Test image analysis timeout by triggering analysis and observing cancel link after 30s
+  2. Verify Promising badge distribution improved after linear T/N change
+  3. Run pool reset on existing listings to recalculate scores with new formula
+  4. Consider removing debug console.log before production deploy
