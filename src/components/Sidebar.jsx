@@ -1,4 +1,4 @@
-import { LayoutDashboard, Shirt, LineChart, FlaskConical, ShoppingBag, Settings, User, LogOut, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, Shirt, LineChart, FlaskConical, ShoppingBag, Settings, User, LogOut, ShieldAlert, CreditCard, Coins } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import pennyseoLogo from '../assets/pennyseo-logo.png';
@@ -14,6 +14,7 @@ const Sidebar = () => {
     { name: 'SEO Lab', icon: FlaskConical, path: '/lab' },
     { name: 'My Shop', icon: ShoppingBag, path: '/shop' },
     { name: 'Settings', icon: Settings, path: '/settings' },
+    { name: 'Billing', icon: CreditCard, path: '/billing' },
   ];
 
   const handleLogout = async () => {
@@ -72,6 +73,19 @@ const Sidebar = () => {
         >
           <ShieldAlert size={20} className={location.pathname === '/admin/system' ? 'text-rose-600' : 'text-slate-400'} />
           Admin
+        </Link>
+      </div>
+
+      {/* Token Badge */}
+      <div className="px-4 pb-1">
+        <Link to="/billing" className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors">
+          <Coins className="w-4 h-4 text-amber-500" />
+          <span className="text-sm font-medium text-slate-700">
+            {(profile?.tokens_monthly_balance ?? 0) + (profile?.tokens_bonus_balance ?? 0)} tokens
+          </span>
+          {((profile?.tokens_monthly_balance ?? 0) + (profile?.tokens_bonus_balance ?? 0)) < 10 && (
+            <span className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full font-semibold">Low</span>
+          )}
         </Link>
       </div>
 

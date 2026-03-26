@@ -5,6 +5,7 @@ import { enrichKeywords } from '../../lib/seo/enrich-keywords.js';
 import { scoreKeywords } from '../../lib/seo/score-keywords.js';
 import { selectAndScore } from '../../lib/seo/select-and-score.js';
 import { persistSeo } from '../../lib/seo/persist-seo.js';
+import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
 
 const STATUS_SEO_DONE = '35660e24-94bb-4586-aa5a-a5027546b4a1';
 
@@ -24,6 +25,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!listing_id || !user_id) {
       return res.status(400).json({ error: 'Missing required fields: listing_id and user_id' });
+    }
+
+    // Token check (generate_keywords vs rerun_keywords cost determined inside)
+    const tokenCheck = await checkTokenBalance(user_id, 'generate_keywords', listing_id);
+    if (!tokenCheck.allowed) {
+      return res.status(402).json({ error: tokenCheck.reason, balance: tokenCheck.balance, required: tokenCheck.required });
     }
 
     const ctx = { product_type, theme, niche, sub_niche, client_description, visual_aesthetic, visual_target_audience, visual_overall_vibe, visual_colors, visual_graphics };
@@ -71,6 +78,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       status_id: STATUS_SEO_DONE,
       updated_at: new Date().toISOString(),
     }).eq('id', listing_id);
+
+    // Deduct tokens after successful processing
+    const deductAction = tokenCheck.required === 4 ? 'rerun_keywords' as const : 'generate_keywords' as const;
+    await deductTokens(user_id, deductAction, tokenCheck.required, listing_id);
 
     console.info(`[generate-keywords] complete listing=${listing_id} selected=${selected.length}/${finalKeywords.length} LSI=${strength?.listing_strength ?? 'N/A'} elapsed=${((Date.now() - t0) / 1000).toFixed(1)}s`);
 

@@ -13,6 +13,8 @@ import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
+import InsufficientTokensModal from '../components/billing/InsufficientTokensModal';
+import QuotaExceededModal from '../components/billing/QuotaExceededModal';
 import { toast } from 'sonner';
 
 const IMAGE_ANALYSIS_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
@@ -59,7 +61,7 @@ const STATUS_IDS = {
 };
 
 const ProductStudio = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const location = useLocation();
   const [showResults, setShowResults] = useState(false);
   const [isLoading, setIsLoading] = useState(false); // false | 'uploading' | 'saving' | 'triggering' | true
@@ -101,6 +103,10 @@ const ProductStudio = () => {
   // Confirmation Modal State
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingRelaunchData, setPendingRelaunchData] = useState(null);
+
+  // Billing Modal State
+  const [insufficientTokensModal, setInsufficientTokensModal] = useState({ isOpen: false, balance: 0, required: 0, action: null });
+  const [quotaExceededModal, setQuotaExceededModal] = useState({ isOpen: false, used: 0, limit: 0, quotaType: null });
 
   // Active Session State for "New Listing" flow
   const [isNewListingActive, setIsNewListingActive] = useState(false);
@@ -617,7 +623,12 @@ const ProductStudio = () => {
           // Fire and forget — the Realtime listener will detect completion
           axios.post('/api/seo/analyze-image', analyzePayload).catch(err => {
               console.error("Analyze-image API call failed:", err);
-              toast.error("Failed to start analysis. Check your connection.");
+              if (err.response?.status === 402) {
+                const d = err.response.data;
+                setInsufficientTokensModal({ isOpen: true, balance: d.balance, required: d.required, action: 'analyze_image' });
+              } else {
+                toast.error("Failed to start analysis. Check your connection.");
+              }
               isWaitingForImageAnalysisRef.current = false;
               setIsAnalyzingDesign(false);
           });
@@ -897,10 +908,14 @@ const ProductStudio = () => {
         toast.success("SEO Analysis completed! Loading results...");
         await handleLoadListing(activeListingId);
         setIsSeoLoading(false);
+        refreshProfile(); // Update sidebar token badge
 
     } catch (err) {
         console.error("Error in handleAnalyze:", err);
-        if (err.response) {
+        if (err.response?.status === 402) {
+            const d = err.response.data;
+            setInsufficientTokensModal({ isOpen: true, balance: d.balance, required: d.required, action: d.required === 4 ? 'rerun_keywords' : 'generate_keywords' });
+        } else if (err.response) {
             console.error("Webhook Error Response:", err.response.data);
             toast.error(`Analysis failed: Server returned ${err.response.status}. Check console for details.`);
         } else if (err.request) {
@@ -991,6 +1006,7 @@ const ProductStudio = () => {
 
         const response = await axios.post('/api/seo/generate-draft', {
             listing_id: listingId,
+            user_id: user.id,
             keywords: statsToUse.map(k => ({
                 keyword: k.keyword,
                 avg_volume: k.volume,
@@ -1043,10 +1059,14 @@ const ProductStudio = () => {
         }));
 
         toast.success("Magic Draft generated and listing completed!");
+        refreshProfile(); // Update sidebar token badge
 
       } catch (err) {
           console.error("Draft generation failed:", err);
-          if (err.response) {
+          if (err.response?.status === 402) {
+               const d = err.response.data;
+               setInsufficientTokensModal({ isOpen: true, balance: d.balance, required: d.required, action: 'generate_draft' });
+          } else if (err.response) {
                console.error("Server Error Response:", err.response.data);
                toast.error(`Draft generation failed: Server returned ${err.response.status}`);
           } else {
@@ -1219,6 +1239,7 @@ const ProductStudio = () => {
       try {
           const response = await axios.post('/api/seo/user-keyword', {
               listing_id: currentListingId,
+              user_id: user.id,
               keyword: newKeyword
           });
           
@@ -1226,6 +1247,7 @@ const ProductStudio = () => {
               // Refresh the listing to load the newly re-ranked pool and global strength
               toast.success(`Keyword "${response.data.keyword?.tag || newKeyword}" added successfully!`);
               await handleLoadListing(currentListingId);
+              refreshProfile(); // Update sidebar token badge
               if (onSuccess) onSuccess();
           } else {
               throw new Error(response.data.error || 'Failed to add keyword');
@@ -1233,7 +1255,12 @@ const ProductStudio = () => {
 
       } catch (err) {
           console.error("Error adding custom keyword:", err);
-          toast.error(err.response?.data?.error || err.message || "Failed to add keyword.");
+          if (err.response?.status === 402) {
+              const d = err.response.data;
+              setQuotaExceededModal({ isOpen: true, used: d.used, limit: d.limit, quotaType: 'add_custom' });
+          } else {
+              toast.error(err.response?.data?.error || err.message || "Failed to add keyword.");
+          }
       } finally {
           setIsAddingKeyword(false);
       }
@@ -1270,6 +1297,7 @@ const ProductStudio = () => {
           // (last_volume, last_competition, last_cpc, volume_history)
           const response = await axios.post('/api/seo/add-from-favorite', {
               listing_id: currentListingId,
+              user_id: user.id,
               keywords: newKeywordObjects,
           });
 
@@ -1284,7 +1312,12 @@ const ProductStudio = () => {
           }
       } catch (err) {
           console.error('Error adding batch keywords:', err);
-          toast.error(err.response?.data?.error || err.message || 'Failed to add keywords.');
+          if (err.response?.status === 402) {
+              const d = err.response.data;
+              setQuotaExceededModal({ isOpen: true, used: d.used, limit: d.limit, quotaType: 'add_favorite' });
+          } else {
+              toast.error(err.response?.data?.error || err.message || 'Failed to add keywords.');
+          }
           return false;
       } finally {
           setIsAddingBatchKeywords(false);
@@ -1999,6 +2032,7 @@ const ProductStudio = () => {
                              >
                                <Sparkles size={16} className="group-hover:animate-pulse" />
                                Analyse Design
+                               <span className="text-xs bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full">1 token</span>
                              </button>
                            </div>
 
@@ -2224,9 +2258,11 @@ const ProductStudio = () => {
                              !(selectedImage || results?.imageUrl) ? 'SELECT AN IMAGE FIRST' :
                              !isImageAnalyzedState ? 'ANALYZE IMAGE FIRST' :
                              !productTypeName ? 'SELECT PRODUCT TYPE' :
-                             'ANALYZE (1 Credit)'
+                             'GENERATE SEO'
                            )}
-                           {!isLoading && isImageAnalyzedState && productTypeName && <span className="text-indigo-200">🚀</span>}
+                           {!isLoading && isImageAnalyzedState && productTypeName && (
+                             <span className="ml-1 text-xs bg-indigo-500/30 text-indigo-100 px-1.5 py-0.5 rounded-full">8 tokens</span>
+                           )}
                          </button>
                        </div>
 
@@ -2255,13 +2291,29 @@ const ProductStudio = () => {
         </div>
 
       </div>
-      <ConfirmationModal 
+      <ConfirmationModal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
         onConfirm={executeRelaunch}
         title="Relaunch Analysis?"
         message="This action will consume 1 credit to re-analyze the current image with the updated settings. Do you want to continue?"
         confirmText="Yes, Relaunch"
+      />
+
+      <InsufficientTokensModal
+        isOpen={insufficientTokensModal.isOpen}
+        onClose={() => setInsufficientTokensModal(m => ({ ...m, isOpen: false }))}
+        balance={insufficientTokensModal.balance}
+        required={insufficientTokensModal.required}
+        action={insufficientTokensModal.action}
+      />
+
+      <QuotaExceededModal
+        isOpen={quotaExceededModal.isOpen}
+        onClose={() => setQuotaExceededModal(m => ({ ...m, isOpen: false }))}
+        used={quotaExceededModal.used}
+        limit={quotaExceededModal.limit}
+        quotaType={quotaExceededModal.quotaType}
       />
 
     </Layout>

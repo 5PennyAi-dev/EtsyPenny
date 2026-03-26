@@ -24,9 +24,15 @@ import { persistSeo } from './lib/seo/persist-seo.ts';
 import { persistStrength } from './lib/seo/persist-strength.ts';
 import { applySEOFilter } from './lib/seo/filter-logic.ts';
 import { extractProductTypeWords } from './lib/seo/concept-diversity.ts';
+import { checkTokenBalance, deductTokens, checkQuota, incrementQuota } from './lib/tokens/token-middleware.ts';
+import { getStripe, PRICE_TO_PLAN, PRICE_TO_PACK, PLAN_TOKENS } from './lib/stripe/client.ts';
 
 const app = express();
-app.use(express.json({ limit: '10mb' }));
+// JSON body parser for all routes EXCEPT Stripe webhook (needs raw body)
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/stripe/webhook') return next();
+  express.json({ limit: '10mb' })(req, res, next);
+});
 
 const PORT = process.env.API_PORT || 3001;
 
@@ -39,6 +45,7 @@ for (const [name, val] of Object.entries({
   GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
   SUPABASE_URL, SUPABASE_SERVICE_KEY, N8N_SECRET,
   DATAFORSEO_LOGIN: process.env.DATAFORSEO_LOGIN,
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
 })) {
   if (!val) { console.error(`❌ Missing env var: ${name}`); process.exit(1); }
 }
@@ -63,6 +70,12 @@ app.post('/api/seo/analyze-image', async (req, res) => {
     }
 
     console.log(`\n🔍 [analyze-image] Starting for listing ${listing_id}`);
+
+    // Token check
+    const tokenCheck = await checkTokenBalance(user_id, 'analyze_image');
+    if (!tokenCheck.allowed) {
+      return res.status(402).json({ error: tokenCheck.reason, balance: tokenCheck.balance, required: tokenCheck.required });
+    }
 
     // Step 2: Visual DNA Extraction (Gemini Vision)
     console.log('   Step 2: Running Gemini Vision...');
@@ -133,6 +146,9 @@ app.post('/api/seo/analyze-image', async (req, res) => {
       throw new Error(`Edge function failed (${saveResponse.status}): ${errText}`);
     }
 
+    // Deduct token after successful processing
+    await deductTokens(user_id, 'analyze_image', tokenCheck.required, listing_id);
+
     console.log('   ✅ Saved successfully!\n');
     return res.json(finalAnalysis);
 
@@ -163,6 +179,12 @@ app.post('/api/seo/generate-keywords', async (req, res) => {
 
     if (!listing_id || !user_id) {
       return res.status(400).json({ error: 'Missing required fields: listing_id and user_id' });
+    }
+
+    // Token check (generate_keywords vs rerun_keywords cost determined inside)
+    const tokenCheck = await checkTokenBalance(user_id, 'generate_keywords', listing_id);
+    if (!tokenCheck.allowed) {
+      return res.status(402).json({ error: tokenCheck.reason, balance: tokenCheck.balance, required: tokenCheck.required });
     }
 
     const ctx = { product_type, theme, niche, sub_niche, client_description, visual_aesthetic, visual_target_audience, visual_overall_vibe, visual_colors, visual_graphics };
@@ -220,6 +242,10 @@ app.post('/api/seo/generate-keywords', async (req, res) => {
       status_id: STATUS_SEO_DONE,
       updated_at: new Date().toISOString(),
     }).eq('id', listing_id);
+
+    // Deduct tokens after successful processing
+    const deductAction = tokenCheck.required === 4 ? 'rerun_keywords' : 'generate_keywords';
+    await deductTokens(user_id, deductAction, tokenCheck.required, listing_id);
 
     console.log(`   🎉 Pipeline complete in ${((Date.now() - t0) / 1000).toFixed(1)}s\n`);
 
@@ -442,10 +468,16 @@ const STATUS_COMPLETE = '28a11ca0-bcfc-42e0-971d-efc320f78424';
 
 app.post('/api/seo/generate-draft', async (req, res) => {
   try {
-    const { listing_id, keywords, image_url, visual_analysis, categorization, product_details, shop_context } = req.body;
+    const { listing_id, user_id, keywords, image_url, visual_analysis, categorization, product_details, shop_context } = req.body;
 
-    if (!listing_id || !keywords?.length) {
-      return res.status(400).json({ error: 'Missing listing_id or keywords' });
+    if (!listing_id || !keywords?.length || !user_id) {
+      return res.status(400).json({ error: 'Missing listing_id, user_id, or keywords' });
+    }
+
+    // Token check
+    const tokenCheck = await checkTokenBalance(user_id, 'generate_draft');
+    if (!tokenCheck.allowed) {
+      return res.status(402).json({ error: tokenCheck.reason, balance: tokenCheck.balance, required: tokenCheck.required });
     }
 
     console.log(`\n✍️  [generate-draft] Starting for listing ${listing_id} (${keywords.length} keywords)`);
@@ -576,6 +608,9 @@ Respond with ONLY this JSON, no other text:
       console.error('   ⚠️ DB update failed:', updateError.message);
     }
 
+    // Deduct token after successful processing
+    await deductTokens(user_id, 'generate_draft', tokenCheck.required, listing_id);
+
     console.log(`   ✅ Draft generated for ${listing_id} — title: "${title.substring(0, 50)}..."`);
     return res.json({ success: true, title, description });
 
@@ -629,13 +664,19 @@ app.post('/api/seo/refresh-keyword-bank', async (req, res) => {
 app.post('/api/seo/user-keyword', async (req, res) => {
   const t0 = Date.now();
   console.log(`\n📥 [user-keyword] Request for listing: ${req.body.listing_id}`);
-  const { listing_id, keyword } = req.body;
+  const { listing_id, keyword, user_id } = req.body;
 
-  if (!listing_id || !keyword) {
-    return res.status(400).json({ error: 'Missing listing_id or keyword' });
+  if (!listing_id || !keyword || !user_id) {
+    return res.status(400).json({ error: 'Missing listing_id, user_id, or keyword' });
   }
 
   try {
+    // Quota check
+    const quotaCheck = await checkQuota(user_id, 'add_custom');
+    if (!quotaCheck.allowed) {
+      return res.status(402).json({ error: quotaCheck.reason, used: quotaCheck.used, limit: quotaCheck.limit });
+    }
+
     const cleanKeyword = keyword.trim().toLowerCase();
 
     // 1. Fetch listing context
@@ -763,6 +804,9 @@ app.post('/api/seo/user-keyword', async (req, res) => {
 
     const finalKw = processedPool.find(k => k.tag === cleanKeyword) || newKw;
     
+    // Increment quota after success
+    await incrementQuota(user_id, 'add_custom');
+
     console.log(`   ✅ User keyword added: ${cleanKeyword} (${Date.now() - t0}ms)`);
     return res.json({
       success: true,
@@ -794,16 +838,22 @@ app.post('/api/seo/user-keyword', async (req, res) => {
 // ─── API ROUTE: POST /api/seo/add-from-favorite ───────────
 app.post('/api/seo/add-from-favorite', async (req, res) => {
   const t0 = Date.now();
-  const { listing_id, keywords: incomingKeywords } = req.body;
+  const { listing_id, user_id, keywords: incomingKeywords } = req.body;
 
   console.log(`\n⭐ [add-from-favorite] Request for listing: ${listing_id} (${incomingKeywords?.length || 0} keywords)`);
 
   // ── Step 1: Validation ───────────────────────────────────
-  if (!listing_id || !incomingKeywords || !Array.isArray(incomingKeywords) || incomingKeywords.length === 0) {
-    return res.status(400).json({ error: 'Missing listing_id or keywords array' });
+  if (!listing_id || !user_id || !incomingKeywords || !Array.isArray(incomingKeywords) || incomingKeywords.length === 0) {
+    return res.status(400).json({ error: 'Missing listing_id, user_id, or keywords array' });
   }
 
   try {
+    // Quota check
+    const quotaCheck = await checkQuota(user_id, 'add_favorite');
+    if (!quotaCheck.allowed) {
+      return res.status(402).json({ error: quotaCheck.reason, used: quotaCheck.used, limit: quotaCheck.limit });
+    }
+
     // Normalize: accept both string[] and object[] for keywords
     const normalizedKeywords = incomingKeywords.map(kw => {
       if (typeof kw === 'string') {
@@ -991,6 +1041,9 @@ app.post('/api/seo/add-from-favorite', async (req, res) => {
         is_promising: kw.status?.promising || kw.is_promising || false,
       }));
 
+    // Increment quota after success
+    await incrementQuota(user_id, 'add_favorite');
+
     console.log(`   ✅ Added ${responseKeywords.length} keywords | LSI: ${strength?.listing_strength ?? 'N/A'} (${Date.now() - t0}ms)\n`);
 
     return res.json({
@@ -1006,6 +1059,259 @@ app.post('/api/seo/add-from-favorite', async (req, res) => {
   }
 });
 
+// ─── API ROUTE: POST /api/stripe/webhook ──────────────────
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const stripe = getStripe();
+  const sig = req.headers['stripe-signature'];
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).json({ error: `Webhook Error: ${err.message}` });
+  }
+
+  console.log(`\n💳 [stripe-webhook] event=${event.type} id=${event.id}`);
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const userId = session.metadata?.user_id;
+        if (!userId) break;
+
+        await supabaseAdmin
+          .from('profiles')
+          .update({ stripe_customer_id: session.customer })
+          .eq('id', userId);
+
+        if (session.mode === 'subscription') {
+          await supabaseAdmin
+            .from('profiles')
+            .update({ subscription_id: session.subscription })
+            .eq('id', userId);
+        }
+
+        if (session.mode === 'payment') {
+          const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
+          const priceId = lineItems.data[0]?.price?.id;
+          const tokenAmount = PRICE_TO_PACK[priceId ?? ''];
+          if (tokenAmount) {
+            const { data: profile } = await supabaseAdmin
+              .from('profiles')
+              .select('tokens_bonus_balance')
+              .eq('id', userId)
+              .single();
+
+            const newBonus = (profile?.tokens_bonus_balance ?? 0) + tokenAmount;
+            await supabaseAdmin
+              .from('profiles')
+              .update({ tokens_bonus_balance: newBonus })
+              .eq('id', userId);
+
+            await supabaseAdmin.from('token_transactions').insert({
+              user_id: userId,
+              type: 'pack_purchase',
+              amount: tokenAmount,
+              balance_after: newBonus,
+              description: `Token pack purchase: ${tokenAmount} tokens`,
+            });
+          }
+        }
+        break;
+      }
+
+      case 'invoice.paid': {
+        const invoice = event.data.object;
+        const customerId = invoice.customer;
+        const priceId = invoice.lines?.data?.[0]?.price?.id;
+        const planId = PRICE_TO_PLAN[priceId ?? ''];
+        if (!planId) break;
+
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('stripe_customer_id', customerId)
+          .single();
+        if (!profile) break;
+
+        const userId = profile.id;
+        const newTokens = PLAN_TOKENS[planId];
+        const resetAt = new Date();
+        resetAt.setMonth(resetAt.getMonth() + 1);
+
+        await supabaseAdmin.from('profiles').update({
+          subscription_plan: planId,
+          subscription_status: 'active',
+          tokens_monthly_balance: newTokens,
+          tokens_reset_at: resetAt.toISOString(),
+          add_custom_used: 0,
+          add_favorite_used: 0,
+          counters_reset_at: resetAt.toISOString(),
+          subscription_end_at: new Date(invoice.lines?.data?.[0]?.period?.end * 1000).toISOString(),
+        }).eq('id', userId);
+
+        await supabaseAdmin.from('token_transactions').insert({
+          user_id: userId,
+          type: 'subscription_credit',
+          amount: newTokens,
+          balance_after: newTokens,
+          description: `Monthly reset — ${planId} plan (${newTokens} tokens)`,
+        });
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object;
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('stripe_customer_id', invoice.customer)
+          .single();
+        if (!profile) break;
+
+        await supabaseAdmin
+          .from('profiles')
+          .update({ subscription_status: 'past_due' })
+          .eq('id', profile.id);
+        break;
+      }
+
+      case 'customer.subscription.updated': {
+        const sub = event.data.object;
+        const priceId = sub.items?.data?.[0]?.price?.id;
+        const planId = PRICE_TO_PLAN[priceId ?? ''];
+        if (!planId) break;
+
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('id, subscription_plan')
+          .eq('stripe_customer_id', sub.customer)
+          .single();
+        if (!profile) break;
+
+        await supabaseAdmin.from('profiles').update({
+          subscription_plan: planId,
+          subscription_status: sub.status,
+          subscription_id: sub.id,
+        }).eq('id', profile.id);
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object;
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('stripe_customer_id', sub.customer)
+          .single();
+        if (!profile) break;
+
+        await supabaseAdmin.from('profiles').update({
+          subscription_plan: 'free',
+          subscription_status: 'canceled',
+          subscription_id: null,
+          tokens_monthly_balance: PLAN_TOKENS['free'],
+          add_custom_used: 0,
+          add_favorite_used: 0,
+        }).eq('id', profile.id);
+        break;
+      }
+    }
+  } catch (err) {
+    console.error('[stripe-webhook] handler error:', err);
+    return res.status(500).json({ error: 'Internal error' });
+  }
+
+  return res.json({ received: true });
+});
+
+// ─── API ROUTE: POST /api/stripe/create-checkout ──────────
+app.post('/api/stripe/create-checkout', async (req, res) => {
+  try {
+    const { priceId, userId, mode } = req.body;
+    if (!priceId || !userId || !mode) {
+      return res.status(400).json({ error: 'Missing priceId, userId, or mode' });
+    }
+
+    const stripe = getStripe();
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('stripe_customer_id, full_name')
+      .eq('id', userId)
+      .single();
+
+    let customerId = profile?.stripe_customer_id;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        metadata: { user_id: userId },
+      });
+      customerId = customer.id;
+      await supabaseAdmin
+        .from('profiles')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', userId);
+    }
+
+    const appUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
+
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode,
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${appUrl}/billing?success=true`,
+      cancel_url: `${appUrl}/billing?canceled=true`,
+      metadata: { user_id: userId },
+    });
+
+    console.log(`   ✅ [create-checkout] session=${session.id} user=${userId} mode=${mode}`);
+    return res.json({ url: session.url });
+
+  } catch (error) {
+    console.error('[create-checkout] Error:', error.message || error);
+    return res.status(500).json({ error: 'Failed to create checkout session', details: error.message });
+  }
+});
+
+// ─── API ROUTE: POST /api/stripe/create-portal ────────────
+app.post('/api/stripe/create-portal', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    const stripe = getStripe();
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', userId)
+      .single();
+
+    if (!profile?.stripe_customer_id) {
+      return res.status(400).json({ error: 'No Stripe customer found' });
+    }
+
+    const appUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: profile.stripe_customer_id,
+      return_url: `${appUrl}/billing`,
+    });
+
+    console.log(`   ✅ [create-portal] user=${userId}`);
+    return res.json({ url: session.url });
+
+  } catch (error) {
+    console.error('[create-portal] Error:', error.message || error);
+    return res.status(500).json({ error: 'Failed to create portal session', details: error.message });
+  }
+});
+
 // ─── START ────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🚀 EtsyPenny API server running on http://localhost:${PORT}`);
@@ -1017,5 +1323,8 @@ app.listen(PORT, () => {
   console.log(`   POST /api/seo/refresh-keyword-bank`);
   console.log(`   POST /api/seo/user-keyword`);
   console.log(`   POST /api/seo/add-from-favorite`);
+  console.log(`   POST /api/stripe/webhook`);
+  console.log(`   POST /api/stripe/create-checkout`);
+  console.log(`   POST /api/stripe/create-portal`);
   console.log(`   GET  /api/health\n`);
 });

@@ -1514,11 +1514,86 @@ Fixed the opportunity score calculation in `applySEOFilter()` that powers the Pr
 #### Files Modified
 - `lib/seo/filter-logic.ts` — Opportunity score formula in `applySEOFilter()`
 
+### Token System & Stripe Billing (2026-03-25)
+
+Implemented a complete token-based billing system with Stripe integration across 5 prompts:
+
+#### Prompt 1 — Token Middleware
+- Created `lib/tokens/token-middleware.ts` with 4 functions: `checkTokenBalance`, `deductTokens`, `checkQuota`, `incrementQuota`
+- Token costs: analyze_image (1), generate_keywords (8), rerun_keywords (4), generate_draft (1)
+- Deduction order: monthly tokens first, then bonus tokens
+- Quota enforcement: `add_custom` and `add_favorite` limits per plan from `plans` table
+- All 5 API routes updated (analyze-image, generate-keywords, generate-draft, user-keyword, add-from-favorite) — check before, deduct/increment after success
+- HTTP 402 returned on insufficient balance/quota
+- All changes mirrored in `server.mjs` for local dev
+- Frontend updated to send `user_id` in generate-draft, user-keyword, add-from-favorite payloads
+
+#### Prompt 2 — Stripe Webhooks Backend
+- Created `lib/stripe/client.ts` — lazy Stripe singleton + price/plan mappings
+- Created `api/stripe/webhook.ts` — handles 5 Stripe events (checkout.session.completed, invoice.paid, invoice.payment_failed, customer.subscription.updated, customer.subscription.deleted)
+- Created `api/stripe/create-checkout.ts` — creates Stripe Checkout sessions (subscriptions + one-time token packs)
+- Created `api/stripe/create-portal.ts` — creates Stripe Billing Portal sessions
+- All mirrored in `server.mjs` (webhook route uses `express.raw()` with JSON parser exclusion)
+- Stripe env vars added: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `VITE_APP_URL`
+
+#### Prompt 3 — Pricing Page (`/pricing`)
+- Created `src/pages/PricingPage.jsx` — public standalone page (no sidebar)
+- Monthly/Yearly toggle with "Save 17%" badge
+- 4 plan cards (Free, Starter, Growth with "Most Popular" highlight, Pro)
+- Token packs section (50/150/500 tokens, "Never expires" badges)
+- FAQ accordion (4 questions)
+- Smart CTA buttons (adapts based on auth state and current plan)
+- Route added in `App.jsx`, "Pricing" link added to `LandingPage.jsx` nav
+
+#### Prompt 4 — Billing Page (`/billing`)
+- Created `src/pages/BillingPage.jsx` — protected page with Layout
+- Current Plan card with status badge + "Manage subscription" (Stripe Portal)
+- Token Balance card with monthly progress bar + bonus count + "Buy tokens" modal
+- Usage stats row (custom keywords / favorites used vs limit)
+- Transaction history table (paginated, color-coded amounts)
+- Stripe redirect handling (`?success=true` / `?canceled=true` → toast)
+
+#### Prompt 5 — Token UI Integration
+- Sidebar: Added "Billing" nav link + token badge with Coins icon and "Low" warning when < 10 tokens
+- Created `src/components/billing/InsufficientTokensModal.jsx` — shown on 402 for token actions
+- Created `src/components/billing/QuotaExceededModal.jsx` — shown on 402 for quota actions
+- ProductStudio: Replaced all 402 toast handlers with modal-based approach
+- Token cost badges added: "1 token" on Analyse Design and Generate Draft, "8 tokens" on Generate SEO
+- `refreshProfile()` called after successful token-consuming actions to update sidebar badge
+
+#### DB Schema Changes (applied via SQL)
+- `plans` table: free/starter/growth/pro with token allocations, quotas, Stripe price IDs
+- `token_packs` table: 50/150/500 packs with Stripe price IDs
+- `token_transactions` table: audit log with RLS
+- `profiles` additions: `subscription_plan`, `subscription_status`, `subscription_id`, `stripe_customer_id`, `subscription_end_at`, `tokens_monthly_balance`, `tokens_bonus_balance`, `tokens_reset_at`, `add_custom_used`, `add_favorite_used`, `counters_reset_at`
+- `listings` addition: `seo_generation_count`
+- RPC function: `increment_seo_generation_count`
+
+#### Files Created
+- `lib/tokens/token-middleware.ts`
+- `lib/stripe/client.ts`
+- `api/stripe/webhook.ts`, `api/stripe/create-checkout.ts`, `api/stripe/create-portal.ts`
+- `src/pages/PricingPage.jsx`, `src/pages/BillingPage.jsx`
+- `src/components/billing/InsufficientTokensModal.jsx`, `src/components/billing/QuotaExceededModal.jsx`
+- `supabase/migrations/20260325_increment_seo_generation_count.sql`
+
+#### Files Modified
+- All `api/seo/*.ts` routes (token checks + quota checks)
+- `server.mjs` (mirrored all API changes + Stripe routes)
+- `src/App.jsx` (pricing + billing routes)
+- `src/components/Sidebar.jsx` (billing link + token badge)
+- `src/pages/ProductStudio.jsx` (modals, badges, profile refresh)
+- `src/components/studio/ResultsDisplay.jsx` (draft token badge)
+- `src/pages/LandingPage.jsx` (pricing link)
+- `src/pages/SEOLab.jsx` (user_id in add-from-favorite)
+- `.env` (Stripe vars)
+- `package.json` (stripe dependency)
+
 ### Session Handover
 - **Branch**: `main`
-- **Status**: Image analysis stuck spinner fixed, opportunity score formula recalibrated
+- **Status**: Complete token billing system implemented (middleware, Stripe webhooks, pricing page, billing page, UI modals)
 - **Next Steps**:
-  1. Test image analysis timeout by triggering analysis and observing cancel link after 30s
-  2. Verify Promising badge distribution improved after linear T/N change
-  3. Run pool reset on existing listings to recalculate scores with new formula
-  4. Consider removing debug console.log before production deploy
+  1. Deploy to Vercel — add Stripe env vars + `VITE_APP_URL` to Vercel dashboard
+  2. Add Stripe webhook endpoint URL in Stripe Dashboard → Developers → Webhooks
+  3. Test end-to-end: checkout flow, token deduction, webhook events, billing portal
+  4. Update old `credits_balance` / `subscription_credits_balance` / `bonus_credits_balance` UI references (Dashboard QuickStats) to use new token fields

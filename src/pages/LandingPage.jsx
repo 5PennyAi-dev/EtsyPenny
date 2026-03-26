@@ -45,8 +45,14 @@ const LandingPage = () => {
             className="object-cover"
           />
         </div>
-        <div className="hidden md:flex items-center gap-2 text-sm font-medium text-slate-500">
-          Powered by <img src={fivePennyLogo} alt="5PennyAi" className="h-5 object-contain" />
+        <div className="hidden md:flex items-center gap-4">
+          <Link to="/pricing" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
+            Pricing
+          </Link>
+          <span className="text-slate-300">|</span>
+          <span className="flex items-center gap-2 text-sm font-medium text-slate-500">
+            Powered by <img src={fivePennyLogo} alt="5PennyAi" className="h-5 object-contain" />
+          </span>
         </div>
       </nav>
 

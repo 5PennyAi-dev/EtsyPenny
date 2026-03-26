@@ -8,6 +8,7 @@ import {
   buildTaxonomyPrompt,
   mergeAnalysisResults,
 } from '../../lib/logic/analyse-image-logic.js';
+import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -28,6 +29,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     console.info(`[analyze-image] listing=${listing_id}`);
+
+    // Token check
+    const tokenCheck = await checkTokenBalance(user_id, 'analyze_image');
+    if (!tokenCheck.allowed) {
+      return res.status(402).json({ error: tokenCheck.reason, balance: tokenCheck.balance, required: tokenCheck.required });
+    }
 
     // Step 2: Visual DNA Extraction (Gemini Vision)
     const visualPrompt = PROMPT_VISUAL_ANALYST
@@ -90,6 +97,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const errText = await saveResponse.text();
       throw new Error(`Edge function failed (${saveResponse.status}): ${errText}`);
     }
+
+    // Deduct token after successful processing
+    await deductTokens(user_id, 'analyze_image', tokenCheck.required, listing_id);
 
     console.info(`[analyze-image] complete listing=${listing_id}`);
     return res.json(finalAnalysis);

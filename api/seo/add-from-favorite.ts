@@ -4,6 +4,7 @@ import { scoreKeywords } from '../../lib/seo/score-keywords.js';
 import { applySEOFilter } from '../../lib/seo/filter-logic.js';
 import { selectAndScore } from '../../lib/seo/select-and-score.js';
 import { extractProductTypeWords } from '../../lib/seo/concept-diversity.js';
+import { checkQuota, incrementQuota } from '../../lib/tokens/token-middleware.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -11,15 +12,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const t0 = Date.now();
-  const { listing_id, keywords: incomingKeywords } = req.body;
+  const { listing_id, user_id, keywords: incomingKeywords } = req.body;
 
   console.info(`[add-from-favorite] listing=${listing_id} keywords=${incomingKeywords?.length || 0}`);
 
-  if (!listing_id || !incomingKeywords || !Array.isArray(incomingKeywords) || incomingKeywords.length === 0) {
-    return res.status(400).json({ error: 'Missing listing_id or keywords array' });
+  if (!listing_id || !user_id || !incomingKeywords || !Array.isArray(incomingKeywords) || incomingKeywords.length === 0) {
+    return res.status(400).json({ error: 'Missing listing_id, user_id, or keywords array' });
   }
 
   try {
+    // Quota check
+    const quotaCheck = await checkQuota(user_id, 'add_favorite');
+    if (!quotaCheck.allowed) {
+      return res.status(402).json({ error: quotaCheck.reason, used: (quotaCheck as any).used, limit: (quotaCheck as any).limit });
+    }
+
     // Normalize: accept both string[] and object[]
     const normalizedKeywords = incomingKeywords.map((kw: string | Record<string, unknown>) => {
       if (typeof kw === 'string') {
@@ -200,6 +207,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         is_evergreen: kw.status?.evergreen || false,
         is_promising: kw.status?.promising || false,
       }));
+
+    // Increment quota after success
+    await incrementQuota(user_id, 'add_favorite');
 
     console.info(`[add-from-favorite] complete added=${responseKeywords.length} LSI=${strength?.listing_strength ?? 'N/A'} (${Date.now() - t0}ms)`);
 

@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { runAI } from '../../lib/ai/provider-router.js';
 import { extractJson } from '../../lib/ai/extract-json.js';
+import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
 
 const STATUS_COMPLETE = '28a11ca0-bcfc-42e0-971d-efc320f78424';
 
@@ -11,10 +12,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { listing_id, keywords, image_url, visual_analysis, categorization, product_details, shop_context } = req.body;
+    const { listing_id, user_id, keywords, image_url, visual_analysis, categorization, product_details, shop_context } = req.body;
 
-    if (!listing_id || !keywords?.length) {
-      return res.status(400).json({ error: 'Missing listing_id or keywords' });
+    if (!listing_id || !keywords?.length || !user_id) {
+      return res.status(400).json({ error: 'Missing listing_id, user_id, or keywords' });
+    }
+
+    // Token check
+    const tokenCheck = await checkTokenBalance(user_id, 'generate_draft');
+    if (!tokenCheck.allowed) {
+      return res.status(402).json({ error: tokenCheck.reason, balance: tokenCheck.balance, required: tokenCheck.required });
     }
 
     console.info(`[generate-draft] listing=${listing_id} keywords=${keywords.length}`);
@@ -145,6 +152,9 @@ Respond with ONLY this JSON, no other text:
     if (updateError) {
       console.error('[generate-draft] DB update failed:', updateError.message);
     }
+
+    // Deduct token after successful processing
+    await deductTokens(user_id, 'generate_draft', tokenCheck.required, listing_id);
 
     console.info(`[generate-draft] complete listing=${listing_id}`);
     return res.json({ success: true, title, description });

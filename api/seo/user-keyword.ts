@@ -5,6 +5,7 @@ import { scoreKeywords } from '../../lib/seo/score-keywords.js';
 import { applySEOFilter } from '../../lib/seo/filter-logic.js';
 import { selectAndScore } from '../../lib/seo/select-and-score.js';
 import { extractProductTypeWords } from '../../lib/seo/concept-diversity.js';
+import { checkQuota, incrementQuota } from '../../lib/tokens/token-middleware.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -12,13 +13,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const t0 = Date.now();
-  const { listing_id, keyword } = req.body;
+  const { listing_id, keyword, user_id } = req.body;
 
-  if (!listing_id || !keyword) {
-    return res.status(400).json({ error: 'Missing listing_id or keyword' });
+  if (!listing_id || !keyword || !user_id) {
+    return res.status(400).json({ error: 'Missing listing_id, user_id, or keyword' });
   }
 
   try {
+    // Quota check
+    const quotaCheck = await checkQuota(user_id, 'add_custom');
+    if (!quotaCheck.allowed) {
+      return res.status(402).json({ error: quotaCheck.reason, used: (quotaCheck as any).used, limit: (quotaCheck as any).limit });
+    }
+
     const cleanKeyword = keyword.trim().toLowerCase();
     console.info(`[user-keyword] listing=${listing_id}`);
 
@@ -143,6 +150,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { strength } = selectAndScore(processedPool, params);
 
     const finalKw = processedPool.find(k => k.tag === cleanKeyword) || newKw;
+
+    // Increment quota after success
+    await incrementQuota(user_id, 'add_custom');
 
     console.info(`[user-keyword] complete keyword="${cleanKeyword}" (${Date.now() - t0}ms)`);
     return res.json({

@@ -12,6 +12,8 @@ import UserSettings from './pages/UserSettings';
 import LandingPage from './pages/LandingPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
+import PricingPage from './pages/PricingPage';
+import BillingPage from './pages/BillingPage';
 
 import { Toaster } from 'sonner';
 
@@ -81,6 +83,15 @@ export default function App() {
           />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route
+            path="/billing"
+            element={
+              <ProtectedRoute>
+                <BillingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/pricing" element={<PricingPage />} />
           <Route path="/" element={<LandingPage />} />
         </Routes>
       </BrowserRouter>

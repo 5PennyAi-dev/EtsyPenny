@@ -928,6 +928,7 @@ const SEOLab = () => {
   const handleApplyPresetToListing = async (listingId, kws) => {
     const response = await axios.post('/api/seo/add-from-favorite', {
       listing_id: listingId,
+      user_id: user.id,
       keywords: kws.map(kw => ({
         tag: kw.tag,
         last_volume: kw.last_volume,

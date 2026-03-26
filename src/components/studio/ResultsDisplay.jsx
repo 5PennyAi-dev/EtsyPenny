@@ -1450,6 +1450,7 @@ const SidebarSkeleton = ({ phase }) => (
                                         : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 hover:shadow-indigo-200'}`}
                              >
                                 <Sparkles size={14} /> Optimize with AI
+                               <span className="text-xs bg-indigo-500/30 text-indigo-100 px-1.5 py-0.5 rounded-full">1 token</span>
                              </button>
                          </div>
                     </div>

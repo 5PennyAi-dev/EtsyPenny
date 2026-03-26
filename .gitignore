@@ -1,3 +1,6 @@
+# MCP config (contains access tokens)
+.mcp.json
+
 # Sensitive workflow/test files (may contain secrets)
 docs/n8nWorkflow.json
 docs/analyse-image-logic.ts
