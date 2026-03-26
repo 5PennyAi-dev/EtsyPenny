@@ -1255,7 +1255,7 @@ app.post('/api/stripe/create-checkout', async (req, res) => {
         .eq('id', userId);
     }
 
-    const appUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
+    const appUrl = process.env.APP_URL || 'http://localhost:5173';
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -1296,7 +1296,7 @@ app.post('/api/stripe/create-portal', async (req, res) => {
       return res.status(400).json({ error: 'No Stripe customer found' });
     }
 
-    const appUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
+    const appUrl = process.env.APP_URL || 'http://localhost:5173';
 
     const session = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,

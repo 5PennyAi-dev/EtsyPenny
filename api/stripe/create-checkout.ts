@@ -36,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('id', userId);
     }
 
-    const appUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
+    const appUrl = process.env.APP_URL || 'http://localhost:5173';
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,

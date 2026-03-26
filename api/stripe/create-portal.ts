@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'No Stripe customer found' });
     }
 
-    const appUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
+    const appUrl = process.env.APP_URL || 'http://localhost:5173';
 
     const session = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,
