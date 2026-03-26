@@ -40,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('v_user_seo_active_settings')
       .select('*')
       .eq('user_id', user_id)
-      .single();
+      .maybeSingle();
 
     const params = {
       Volume: settings?.param_volume ?? 0.25,

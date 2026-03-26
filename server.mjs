@@ -194,7 +194,7 @@ app.post('/api/seo/generate-keywords', async (req, res) => {
       .from('v_user_seo_active_settings')
       .select('*')
       .eq('user_id', user_id)
-      .single();
+      .maybeSingle();
 
     const params = {
       Volume: settings?.param_volume ?? 0.25,
@@ -326,27 +326,28 @@ app.post('/api/seo/reset-pool', async (req, res) => {
       .from('v_user_seo_active_settings')
       .select('*')
       .eq('user_id', listing.user_id)
-      .single();
+      .maybeSingle();
 
-    if (settingsError || !settings) throw settingsError || new Error("Settings not found");
+    if (settingsError) throw settingsError;
+    const s = settings || {};
 
     const params = {
-      Volume: settings.param_volume ?? 0.25,
-      Competition: settings.param_competition ?? 0.10,
-      Transaction: settings.param_transaction ?? 0.25,
-      Niche: settings.param_niche ?? 0.20,
-      CPC: settings.param_cpc ?? 0.20,
-      evergreen_stability_ratio: settings.evergreen_stability_ratio ?? 4,
-      evergreen_minimum_volume: settings.evergreen_minimum_volume ?? 0.3,
-      evergreen_avg_volume: settings.evergreen_avg_volume ?? 50,
-      trending_dropping_threshold: settings.trending_dropping_threshold ?? 0.8,
-      trending_current_month_min_volume: settings.trending_current_month_min_volume ?? 150,
-      trending_growth_factor: settings.trending_growth_factor ?? 1.5,
-      promising_min_score: settings.promising_min_score ?? 55,
-      promising_competition: settings.promising_competition ?? settings.promosing_competition ?? 0.4,
-      ai_selection_count: settings.ai_selection_count || 13,
-      working_pool_count: settings.working_pool_count || 40,
-      concept_diversity_limit: settings.concept_diversity_limit || 2,
+      Volume: s.param_volume ?? 0.25,
+      Competition: s.param_competition ?? 0.10,
+      Transaction: s.param_transaction ?? 0.25,
+      Niche: s.param_niche ?? 0.20,
+      CPC: s.param_cpc ?? 0.20,
+      evergreen_stability_ratio: s.evergreen_stability_ratio ?? 4,
+      evergreen_minimum_volume: s.evergreen_minimum_volume ?? 0.3,
+      evergreen_avg_volume: s.evergreen_avg_volume ?? 50,
+      trending_dropping_threshold: s.trending_dropping_threshold ?? 0.8,
+      trending_current_month_min_volume: s.trending_current_month_min_volume ?? 150,
+      trending_growth_factor: s.trending_growth_factor ?? 1.5,
+      promising_min_score: s.promising_min_score ?? 55,
+      promising_competition: s.promising_competition ?? s.promosing_competition ?? 0.4,
+      ai_selection_count: s.ai_selection_count || 13,
+      working_pool_count: s.working_pool_count || 40,
+      concept_diversity_limit: s.concept_diversity_limit || 2,
       productTypeWords: extractProductTypeWords(productTypeName),
     };
 
@@ -430,16 +431,17 @@ app.post('/api/seo/recalculate-scores', async (req, res) => {
       .from('v_user_seo_active_settings')
       .select('*')
       .eq('user_id', listing.user_id)
-      .single();
+      .maybeSingle();
 
-    if (settingsError || !settings) throw settingsError || new Error('Settings not found');
+    if (settingsError) throw settingsError;
+    const s = settings || {};
 
     const params = {
-      Volume: settings.param_volume ?? 0.25,
-      Competition: settings.param_competition ?? 0.10,
-      Transaction: settings.param_transaction ?? 0.25,
-      Niche: settings.param_niche ?? 0.20,
-      CPC: settings.param_cpc ?? 0.20,
+      Volume: s.param_volume ?? 0.25,
+      Competition: s.param_competition ?? 0.10,
+      Transaction: s.param_transaction ?? 0.25,
+      Niche: s.param_niche ?? 0.20,
+      CPC: s.param_cpc ?? 0.20,
       ai_selection_count: selected_keywords.length // treat ALL passed keywords as selected
     };
 
@@ -714,27 +716,28 @@ app.post('/api/seo/user-keyword', async (req, res) => {
       .from('v_user_seo_active_settings')
       .select('*')
       .eq('user_id', listing.user_id)
-      .single();
+      .maybeSingle();
 
-    if (settingsError || !settings) throw new Error("Settings not found");
+    if (settingsError) throw settingsError;
+    const s = settings || {};
 
     const params = {
-      Volume: settings.param_volume ?? 0.25,
-      Competition: settings.param_competition ?? 0.10,
-      Transaction: settings.param_transaction ?? 0.25,
-      Niche: settings.param_niche ?? 0.20,
-      CPC: settings.param_cpc ?? 0.20,
-      evergreen_stability_ratio: settings.evergreen_stability_ratio ?? 4,
-      evergreen_minimum_volume: settings.evergreen_minimum_volume ?? 0.3,
-      evergreen_avg_volume: settings.evergreen_avg_volume ?? 50,
-      trending_dropping_threshold: settings.trending_dropping_threshold ?? 0.8,
-      trending_current_month_min_volume: settings.trending_current_month_min_volume ?? 150,
-      trending_growth_factor: settings.trending_growth_factor ?? 1.5,
-      promising_min_score: settings.promising_min_score ?? 55,
-      promising_competition: settings.promising_competition ?? 0.4,
-      ai_selection_count: settings.ai_selection_count || 13,
-      working_pool_count: settings.working_pool_count || 40,
-      concept_diversity_limit: settings.concept_diversity_limit || 2,
+      Volume: s.param_volume ?? 0.25,
+      Competition: s.param_competition ?? 0.10,
+      Transaction: s.param_transaction ?? 0.25,
+      Niche: s.param_niche ?? 0.20,
+      CPC: s.param_cpc ?? 0.20,
+      evergreen_stability_ratio: s.evergreen_stability_ratio ?? 4,
+      evergreen_minimum_volume: s.evergreen_minimum_volume ?? 0.3,
+      evergreen_avg_volume: s.evergreen_avg_volume ?? 50,
+      trending_dropping_threshold: s.trending_dropping_threshold ?? 0.8,
+      trending_current_month_min_volume: s.trending_current_month_min_volume ?? 150,
+      trending_growth_factor: s.trending_growth_factor ?? 1.5,
+      promising_min_score: s.promising_min_score ?? 55,
+      promising_competition: s.promising_competition ?? 0.4,
+      ai_selection_count: s.ai_selection_count || 13,
+      working_pool_count: s.working_pool_count || 40,
+      concept_diversity_limit: s.concept_diversity_limit || 2,
       productTypeWords: extractProductTypeWords(productTypeName),
     };
 
@@ -909,27 +912,28 @@ app.post('/api/seo/add-from-favorite', async (req, res) => {
       .from('v_user_seo_active_settings')
       .select('*')
       .eq('user_id', listing.user_id)
-      .single();
+      .maybeSingle();
 
-    if (settingsError || !settings) throw new Error('User settings not found');
+    if (settingsError) throw settingsError;
+    const s = settings || {};
 
     const params = {
-      Volume: settings.param_volume ?? 0.25,
-      Competition: settings.param_competition ?? 0.10,
-      Transaction: settings.param_transaction ?? 0.25,
-      Niche: settings.param_niche ?? 0.20,
-      CPC: settings.param_cpc ?? 0.20,
-      evergreen_stability_ratio: settings.evergreen_stability_ratio ?? 4,
-      evergreen_minimum_volume: settings.evergreen_minimum_volume ?? 0.3,
-      evergreen_avg_volume: settings.evergreen_avg_volume ?? 50,
-      trending_dropping_threshold: settings.trending_dropping_threshold ?? 0.8,
-      trending_current_month_min_volume: settings.trending_current_month_min_volume ?? 150,
-      trending_growth_factor: settings.trending_growth_factor ?? 1.5,
-      promising_min_score: settings.promising_min_score ?? 55,
-      promising_competition: settings.promising_competition ?? 0.4,
-      ai_selection_count: settings.ai_selection_count || 13,
-      working_pool_count: settings.working_pool_count || 40,
-      concept_diversity_limit: settings.concept_diversity_limit || 2,
+      Volume: s.param_volume ?? 0.25,
+      Competition: s.param_competition ?? 0.10,
+      Transaction: s.param_transaction ?? 0.25,
+      Niche: s.param_niche ?? 0.20,
+      CPC: s.param_cpc ?? 0.20,
+      evergreen_stability_ratio: s.evergreen_stability_ratio ?? 4,
+      evergreen_minimum_volume: s.evergreen_minimum_volume ?? 0.3,
+      evergreen_avg_volume: s.evergreen_avg_volume ?? 50,
+      trending_dropping_threshold: s.trending_dropping_threshold ?? 0.8,
+      trending_current_month_min_volume: s.trending_current_month_min_volume ?? 150,
+      trending_growth_factor: s.trending_growth_factor ?? 1.5,
+      promising_min_score: s.promising_min_score ?? 55,
+      promising_competition: s.promising_competition ?? 0.4,
+      ai_selection_count: s.ai_selection_count || 13,
+      working_pool_count: s.working_pool_count || 40,
+      concept_diversity_limit: s.concept_diversity_limit || 2,
       productTypeWords: extractProductTypeWords(productTypeName),
     };
 

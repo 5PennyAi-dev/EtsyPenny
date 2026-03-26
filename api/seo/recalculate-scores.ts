@@ -30,16 +30,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('v_user_seo_active_settings')
       .select('*')
       .eq('user_id', listing.user_id)
-      .single();
+      .maybeSingle();
 
-    if (settingsError || !settings) throw settingsError || new Error('Settings not found');
+    if (settingsError) throw settingsError;
+    const s = settings || {};
 
     const params = {
-      Volume: settings.param_volume ?? 0.25,
-      Competition: settings.param_competition ?? 0.10,
-      Transaction: settings.param_transaction ?? 0.25,
-      Niche: settings.param_niche ?? 0.20,
-      CPC: settings.param_cpc ?? 0.20,
+      Volume: s.param_volume ?? 0.25,
+      Competition: s.param_competition ?? 0.10,
+      Transaction: s.param_transaction ?? 0.25,
+      Niche: s.param_niche ?? 0.20,
+      CPC: s.param_cpc ?? 0.20,
       ai_selection_count: selected_keywords.length,
     };
 
