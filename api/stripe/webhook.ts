@@ -53,13 +53,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const resetAt = new Date();
           resetAt.setMonth(resetAt.getMonth() + 1);
 
-          // Save everything in one atomic update including stripe_customer_id
+          // Read current balance BEFORE update — accumulate on upgrade, don't overwrite
+          const { data: currentProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('tokens_monthly_balance, tokens_bonus_balance')
+            .eq('id', userId)
+            .single();
+
+          const existingMonthly = currentProfile?.tokens_monthly_balance ?? 0;
+          const totalMonthly = existingMonthly + newTokens;
+          const balanceAfter = totalMonthly + (currentProfile?.tokens_bonus_balance ?? 0);
+
           await supabaseAdmin.from('profiles').update({
             stripe_customer_id: session.customer,
             subscription_id: session.subscription,
             subscription_plan: planId,
             subscription_status: 'active',
-            tokens_monthly_balance: newTokens,
+            tokens_monthly_balance: totalMonthly,
             tokens_reset_at: resetAt.toISOString(),
             add_custom_used: 0,
             add_favorite_used: 0,
@@ -67,21 +77,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             subscription_end_at: new Date((subscription as any).current_period_end * 1000).toISOString(),
           }).eq('id', userId);
 
-          // Log transaction
-          const { data: profile } = await supabaseAdmin
-            .from('profiles')
-            .select('tokens_bonus_balance')
-            .eq('id', userId)
-            .single();
-
-          const balanceAfter = newTokens + (profile?.tokens_bonus_balance ?? 0);
-
           await supabaseAdmin.from('token_transactions').insert({
             user_id: userId,
             type: 'subscription_credit',
             amount: newTokens,
             balance_after: balanceAfter,
-            description: `${planId} plan activated — ${newTokens} tokens credited`,
+            description: `${planId} plan activated — ${newTokens} tokens credited (total: ${totalMonthly} monthly)`,
           });
         }
 
