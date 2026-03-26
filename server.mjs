@@ -1081,19 +1081,55 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         const userId = session.metadata?.user_id;
         if (!userId) break;
 
-        await supabaseAdmin
-          .from('profiles')
-          .update({ stripe_customer_id: session.customer })
-          .eq('id', userId);
-
         if (session.mode === 'subscription') {
-          await supabaseAdmin
+          // Retrieve full subscription to get price_id and plan
+          const subscription = await stripe.subscriptions.retrieve(session.subscription);
+          const priceId = subscription.items.data[0]?.price?.id;
+          const planId = PRICE_TO_PLAN[priceId ?? ''];
+          const newTokens = PLAN_TOKENS[planId ?? ''] ?? 0;
+
+          const resetAt = new Date();
+          resetAt.setMonth(resetAt.getMonth() + 1);
+
+          // Save everything in one atomic update including stripe_customer_id
+          await supabaseAdmin.from('profiles').update({
+            stripe_customer_id: session.customer,
+            subscription_id: session.subscription,
+            subscription_plan: planId,
+            subscription_status: 'active',
+            tokens_monthly_balance: newTokens,
+            tokens_reset_at: resetAt.toISOString(),
+            add_custom_used: 0,
+            add_favorite_used: 0,
+            counters_reset_at: resetAt.toISOString(),
+            subscription_end_at: new Date(subscription.current_period_end * 1000).toISOString(),
+          }).eq('id', userId);
+
+          // Log transaction
+          const { data: profile } = await supabaseAdmin
             .from('profiles')
-            .update({ subscription_id: session.subscription })
-            .eq('id', userId);
+            .select('tokens_bonus_balance')
+            .eq('id', userId)
+            .single();
+
+          const balanceAfter = newTokens + (profile?.tokens_bonus_balance ?? 0);
+
+          await supabaseAdmin.from('token_transactions').insert({
+            user_id: userId,
+            type: 'subscription_credit',
+            amount: newTokens,
+            balance_after: balanceAfter,
+            description: `${planId} plan activated — ${newTokens} tokens credited`,
+          });
         }
 
         if (session.mode === 'payment') {
+          // Save Stripe customer ID for one-time purchases too
+          await supabaseAdmin
+            .from('profiles')
+            .update({ stripe_customer_id: session.customer })
+            .eq('id', userId);
+
           const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
           const priceId = lineItems.data[0]?.price?.id;
           const tokenAmount = PRICE_TO_PACK[priceId ?? ''];
@@ -1129,9 +1165,12 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         const planId = PRICE_TO_PLAN[priceId ?? ''];
         if (!planId) break;
 
+        // Skip the first invoice — already handled by checkout.session.completed
+        if (invoice.billing_reason === 'subscription_create') break;
+
         const { data: profile } = await supabaseAdmin
           .from('profiles')
-          .select('id')
+          .select('id, tokens_bonus_balance')
           .eq('stripe_customer_id', customerId)
           .single();
         if (!profile) break;
@@ -1140,6 +1179,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         const newTokens = PLAN_TOKENS[planId];
         const resetAt = new Date();
         resetAt.setMonth(resetAt.getMonth() + 1);
+        const balanceAfter = newTokens + (profile.tokens_bonus_balance ?? 0);
 
         await supabaseAdmin.from('profiles').update({
           subscription_plan: planId,
@@ -1156,8 +1196,8 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           user_id: userId,
           type: 'subscription_credit',
           amount: newTokens,
-          balance_after: newTokens,
-          description: `Monthly reset — ${planId} plan (${newTokens} tokens)`,
+          balance_after: balanceAfter,
+          description: `Monthly renewal — ${planId} plan (${newTokens} tokens)`,
         });
         break;
       }
