@@ -72,8 +72,8 @@ export function applySEOFilter(keywords: KeywordInput[], params: FilterParameter
   const VOLUME_CEILING = 50_000;
 
   // Hard filter limits from old logic (could be made dynamic if needed)
-  const MIN_TRANSACTIONAL = 5;
-  const MIN_NICHE = 5;
+  const MIN_TRANSACTIONAL = 1;
+  const MIN_NICHE = 1;
 
   // 1. Processing, Scoring, and Status
   const processed = keywords.map(item => {

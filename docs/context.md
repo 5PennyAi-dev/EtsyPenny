@@ -1686,3 +1686,41 @@ Moved "Billing" above "Settings" in the sidebar navigation.
 - Privacy/Cookie policies are on Iubenda — internal `/privacy` page still exists but all links now point to Iubenda
 - Token billing system is fully in place: `tokens_monthly_balance`, `tokens_bonus_balance`, `subscription_plan` fields on `profiles`
 - `vercel.json` catch-all rewrite already handles SPA routing for `/terms`, `/privacy`, etc.
+
+---
+
+## Session: 2026-03-27 — Dashboard Redesign, Listings by Status, Keyword Pipeline
+
+### Dashboard Recent Listings Redesign
+- **ListingsTable.jsx**: Complete rewrite — flexbox → CSS grid (`2fr 1fr 1fr 1fr 60px`) with inline styles. Columns: Image, Product Name (+ keyword count badge), Score, Status, Date, Action. Header row added. Uses `v_dashboard_listings` view with `computed_status`.
+- **2-Column Layout**: Dashboard now shows Recent Listings (3fr) + Trending Keywords (2fr) side-by-side via CSS grid. TrendingKeywords changed to `grid-cols-1` vertical stack (was `grid-cols-3`), shows up to 5 keywords.
+- **Dashboard query**: Changed from `action_priority` sort to `updated_at DESC` for true recency.
+
+### ProductStudio Recent Listings
+- **RecentOptimizations.jsx**: Rewritten with same inline-style layout as Dashboard. Switched data source from `view_listing_scores` to `v_dashboard_listings`. Removed French labels, date-fns dependency. Moved inside sidebar in ResultsDisplay (below Listing Info card).
+
+### Listings by Status Page (`/listings`)
+- **New file**: `src/pages/ListingsByStatusPage.jsx` — full page with status tabs (New, Analyzed, SEO Ready, Draft Ready, Complete), checkboxes, bulk action bar, confirm modal, progress bar.
+- **Bulk actions**: Analyze Images (limit 10), Generate Keywords (limit 5), Generate Drafts (limit 15). Sequential processing with progress bar and 402 error handling.
+- **Route**: Added `/listings` to `App.jsx` with `ProtectedRoute`.
+- **NextActions.jsx**: Action buttons now navigate to `/listings?status=X` instead of `/studio`.
+
+### API: Bulk Action Support
+- **generate-keywords** (`api/seo/generate-keywords.ts` + `server.mjs`): Added DB fallback — when context fields (theme, niche, visual analysis) not in request body, fetches from `listings` table. Enables bulk keyword generation with minimal `{ listing_id, user_id }` payloads.
+- **generate-draft** (`api/seo/generate-draft.ts` + `server.mjs`): Added DB fallback — when keywords not in body, fetches top 13 from `listing_seo_stats`, listing data from `listings`, shop context from `profiles`. Enables bulk draft generation.
+
+### Keyword Pipeline: Segment 6 — Broad Discovery
+- **generate-keyword-pool.ts**: Added 6th segment `SEGMENT_BROAD_DISCOVERY` (20 keywords). Targets broad, non-niche product function/format terms. Ignores theme/niche entirely. Pipeline now produces ~180 keywords (was ~160).
+- **Segment logging**: Each segment now logs its keyword list for debugging.
+
+### Filter Logic Fix
+- **filter-logic.ts**: Set `MIN_NICHE = 1` and `MIN_TRANSACTIONAL = 1` (was 5). Hard floors were excluding broad discovery keywords (niche_score = 4) before opportunity_score could weight them. Now all keywords pass through to scoring — strategy weights handle ranking.
+
+### ProductStudio: Save Validation Fix
+- **getFormData()**: Added `{ validate }` option. Save button calls without validation (allows saving with just image/title). Analyze/Generate buttons call with `{ validate: true }` (requires product type + categorization).
+- **Removed**: `handleSEOSniper`, `isSniperLoading` state, and related props (dead code).
+
+### Session Handover
+- Broad discovery keywords should now appear in pools — verify after next keyword generation
+- Bulk actions send minimal payloads; server fetches context from DB
+- ListingsTable uses inline styles (not Tailwind) for reliable layout — intentional choice after multiple CSS layout issues

@@ -1,123 +1,184 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { ExternalLink, History } from 'lucide-react';
-import { formatRelative } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { History } from 'lucide-react';
 import Accordion from '../ui/Accordion';
 
+const getScoreColor = (score) => {
+  if (!score) return { background: '#f1f5f9', color: '#94a3b8' };
+  if (score >= 80) return { background: '#d1fae5', color: '#065f46' };
+  if (score >= 60) return { background: '#fef3c7', color: '#92400e' };
+  return { background: '#fee2e2', color: '#991b1b' };
+};
+
+const getListingStatus = (listing) => {
+  const s = listing.computed_status;
+  if (s === 'OPTIMIZED') return { label: 'Optimized', bg: '#d1fae5', color: '#065f46' };
+  if (s === 'DRAFT_READY') return { label: 'Draft ready', bg: '#fef3c7', color: '#92400e' };
+  if (s === 'SEO_READY') return { label: 'SEO ready', bg: '#e0e7ff', color: '#3730a3' };
+  if (s === 'ANALYZED') return { label: 'Analyzed', bg: '#dbeafe', color: '#1e40af' };
+  return { label: 'New', bg: '#f1f5f9', color: '#64748b' };
+};
+
+function relativeTime(dateStr) {
+  if (!dateStr) return '—';
+  const now = Date.now();
+  const diff = now - new Date(dateStr).getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`;
+  const months = Math.floor(days / 30);
+  return `${months} mo ago`;
+}
+
 const RecentOptimizations = ({ onViewResults }) => {
-    const { user } = useAuth();
-    const [recentListings, setRecentListings] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
+  const [recentListings, setRecentListings] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        if (user) {
-            fetchRecentListings();
+  useEffect(() => {
+    if (user) {
+      fetchRecentListings();
+    }
+  }, [user]);
+
+  const fetchRecentListings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('v_dashboard_listings')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      setRecentListings(data || []);
+    } catch (err) {
+      console.error('Error fetching recent listings:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) return <div className="text-center py-4 text-slate-400">Loading recent listings...</div>;
+  if (recentListings.length === 0) return null;
+
+  return (
+    <div className="mt-8">
+      <Accordion
+        defaultOpen={false}
+        title={
+          <div className="flex items-center gap-2">
+            <History size={16} className="text-indigo-600" />
+            <span className="text-sm font-bold text-slate-900">Recent Listings</span>
+          </div>
         }
-    }, [user]);
-
-    const fetchRecentListings = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('view_listing_scores')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
-                .limit(5);
-
-            if (error) throw error;
-            setRecentListings(data || []);
-        } catch (err) {
-            console.error('Error fetching recent listings:', err);
-        } finally {
-            setIsLoading(false);
+        headerActions={
+          <a href="/history" className="text-xs font-medium text-indigo-600 hover:underline flex items-center gap-1">
+            View all &rarr;
+          </a>
         }
-    };
+      >
+        <div style={{ width: '100%', borderTop: '1px solid #f1f5f9' }}>
+          {recentListings.map(listing => {
+            const status = getListingStatus(listing);
+            const scoreStyle = getScoreColor(listing.listing_strength);
 
-    if (isLoading) return <div className="text-center py-4 text-slate-400">Loading recent optimizations...</div>;
-    if (recentListings.length === 0) return null; // Or a placeholder
-
-    return (
-        <div className="mt-8">
-            <Accordion
-                defaultOpen={false}
-                title={
-                    <div className="flex items-center gap-2">
-                        <History size={16} className="text-indigo-600" />
-                        <span className="text-sm font-bold text-slate-900">Recent History</span>
-                    </div>
-                }
-                headerActions={
-                    <a href="/history" className="text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors flex items-center gap-1">
-                        Voir tout l'historique
-                        <ExternalLink size={12} />
-                    </a>
-                }
-            >
-                <div className="overflow-x-auto border-t border-slate-100">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
-                            <tr>
-                                <th className="px-6 py-3 font-semibold">Image</th>
-                                <th className="px-4 py-3 font-semibold">Nom du Produit</th>
-                                <th className="px-4 py-3 font-semibold">Date</th>
-                                <th className="px-4 py-3 font-semibold">Niche</th>
-                                <th className="px-4 py-3 font-semibold text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {recentListings.map((listing) => {
-                                const listingId = listing.listing_id || listing.id; 
-                                const nicheName = listing.niche_full || listing.niche_name || "General";
-                                const productName = listing.display_title || listing.title || "Untitled";
-                                // Try to get product type if available in view, else skip
-                                const productType = listing.product_type_name || listing.product_type || "";
-
-                                return (
-                                    <tr key={listingId} className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-6 py-3">
-                                            <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
-                                                {listing.image_url ? (
-                                                    <img 
-                                                        src={listing.image_url} 
-                                                        alt={productName} 
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">No Img</div>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 font-medium text-slate-700">
-                                            {productName}
-                                            {productType && <div className="text-xs text-slate-400 font-normal">{productType}</div>}
-                                        </td>
-                                        <td className="px-4 py-3 text-slate-500">
-                                            {formatRelative(new Date(listing.created_at), new Date(), { locale: fr })}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                                                {nicheName}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <button 
-                                                onClick={() => onViewResults(listingId)}
-                                                className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors"
-                                            >
-                                                SHOW SEO ↗
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+            return (
+              <div
+                key={listing.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '10px 8px',
+                  borderBottom: '1px solid #f1f5f9',
+                  gap: 12,
+                  cursor: 'pointer',
+                }}
+                onClick={() => onViewResults(listing.id)}
+              >
+                {/* Image — fixed 36px */}
+                <div style={{ width: 36, flexShrink: 0 }}>
+                  {listing.image_url
+                    ? <img src={listing.image_url} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} />
+                    : <div style={{ width: 36, height: 36, borderRadius: 6, background: '#f1f5f9' }} />
+                  }
                 </div>
-            </Accordion>
+
+                {/* Product Name + Theme — grows but capped */}
+                <div style={{ flex: 1, minWidth: 0, maxWidth: 320 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {listing.title || 'Untitled'}
+                  </div>
+                  {listing.theme && (
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                      {listing.theme}
+                    </div>
+                  )}
+                </div>
+
+                {/* Spacer */}
+                <div style={{ flex: 1 }} />
+
+                {/* Score — fixed 50px */}
+                <div style={{ width: 50, flexShrink: 0, textAlign: 'center' }}>
+                  {listing.listing_strength != null && (
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 999,
+                      ...scoreStyle,
+                    }}>
+                      {listing.listing_strength}
+                    </span>
+                  )}
+                </div>
+
+                {/* Status — fixed 90px */}
+                <div style={{ width: 90, flexShrink: 0 }}>
+                  <span style={{
+                    fontSize: 11,
+                    fontWeight: 500,
+                    padding: '3px 10px',
+                    borderRadius: 999,
+                    background: status.bg,
+                    color: status.color,
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {status.label}
+                  </span>
+                </div>
+
+                {/* Date — fixed 90px */}
+                <div style={{ width: 90, flexShrink: 0, fontSize: 12, color: '#94a3b8', textAlign: 'right' }}>
+                  {relativeTime(listing.updated_at)}
+                </div>
+
+                {/* Action — fixed 60px */}
+                <div style={{ width: 60, flexShrink: 0, textAlign: 'right' }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewResults(listing.id);
+                    }}
+                    style={{ fontSize: 13, fontWeight: 500, color: '#4f46e5', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    Open →
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
-    );
+      </Accordion>
+    </div>
+  );
 };
 
 export default RecentOptimizations;

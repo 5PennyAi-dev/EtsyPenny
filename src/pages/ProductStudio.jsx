@@ -73,7 +73,6 @@ const ProductStudio = () => {
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
 
   const [isSeoLoading, setIsSeoLoading] = useState(false);
-  const [isSniperLoading, setIsSniperLoading] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isResettingPool, setIsResettingPool] = useState(false);
   const [isApplyingStrategy, setIsApplyingStrategy] = useState(false);
@@ -280,14 +279,16 @@ const ProductStudio = () => {
     setNicheName(nicheObj ? nicheObj.name : selectedId);
   };
 
-  const getFormData = () => {
-    if (!productTypeName) {
-      toast.error("Please select a Product Type.");
-      return null;
-    }
-    if (!themeName && !nicheName && !subNicheName) {
-      toast.error("Please enter at least one categorization field (Theme, Niche, or Sub-niche).");
-      return null;
+  const getFormData = ({ validate = false } = {}) => {
+    if (validate) {
+      if (!productTypeName) {
+        toast.error("Please select a Product Type.");
+        return null;
+      }
+      if (!themeName && !nicheName && !subNicheName) {
+        toast.error("Please enter at least one categorization field (Theme, Niche, or Sub-niche).");
+        return null;
+      }
     }
     return {
       theme_name: themeName,
@@ -1845,16 +1846,6 @@ const ProductStudio = () => {
       }
   };
 
-  const handleSEOSniper = async () => {
-      setIsSniperLoading(true);
-      try {
-          const formData = getFormData();
-          if (formData) await handleAnalyze(formData);
-      } finally {
-          setIsSniperLoading(false);
-      }
-  };
-
   const currentListingContext = useMemo(() => ({
     product_type_name: analysisContext?.product_type_name || '',
     theme: analysisContext?.theme_name || analysisContext?.theme || '',
@@ -1872,8 +1863,6 @@ const ProductStudio = () => {
       isSeoLoading={isSeoLoading}
       showSeoCancelLink={showSeoCancelLink}
       onCancelSeoGeneration={handleCancelSeoGeneration}
-      onSEOSniper={handleSEOSniper}
-      isSniperLoading={isSniperLoading}
       onAddCustomKeyword={handleAddCustomKeyword}
       onAddBatchKeywords={handleAddBatchKeywords}
       isAddingKeyword={isAddingKeyword}
@@ -2297,7 +2286,7 @@ const ProductStudio = () => {
                        {/* ═══ BLOCK 3: GENERATE ACTION ═══ */}
                        <div>
                          <button
-                           onClick={() => { const data = getFormData(); if (data) handleAnalyze(data); }}
+                           onClick={() => { const data = getFormData({ validate: true }); if (data) handleAnalyze(data); }}
                            disabled={isLoading || !(selectedImage || results?.imageUrl) || !isImageAnalyzedState || !productTypeName}
                            className={`w-full py-3 rounded-xl font-bold shadow-lg transition-all transform flex items-center justify-center gap-2
                              ${isLoading || !(selectedImage || results?.imageUrl) || !isImageAnalyzedState || !productTypeName

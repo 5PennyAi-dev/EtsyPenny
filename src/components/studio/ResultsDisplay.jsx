@@ -1439,8 +1439,6 @@ const SidebarSkeleton = ({ phase }) => (
                 </div>
               </Accordion>
 
-        {/* Injected Content (e.g. Recent History) */}
-        {children}
         </div>
 
         {/* --- SIDEBAR: DRAFTING (33% width) --- */}
@@ -1633,6 +1631,9 @@ const SidebarSkeleton = ({ phase }) => (
                         </div>
                     )}
              </div>
+
+             {/* Recent Listings — below Listing Info */}
+             {children}
         </div>
       </div>
 

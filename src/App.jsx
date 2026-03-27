@@ -14,6 +14,7 @@ import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import PricingPage from './pages/PricingPage';
 import BillingPage from './pages/BillingPage';
+import ListingsByStatusPage from './pages/ListingsByStatusPage';
 
 import { Toaster } from 'sonner';
 
@@ -88,6 +89,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <BillingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/listings"
+            element={
+              <ProtectedRoute>
+                <ListingsByStatusPage />
               </ProtectedRoute>
             }
           />

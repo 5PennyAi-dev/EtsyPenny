@@ -79,8 +79,7 @@ export default function Dashboard() {
           .from('v_dashboard_listings')
           .select('*')
           .eq('user_id', user.id)
-          .order('action_priority', { ascending: true })
-          .order('listing_strength', { ascending: true, nullsFirst: true })
+          .order('updated_at', { ascending: false })
           .limit(10),
         supabase
           .from('v_dashboard_trending')
@@ -227,12 +226,13 @@ export default function Dashboard() {
                 />
               </div>
 
-              <ListingsTable
-                listings={listings}
-                onAction={handleListingAction}
-              />
-
-              <TrendingKeywords keywords={trending} />
+              <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 24 }}>
+                <ListingsTable
+                  listings={listings}
+                  onAction={handleListingAction}
+                />
+                <TrendingKeywords keywords={trending} />
+              </div>
             </>
           )}
         </div>

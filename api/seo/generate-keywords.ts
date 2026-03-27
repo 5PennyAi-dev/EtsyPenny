@@ -17,9 +17,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const t0 = Date.now();
   try {
     const {
-      listing_id, user_id, product_type = '', theme = '', niche = '', sub_niche = '',
-      client_description = '', visual_aesthetic = '', visual_target_audience = '', visual_overall_vibe = '',
-      visual_colors = '', visual_graphics = '',
+      listing_id, user_id,
+      product_type: bodyProductType, theme: bodyTheme, niche: bodyNiche, sub_niche: bodySub,
+      client_description: bodyDesc, visual_aesthetic: bodyAesthetic, visual_target_audience: bodyAudience,
+      visual_overall_vibe: bodyVibe, visual_colors: bodyColors, visual_graphics: bodyGraphics,
       parameters = {},
     } = req.body;
 
@@ -31,6 +32,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const tokenCheck = await checkTokenBalance(user_id, 'generate_keywords', listing_id);
     if (!tokenCheck.allowed) {
       return res.status(402).json({ error: tokenCheck.reason, balance: tokenCheck.balance, required: tokenCheck.required });
+    }
+
+    // If context not provided in request body, fetch fresh from DB
+    let product_type = bodyProductType || '';
+    let theme = bodyTheme || '';
+    let niche = bodyNiche || '';
+    let sub_niche = bodySub || '';
+    let client_description = bodyDesc || '';
+    let visual_aesthetic = bodyAesthetic || '';
+    let visual_target_audience = bodyAudience || '';
+    let visual_overall_vibe = bodyVibe || '';
+    let visual_colors = bodyColors || '';
+    let visual_graphics = bodyGraphics || '';
+
+    if (!product_type && !theme && !niche) {
+      const { data: listing } = await supabaseAdmin
+        .from('listings')
+        .select('*')
+        .eq('id', listing_id)
+        .single();
+
+      if (listing) {
+        product_type = listing.product_type || '';
+        theme = listing.theme || '';
+        niche = listing.niche || '';
+        sub_niche = listing.sub_niche || '';
+        client_description = listing.user_description || listing.client_description || '';
+        visual_aesthetic = listing.visual_aesthetic || '';
+        visual_target_audience = listing.visual_target_audience || '';
+        visual_overall_vibe = listing.visual_overall_vibe || '';
+        visual_colors = listing.visual_colors || '';
+        visual_graphics = listing.visual_graphics || '';
+      }
     }
 
     const ctx = { product_type, theme, niche, sub_niche, client_description, visual_aesthetic, visual_target_audience, visual_overall_vibe, visual_colors, visual_graphics };

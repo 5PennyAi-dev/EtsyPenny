@@ -171,9 +171,10 @@ app.post('/api/seo/generate-keywords', async (req, res) => {
   const t0 = Date.now();
   try {
     const {
-      listing_id, user_id, product_type = '', theme = '', niche = '', sub_niche = '',
-      client_description = '', visual_aesthetic = '', visual_target_audience = '', visual_overall_vibe = '',
-      visual_colors = '', visual_graphics = '',
+      listing_id, user_id,
+      product_type: bodyProductType, theme: bodyTheme, niche: bodyNiche, sub_niche: bodySub,
+      client_description: bodyDesc, visual_aesthetic: bodyAesthetic, visual_target_audience: bodyAudience,
+      visual_overall_vibe: bodyVibe, visual_colors: bodyColors, visual_graphics: bodyGraphics,
       parameters = {},
     } = req.body;
 
@@ -185,6 +186,39 @@ app.post('/api/seo/generate-keywords', async (req, res) => {
     const tokenCheck = await checkTokenBalance(user_id, 'generate_keywords', listing_id);
     if (!tokenCheck.allowed) {
       return res.status(402).json({ error: tokenCheck.reason, balance: tokenCheck.balance, required: tokenCheck.required });
+    }
+
+    // If context not provided in request body, fetch fresh from DB
+    let product_type = bodyProductType || '';
+    let theme = bodyTheme || '';
+    let niche = bodyNiche || '';
+    let sub_niche = bodySub || '';
+    let client_description = bodyDesc || '';
+    let visual_aesthetic = bodyAesthetic || '';
+    let visual_target_audience = bodyAudience || '';
+    let visual_overall_vibe = bodyVibe || '';
+    let visual_colors = bodyColors || '';
+    let visual_graphics = bodyGraphics || '';
+
+    if (!product_type && !theme && !niche) {
+      const { data: listing } = await supabaseAdmin
+        .from('listings')
+        .select('*')
+        .eq('id', listing_id)
+        .single();
+
+      if (listing) {
+        product_type = listing.product_type || '';
+        theme = listing.theme || '';
+        niche = listing.niche || '';
+        sub_niche = listing.sub_niche || '';
+        client_description = listing.user_description || listing.client_description || '';
+        visual_aesthetic = listing.visual_aesthetic || '';
+        visual_target_audience = listing.visual_target_audience || '';
+        visual_overall_vibe = listing.visual_overall_vibe || '';
+        visual_colors = listing.visual_colors || '';
+        visual_graphics = listing.visual_graphics || '';
+      }
     }
 
     const ctx = { product_type, theme, niche, sub_niche, client_description, visual_aesthetic, visual_target_audience, visual_overall_vibe, visual_colors, visual_graphics };
@@ -470,16 +504,91 @@ const STATUS_COMPLETE = '28a11ca0-bcfc-42e0-971d-efc320f78424';
 
 app.post('/api/seo/generate-draft', async (req, res) => {
   try {
-    const { listing_id, user_id, keywords, image_url, visual_analysis, categorization, product_details, shop_context } = req.body;
+    let { listing_id, user_id, keywords, image_url, visual_analysis, categorization, product_details, shop_context } = req.body;
 
-    if (!listing_id || !keywords?.length || !user_id) {
-      return res.status(400).json({ error: 'Missing listing_id, user_id, or keywords' });
+    if (!listing_id || !user_id) {
+      return res.status(400).json({ error: 'Missing listing_id or user_id' });
     }
 
     // Token check
     const tokenCheck = await checkTokenBalance(user_id, 'generate_draft');
     if (!tokenCheck.allowed) {
       return res.status(402).json({ error: tokenCheck.reason, balance: tokenCheck.balance, required: tokenCheck.required });
+    }
+
+    // If keywords not provided (e.g. bulk action), fetch from DB
+    if (!keywords?.length) {
+      const { data: listing } = await supabaseAdmin
+        .from('listings')
+        .select('*')
+        .eq('id', listing_id)
+        .single();
+
+      const { data: kwRows } = await supabaseAdmin
+        .from('listing_seo_stats')
+        .select('*')
+        .eq('listing_id', listing_id)
+        .eq('is_current_eval', true)
+        .order('opportunity_score', { ascending: false })
+        .limit(13);
+
+      if (!kwRows?.length) {
+        return res.status(400).json({ error: 'No keywords found for this listing' });
+      }
+
+      keywords = kwRows.map(kw => ({
+        keyword: kw.tag,
+        avg_volume: kw.search_volume,
+        competition: kw.competition,
+        opportunity_score: kw.opportunity_score,
+        status: {
+          trending: kw.is_trending,
+          evergreen: kw.is_evergreen,
+          promising: kw.is_promising,
+        },
+      }));
+
+      if (listing) {
+        image_url = image_url || listing.image_url;
+        visual_analysis = visual_analysis || {
+          aesthetic: listing.visual_aesthetic,
+          typography: listing.visual_typography,
+          graphics: listing.visual_graphics,
+          colors: listing.visual_colors,
+          target_audience: listing.visual_target_audience,
+          overall_vibe: listing.visual_overall_vibe,
+        };
+        categorization = categorization || {
+          theme: listing.theme,
+          niche: listing.niche,
+          sub_niche: listing.sub_niche,
+          user_description: listing.user_description,
+        };
+        product_details = product_details || {
+          product_type: listing.product_type || 'Product',
+          client_description: listing.user_description || '',
+        };
+      }
+
+      // Fetch shop context from profile if not provided
+      if (!shop_context) {
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('shop_name, shop_bio, target_audience, brand_tone, brand_keywords, signature_text')
+          .eq('id', user_id)
+          .single();
+
+        if (profile) {
+          shop_context = {
+            shop_name: profile.shop_name,
+            shop_bio: profile.shop_bio,
+            target_audience: profile.target_audience,
+            brand_tone: profile.brand_tone,
+            brand_keywords: profile.brand_keywords,
+            signature_text: profile.signature_text,
+          };
+        }
+      }
     }
 
     console.log(`\n✍️  [generate-draft] Starting for listing ${listing_id} (${keywords.length} keywords)`);

@@ -1,5 +1,5 @@
 /**
- * 5 parallel AI calls to generate keyword pool across differentiated segments.
+ * 6 parallel AI calls to generate keyword pool across differentiated segments.
  * Each segment targets a distinct keyword strategy to minimize overlap.
  */
 
@@ -203,6 +203,42 @@ Generate 30 keywords.
 
 {RULES}`;
 
+const SEGMENT_BROAD_DISCOVERY = `
+# Role
+You are an Etsy SEO specialist generating broad discovery keywords.
+
+# Your segment: Broad Discovery Keywords
+Generate high-volume, non-niche-specific keywords that capture buyers
+who are BROWSING rather than searching for something specific. These are
+transversal terms that bring in traffic from adjacent searches — buyers
+who didn't know they wanted this product until they saw it.
+
+{CONTEXT}
+
+# Segment-specific rules
+- The product type should appear in about 70% of keywords
+- IGNORE the niche and theme entirely — focus on the product FUNCTION and FORMAT
+- Use the broadest possible product category terms
+- Include material, size, format, and use-case without style qualifiers
+- These keywords overlap with mass-market searches, not niche searches
+- Think: "what would someone type if they had never heard of this product
+  and searched only by its function or category?"
+
+# Examples for a "Retro 2026 Monthly Wall Calendar":
+  "wall calendar", "monthly calendar", "calendar 2026", "calendar planner",
+  "wall planner", "yearly planner", "desk calendar", "large calendar",
+  "monthly planner", "office calendar"
+
+# What NOT to generate (these belong to other segments):
+- Niche-specific terms (e.g., "cat lover gift" — Segment 3)
+- Style/aesthetic terms (e.g., "kawaii aesthetic" — Segment 2)
+- Long-tail micro-niche (e.g., "anime cat phone grip" — Segment 5)
+- Gift/occasion terms (e.g., "birthday gift" — Segment 3)
+
+Generate 20 keywords.
+
+{RULES}`;
+
 // ─── SEGMENT DEFINITIONS ─────────────────────────────────
 
 const SEGMENTS = [
@@ -211,6 +247,7 @@ const SEGMENTS = [
   { key: 'buyer_occasion', name: 'Buyer & Occasion', prompt: SEGMENT_BUYER_OCCASION, count: 30 },
   { key: 'niche_adjacent', name: 'Niche & Adjacent', prompt: SEGMENT_NICHE_ADJACENT, count: 30 },
   { key: 'long_tail', name: 'Long-Tail & Specific', prompt: SEGMENT_LONG_TAIL, count: 30 },
+  { key: 'broad_discovery', name: 'Broad Discovery', prompt: SEGMENT_BROAD_DISCOVERY, count: 20 },
 ];
 
 function buildSegmentPrompt(segmentPrompt: string, context: string): string {
@@ -236,7 +273,7 @@ export async function generateKeywordPool(ctx: KeywordContext): Promise<string[]
         .filter(k => typeof k === 'string' && k.length > 0)
         .map(k => k.toLowerCase().trim())
         .filter(k => k.length <= 20);
-      console.info(`[generate-keywords] Segment "${seg.name}": ${valid.length} valid keywords`);
+      console.info(`[generate-keywords] Segment "${seg.name}": ${valid.length} valid keywords\n   → ${valid.join(', ')}`);
       return valid;
     })
   );

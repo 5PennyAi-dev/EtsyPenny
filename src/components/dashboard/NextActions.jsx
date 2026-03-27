@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import {
   ImagePlus,
   Eye,
@@ -8,6 +9,13 @@ import {
   Plus,
 } from 'lucide-react';
 import { LISTING_STATUSES, STATUS_PIPELINE } from '@/lib/listingStatuses';
+
+const STATUS_TO_URL = {
+  NEW: 'new',
+  ANALYZED: 'analyzed',
+  SEO_READY: 'seo-ready',
+  DRAFT_READY: 'draft-ready',
+};
 
 const ICONS = {
   ImagePlus,
@@ -29,6 +37,7 @@ function getActionDescription(key, count) {
 }
 
 export default function NextActions({ counts = {}, onNavigate, onNewListing }) {
+  const navigate = useNavigate();
   const actionableStatuses = STATUS_PIPELINE.filter(
     (key) => key !== 'OPTIMIZED' && (counts?.[`count_${key.toLowerCase()}`] || 0) > 0
   );
@@ -84,8 +93,7 @@ export default function NextActions({ counts = {}, onNavigate, onNewListing }) {
                 {count}
               </span>
               <button
-                onClick={() => onNavigate(null, key)}
-
+                onClick={() => navigate(`/listings?status=${STATUS_TO_URL[key] || 'new'}`)}
                 className="text-xs font-medium text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors flex-shrink-0"
               >
                 {status.action}

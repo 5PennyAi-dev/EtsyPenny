@@ -26,12 +26,12 @@ export default function TrendingKeywords({ keywords = [] }) {
   }
 
   const navigate = useNavigate();
-  const display = keywords.slice(0, 3);
+  const display = keywords.slice(0, 5);
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-5">
       <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-4">Trending in your niches</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         {display.map((kw) => (
           <div
             key={kw.tag}

@@ -12,10 +12,85 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { listing_id, user_id, keywords, image_url, visual_analysis, categorization, product_details, shop_context } = req.body;
+    let { listing_id, user_id, keywords, image_url, visual_analysis, categorization, product_details, shop_context } = req.body;
 
-    if (!listing_id || !keywords?.length || !user_id) {
-      return res.status(400).json({ error: 'Missing listing_id, user_id, or keywords' });
+    if (!listing_id || !user_id) {
+      return res.status(400).json({ error: 'Missing listing_id or user_id' });
+    }
+
+    // If keywords not provided (e.g. bulk action), fetch from DB
+    if (!keywords?.length) {
+      const { data: listing } = await supabaseAdmin
+        .from('listings')
+        .select('*')
+        .eq('id', listing_id)
+        .single();
+
+      const { data: kwRows } = await supabaseAdmin
+        .from('listing_seo_stats')
+        .select('*')
+        .eq('listing_id', listing_id)
+        .eq('is_current_eval', true)
+        .order('opportunity_score', { ascending: false })
+        .limit(13);
+
+      if (!kwRows?.length) {
+        return res.status(400).json({ error: 'No keywords found for this listing' });
+      }
+
+      keywords = kwRows.map((kw: any) => ({
+        keyword: kw.tag,
+        avg_volume: kw.search_volume,
+        competition: kw.competition,
+        opportunity_score: kw.opportunity_score,
+        status: {
+          trending: kw.is_trending,
+          evergreen: kw.is_evergreen,
+          promising: kw.is_promising,
+        },
+      }));
+
+      if (listing) {
+        image_url = image_url || listing.image_url;
+        visual_analysis = visual_analysis || {
+          aesthetic: listing.visual_aesthetic,
+          typography: listing.visual_typography,
+          graphics: listing.visual_graphics,
+          colors: listing.visual_colors,
+          target_audience: listing.visual_target_audience,
+          overall_vibe: listing.visual_overall_vibe,
+        };
+        categorization = categorization || {
+          theme: listing.theme,
+          niche: listing.niche,
+          sub_niche: listing.sub_niche,
+          user_description: listing.user_description,
+        };
+        product_details = product_details || {
+          product_type: listing.product_type || 'Product',
+          client_description: listing.user_description || '',
+        };
+      }
+
+      // Fetch shop context from profile if not provided
+      if (!shop_context) {
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('shop_name, shop_bio, target_audience, brand_tone, brand_keywords, signature_text')
+          .eq('id', user_id)
+          .single();
+
+        if (profile) {
+          shop_context = {
+            shop_name: profile.shop_name,
+            shop_bio: profile.shop_bio,
+            target_audience: profile.target_audience,
+            brand_tone: profile.brand_tone,
+            brand_keywords: profile.brand_keywords,
+            signature_text: profile.signature_text,
+          };
+        }
+      }
     }
 
     // Token check
