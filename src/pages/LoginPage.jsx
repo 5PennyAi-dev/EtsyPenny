@@ -344,14 +344,14 @@ const LoginPage = () => {
 
             {/* Footer */}
             <p className="text-xs text-slate-400 text-center mt-8 leading-relaxed">
-              By continuing, you agree to PennySEO's{' '}
+              By {view === 'sign_up' ? 'creating an account' : 'continuing'}, you agree to our{' '}
               <Link to="/terms" className="text-slate-500 underline hover:text-slate-700">
                 Terms of Service
               </Link>
               {' '}and{' '}
-              <Link to="/privacy" className="text-slate-500 underline hover:text-slate-700">
+              <a href="https://www.iubenda.com/privacy-policy/39387054" target="_blank" rel="noopener noreferrer" className="text-slate-500 underline hover:text-slate-700">
                 Privacy Policy
-              </Link>
+              </a>
             </p>
 
           </div>

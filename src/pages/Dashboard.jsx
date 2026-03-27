@@ -188,9 +188,9 @@ export default function Dashboard() {
                 createdThisMonth={statusCounts?.created_this_month || 0}
                 avgScore={statusCounts?.avg_seo_score}
                 optimizedCount={statusCounts?.count_optimized || 0}
-                creditsBalance={profile?.credits_balance || 0}
-                subscriptionCredits={profile?.subscription_credits_balance || 0}
-                bonusCredits={profile?.bonus_credits_balance || 0}
+                tokensMonthly={profile?.tokens_monthly_balance || 0}
+                tokensBonus={profile?.tokens_bonus_balance || 0}
+                subscriptionPlan={profile?.subscription_plan || 'free'}
               />
 
               <PipelineBar

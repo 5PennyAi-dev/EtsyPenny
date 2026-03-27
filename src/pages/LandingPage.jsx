@@ -171,10 +171,11 @@ const LandingPage = () => {
 
       {/* Footer */}
       <footer className="py-12 text-center text-slate-400 text-sm">
-        © 2026 5PennyAi. All rights reserved. <br />
+        &copy; 2026 5PennyAi. All rights reserved. <br />
         <span className="italic">Designed for Online Sellers, by AI Enthusiasts.</span>
         <div className="mt-4 space-x-4">
-          <Link to="/privacy" className="hover:text-slate-600 underline">Privacy Policy</Link>
+          <a href="https://www.iubenda.com/privacy-policy/39387054" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 underline">Privacy Policy</a>
+          <a href="https://www.iubenda.com/privacy-policy/39387054/cookie-policy" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 underline">Cookie Policy</a>
           <Link to="/terms" className="hover:text-slate-600 underline">Terms of Service</Link>
         </div>
         <p className="text-xs text-slate-400 mt-3">

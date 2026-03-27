@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-03-25*
+*Dernière mise à jour : 2026-03-26*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -1633,3 +1633,56 @@ Fixed a bug where listings with completed image analysis (visual fields populate
 
 #### Files Modified
 - `src/pages/ProductStudio.jsx` — `seoGenerationCount` state, `isImageAnalyzedState` derivation, button label logic
+
+## Session: 2026-03-26 — Auth Fix, Token Migration, SEO Pre-render, Legal Pages
+
+### Signup Redirect Fix
+The signup handler in `LoginPage.jsx` never called `navigate()` when `supabase.auth.signUp()` returned a session directly (email confirmation disabled), causing an infinite spinner on `/login`.
+- **Fix**: If `data.session` exists after signUp, navigate immediately. Falls back to "check email" message if only `data.user` exists.
+
+#### Files Modified
+- `src/pages/LoginPage.jsx` — signup handler in `handleEmailAuth`
+
+### Dashboard QuickStats — Token Migration
+Migrated the credits card from legacy `credits_balance`/`subscription_credits_balance`/`bonus_credits_balance` fields to the new token-based billing fields.
+- **Value**: `tokens_monthly_balance + tokens_bonus_balance`
+- **Sub-text**: Shows plan name (e.g. "Starter plan") + bonus indicator if applicable
+- **Label**: "Credits" → "Tokens"
+
+#### Files Modified
+- `src/components/dashboard/QuickStats.jsx` — props and card config
+- `src/pages/Dashboard.jsx` — updated props passed to QuickStats
+
+### SEO Pre-render for Bots (index.html)
+Added static HTML content in `index.html` so search engine bots and API reviewers (Etsy) see real content without JavaScript execution.
+- **Meta tags**: `description`, Open Graph (`og:title`, `og:description`, `og:url`, `og:type`, `og:site_name`)
+- **`<noscript>` block**: Full static content (how it works, features, legal links, Etsy trademark disclaimer)
+
+#### Files Modified
+- `index.html` — meta tags in `<head>`, `<noscript>` block in `<body>`
+
+### Legal Pages — Terms of Service + Link Integration
+Rewrote `TermsPage.jsx` with 11 sections covering: Acceptance, Description, Token System, Subscriptions & Billing, Acceptable Use, IP, Limitation of Liability, Service Availability, Changes to Terms, Governing Law, Contact (`christian.couillard@5pennyai.com`). Privacy Policy is now hosted on Iubenda.
+
+**Links added/updated across the app:**
+- **LandingPage**: Footer links to Iubenda Privacy (new tab), Iubenda Cookie Policy (new tab), internal `/terms`
+- **PricingPage**: "By subscribing..." legal line below plan cards; footer Privacy → Iubenda
+- **LoginPage**: Privacy → Iubenda; text adapts ("creating an account" vs "continuing")
+- **Sidebar**: Legal section (Terms + Privacy) added above user profile
+- **PrivacyPage/TermsPage**: Footer Privacy links → Iubenda
+
+#### Files Modified
+- `src/pages/TermsPage.jsx` — full rewrite
+- `src/pages/LandingPage.jsx` — footer links
+- `src/pages/PricingPage.jsx` — legal line + footer link
+- `src/pages/LoginPage.jsx` — privacy link
+- `src/components/Sidebar.jsx` — legal section + billing/settings reorder
+- `src/pages/PrivacyPage.jsx` — footer link
+
+### Sidebar Reorder
+Moved "Billing" above "Settings" in the sidebar navigation.
+
+### Session Handover
+- Privacy/Cookie policies are on Iubenda — internal `/privacy` page still exists but all links now point to Iubenda
+- Token billing system is fully in place: `tokens_monthly_balance`, `tokens_bonus_balance`, `subscription_plan` fields on `profiles`
+- `vercel.json` catch-all rewrite already handles SPA routing for `/terms`, `/privacy`, etc.

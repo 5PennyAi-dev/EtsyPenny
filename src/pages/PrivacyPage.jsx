@@ -135,7 +135,7 @@ const PrivacyPage = () => {
         © 2026 5PennyAi. All rights reserved. <br />
         <span className="italic">Designed for Etsy Sellers, by AI Enthusiasts.</span>
         <div className="mt-4 space-x-4">
-          <Link to="/privacy" className="hover:text-slate-600 underline">Privacy Policy</Link>
+          <a href="https://www.iubenda.com/privacy-policy/39387054" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 underline">Privacy Policy</a>
           <Link to="/terms" className="hover:text-slate-600 underline">Terms of Service</Link>
         </div>
         <p className="text-xs text-slate-400 mt-4">

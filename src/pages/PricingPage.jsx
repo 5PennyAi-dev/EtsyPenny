@@ -316,6 +316,12 @@ const PricingPage = () => {
             );
           })}
         </div>
+        <p className="text-center text-sm text-slate-400 mt-8">
+          By subscribing, you agree to our{' '}
+          <Link to="/terms" className="text-slate-500 underline hover:text-slate-700">Terms of Service</Link>
+          {' '}and{' '}
+          <a href="https://www.iubenda.com/privacy-policy/39387054" target="_blank" rel="noopener noreferrer" className="text-slate-500 underline hover:text-slate-700">Privacy Policy</a>.
+        </p>
       </section>
 
       {/* ── Token Packs ────────────────────────────── */}
@@ -402,7 +408,7 @@ const PricingPage = () => {
         <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-slate-400">&copy; {new Date().getFullYear()} PennySEO. All rights reserved.</p>
           <div className="flex gap-6 text-sm text-slate-400">
-            <Link to="/privacy" className="hover:text-slate-600 transition-colors">Privacy</Link>
+            <a href="https://www.iubenda.com/privacy-policy/39387054" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 transition-colors">Privacy</a>
             <Link to="/terms" className="hover:text-slate-600 transition-colors">Terms</Link>
           </div>
         </div>

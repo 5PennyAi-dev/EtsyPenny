@@ -46,17 +46,17 @@ const cards = [
         : 'No listings yet',
   },
   {
-    key: 'credits',
-    label: 'Credits',
+    key: 'tokens',
+    label: 'Tokens',
     icon: Coins,
     iconBg: 'bg-amber-100',
     iconColor: 'text-amber-600',
-    getValue: (p) => p.creditsBalance,
+    getValue: (p) => p.tokensMonthly + p.tokensBonus,
     getSub: (p) => {
-      const parts = [];
-      if (p.subscriptionCredits > 0) parts.push(`${p.subscriptionCredits} sub`);
-      if (p.bonusCredits > 0) parts.push(`${p.bonusCredits} bonus`);
-      return parts.length > 0 ? parts.join(' + ') : 'No credits';
+      const plan = p.subscriptionPlan.charAt(0).toUpperCase() + p.subscriptionPlan.slice(1);
+      const parts = [`${plan} plan`];
+      if (p.tokensBonus > 0) parts.push(`+${p.tokensBonus} bonus`);
+      return parts.join(' · ');
     },
   },
 ];
@@ -66,11 +66,11 @@ export default function QuickStats({
   createdThisMonth = 0,
   avgScore,
   optimizedCount = 0,
-  creditsBalance = 0,
-  subscriptionCredits = 0,
-  bonusCredits = 0,
+  tokensMonthly = 0,
+  tokensBonus = 0,
+  subscriptionPlan = 'free',
 }) {
-  const props = { totalListings, createdThisMonth, avgScore, optimizedCount, creditsBalance, subscriptionCredits, bonusCredits };
+  const props = { totalListings, createdThisMonth, avgScore, optimizedCount, tokensMonthly, tokensBonus, subscriptionPlan };
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

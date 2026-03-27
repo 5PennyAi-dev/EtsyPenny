@@ -89,6 +89,15 @@ const Sidebar = () => {
         </Link>
       </div>
 
+      {/* Legal */}
+      <div className="px-4 pb-1">
+        <div className="flex items-center gap-3 px-4 text-xs text-slate-400">
+          <Link to="/terms" className="hover:text-slate-600 transition-colors">Terms</Link>
+          <span>·</span>
+          <a href="https://www.iubenda.com/privacy-policy/39387054" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 transition-colors">Privacy</a>
+        </div>
+      </div>
+
       {/* User Profile */}
       <div className="p-4 border-t border-slate-100">
         <div className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group">

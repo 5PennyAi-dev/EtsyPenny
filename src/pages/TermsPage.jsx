@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import logo from '../assets/pennyseo-logo.png';
 import fivePennyLogo from '../assets/5pennyAi_logo.png';
 
+const IUBENDA_PRIVACY = 'https://www.iubenda.com/privacy-policy/39387054';
+
 const TermsPage = () => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -25,12 +27,12 @@ const TermsPage = () => {
       <main className="max-w-3xl mx-auto px-6 py-12">
         <div className="bg-white rounded-xl border border-slate-200 p-8">
           <h1 className="text-3xl font-extrabold tracking-tight mb-2">Terms of Service</h1>
-          <p className="text-sm text-slate-400 mb-8">Last updated: March 24, 2026</p>
+          <p className="text-sm text-slate-400 mb-8">Last updated: March 26, 2026</p>
 
           <div className="prose prose-slate max-w-none space-y-6">
             <p>
               Please read these Terms of Service ("Terms") carefully before using PennySEO ("the Service")
-              operated by 5PennyAi ("we", "us", or "our").
+              operated by 5PennyAi, a numbered company based in Quebec, Canada ("we", "us", or "our").
             </p>
 
             <h2 className="text-xl font-bold mt-8 mb-3">1. Acceptance of Terms</h2>
@@ -41,101 +43,98 @@ const TermsPage = () => {
 
             <h2 className="text-xl font-bold mt-8 mb-3">2. Description of Service</h2>
             <p>
-              PennySEO is an AI-powered SEO optimization tool that helps online sellers improve their product
-              listing visibility through image analysis, keyword generation, and listing optimization. The Service
-              provides suggestions and recommendations — final listing decisions remain entirely with the user.
+              PennySEO is an AI-powered SEO optimization tool for Etsy sellers. The Service analyzes product
+              images using AI vision technology, generates optimized titles, descriptions, and keyword tags,
+              and scores them using real-time market data including search volume, competition, and buyer intent.
+              PennySEO provides suggestions and recommendations — final listing decisions remain entirely with the user.
             </p>
 
-            <h2 className="text-xl font-bold mt-8 mb-3">3. Etsy Trademark Notice</h2>
+            <h2 className="text-xl font-bold mt-8 mb-3">3. Token System</h2>
             <p>
-              The term "Etsy" is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed
-              or certified by Etsy, Inc. PennySEO is an independent tool and is not affiliated with, sponsored by,
-              or officially connected to Etsy, Inc.
+              PennySEO uses a token-based system to meter usage. Each subscription plan (Free, Starter, Growth,
+              and Pro) includes a monthly token allocation. Tokens are consumed when performing actions such as
+              image analysis, keyword generation, and draft generation.
             </p>
-
-            <h2 className="text-xl font-bold mt-8 mb-3">4. Account Responsibilities</h2>
-            <p>You are responsible for:</p>
             <ul className="list-disc pl-6 space-y-1">
-              <li>Maintaining the confidentiality of your account credentials</li>
-              <li>All activities that occur under your account</li>
-              <li>Ensuring that your use of the Service complies with applicable marketplace policies</li>
-              <li>The accuracy of information you provide</li>
+              <li>Monthly tokens are allocated at the start of each billing cycle and do not roll over to the next period</li>
+              <li>One-time bonus token packs can be purchased separately and never expire</li>
+              <li>Bonus tokens are consumed only after your monthly allocation is used up</li>
+              <li>Token costs per action are displayed in the application before each operation</li>
+            </ul>
+
+            <h2 className="text-xl font-bold mt-8 mb-3">4. Subscriptions & Billing</h2>
+            <p>
+              All payments are processed securely through Stripe. Subscription plans renew automatically on a
+              monthly or annual basis depending on the billing cycle you selected. You can upgrade, downgrade,
+              or cancel your plan at any time from your billing settings.
+            </p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>Upgrades take effect immediately, with prorated charges applied</li>
+              <li>Downgrades and cancellations take effect at the end of the current billing period</li>
+              <li>Consumed tokens are non-refundable</li>
+              <li>Refund requests for unused subscription periods may be considered on a case-by-case basis</li>
             </ul>
 
             <h2 className="text-xl font-bold mt-8 mb-3">5. Acceptable Use</h2>
             <p>You agree NOT to:</p>
             <ul className="list-disc pl-6 space-y-1">
-              <li>Use the Service for any unlawful purpose</li>
-              <li>Attempt to reverse-engineer, decompile, or extract source code from the Service</li>
+              <li>Scrape, crawl, or programmatically extract data from the Service</li>
+              <li>Use automated tools or bots to interact with the Service</li>
+              <li>Create or maintain multiple accounts for the same individual</li>
+              <li>Use the Service for any purpose other than legitimate Etsy seller activity</li>
               <li>Use the Service to generate misleading, fraudulent, or deceptive listing content</li>
               <li>Resell or redistribute SEO data generated by the Service</li>
-              <li>Exceed reasonable usage limits or attempt to abuse the Service</li>
+              <li>Attempt to reverse-engineer, decompile, or extract source code from the Service</li>
             </ul>
 
             <h2 className="text-xl font-bold mt-8 mb-3">6. Intellectual Property</h2>
             <p>
-              The Service, including its original content, features, and functionality, is owned by 5PennyAi and is
-              protected by applicable intellectual property laws. SEO suggestions generated for your listings are
-              provided for your use in your marketplace listings.
+              The Service, including its original content, features, design, and functionality, is owned by
+              5PennyAi and is protected by applicable intellectual property laws. You retain full ownership of
+              the content generated for you through the Service, including titles, descriptions, and tags.
+              You are free to use this generated content in your marketplace listings without restriction.
             </p>
 
-            <h2 className="text-xl font-bold mt-8 mb-3">7. AI-Generated Content</h2>
+            <h2 className="text-xl font-bold mt-8 mb-3">7. Limitation of Liability</h2>
             <p>
-              SEO titles, descriptions, tags, and scores generated by PennySEO are AI-assisted suggestions. We do
-              not guarantee:
+              PennySEO is a tool that provides AI-generated suggestions. We do not guarantee any specific
+              improvement in search rankings, visibility, or sales performance on Etsy or any other platform.
             </p>
-            <ul className="list-disc pl-6 space-y-1">
-              <li>Specific search ranking improvements</li>
-              <li>Accuracy of keyword volume or competition data</li>
-              <li>That generated content complies with any specific marketplace's content policies</li>
-            </ul>
-            <p>
-              You are solely responsible for reviewing, editing, and approving any AI-generated content before
-              publishing it to your listings.
-            </p>
-
-            <h2 className="text-xl font-bold mt-8 mb-3">8. Third-Party Integrations</h2>
-            <p>
-              The Service integrates with third-party platforms (including Etsy) via their official APIs. We are not
-              responsible for:
-            </p>
-            <ul className="list-disc pl-6 space-y-1">
-              <li>Changes to third-party API availability or terms</li>
-              <li>Actions taken by third-party platforms on your account</li>
-              <li>Data accuracy from third-party data providers</li>
-            </ul>
-
-            <h2 className="text-xl font-bold mt-8 mb-3">9. Limitation of Liability</h2>
             <p className="uppercase text-sm">
-              To the maximum extent permitted by law, PennySEO and its operators shall not be liable for any
-              indirect, incidental, special, consequential, or punitive damages, including but not limited to loss
-              of profits, data, or business opportunities, arising from your use of the Service.
+              To the maximum extent permitted by law, 5PennyAi shall not be liable for any indirect, incidental,
+              special, consequential, or punitive damages, including but not limited to loss of profits, data,
+              or business opportunities, arising from your use of the Service.
             </p>
 
-            <h2 className="text-xl font-bold mt-8 mb-3">10. Termination</h2>
+            <h2 className="text-xl font-bold mt-8 mb-3">8. Service Availability</h2>
             <p>
-              We reserve the right to suspend or terminate your access to the Service at our discretion, with or
-              without notice, for conduct that we determine violates these Terms or is harmful to other users or
-              the Service.
+              We strive to maintain high availability but provide the Service on a best-effort basis. There is
+              no guaranteed uptime or service-level agreement (SLA) during the current beta period. We may
+              perform maintenance, updates, or experience downtime without prior notice.
             </p>
 
-            <h2 className="text-xl font-bold mt-8 mb-3">11. Modifications</h2>
+            <h2 className="text-xl font-bold mt-8 mb-3">9. Changes to Terms</h2>
             <p>
-              We may modify these Terms at any time. Continued use of the Service after changes constitutes
-              acceptance of the updated Terms.
+              We reserve the right to update these Terms at any time. When we make material changes, we will
+              notify users through the application or by email. Continued use of the Service after changes
+              are posted constitutes acceptance of the updated Terms.
             </p>
 
-            <h2 className="text-xl font-bold mt-8 mb-3">12. Governing Law</h2>
+            <h2 className="text-xl font-bold mt-8 mb-3">10. Governing Law</h2>
             <p>
-              These Terms shall be governed by the laws of the Province of Quebec, Canada, without regard to
-              conflict of law provisions.
+              These Terms shall be governed by and construed in accordance with the laws of the Province of
+              Quebec, Canada, without regard to conflict of law provisions.
             </p>
 
-            <h2 className="text-xl font-bold mt-8 mb-3">13. Contact</h2>
+            <h2 className="text-xl font-bold mt-8 mb-3">11. Contact</h2>
             <p>For questions about these Terms, contact us at:</p>
             <p>
-              Email: <a href="mailto:support@pennyseo.ai" className="text-indigo-600 hover:underline">support@pennyseo.ai</a><br />
+              Email: <a href="mailto:christian.couillard@5pennyai.com" className="text-indigo-600 hover:underline">christian.couillard@5pennyai.com</a><br />
               Website: <a href="https://www.pennyseo.ai" className="text-indigo-600 hover:underline">https://www.pennyseo.ai</a>
+            </p>
+            <p className="text-sm text-slate-500 mt-4">
+              The term "Etsy" is a trademark of Etsy, Inc. This application uses the Etsy API but is not
+              endorsed or certified by Etsy, Inc.
             </p>
           </div>
         </div>
@@ -143,10 +142,10 @@ const TermsPage = () => {
 
       {/* Footer */}
       <footer className="py-12 text-center text-slate-400 text-sm">
-        © 2026 5PennyAi. All rights reserved. <br />
-        <span className="italic">Designed for Etsy Sellers, by AI Enthusiasts.</span>
+        &copy; 2026 5PennyAi. All rights reserved. <br />
+        <span className="italic">Designed for Online Sellers, by AI Enthusiasts.</span>
         <div className="mt-4 space-x-4">
-          <Link to="/privacy" className="hover:text-slate-600 underline">Privacy Policy</Link>
+          <a href={IUBENDA_PRIVACY} target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 underline">Privacy Policy</a>
           <Link to="/terms" className="hover:text-slate-600 underline">Terms of Service</Link>
         </div>
         <p className="text-xs text-slate-400 mt-4">
