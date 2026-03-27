@@ -78,7 +78,11 @@ const LoginPage = () => {
           password,
         });
         if (error) throw error;
-        if (data.user && !data.session) {
+        if (data.session) {
+          navigate(from, { replace: true });
+          return;
+        }
+        if (data.user) {
           setError('Please check your email for the confirmation link.');
           setLoading(false);
           return;

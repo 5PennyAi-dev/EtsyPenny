@@ -13,8 +13,8 @@ const Sidebar = () => {
     { name: 'SEO History', icon: LineChart, path: '/history' },
     { name: 'SEO Lab', icon: FlaskConical, path: '/lab' },
     { name: 'My Shop', icon: ShoppingBag, path: '/shop' },
-    { name: 'Settings', icon: Settings, path: '/settings' },
     { name: 'Billing', icon: CreditCard, path: '/billing' },
+    { name: 'Settings', icon: Settings, path: '/settings' },
   ];
 
   const handleLogout = async () => {
