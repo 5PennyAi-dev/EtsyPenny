@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useBulkProgress } from '@/context/BulkProgressContext';
@@ -112,11 +112,11 @@ const ROW_GRID = {
 
 export default function ListingsByStatusPage() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, profile, refreshProfile } = useAuth();
   const { bulkProgress, startBulk, incrementBulk, finishBulk } = useBulkProgress();
 
-  const currentStatus = new URLSearchParams(location.search).get('status') || 'new';
+  const currentStatus = searchParams.get('status') || 'new';
   const config = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.new;
 
   const [allListings, setAllListings] = useState([]);
@@ -232,7 +232,7 @@ export default function ListingsByStatusPage() {
             return (
               <button
                 key={key}
-                onClick={() => navigate(`/listings?status=${key}`)}
+                onClick={() => setSearchParams({ status: key })}
                 style={{
                   padding: '6px 14px',
                   borderRadius: 999,
