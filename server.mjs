@@ -1172,6 +1172,64 @@ app.post('/api/seo/add-from-favorite', async (req, res) => {
   }
 });
 
+// ─── API ROUTE: POST /api/feedback ──────────────────
+app.post('/api/feedback', async (req, res) => {
+  const { user_id, name, email, type, message, page } = req.body;
+
+  if (!type || !message) {
+    return res.status(400).json({ error: 'Missing required fields: type and message' });
+  }
+
+  const validTypes = ['bug', 'suggestion', 'question', 'other'];
+  if (!validTypes.includes(type)) {
+    return res.status(400).json({ error: `Invalid type. Must be one of: ${validTypes.join(', ')}` });
+  }
+
+  try {
+    console.info(`[feedback] type=${type} user=${user_id || 'anonymous'}`);
+
+    const { error: dbError } = await supabaseAdmin
+      .from('feedback')
+      .insert({
+        user_id: user_id || null,
+        name: name || null,
+        email: email || null,
+        type,
+        message,
+        page: page || null,
+      });
+
+    if (dbError) throw dbError;
+
+    // Send notification email via Resend (non-blocking)
+    const resendKey = process.env.RESEND_API_KEY;
+    if (resendKey) {
+      try {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'onboarding@resend.dev',
+            to: ['christian.couillard@5pennyai.com'],
+            subject: `[PennySEO Feedback] ${type} — from ${email || 'anonymous'}`,
+            text: `Type: ${type}\nPage: ${page || 'N/A'}\nMessage: ${message}\nUser: ${email || 'anonymous'}`,
+          }),
+        });
+      } catch (emailErr) {
+        console.error('[feedback] Email notification failed:', emailErr.message);
+      }
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('❌ [feedback] Error:', error.message || error);
+    return res.status(500).json({ error: 'Failed to submit feedback', details: error.message || 'Unknown error' });
+  }
+});
+
 // ─── API ROUTE: POST /api/stripe/webhook ──────────────────
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const stripe = getStripe();

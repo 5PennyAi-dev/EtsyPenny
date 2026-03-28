@@ -1724,3 +1724,28 @@ Moved "Billing" above "Settings" in the sidebar navigation.
 - Broad discovery keywords should now appear in pools — verify after next keyword generation
 - Bulk actions send minimal payloads; server fetches context from DB
 - ListingsTable uses inline styles (not Tailwind) for reliable layout — intentional choice after multiple CSS layout issues
+
+---
+
+## Session: 2026-03-27 — Icon Unification, Feedback System, Token Widget Fix
+
+### Icon & Term Unification (Technical Analysis ↔ Strategy Tuner)
+- **ResultsDisplay.jsx**: Renamed "Conversion" → "Buy intent". Changed Competition icon from `Swords` → `BarChart2` with tooltip. Icons now match Strategy Tuner: TrendingUp, Target, ShoppingCart, BarChart2.
+- **StrategyTuner.jsx**: Renamed "Market reach" → "Reach". Updated icons: `BarChart3` → `TrendingUp`, `Shield` → `BarChart2`, `Crosshair` → `Target`. Updated Ranking ease description. Display-only change — no scoring logic modified.
+
+### Beta Feedback System (Full Stack)
+- **Supabase**: `feedback` table with RLS policies — authenticated insert (user_id match), anonymous insert (user_id IS NULL), admin SELECT/UPDATE via `auth.jwt() ->> 'email'` for both `christian.couillard@5pennyai.com` and `admin@etsypenny.dev`.
+- **API**: `api/feedback.ts` (Vercel) + route in `server.mjs` (local dev). POST inserts to `feedback` table + sends email notification via Resend API (`onboarding@resend.dev` → `christian.couillard@5pennyai.com`). Email is non-blocking.
+- **FeedbackModal.jsx** (`src/components/feedback/`): Portal modal with type selector (Bug/Suggestion/Question/Other), textarea, success animation. Uses `axios.post('/api/feedback')`.
+- **Sidebar.jsx**: "Give feedback" button added above Legal links, opens FeedbackModal.
+- **LandingPage.jsx**: "Have a question?" contact form section added before footer. Public (no auth), sends `user_id: null` to `/api/feedback`.
+- **AdminSystemPage.jsx**: "Beta Feedback" accordion with purple accent, table (date, type badge, message, page, email, status dropdown). Status updates via Supabase client.
+- **Env var**: `RESEND_API_KEY` required for email notifications.
+
+### Token Widget Fix (ProductStudio Header)
+- **ProductStudio.jsx**: Replaced legacy `credits_balance` / "5 / 5 Credits" widget with live token display: `{tokens_monthly_balance} tokens + {tokens_bonus_balance} bonus`. Warning state (rose) when total < 10. "Top Up →" is now a working `<Link to="/billing">`. Swapped `Zap` icon for `Coins`.
+
+### Session Handover
+- Feedback system is live — Resend test mode only sends to registered account email
+- RLS admin policies use JWT email check (not auth.users subquery) — more reliable
+- FeedbackModal type pill buttons use dynamic Tailwind classes (`bg-${color}-50`) — may need safelist if colors get purged in production

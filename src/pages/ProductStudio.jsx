@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { DEFAULT_STRATEGY_SELECTIONS, getStrategyValues, getSelectionsFromValues } from '../components/studio/StrategyTuner';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Wand2, Sparkles, Shirt, ChevronUp, ChevronDown, ChevronRight, Palette, Type, LayoutTemplate, Heart, Save, Zap, Package, Users } from 'lucide-react';
+import { Wand2, Sparkles, Shirt, ChevronUp, ChevronDown, ChevronRight, Palette, Type, LayoutTemplate, Heart, Save, Coins, Package, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ImageUpload from '../components/studio/ImageUpload';
 import ProductTypeCombobox from '../components/studio/ProductTypeCombobox';
@@ -1911,17 +1911,20 @@ const ProductStudio = () => {
           </div>
           
           <div className="flex items-center gap-4">
-             <div className="flex items-center gap-2 bg-white border border-amber-200 px-4 py-2 rounded-full shadow-sm">
-                <div className="p-1 bg-amber-100 rounded-full">
-                  <Zap size={16} className="text-amber-600" fill="currentColor" />
+             <Link to="/billing" className="flex items-center gap-2 bg-white border border-slate-200 hover:border-indigo-200 px-4 py-2 rounded-full shadow-sm transition-colors group">
+                <div className={`p-1 rounded-full ${((profile?.tokens_monthly_balance ?? 0) + (profile?.tokens_bonus_balance ?? 0)) < 10 ? 'bg-rose-100' : 'bg-amber-100'}`}>
+                  <Coins size={16} className={((profile?.tokens_monthly_balance ?? 0) + (profile?.tokens_bonus_balance ?? 0)) < 10 ? 'text-rose-600' : 'text-amber-600'} />
                 </div>
-                <span className="text-sm font-medium text-slate-700">
-                  Balance: <span className="font-bold text-slate-900">{profile?.credits_balance ?? 0}</span> / 5 Credits
+                <span className={`text-sm font-medium ${((profile?.tokens_monthly_balance ?? 0) + (profile?.tokens_bonus_balance ?? 0)) < 10 ? 'text-rose-700' : 'text-slate-700'}`}>
+                  <span className="font-bold">{profile?.tokens_monthly_balance ?? 0}</span> tokens
+                  {(profile?.tokens_bonus_balance ?? 0) > 0 && (
+                    <span className="text-slate-500"> + <span className="font-bold">{profile.tokens_bonus_balance}</span> bonus</span>
+                  )}
                 </span>
-                <button className="text-xs text-indigo-600 hover:text-indigo-700 font-medium ml-2">
-                  Top Up
-                </button>
-             </div>
+                <span className="text-xs text-indigo-600 group-hover:text-indigo-700 font-medium ml-2">
+                  Top Up →
+                </span>
+             </Link>
           </div>
         </div>
 

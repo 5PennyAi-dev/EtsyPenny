@@ -2,7 +2,7 @@ import {
   Copy, Check, Flame, TrendingUp, Leaf, Star, Sparkles,
   ArrowUpDown, ArrowUp, ArrowDown, Lightbulb, AlertTriangle, Target, Loader2,
   Info, Plus, Minus, Save, ArrowUpRight, ArrowDownRight, ShoppingCart,
-  Pin, Tag, User, Zap, Swords, DollarSign, Award, BarChart3, History, Folder, Shield,
+  Pin, Tag, User, Zap, DollarSign, Award, BarChart3, History, Folder, Shield, BarChart2,
   FileText, Image as ImageIcon
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
@@ -367,7 +367,7 @@ const SidebarSkeleton = ({ phase }) => (
                 <div>
                     <div className="flex items-center justify-between mb-1">
                          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                           <ShoppingCart size={14} className="text-slate-400" /> Conversion
+                           <ShoppingCart size={14} className="text-slate-400" /> Buy intent
                          </span>
                          <span className={`text-sm font-bold ${isPreAnalysis ? 'text-slate-400' : convTier.text}`}>
                            {isPreAnalysis ? '--' : (listingConversion || 0)}
@@ -379,7 +379,7 @@ const SidebarSkeleton = ({ phase }) => (
                 <div>
                     <div className="flex items-center justify-between mb-1">
                          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                           <Swords size={14} className="text-slate-400" /> Competition
+                           <BarChart2 size={14} className="text-slate-400" title="How saturated the market is for your selected keywords (lower is better)" /> Competition
                          </span>
                          <span className={`text-sm font-bold ${isPreAnalysis ? 'text-slate-400' : compTier.text}`}>
                            {isPreAnalysis ? '--' : (listingCompetition || 0)}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Layout from '../components/Layout';
 import Accordion from '../components/ui/Accordion';
-import { Settings2, Zap, Edit2, Check, X, Trash2, Plus, ArrowUpDown, ChevronUp, ChevronDown, Globe, Package, Brain } from 'lucide-react';
+import { Settings2, Zap, Edit2, Check, X, Trash2, Plus, ArrowUpDown, ChevronUp, ChevronDown, Globe, Package, Brain, MessageSquare } from 'lucide-react';
 import TaxonomyManagement from '../components/admin/TaxonomyManagement';
 import ProductTypeManagement from '../components/admin/ProductTypeManagement';
 import AIModelConfig from '../components/admin/AIModelConfig';
@@ -28,8 +28,47 @@ export default function AdminSystemPage() {
 
   const [sortConfig, setSortConfig] = useState({ key: 'param_key', direction: 'asc' });
 
+  // Feedback state
+  const [feedbackList, setFeedbackList] = useState([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  const fetchFeedback = async () => {
+    try {
+      setFeedbackLoading(true);
+      const { data, error } = await supabase
+        .from('feedback')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setFeedbackList(data || []);
+    } catch (error) {
+      console.error('Error fetching feedback:', error);
+      toast.error('Failed to load feedback');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  const updateFeedbackStatus = async (id, newStatus) => {
+    try {
+      const { error } = await supabase
+        .from('feedback')
+        .update({ status: newStatus })
+        .eq('id', id);
+      if (error) throw error;
+      setFeedbackList((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, status: newStatus } : f))
+      );
+    } catch (error) {
+      console.error('Error updating feedback status:', error);
+      toast.error('Failed to update status');
+    }
+  };
+
   useEffect(() => {
     fetchConstants();
+    fetchFeedback();
   }, []);
 
   const fetchConstants = async () => {
@@ -431,6 +470,90 @@ export default function AdminSystemPage() {
               </p>
             </div>
           </div>
+
+          {/* Beta Feedback */}
+          <Accordion
+            defaultOpen={false}
+            title={
+              <div className="flex items-center justify-between w-full pr-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
+                    <MessageSquare size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900 text-left">Beta Feedback</h2>
+                    <p className="text-sm text-slate-500 font-normal mt-0.5 text-left">User feedback and contact form submissions</p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                  {feedbackList.filter((f) => f.status === 'new').length} new
+                </span>
+              </div>
+            }
+          >
+            <div className="p-6">
+              {feedbackLoading ? (
+                <p className="text-sm text-slate-500">Loading...</p>
+              ) : feedbackList.length === 0 ? (
+                <p className="text-sm text-slate-500">No feedback yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200">
+                        <th className="text-left py-2 px-3 text-xs font-bold text-slate-500 uppercase">Date</th>
+                        <th className="text-left py-2 px-3 text-xs font-bold text-slate-500 uppercase">Type</th>
+                        <th className="text-left py-2 px-3 text-xs font-bold text-slate-500 uppercase">Message</th>
+                        <th className="text-left py-2 px-3 text-xs font-bold text-slate-500 uppercase">Page</th>
+                        <th className="text-left py-2 px-3 text-xs font-bold text-slate-500 uppercase">Email</th>
+                        <th className="text-left py-2 px-3 text-xs font-bold text-slate-500 uppercase">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feedbackList.map((fb) => (
+                        <tr key={fb.id} className="border-b border-slate-100 hover:bg-slate-50">
+                          <td className="py-2 px-3 text-slate-600 whitespace-nowrap">
+                            {new Date(fb.created_at).toLocaleDateString('en-CA')}{' '}
+                            {new Date(fb.created_at).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="py-2 px-3">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              fb.type === 'bug' ? 'bg-rose-100 text-rose-700' :
+                              fb.type === 'suggestion' ? 'bg-blue-100 text-blue-700' :
+                              fb.type === 'question' ? 'bg-amber-100 text-amber-700' :
+                              'bg-slate-100 text-slate-600'
+                            }`}>
+                              {fb.type}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-slate-700 max-w-xs truncate" title={fb.message}>
+                            {fb.message.length > 100 ? fb.message.slice(0, 100) + '...' : fb.message}
+                          </td>
+                          <td className="py-2 px-3 text-slate-500 text-xs">{fb.page || '—'}</td>
+                          <td className="py-2 px-3 text-slate-500 text-xs">{fb.email || '—'}</td>
+                          <td className="py-2 px-3">
+                            <select
+                              value={fb.status}
+                              onChange={(e) => updateFeedbackStatus(fb.id, e.target.value)}
+                              className={`text-xs font-semibold px-2 py-1 rounded-lg border cursor-pointer ${
+                                fb.status === 'new' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+                                fb.status === 'read' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                'bg-green-50 border-green-200 text-green-700'
+                              }`}
+                            >
+                              <option value="new">new</option>
+                              <option value="read">read</option>
+                              <option value="resolved">resolved</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </Accordion>
 
           {/* Table Area 1: SEO Strategy Weights */}
           <Accordion

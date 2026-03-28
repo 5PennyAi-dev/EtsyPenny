@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle, Search, Target, Zap, Star, Upload, Store, Sparkles, TrendingUp, Loader2 } from 'lucide-react';
+import { CheckCircle, Search, Target, Zap, Star, Upload, Store, Sparkles, TrendingUp, Loader2, Send } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import axios from 'axios';
 import logo from '../assets/pennyseo-logo.png';
 import dashboardPreview from '../assets/dashboard_preview.jpg';
 import fivePennyLogo from '../assets/5pennyAi_logo.png';
@@ -9,6 +10,32 @@ import fivePennyLogo from '../assets/5pennyAi_logo.png';
 const LandingPage = () => {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
+
+  // Contact form state
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactStatus, setContactStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
+
+  const handleContact = async (e) => {
+    e.preventDefault();
+    setContactStatus('loading');
+    try {
+      await axios.post('/api/feedback', {
+        user_id: null,
+        name: contactName.trim(),
+        email: contactEmail.trim(),
+        type: 'question',
+        message: contactMessage.trim(),
+      });
+      setContactStatus('success');
+      setContactName('');
+      setContactEmail('');
+      setContactMessage('');
+    } catch {
+      setContactStatus('error');
+    }
+  };
 
   const handleJoinWaitlist = async (e) => {
     e.preventDefault();
@@ -166,6 +193,70 @@ const LandingPage = () => {
               <p className="text-slate-600">Build your own library of high-performing keywords. Create custom presets and streamline your workflow across your product catalog.</p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Contact */}
+      <section className="py-20">
+        <div className="max-w-xl mx-auto px-6">
+          <h2 className="text-3xl font-bold text-center mb-2">Have a question?</h2>
+          <p className="text-slate-500 text-center mb-10">We'd love to hear from you.</p>
+
+          {contactStatus === 'success' ? (
+            <div className="text-center py-8">
+              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={28} className="text-green-600" />
+              </div>
+              <p className="text-slate-700 font-semibold">Thanks! We'll get back to you shortly.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleContact} className="space-y-4">
+              <input
+                type="text"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                placeholder="Your name"
+                required
+                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              />
+              <input
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="Your email"
+                required
+                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              />
+              <textarea
+                value={contactMessage}
+                onChange={(e) => setContactMessage(e.target.value)}
+                placeholder="Your message"
+                required
+                rows={4}
+                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+              />
+              {contactStatus === 'error' && (
+                <p className="text-sm text-rose-600">Something went wrong. Please try again.</p>
+              )}
+              <button
+                type="submit"
+                disabled={contactStatus === 'loading'}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-md transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+              >
+                {contactStatus === 'loading' ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send size={18} />
+                    Send message
+                  </>
+                )}
+              </button>
+            </form>
+          )}
         </div>
       </section>
 

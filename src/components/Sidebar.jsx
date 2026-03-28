@@ -1,11 +1,14 @@
-import { LayoutDashboard, Shirt, LineChart, FlaskConical, ShoppingBag, Settings, User, LogOut, ShieldAlert, CreditCard, Coins } from 'lucide-react';
+import { useState } from 'react';
+import { LayoutDashboard, Shirt, LineChart, FlaskConical, ShoppingBag, Settings, User, LogOut, ShieldAlert, CreditCard, Coins, MessageSquareText } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import FeedbackModal from './feedback/FeedbackModal';
 import pennyseoLogo from '../assets/pennyseo-logo.png';
 
 const Sidebar = () => {
   const location = useLocation();
   const { user, profile, signOut } = useAuth();
+  const [showFeedback, setShowFeedback] = useState(false);
   
   const navItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -89,6 +92,17 @@ const Sidebar = () => {
         </Link>
       </div>
 
+      {/* Feedback */}
+      <div className="px-4 pb-1">
+        <button
+          onClick={() => setShowFeedback(true)}
+          className="flex items-center gap-2 px-4 py-2 w-full rounded-lg text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors text-sm"
+        >
+          <MessageSquareText size={16} />
+          <span>Give feedback</span>
+        </button>
+      </div>
+
       {/* Legal */}
       <div className="px-4 pb-1">
         <div className="flex items-center gap-3 px-4 text-xs text-slate-400">
@@ -119,6 +133,8 @@ const Sidebar = () => {
           </button>
         </div>
       </div>
+
+      <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
     </div>
   );
 };

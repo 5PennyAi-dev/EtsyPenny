@@ -1,4 +1,4 @@
-import { Sparkles, Loader2, SlidersHorizontal, BarChart3, Shield, ShoppingCart, Crosshair, DollarSign, Info } from 'lucide-react';
+import { Sparkles, Loader2, SlidersHorizontal, TrendingUp, BarChart2, ShoppingCart, Target, DollarSign, Info } from 'lucide-react';
 import Accordion from '../ui/Accordion';
 
 const LEVELS = ['Low', 'Regular', 'High', 'Aggressive'];
@@ -7,16 +7,16 @@ const LEVEL_LABELS = ['Low', 'Regular', 'High', 'Aggr.'];
 export const PARAMETERS = [
   {
     key: 'Volume',
-    label: 'Market reach',
+    label: 'Reach',
     description: 'Prioritize keywords with massive search volumes.',
-    icon: BarChart3,
+    icon: TrendingUp,
     values: [0.10, 0.25, 0.50, 0.85],
   },
   {
     key: 'Competition',
     label: 'Ranking ease',
-    description: 'Favor keywords where competition is low, making it easier to rank.',
-    icon: Shield,
+    description: 'Adjust how aggressively to prioritize low-competition keywords.',
+    icon: BarChart2,
     values: [0.05, 0.10, 0.25, 0.45],
   },
   {
@@ -30,7 +30,7 @@ export const PARAMETERS = [
     key: 'Niche',
     label: 'Niche focus',
     description: 'Favor keywords closely matching your exact niche and product.',
-    icon: Crosshair,
+    icon: Target,
     values: [0.08, 0.20, 0.40, 0.70],
   },
   {
