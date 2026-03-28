@@ -10,7 +10,7 @@ import ShopHealth from '@/components/dashboard/ShopHealth';
 import KeywordBankStats from '@/components/dashboard/KeywordBankStats';
 import ListingsTable from '@/components/dashboard/ListingsTable';
 import TrendingKeywords from '@/components/dashboard/TrendingKeywords';
-import { Plus, Sparkles } from 'lucide-react';
+import { Plus, Sparkles, Camera, Search, Copy } from 'lucide-react';
 
 function DashboardSkeleton() {
   return (
@@ -130,11 +130,14 @@ export default function Dashboard() {
     navigate('/studio', { state: { newListing: true } });
   }
 
+  const isFirstRun = !loading && (statusCounts?.total_listings || 0) === 0;
+
   return (
     <Layout>
 <div className="min-h-screen bg-slate-50 px-6 lg:px-8 py-6">
         <div className="space-y-5">
           {/* Header */}
+          {!isFirstRun && (
           <div className="flex items-center justify-between mb-5">
             <div>
               <p className="text-sm text-slate-500">Dashboard</p>
@@ -150,26 +153,55 @@ export default function Dashboard() {
               New listing
             </button>
           </div>
+          )}
 
           {loading ? (
             <DashboardSkeleton />
-          ) : (statusCounts?.total_listings || 0) === 0 ? (
-            /* Empty state */
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mb-4">
-                <Sparkles className="w-8 h-8 text-indigo-600" />
+          ) : isFirstRun ? (
+            /* First-run welcome screen */
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="max-w-[560px] w-full">
+                <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mb-6 mx-auto">
+                  <Sparkles className="w-8 h-8 text-indigo-600" />
+                </div>
+                <h1 className="text-2xl font-bold text-slate-800 mb-2">
+                  Welcome to PennySEO!
+                </h1>
+                <p className="text-slate-500 mb-10">
+                  Your AI-powered SEO assistant for Etsy
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 text-center">
+                    <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                      <Camera className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-700 mb-1">Step 1</p>
+                    <p className="text-xs text-slate-500">Upload your product image</p>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 text-center">
+                    <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                      <Search className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-700 mb-1">Step 2</p>
+                    <p className="text-xs text-slate-500">We analyze it and find the best keywords</p>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 text-center">
+                    <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                      <Copy className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-700 mb-1">Step 3</p>
+                    <p className="text-xs text-slate-500">Copy optimized titles, tags & descriptions</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleNewListing}
+                  className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors text-sm"
+                >
+                  Optimize my first listing →
+                </button>
               </div>
-              <h2 className="text-xl font-medium text-slate-800 mb-2">Welcome to PennySEO</h2>
-              <p className="text-slate-500 mb-6 max-w-md">
-                Upload your first product mockup to get AI-powered SEO keywords,
-                optimized titles, and descriptions for your Etsy listings.
-              </p>
-              <button
-                onClick={handleNewListing}
-                className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition-colors"
-              >
-                Create your first listing
-              </button>
             </div>
           ) : (
             <>
