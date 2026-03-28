@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useBulkProgress } from '@/context/BulkProgressContext';
 import Layout from '@/components/Layout';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -113,6 +114,7 @@ export default function ListingsByStatusPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, profile, refreshProfile } = useAuth();
+  const { bulkProgress, startBulk, incrementBulk, finishBulk } = useBulkProgress();
 
   const currentStatus = new URLSearchParams(location.search).get('status') || 'new';
   const config = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.new;
@@ -121,7 +123,6 @@ export default function ListingsByStatusPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [progress, setProgress] = useState({ current: 0, total: 0, running: false });
 
   const totalTokens = (profile?.tokens_monthly_balance ?? 0) + (profile?.tokens_bonus_balance ?? 0);
 
@@ -157,11 +158,15 @@ export default function ListingsByStatusPage() {
 
   const handleBulkAction = async () => {
     setShowConfirmModal(false);
-    setProgress({ current: 0, total: selected.length, running: true });
+    // Note: bulk processing runs in the browser. Closing the tab or refreshing
+    // the page will interrupt processing. A server-side job queue would be
+    // required to survive tab close — acceptable limitation for v1.
+    startBulk(selected.length, config.bulkAction);
 
     for (let i = 0; i < selected.length; i++) {
       const listingId = selected[i];
       const listing = allListings.find((l) => l.id === listingId);
+      let hasError = false;
       try {
         if (config.actionKey === 'analyze_image') {
           await axios.post('/api/seo/analyze-image', {
@@ -181,16 +186,18 @@ export default function ListingsByStatusPage() {
           });
         }
       } catch (err) {
+        hasError = true;
         if (err.response?.status === 402) {
           toast.error('Insufficient tokens — stopping bulk action.');
+          incrementBulk(true);
           break;
         }
         toast.error(`Failed on listing ${i + 1}: ${err.message}`);
       }
-      setProgress((p) => ({ ...p, current: i + 1 }));
+      incrementBulk(hasError);
     }
 
-    setProgress((p) => ({ ...p, running: false }));
+    finishBulk();
     setSelected([]);
     toast.success(`Bulk ${config.bulkAction} complete!`);
     await refreshProfile();
@@ -250,10 +257,15 @@ export default function ListingsByStatusPage() {
         )}
 
         {/* Progress bar */}
-        {progress.running && (
+        {bulkProgress.running && (
           <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
             <div style={{ fontSize: 13, color: '#065f46', marginBottom: 6 }}>
-              Processing {progress.current} of {progress.total} listings...
+              Processing {bulkProgress.current} of {bulkProgress.total} listings...
+              {bulkProgress.errors > 0 && (
+                <span style={{ color: '#dc2626', marginLeft: 8 }}>
+                  ({bulkProgress.errors} failed)
+                </span>
+              )}
             </div>
             <div style={{ height: 4, background: '#dcfce7', borderRadius: 999 }}>
               <div
@@ -261,7 +273,7 @@ export default function ListingsByStatusPage() {
                   height: 4,
                   background: '#22c55e',
                   borderRadius: 999,
-                  width: `${(progress.current / progress.total) * 100}%`,
+                  width: `${(bulkProgress.current / bulkProgress.total) * 100}%`,
                   transition: 'width 0.3s',
                 }}
               />

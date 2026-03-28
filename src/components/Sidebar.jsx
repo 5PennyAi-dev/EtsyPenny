@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { LayoutDashboard, Shirt, LineChart, FlaskConical, ShoppingBag, Settings, User, LogOut, ShieldAlert, CreditCard, Coins, MessageSquareText } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useBulkProgress } from '../context/BulkProgressContext';
 import FeedbackModal from './feedback/FeedbackModal';
 import pennyseoLogo from '../assets/pennyseo-logo.png';
 
 const Sidebar = () => {
   const location = useLocation();
   const { user, profile, signOut } = useAuth();
+  const { bulkProgress } = useBulkProgress();
   const [showFeedback, setShowFeedback] = useState(false);
   
   const navItems = [
@@ -91,6 +93,45 @@ const Sidebar = () => {
           )}
         </Link>
       </div>
+
+      {/* Bulk Progress Indicator */}
+      {bulkProgress.running && (
+        <div style={{
+          margin: '4px 16px 4px',
+          padding: '10px 12px',
+          background: '#f0fdf4',
+          borderRadius: 8,
+          border: '1px solid #bbf7d0',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: '#22c55e',
+              animation: 'pulse 1.5s ease-in-out infinite',
+            }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#065f46' }}>
+              {bulkProgress.action}
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>
+            {bulkProgress.current} of {bulkProgress.total} processed
+            {bulkProgress.errors > 0 && (
+              <span style={{ color: '#dc2626', marginLeft: 6 }}>
+                ({bulkProgress.errors} failed)
+              </span>
+            )}
+          </div>
+          <div style={{ height: 3, background: '#dcfce7', borderRadius: 999 }}>
+            <div style={{
+              height: 3,
+              background: '#22c55e',
+              borderRadius: 999,
+              width: `${(bulkProgress.current / bulkProgress.total) * 100}%`,
+              transition: 'width 0.3s',
+            }} />
+          </div>
+        </div>
+      )}
 
       {/* Feedback */}
       <div className="px-4 pb-1">

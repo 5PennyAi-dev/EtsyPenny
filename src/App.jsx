@@ -16,11 +16,13 @@ import PricingPage from './pages/PricingPage';
 import BillingPage from './pages/BillingPage';
 import ListingsByStatusPage from './pages/ListingsByStatusPage';
 
+import { BulkProgressProvider } from './context/BulkProgressContext';
 import { Toaster } from 'sonner';
 
 export default function App() {
   return (
     <AuthProvider>
+      <BulkProgressProvider>
       <BrowserRouter>
         <Toaster position="top-center" richColors />
         <Routes>
@@ -104,6 +106,7 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
         </Routes>
       </BrowserRouter>
+      </BulkProgressProvider>
     </AuthProvider>
   );
 }
