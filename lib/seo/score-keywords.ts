@@ -336,26 +336,50 @@ export async function scoreKeywords(stats: EnrichedKeyword[], ctx: ScoringContex
 
   console.info(`[scoring] Scoring ${kws.length} keywords in ${batches.length} parallel batches per scorer`);
 
-  const MAX_RETRIES = 2;
+  const MAX_RETRIES = 3;
+
+  const cleanJsonResponse = (text: string): string => {
+    let cleaned = text
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/gi, '')
+      .trim();
+    // Strip trailing commas before } or ]
+    cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
+    // If the response got truncated mid-JSON, try to salvage it
+    if (!cleaned.endsWith('}')) {
+      // Try to find the last complete keyword entry and close the JSON
+      const lastComplete = cleaned.lastIndexOf('}');
+      if (lastComplete > 0) {
+        cleaned = cleaned.substring(0, lastComplete + 1) + ']}';
+      }
+    }
+    return cleaned;
+  };
+
+  const scoreField = (taskKey: string) =>
+    taskKey === 'niche_scoring' ? 'niche_score' : 'transactional_score';
 
   const runScoring = async (taskKey: string, systemPrompt: string, batchList: string[][]) => {
     const batchResults = await Promise.all(
-      batchList.map(async (batch) => {
+      batchList.map(async (batch, batchIdx) => {
         let lastError: unknown;
         for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
           try {
             const { text } = await runAI(taskKey, `# Keywords to Analyze:\n${JSON.stringify(batch)}`, {
               systemPrompt,
             });
-            const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+            const cleaned = cleanJsonResponse(text);
             const parsed = JSON.parse(cleaned);
             return (parsed.keywords ?? []) as Array<{ keyword?: string; niche_score?: number; transactional_score?: number }>;
           } catch (err) {
             lastError = err;
-            console.warn(`[scoring] ${taskKey} batch parse failed (attempt ${attempt}/${MAX_RETRIES}): ${(err as Error).message}`);
+            console.warn(`[scoring] ${taskKey} batch ${batchIdx + 1} parse failed (attempt ${attempt}/${MAX_RETRIES}): ${(err as Error).message}`);
           }
         }
-        throw new Error(`[scoring] ${taskKey} batch failed after ${MAX_RETRIES} attempts: ${(lastError as Error).message}`);
+        // Graceful fallback: return default score 4 for all keywords in this batch
+        const field = scoreField(taskKey);
+        console.error(`[scoring] ${taskKey} batch ${batchIdx + 1} failed after ${MAX_RETRIES} attempts — assigning default score 4 to ${batch.length} keywords`);
+        return batch.map(kw => ({ keyword: kw, [field]: 4 })) as Array<{ keyword?: string; niche_score?: number; transactional_score?: number }>;
       })
     );
     return batchResults.flat();
