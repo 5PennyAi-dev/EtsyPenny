@@ -10,7 +10,7 @@ import ShopHealth from '@/components/dashboard/ShopHealth';
 import KeywordBankStats from '@/components/dashboard/KeywordBankStats';
 import ListingsTable from '@/components/dashboard/ListingsTable';
 import TrendingKeywords from '@/components/dashboard/TrendingKeywords';
-import { Plus, Sparkles, Camera, Search, Copy } from 'lucide-react';
+import { Plus, Sparkles, Camera, Search, PenLine, ClipboardCopy } from 'lucide-react';
 
 function DashboardSkeleton() {
   return (
@@ -207,7 +207,7 @@ export default function Dashboard() {
           ) : isFirstRun ? (
             /* First-run welcome screen */
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="max-w-[560px] w-full">
+              <div className="max-w-[680px] w-full">
                 <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mb-6 mx-auto">
                   <Sparkles className="w-8 h-8 text-indigo-600" />
                 </div>
@@ -218,27 +218,34 @@ export default function Dashboard() {
                   Your AI-powered SEO assistant for Etsy
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-                  <div className="bg-white border border-slate-200 rounded-xl p-5 text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
                     <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-3">
                       <Camera className="w-5 h-5 text-indigo-600" />
                     </div>
-                    <p className="text-sm font-semibold text-slate-700 mb-1">Step 1</p>
-                    <p className="text-xs text-slate-500">Upload your product image</p>
+                    <p className="text-sm font-semibold text-slate-700 mb-1">Upload & analyze</p>
+                    <p className="text-xs text-slate-500">Upload your product image and analyze its visual style</p>
                   </div>
-                  <div className="bg-white border border-slate-200 rounded-xl p-5 text-center">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
                     <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-3">
                       <Search className="w-5 h-5 text-indigo-600" />
                     </div>
-                    <p className="text-sm font-semibold text-slate-700 mb-1">Step 2</p>
-                    <p className="text-xs text-slate-500">We analyze it and find the best keywords</p>
+                    <p className="text-sm font-semibold text-slate-700 mb-1">Generate SEO</p>
+                    <p className="text-xs text-slate-500">We find the best keywords using real Etsy search data</p>
                   </div>
-                  <div className="bg-white border border-slate-200 rounded-xl p-5 text-center">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
                     <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-3">
-                      <Copy className="w-5 h-5 text-indigo-600" />
+                      <PenLine className="w-5 h-5 text-indigo-600" />
                     </div>
-                    <p className="text-sm font-semibold text-slate-700 mb-1">Step 3</p>
-                    <p className="text-xs text-slate-500">Copy optimized titles, tags & descriptions</p>
+                    <p className="text-sm font-semibold text-slate-700 mb-1">Generate draft</p>
+                    <p className="text-xs text-slate-500">Get an AI-written title and description from your top keywords</p>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
+                    <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                      <ClipboardCopy className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-700 mb-1">Copy to Etsy</p>
+                    <p className="text-xs text-slate-500">Paste your optimized content directly into your listing</p>
                   </div>
                 </div>
 
