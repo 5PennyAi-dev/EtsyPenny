@@ -202,7 +202,8 @@ const BrandProfilePage = () => {
             </p>
         </div>
 
-        {/* Section B: Magic Sync (Card) */}
+        {/* TODO: re-enable when Etsy API license is approved */}
+        {false && (
         <div className="bg-gradient-to-r from-indigo-50 to-violet-50 rounded-2xl border border-indigo-100 p-6 shadow-sm">
             <div className="flex items-start gap-4">
                 <div className="p-3 bg-white rounded-full shadow-sm text-indigo-600">
@@ -215,12 +216,12 @@ const BrandProfilePage = () => {
                             Paste your Etsy Shop URL and let our AI analyze your existing listings to automatically detect your brand voice.
                         </p>
                     </div>
-                    
+
                     <div className="flex gap-2">
                         <div className="relative flex-1">
                              <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-300" size={16} />
-                             <input 
-                                type="url" 
+                             <input
+                                type="url"
                                 placeholder="https://www.etsy.com/shop/YourShopName"
                                 value={etsyUrl}
                                 onChange={(e) => setEtsyUrl(e.target.value)}
@@ -239,6 +240,7 @@ const BrandProfilePage = () => {
                 </div>
             </div>
         </div>
+        )}
 
         {/* Section A: Manual Input (Form) */}
         <form onSubmit={handleSave} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
