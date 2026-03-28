@@ -79,12 +79,16 @@ const LoginPage = () => {
           password,
         });
         if (error) throw error;
-        if (data.session) {
-          // Send welcome email (fire-and-forget)
+
+        // Send welcome email regardless of confirmation flow (fire-and-forget)
+        if (data.user?.email) {
           axios.post('/api/emails/welcome', {
-            email: data.user?.email,
-            name: data.user?.user_metadata?.full_name || '',
+            email: data.user.email,
+            name: data.user.user_metadata?.full_name || '',
           }).catch(() => {});
+        }
+
+        if (data.session) {
           navigate(from, { replace: true });
           return;
         }

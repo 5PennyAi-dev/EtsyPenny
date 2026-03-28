@@ -13,10 +13,16 @@ export async function sendEmail({
   html: string;
 }) {
   const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) return;
+  if (!resendKey) {
+    console.warn('[email] RESEND_API_KEY not set — skipping');
+    return;
+  }
 
   // Only send in production (Vercel)
-  if (process.env.VERCEL_ENV !== 'production') return;
+  if (!process.env.VERCEL_ENV) {
+    console.info('[email] Not on Vercel — skipping');
+    return;
+  }
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
