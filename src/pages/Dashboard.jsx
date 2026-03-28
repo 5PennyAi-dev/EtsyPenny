@@ -53,10 +53,12 @@ function DashboardSkeleton() {
 }
 
 export default function Dashboard() {
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [statusCounts, setStatusCounts] = useState(null);
+  const [onboardingStep, setOnboardingStep] = useState('name');
+  const [nameInput, setNameInput] = useState('');
   const [listings, setListings] = useState([]);
   const [trending, setTrending] = useState([]);
   const [bankStats, setBankStats] = useState({ keywords: 0, presets: 0, gems: 0 });
@@ -131,6 +133,15 @@ export default function Dashboard() {
   }
 
   const isFirstRun = !loading && (statusCounts?.total_listings || 0) === 0;
+  const showNameStep = isFirstRun && !profile?.full_name && onboardingStep === 'name';
+
+  async function handleSaveName() {
+    if (nameInput.trim()) {
+      await supabase.from('profiles').update({ full_name: nameInput.trim() }).eq('id', user.id);
+      await refreshProfile();
+    }
+    setOnboardingStep('welcome');
+  }
 
   return (
     <Layout>
@@ -157,6 +168,42 @@ export default function Dashboard() {
 
           {loading ? (
             <DashboardSkeleton />
+          ) : showNameStep ? (
+            /* Name collection step */
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="max-w-[400px] w-full">
+                <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mb-6 mx-auto">
+                  <Sparkles className="w-8 h-8 text-indigo-600" />
+                </div>
+                <h1 className="text-2xl font-bold text-slate-800 mb-2">
+                  What's your name?
+                </h1>
+                <p className="text-slate-500 mb-8 text-sm">
+                  So we can personalize your experience
+                </p>
+                <input
+                  type="text"
+                  placeholder="Your first name"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-center text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none mb-4"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveName}
+                  className="w-full bg-indigo-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors text-sm mb-3"
+                >
+                  Continue →
+                </button>
+                <button
+                  onClick={() => setOnboardingStep('welcome')}
+                  className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  Skip for now
+                </button>
+              </div>
+            </div>
           ) : isFirstRun ? (
             /* First-run welcome screen */
             <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -165,7 +212,7 @@ export default function Dashboard() {
                   <Sparkles className="w-8 h-8 text-indigo-600" />
                 </div>
                 <h1 className="text-2xl font-bold text-slate-800 mb-2">
-                  Welcome to PennySEO!
+                  Welcome to PennySEO{profile?.full_name ? `, ${profile.full_name}` : ''}!
                 </h1>
                 <p className="text-slate-500 mb-10">
                   Your AI-powered SEO assistant for Etsy
