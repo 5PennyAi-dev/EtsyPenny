@@ -12,10 +12,15 @@ export function welcomeEmail(name: string) {
       and we'll generate optimized titles, descriptions, and tags to help your listings
       rank higher and sell more.
     </p>
-    <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 24px;">
+    <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 12px;">
       You have <strong style="color: #4f46e5;">30 free tokens</strong> to get started.
-      Each token lets you analyze an image or generate SEO keywords for a listing.
+      Here's what each action costs:
     </p>
+    <ul style="font-size: 14px; color: #475569; line-height: 1.8; margin: 0 0 24px; padding-left: 20px;">
+      <li>Image analysis: <strong>1 token</strong></li>
+      <li>SEO generation: <strong>8 tokens</strong></li>
+      <li>Draft generation: <strong>1 token</strong></li>
+    </ul>
     <div style="text-align: center; margin: 32px 0;">
       <a href="https://www.pennyseo.ai/dashboard"
          style="display: inline-block; padding: 12px 32px; background: #4f46e5; color: #ffffff;
