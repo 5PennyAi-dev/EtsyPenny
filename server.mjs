@@ -1308,11 +1308,11 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             description: `${planId} plan activated — ${newTokens} tokens credited (total: ${totalMonthly} monthly)`,
           });
 
-          // Send subscription confirmation email (fire-and-forget)
+          // Send subscription confirmation email
           const subEmail = session.customer_email || session.customer_details?.email;
           if (subEmail && planId) {
             const { subject, html } = subscriptionEmail(planId, newTokens);
-            sendEmail({ to: subEmail, subject, html });
+            await sendEmail({ to: subEmail, subject, html });
           }
         }
 
@@ -1347,11 +1347,11 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               description: `Token pack purchase: ${tokenAmount} tokens`,
             });
 
-            // Send token pack confirmation email (fire-and-forget)
+            // Send token pack confirmation email
             const packEmail = session.customer_email || session.customer_details?.email;
             if (packEmail) {
               const { subject, html } = tokenPackEmail(tokenAmount);
-              sendEmail({ to: packEmail, subject, html });
+              await sendEmail({ to: packEmail, subject, html });
             }
           }
         }
