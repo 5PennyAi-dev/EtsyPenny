@@ -132,6 +132,15 @@ export default function Dashboard() {
 
   return (
     <Layout>
+      {/* TODO: remove after Sentry test */}
+      <button
+        onClick={() => { throw new Error('Sentry test error — safe to delete'); }}
+        style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 9999,
+                 background: 'red', color: 'white', padding: '8px 12px',
+                 borderRadius: 6, fontSize: 12, cursor: 'pointer', border: 'none' }}
+      >
+        Test Sentry
+      </button>
       <div className="min-h-screen bg-slate-50 px-6 lg:px-8 py-6">
         <div className="space-y-5">
           {/* Header */}
