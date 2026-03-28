@@ -85,9 +85,12 @@ export const AuthProvider = ({ children }) => {
     await supabase.auth.signOut();
   };
 
+  const isAdmin = profile?.role === 'admin';
+
   const value = {
     user,
     profile,
+    isAdmin,
     signOut,
     loading,
     refreshProfile: () => fetchProfile(user?.id)

@@ -8,7 +8,7 @@ import pennyseoLogo from '../assets/pennyseo-logo.png';
 
 const Sidebar = () => {
   const location = useLocation();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, isAdmin, signOut } = useAuth();
   const { bulkProgress } = useBulkProgress();
   const [showFeedback, setShowFeedback] = useState(false);
   
@@ -67,20 +67,22 @@ const Sidebar = () => {
         })}
       </nav>
 
-      {/* Admin Section (Bottom) */}
-      <div className="p-4 border-t border-slate-100 space-y-1">
-        <Link
-          to="/admin/system"
-          className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-            location.pathname === '/admin/system'
-              ? 'bg-rose-50 text-rose-600'
-              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-          }`}
-        >
-          <ShieldAlert size={20} className={location.pathname === '/admin/system' ? 'text-rose-600' : 'text-slate-400'} />
-          Admin
-        </Link>
-      </div>
+      {/* Admin Section (Bottom) — visible only to admins */}
+      {isAdmin && (
+        <div className="p-4 border-t border-slate-100 space-y-1">
+          <Link
+            to="/admin/system"
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              location.pathname === '/admin/system'
+                ? 'bg-rose-50 text-rose-600'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+          >
+            <ShieldAlert size={20} className={location.pathname === '/admin/system' ? 'text-rose-600' : 'text-slate-400'} />
+            Admin
+          </Link>
+        </div>
+      )}
 
       {/* Token Badge */}
       <div className="px-4 pb-1">

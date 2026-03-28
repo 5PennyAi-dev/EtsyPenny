@@ -17,7 +17,15 @@ import BillingPage from './pages/BillingPage';
 import ListingsByStatusPage from './pages/ListingsByStatusPage';
 
 import { BulkProgressProvider } from './context/BulkProgressContext';
+import { useAuth } from './context/AuthContext';
 import { Toaster } from 'sonner';
+
+function AdminRoute({ children }) {
+  const { isAdmin, loading } = useAuth();
+  if (loading) return null;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  return children;
+}
 
 export default function App() {
   return (
@@ -59,13 +67,15 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-          <Route 
-            path="/admin/system" 
+          <Route
+            path="/admin/system"
             element={
               <ProtectedRoute>
-                <AdminSystemPage />
+                <AdminRoute>
+                  <AdminSystemPage />
+                </AdminRoute>
               </ProtectedRoute>
-            } 
+            }
           />
           <Route 
             path="/settings" 
