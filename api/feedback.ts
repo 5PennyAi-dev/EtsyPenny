@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'onboarding@resend.dev',
+            from: 'PennySEO <hello@pennyseo.ai>',
             to: ['christian.couillard@5pennyai.com'],
             subject: `[PennySEO Feedback] ${type} — from ${email || 'anonymous'}`,
             text: `Type: ${type}\nPage: ${page || 'N/A'}\nMessage: ${message}\nUser: ${email || 'anonymous'}`,

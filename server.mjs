@@ -26,6 +26,10 @@ import { applySEOFilter } from './lib/seo/filter-logic.ts';
 import { extractProductTypeWords } from './lib/seo/concept-diversity.ts';
 import { checkTokenBalance, deductTokens, checkQuota, incrementQuota } from './lib/tokens/token-middleware.ts';
 import { getStripe, PRICE_TO_PLAN, PRICE_TO_PACK, PLAN_TOKENS } from './lib/stripe/client.ts';
+import { sendEmail } from './lib/email/send-email.ts';
+import { welcomeEmail } from './lib/email/templates/welcome.ts';
+import { subscriptionEmail } from './lib/email/templates/subscription-confirmation.ts';
+import { tokenPackEmail } from './lib/email/templates/token-pack-confirmation.ts';
 
 const app = express();
 // JSON body parser for all routes EXCEPT Stripe webhook (needs raw body)
@@ -1172,6 +1176,16 @@ app.post('/api/seo/add-from-favorite', async (req, res) => {
   }
 });
 
+// ─── API ROUTE: POST /api/emails/welcome ────────────
+app.post('/api/emails/welcome', async (req, res) => {
+  const { email, name } = req.body || {};
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  const { subject, html } = welcomeEmail(name || '');
+  sendEmail({ to: email, subject, html }); // fire-and-forget
+  return res.json({ ok: true });
+});
+
 // ─── API ROUTE: POST /api/feedback ──────────────────
 app.post('/api/feedback', async (req, res) => {
   const { user_id, name, email, type, message, page } = req.body;
@@ -1212,7 +1226,7 @@ app.post('/api/feedback', async (req, res) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'onboarding@resend.dev',
+            from: 'PennySEO <hello@pennyseo.ai>',
             to: ['christian.couillard@5pennyai.com'],
             subject: `[PennySEO Feedback] ${type} — from ${email || 'anonymous'}`,
             text: `Type: ${type}\nPage: ${page || 'N/A'}\nMessage: ${message}\nUser: ${email || 'anonymous'}`,
@@ -1293,6 +1307,13 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             balance_after: balanceAfter,
             description: `${planId} plan activated — ${newTokens} tokens credited (total: ${totalMonthly} monthly)`,
           });
+
+          // Send subscription confirmation email (fire-and-forget)
+          const subEmail = session.customer_email || session.customer_details?.email;
+          if (subEmail && planId) {
+            const { subject, html } = subscriptionEmail(planId, newTokens);
+            sendEmail({ to: subEmail, subject, html });
+          }
         }
 
         if (session.mode === 'payment') {
@@ -1325,6 +1346,13 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               balance_after: newBonus,
               description: `Token pack purchase: ${tokenAmount} tokens`,
             });
+
+            // Send token pack confirmation email (fire-and-forget)
+            const packEmail = session.customer_email || session.customer_details?.email;
+            if (packEmail) {
+              const { subject, html } = tokenPackEmail(tokenAmount);
+              sendEmail({ to: packEmail, subject, html });
+            }
           }
         }
         break;

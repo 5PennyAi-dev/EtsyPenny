@@ -1,6 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getStripe, PRICE_TO_PLAN, PRICE_TO_PACK, PLAN_TOKENS } from '../../lib/stripe/client.js';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
+import { sendEmail } from '../../lib/email/send-email.js';
+import { subscriptionEmail } from '../../lib/email/templates/subscription-confirmation.js';
+import { tokenPackEmail } from '../../lib/email/templates/token-pack-confirmation.js';
 
 // Disable body parsing so we get the raw body for signature verification
 export const config = { api: { bodyParser: false } };
@@ -84,6 +87,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             balance_after: balanceAfter,
             description: `${planId} plan activated — ${newTokens} tokens credited (total: ${totalMonthly} monthly)`,
           });
+
+          // Send subscription confirmation email (fire-and-forget)
+          const subEmail = session.customer_email || session.customer_details?.email;
+          if (subEmail && planId) {
+            const { subject, html } = subscriptionEmail(planId, newTokens);
+            sendEmail({ to: subEmail, subject, html });
+          }
         }
 
         if (session.mode === 'payment') {
@@ -116,6 +126,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               balance_after: newBonus,
               description: `Token pack purchase: ${tokenAmount} tokens`,
             });
+
+            // Send token pack confirmation email (fire-and-forget)
+            const packEmail = session.customer_email || session.customer_details?.email;
+            if (packEmail) {
+              const { subject, html } = tokenPackEmail(tokenAmount);
+              sendEmail({ to: packEmail, subject, html });
+            }
           }
         }
         break;

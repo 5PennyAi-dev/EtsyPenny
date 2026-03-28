@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import axios from 'axios';
 import { Loader2, Mail, Lock, AlertCircle, ArrowRight, Eye, EyeOff, Sparkles, Target, TrendingUp } from 'lucide-react';
 import pennyseoLogo from '../assets/pennyseo-logo.png';
 
@@ -79,6 +80,11 @@ const LoginPage = () => {
         });
         if (error) throw error;
         if (data.session) {
+          // Send welcome email (fire-and-forget)
+          axios.post('/api/emails/welcome', {
+            email: data.user?.email,
+            name: data.user?.user_metadata?.full_name || '',
+          }).catch(() => {});
           navigate(from, { replace: true });
           return;
         }
