@@ -31,7 +31,9 @@ npm run preview   # Preview production build
 - **Supabase** for auth, database, storage (mockups_bucket), and realtime subscriptions
 - **Vercel Serverless Functions** (`api/`) — production backend for all SEO operations
 - **Local Express API** (`server.mjs`, port 3001) — dev-only mirror of Vercel functions, used via Vite proxy
-- **n8n** webhook — only used for `analyseShop` (auto-fill brand profile from Etsy shop URL)
+- **n8n** webhook — only used for `analyseShop` (currently hidden — pending Etsy API license)
+- **Resend** for transactional emails (welcome, subscription, token pack) via raw fetch API
+- **Sentry** for error monitoring (`@sentry/react` frontend, `@sentry/node` backend)
 - **Multi-provider AI** (Gemini, Anthropic, OpenAI) via configurable provider router — admin assigns any model to any task at runtime via `system_ai_config` table
 - **DataForSEO** API for keyword enrichment (search volume, competition, CPC, volume history)
 - **Framer Motion** for animations
@@ -51,9 +53,12 @@ npm run preview   # Preview production build
 - `src/components/settings/` — User settings components (UserTaxonomyManagement — custom themes/niches CRUD)
 - `src/components/ui/` — Reusable UI primitives (Accordion, ConfirmationModal)
 - `src/components/pdf/` — PDF export (ListingPDFDocument using @react-pdf/renderer)
-- `src/context/AuthContext.jsx` — Auth provider wrapping the app (provides user, profile, signOut, loading)
+- `src/context/AuthContext.jsx` — Auth provider wrapping the app (provides user, profile, isAdmin, signOut, loading)
+- `src/context/BulkProgressContext.jsx` — Bulk action progress state (persists across navigation, shown in Sidebar)
 - `src/lib/supabase.js` — Supabase client singleton
-- `api/` — Vercel serverless functions (production backend): `analyze-image`, `generate-keywords`, `reset-pool`, `recalculate-scores`, `generate-draft`, `user-keyword`, `add-from-favorite`, `health`
+- `api/` — Vercel serverless functions (production backend): `analyze-image`, `generate-keywords`, `reset-pool`, `recalculate-scores`, `generate-draft`, `user-keyword`, `add-from-favorite`, `health`, `feedback`, `emails/welcome`, `stripe/webhook`, `stripe/create-checkout`, `stripe/create-portal`
+- `lib/email/` — Email sending: `send-email.ts` (Resend HTTP wrapper), `templates/` (welcome, subscription-confirmation, token-pack-confirmation, layout)
+- `lib/sentry.ts` — Shared Sentry init helper for backend (lazy, Vercel-only)
 - `server.mjs` — Local Express dev server (mirrors Vercel functions for local development)
 - `vercel.json` — Vercel deployment config (rewrites `/api/*` to serverless functions)
 - `lib/seo/` — Shared backend logic imported by both `server.mjs` and `api/`: `score-keywords.ts`, `generate-keyword-pool.ts`, `filter-logic.ts`, `enrich-keywords.ts`, `select-and-score.ts`, `persist-seo.ts`, `persist-strength.ts`
@@ -97,10 +102,16 @@ npm run preview   # Preview production build
 - `lib/seo/persist-strength.ts` — Shared DB persistence for strength scores
 - `lib/seo/filter-logic.ts` — Opportunity scores, trending/evergreen flags, pool ranking
 
-### n8n Webhook (Single Remaining Use)
+### n8n Webhook (Hidden — Pending Etsy API License)
 
-Only one action still uses the n8n webhook (`VITE_N8N_WEBHOOK_URL_TEST`):
-- **`analyseShop`** in `BrandProfilePage.jsx` — Auto-fill brand profile from Etsy shop URL
+The `analyseShop` feature in `BrandProfilePage.jsx` is hidden via `{false && ...}`. The "My Shop" sidebar item is also commented out. Both have `// TODO: re-enable when Etsy API license is approved` comments.
+
+### Admin Access Control
+
+- `profiles.role` column (`'user'` | `'admin'`, default `'user'`)
+- `AuthContext` exposes `isAdmin` boolean from `profile.role`
+- `AdminRoute` component in `App.jsx` redirects non-admins to `/dashboard`
+- Sidebar Admin link only visible when `isAdmin === true`
 
 ### Data Flow
 1. **Image Upload**: User uploads mockup → stored in Supabase `mockups_bucket` → listing row created in `listings` table
@@ -158,6 +169,8 @@ OPENAI_API_KEY             # OpenAI API key (optional — needed if tasks assign
 DATAFORSEO_LOGIN           # DataForSEO API login
 DATAFORSEO_PASSWORD        # DataForSEO API password
 N8N_WEBHOOK_SECRET         # Shared secret for edge function auth (x-api-key header)
+RESEND_API_KEY             # Resend API key (transactional emails)
+VITE_SENTRY_DSN            # Sentry DSN (frontend + backend error monitoring)
 API_PORT                   # Express server port (defaults to 3001)
 ```
 
@@ -180,7 +193,7 @@ API_PORT                   # Express server port (defaults to 3001)
 - Protected routes wrap content with `ProtectedRoute` (redirects to `/login` if unauthenticated)
 - Supabase queries are made directly in page components (no abstraction layer)
 - Frontend calls `/api/seo/*` endpoints — in dev these are proxied to Express via Vite; in production they hit Vercel serverless functions directly
-- n8n webhook URL accessed via `import.meta.env.VITE_N8N_WEBHOOK_URL_TEST` only for `analyseShop` in BrandProfilePage
+- n8n webhook URL accessed via `import.meta.env.VITE_N8N_WEBHOOK_URL_TEST` — `analyseShop` in BrandProfilePage (currently hidden)
 - Node polyfills are enabled for buffer/process/util/stream (needed by @react-pdf/renderer)
 - The style guide document (`docs/styleguide.md`) is written in French
 - `tests/` contains test files; `pennyseo-audit.mjs` at root runs the codebase audit

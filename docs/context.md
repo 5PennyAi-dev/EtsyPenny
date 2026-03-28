@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-03-26*
+*Dernière mise à jour : 2026-03-28*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -1749,3 +1749,67 @@ Moved "Billing" above "Settings" in the sidebar navigation.
 - Feedback system is live — Resend test mode only sends to registered account email
 - RLS admin policies use JWT email check (not auth.users subquery) — more reliable
 - FeedbackModal type pill buttons use dynamic Tailwind classes (`bg-${color}-50`) — may need safelist if colors get purged in production
+
+## Session: 2026-03-28 — Scoring Resilience, Bulk Progress, Admin Roles, Emails, Sentry, Onboarding
+
+### Scoring Resilience (`lib/seo/score-keywords.ts`)
+- Increased retries from 2 to 3 for AI scoring batches
+- Added JSON cleaning: trailing comma removal, truncated JSON salvaging
+- **Graceful fallback**: failed batches assign default score 4 instead of crashing entire pipeline
+
+### Bulk Progress Context (`src/context/BulkProgressContext.jsx`)
+- Moved bulk action progress from local state to global React Context
+- Sidebar shows compact progress indicator (pulsing dot, counter, progress bar)
+- Progress persists when navigating away from ListingsByStatusPage
+
+### ListingsByStatusPage Improvements
+- Fixed tab switching bug: replaced `useLocation` + `navigate()` with `useSearchParams` + `setSearchParams()`
+- Added "SEO Listings" to sidebar nav with `LayoutList` icon, renamed `/studio` to "SEO Studio"
+- Redesigned page header: fixed "SEO Listings" title, removed back button, underline-style tabs
+
+### Volume Display (`src/components/studio/ResultsDisplay.jsx`)
+- Replaced flat "> 50K" cap with tiered labels: `> 1M`, `> 500K`, `> 250K`, `> 100K`, `> 50K`, `28K`, `1.5K`
+- Display-only change — backend stores real volumes, scoring normalization unchanged
+
+### Admin Role Access Control
+- **Migration**: `profiles.role` column (`'user'` | `'admin'`, default `'user'`, CHECK constraint)
+- **AuthContext**: `isAdmin` boolean from `profile.role === 'admin'`
+- **App.jsx**: `AdminRoute` wrapper redirects non-admins to `/dashboard`
+- **Sidebar**: Admin link conditionally rendered with `isAdmin`
+- Admin users: `admin@etsypenny.dev`, `christian.couillard@gmail.com`, `christian.couillard@5pennyai.com`
+
+### Sidebar Footer Redesign
+- Moved Settings from main nav to footer section
+- Removed Terms/Privacy links (available on landing/pricing pages)
+- New footer order: Token badge → Bulk progress → Settings/Admin/Feedback → User profile
+
+### Transactional Emails via Resend
+- **`lib/email/send-email.ts`**: Shared Resend HTTP wrapper (non-blocking, Vercel-only, logs errors)
+- **`lib/email/templates/`**: `layout.ts` (shared HTML), `welcome.ts`, `subscription-confirmation.ts`, `token-pack-confirmation.ts`
+- **Welcome email**: Sent after signup via `api/emails/welcome.ts` (called from LoginPage, both confirmation flows)
+- **Subscription email**: Sent in `api/stripe/webhook.ts` after `checkout.session.completed` (subscription mode)
+- **Token pack email**: Sent in `api/stripe/webhook.ts` after `checkout.session.completed` (payment mode)
+- **Feedback sender**: Updated from `onboarding@resend.dev` to `PennySEO <hello@pennyseo.ai>`
+- **Key fix**: All webhook emails must be `await`ed — serverless functions kill un-awaited fetches after `res.json()`
+
+### Sentry Error Monitoring
+- **Frontend**: `@sentry/react` init in `main.jsx`, error boundary wrapping App in `App.jsx`
+- **Backend**: `lib/sentry.ts` (lazy init, Vercel-only), `initSentry()` + `Sentry.captureException()` in all 14 API routes
+- Production-only (`import.meta.env.PROD` frontend, `VERCEL_ENV` backend), 10% trace rate, no PII
+
+### Hidden Features (Pending Etsy API License)
+- "My Shop" sidebar item commented out
+- Magic Sync card on BrandProfilePage wrapped in `{false && ...}`
+- Both have `// TODO: re-enable when Etsy API license is approved`
+
+### First-Run Onboarding (Dashboard)
+- Name collection step: shows when `profile.full_name` is empty, saves to profiles, skip option
+- Welcome screen: personalized greeting, 4-step flow cards (Upload & analyze → Generate SEO → Generate draft → Copy to Etsy)
+- Disappears automatically when user creates first listing (`total_listings > 0`)
+
+### Session Handover
+- Scoring pipeline now resilient — won't crash on AI JSON errors (falls back to score 4)
+- Transactional emails working — `await` is critical in serverless webhook handlers
+- Sentry monitoring live on frontend + all 14 backend routes
+- `analyseShop` / My Shop hidden until Etsy API license — code preserved, just hidden from UI
+- Admin access control is frontend-only (sufficient for beta) — system tables don't have RLS
