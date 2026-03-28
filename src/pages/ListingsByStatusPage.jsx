@@ -208,43 +208,48 @@ export default function ListingsByStatusPage() {
     <Layout>
       <div className="min-h-screen bg-slate-50 px-6 lg:px-8 py-6">
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-          <button
-            onClick={() => navigate(-1)}
-            style={{ color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}
-          >
-            ← Back
-          </button>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: 0 }}>
-              {config.label} Listings
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: '0 0 4px' }}>
+              SEO Listings
             </h1>
-            <p style={{ fontSize: 13, color: '#94a3b8', margin: '4px 0 0' }}>
-              {config.description} · {filteredListings.length} listing{filteredListings.length !== 1 ? 's' : ''}
+            <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>
+              {allListings.length} listing{allListings.length !== 1 ? 's' : ''} total · {filteredListings.length} {config.label.toLowerCase()}
             </p>
           </div>
         </div>
 
         {/* Status tabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid #e2e8f0' }}>
           {STATUS_KEYS.map((key) => {
             const cfg = STATUS_CONFIG[key];
+            const isActive = currentStatus === key;
             return (
               <button
                 key={key}
                 onClick={() => setSearchParams({ status: key })}
                 style={{
-                  padding: '6px 14px',
-                  borderRadius: 999,
-                  fontSize: 12,
-                  fontWeight: 500,
+                  padding: '8px 16px',
+                  fontSize: 13,
+                  fontWeight: isActive ? 600 : 400,
                   border: 'none',
+                  borderBottom: isActive ? '2px solid #4f46e5' : '2px solid transparent',
+                  background: 'none',
+                  color: isActive ? '#4f46e5' : '#94a3b8',
                   cursor: 'pointer',
-                  background: currentStatus === key ? cfg.bg : '#f8fafc',
-                  color: currentStatus === key ? cfg.color : '#94a3b8',
+                  marginBottom: -1,
+                  transition: 'all 0.15s',
                 }}
               >
-                {cfg.label} ({statusCounts[key] || 0})
+                {cfg.label}
+                <span style={{
+                  marginLeft: 6, fontSize: 11, fontWeight: 500,
+                  padding: '1px 6px', borderRadius: 999,
+                  background: isActive ? '#eef2ff' : '#f8fafc',
+                  color: isActive ? '#4f46e5' : '#94a3b8',
+                }}>
+                  {statusCounts[key] || 0}
+                </span>
               </button>
             );
           })}
