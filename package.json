@@ -15,6 +15,8 @@
     "@anthropic-ai/sdk": "^0.80.0",
     "@google/generative-ai": "^0.24.1",
     "@react-pdf/renderer": "^4.3.2",
+    "@sentry/node": "^10.46.0",
+    "@sentry/react": "^10.46.0",
     "@supabase/supabase-js": "latest",
     "axios": "^1.13.5",
     "clsx": "latest",

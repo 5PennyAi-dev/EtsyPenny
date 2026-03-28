@@ -1,7 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../lib/supabase/server.js';
+import { initSentry, Sentry } from '../lib/sentry.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  initSentry();
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -57,6 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.json({ success: true });
   } catch (error: unknown) {
+    Sentry.captureException(error);
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[feedback] Error:', msg);
     return res.status(500).json({ error: 'Failed to submit feedback', details: msg });

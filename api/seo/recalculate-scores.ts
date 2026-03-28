@@ -2,8 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { selectAndScore } from '../../lib/seo/select-and-score.js';
 import { persistStrength } from '../../lib/seo/persist-strength.js';
+import { initSentry, Sentry } from '../../lib/sentry.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  initSentry();
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -59,6 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.json({ success: true, strength });
 
   } catch (error: unknown) {
+    Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [recalculate-scores] Error:', message);
     return res.status(500).json({ error: 'Failed to recalculate scores.', details: message });

@@ -3,10 +3,12 @@ import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { runAI } from '../../lib/ai/provider-router.js';
 import { extractJson } from '../../lib/ai/extract-json.js';
 import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
+import { initSentry, Sentry } from '../../lib/sentry.js';
 
 const STATUS_COMPLETE = '28a11ca0-bcfc-42e0-971d-efc320f78424';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  initSentry();
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -235,6 +237,7 @@ Respond with ONLY this JSON, no other text:
     return res.json({ success: true, title, description });
 
   } catch (error: unknown) {
+    Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [generate-draft] Error:', message);
     return res.status(500).json({ error: 'Failed to generate draft.', details: message });

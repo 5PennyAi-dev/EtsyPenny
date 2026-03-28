@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { sendEmail } from '../../lib/email/send-email.js';
 import { subscriptionEmail } from '../../lib/email/templates/subscription-confirmation.js';
 import { tokenPackEmail } from '../../lib/email/templates/token-pack-confirmation.js';
+import { initSentry, Sentry } from '../../lib/sentry.js';
 
 // Disable body parsing so we get the raw body for signature verification
 export const config = { api: { bodyParser: false } };
@@ -18,6 +19,7 @@ function getRawBody(req: VercelRequest): Promise<Buffer> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  initSentry();
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -30,6 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET!);
   } catch (err: unknown) {
+    Sentry.captureException(err);
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('Webhook signature verification failed:', message);
     return res.status(400).json({ error: `Webhook Error: ${message}` });
@@ -245,6 +248,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
   } catch (err) {
+    Sentry.captureException(err);
     console.error('[stripe-webhook] handler error:', err);
     return res.status(500).json({ error: 'Internal error' });
   }

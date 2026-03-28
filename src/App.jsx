@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -27,7 +28,7 @@ function AdminRoute({ children }) {
   return children;
 }
 
-export default function App() {
+function App() {
   return (
     <AuthProvider>
       <BulkProgressProvider>
@@ -120,3 +121,11 @@ export default function App() {
     </AuthProvider>
   );
 }
+
+export default Sentry.withErrorBoundary(App, {
+  fallback: (
+    <div style={{ padding: '2rem', textAlign: 'center', color: '#475569' }}>
+      Something went wrong. Please refresh the page.
+    </div>
+  ),
+});

@@ -1,8 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { enrichKeywords } from '../../lib/seo/enrich-keywords.js';
+import { initSentry, Sentry } from '../../lib/sentry.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  initSentry();
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -54,6 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       refreshed_count: results.filter(r => !(r as any).error).length,
     });
   } catch (err: any) {
+    Sentry.captureException(err);
     console.error('[refresh-keyword-bank] Error:', err.message);
     return res.status(500).json({ error: err.message });
   }

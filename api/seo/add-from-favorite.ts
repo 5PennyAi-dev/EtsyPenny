@@ -5,8 +5,10 @@ import { applySEOFilter } from '../../lib/seo/filter-logic.js';
 import { selectAndScore } from '../../lib/seo/select-and-score.js';
 import { extractProductTypeWords } from '../../lib/seo/concept-diversity.js';
 import { checkQuota, incrementQuota } from '../../lib/tokens/token-middleware.js';
+import { initSentry, Sentry } from '../../lib/sentry.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  initSentry();
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -222,6 +224,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
   } catch (error: unknown) {
+    Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [add-from-favorite] Error:', message);
     return res.status(500).json({ error: 'Failed to add keywords from favorites.', details: message });

@@ -4,8 +4,10 @@ import { applySEOFilter } from '../../lib/seo/filter-logic.js';
 import { selectAndScore } from '../../lib/seo/select-and-score.js';
 import { persistStrength } from '../../lib/seo/persist-strength.js';
 import { extractProductTypeWords } from '../../lib/seo/concept-diversity.js';
+import { initSentry, Sentry } from '../../lib/sentry.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  initSentry();
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -135,6 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
   } catch (error: unknown) {
+    Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [reset-pool] Error:', message);
     return res.status(500).json({ error: 'Failed to reset pool.', details: message });
