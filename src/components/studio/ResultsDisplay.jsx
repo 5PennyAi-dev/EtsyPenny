@@ -53,6 +53,18 @@ const Sparkline = ({ data }) => {
   );
 };
 
+function formatVolume(vol) {
+  if (vol == null || isNaN(vol)) return '—';
+  if (vol >= 1_000_000) return '> 1M';
+  if (vol >= 500_000)   return '> 500K';
+  if (vol >= 250_000)   return '> 250K';
+  if (vol >= 100_000)   return '> 100K';
+  if (vol >= 50_000)    return '> 50K';
+  if (vol >= 10_000)    return `${Math.round(vol / 1000)}K`;
+  if (vol >= 1_000)     return `${(Math.round(vol / 100) / 10).toFixed(1)}K`;
+  return vol.toString();
+}
+
 const CopyButton = ({ text, label = "Copy", className = "", tooltipSide = "top" }) => {
   const [copied, setCopied] = useState(false);
 
@@ -1105,8 +1117,8 @@ const SidebarSkeleton = ({ phase }) => (
                             ) : (
                               <AnimatePresence initial={false}>
                                 {visibleAnalytics.map((row, i) => {
-                                    const isLowVolume = (row.volume || 0) < 10;
-                                    const isHighVolume = (row.volume || 0) >= 50000;
+                                    const vol = row.volume || 0;
+                                    const isLowVolume = vol < 10;
                                     const isSelected = selectedTags.includes(row.keyword);
                                     
                                     // Count how many selected rows appear BEFORE this row in the currently sorted view
@@ -1274,9 +1286,7 @@ const SidebarSkeleton = ({ phase }) => (
                                     <td className="px-3 py-3 text-right text-slate-700 tabular-nums min-w-[75px]">
                                         {isLowVolume
                                             ? <span className="text-slate-400 font-medium text-xs">&lt; 10</span>
-                                            : isHighVolume
-                                                ? <span className="font-bold text-indigo-600">&gt; 50K</span>
-                                                : (row.volume || 0).toLocaleString()
+                                            : <span className={vol >= 50000 ? 'font-bold text-indigo-600' : ''}>{formatVolume(vol)}</span>
                                         }
                                     </td>
                                     <td className="px-3 py-3 min-w-[80px]">
