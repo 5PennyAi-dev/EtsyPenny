@@ -20,7 +20,6 @@ const Sidebar = () => {
     { name: 'SEO Lab', icon: FlaskConical, path: '/lab' },
     { name: 'My Shop', icon: ShoppingBag, path: '/shop' },
     { name: 'Billing', icon: CreditCard, path: '/billing' },
-    { name: 'Settings', icon: Settings, path: '/settings' },
   ];
 
   const handleLogout = async () => {
@@ -67,25 +66,8 @@ const Sidebar = () => {
         })}
       </nav>
 
-      {/* Admin Section (Bottom) — visible only to admins */}
-      {isAdmin && (
-        <div className="p-4 border-t border-slate-100 space-y-1">
-          <Link
-            to="/admin/system"
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              location.pathname === '/admin/system'
-                ? 'bg-rose-50 text-rose-600'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <ShieldAlert size={20} className={location.pathname === '/admin/system' ? 'text-rose-600' : 'text-slate-400'} />
-            Admin
-          </Link>
-        </div>
-      )}
-
       {/* Token Badge */}
-      <div className="px-4 pb-1">
+      <div className="px-4 pt-3 pb-1 border-t border-slate-100">
         <Link to="/billing" className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors">
           <Coins className="w-4 h-4 text-amber-500" />
           <span className="text-sm font-medium text-slate-700">
@@ -136,24 +118,39 @@ const Sidebar = () => {
         </div>
       )}
 
-      {/* Feedback */}
-      <div className="px-4 pb-1">
+      {/* Settings, Admin, Feedback */}
+      <div className="px-4 py-2 border-t border-slate-100 space-y-0.5">
+        <Link
+          to="/settings"
+          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+            location.pathname === '/settings'
+              ? 'bg-indigo-50 text-indigo-600'
+              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          }`}
+        >
+          <Settings size={20} className={location.pathname === '/settings' ? 'text-indigo-600' : 'text-slate-400'} />
+          Settings
+        </Link>
+        {isAdmin && (
+          <Link
+            to="/admin/system"
+            className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              location.pathname === '/admin/system'
+                ? 'bg-rose-50 text-rose-600'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+          >
+            <ShieldAlert size={20} className={location.pathname === '/admin/system' ? 'text-rose-600' : 'text-slate-400'} />
+            Admin
+          </Link>
+        )}
         <button
           onClick={() => setShowFeedback(true)}
-          className="flex items-center gap-2 px-4 py-2 w-full rounded-lg text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors text-sm"
+          className="flex items-center gap-3 px-4 py-2.5 w-full rounded-lg text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors text-sm"
         >
           <MessageSquareText size={16} />
           <span>Give feedback</span>
         </button>
-      </div>
-
-      {/* Legal */}
-      <div className="px-4 pb-1">
-        <div className="flex items-center gap-3 px-4 text-xs text-slate-400">
-          <Link to="/terms" className="hover:text-slate-600 transition-colors">Terms</Link>
-          <span>·</span>
-          <a href="https://www.iubenda.com/privacy-policy/39387054" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 transition-colors">Privacy</a>
-        </div>
       </div>
 
       {/* User Profile */}
