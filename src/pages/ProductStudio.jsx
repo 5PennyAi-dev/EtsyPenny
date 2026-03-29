@@ -1862,6 +1862,10 @@ const ProductStudio = () => {
       onGenerateDraft={handleGenerateDraft}
       isGeneratingDraft={isGeneratingDraft}
       onRelaunchSEO={handleRelaunchSEO}
+      onGenerateSEO={() => { const data = getFormData({ validate: true }); if (data) handleAnalyze(data); }}
+      isGeneratingSEO={!!isLoading}
+      canGenerateSEO={!!(selectedImage || results?.imageUrl) && isImageAnalyzedState && !!productTypeName}
+      seoGenerationCount={seoGenerationCount}
       isSeoLoading={isSeoLoading}
       showSeoCancelLink={showSeoCancelLink}
       onCancelSeoGeneration={handleCancelSeoGeneration}
@@ -2289,33 +2293,6 @@ const ProductStudio = () => {
                          </Accordion>
                        )}
 
-                       {/* ═══ BLOCK 3: GENERATE ACTION ═══ */}
-                       <div>
-                         <button
-                           onClick={() => { const data = getFormData({ validate: true }); if (data) handleAnalyze(data); }}
-                           disabled={isLoading || !(selectedImage || results?.imageUrl) || !isImageAnalyzedState || !productTypeName}
-                           className={`w-full py-3 rounded-xl font-bold shadow-lg transition-all transform flex items-center justify-center gap-2
-                             ${isLoading || !(selectedImage || results?.imageUrl) || !isImageAnalyzedState || !productTypeName
-                               ? 'bg-indigo-400 cursor-not-allowed shadow-none translate-y-0 opacity-70'
-                               : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5'
-                             }`}
-                         >
-                           <Sparkles size={20} className={isLoading ? 'animate-spin' : ''} />
-                           {isLoading === 'uploading' && 'UPLOADING...'}
-                           {isLoading === 'saving' && 'SAVING...'}
-                           {isLoading === 'triggering' && 'STARTING...'}
-                           {isLoading === true && 'ANALYZING...'}
-                           {!isLoading && (
-                             !(selectedImage || results?.imageUrl) ? 'SELECT AN IMAGE FIRST' :
-                             !isImageAnalyzedState ? 'ANALYZE IMAGE FIRST' :
-                             !productTypeName ? 'SELECT PRODUCT TYPE' :
-                             seoGenerationCount > 0 ? 'RE-GENERATE SEO' : 'GENERATE SEO'
-                           )}
-                           {!isLoading && isImageAnalyzedState && productTypeName && (
-                             <span className="ml-1 text-xs bg-indigo-500/30 text-indigo-100 px-1.5 py-0.5 rounded-full">{seoGenerationCount > 0 ? '4' : '8'} tokens</span>
-                           )}
-                         </button>
-                       </div>
 
                     </div>
               </motion.div>

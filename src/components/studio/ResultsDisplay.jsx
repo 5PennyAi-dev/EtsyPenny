@@ -318,13 +318,22 @@ const SidebarSkeleton = ({ phase }) => (
                 </div>
             )}
             {/* Label + Gauge grouped together on the right */}
-            <div className="flex flex-col items-center justify-center gap-1.5 ml-auto text-center min-w-max">
+            <div className="group/score relative flex flex-col items-center justify-center gap-1.5 ml-auto text-center min-w-max cursor-help">
                 <h3 className="text-base font-black text-slate-800 leading-tight">
                     Listing overall<br/>score
                 </h3>
                 <div className="flex-shrink-0 mt-0.5">
                     <RadialGauge value={score} tier={mainTier} />
                 </div>
+                {!isPreAnalysis && (
+                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 p-2 bg-slate-800 text-white text-[11px] font-normal leading-tight rounded-lg shadow-lg opacity-0 invisible group-hover/score:opacity-100 group-hover/score:visible transition-all pointer-events-none z-50">
+                        {score >= 85 ? "Excellent listing — well optimized across all dimensions." :
+                         score >= 70 ? "Good listing — a few improvements could push you higher." :
+                         score >= 55 ? "Average listing — focus on improving your weakest metric." :
+                                       "Needs work — significant improvements possible across metrics."}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                    </div>
+                )}
             </div>
         </div>
 
@@ -336,16 +345,25 @@ const SidebarSkeleton = ({ phase }) => (
                 <div>
                     <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                               <TrendingUp size={14} className="text-slate-400" /> Visibility
-                            </span>
+                            <div className="group/vis relative">
+                                <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 cursor-help">
+                                   <TrendingUp size={14} className="text-slate-400" /> Visibility
+                                   <Info size={10} className="text-slate-300" />
+                                </span>
+                                {!isPreAnalysis && (
+                                    <div className="absolute left-0 bottom-full mb-2 w-56 p-2 bg-slate-800 text-white text-[11px] font-normal leading-tight rounded-lg shadow-lg opacity-0 invisible group-hover/vis:opacity-100 group-hover/vis:visible transition-all pointer-events-none z-50">
+                                        {getMetricTooltip('visibility', listingVisibility)}
+                                        <div className="absolute top-full left-4 border-4 border-transparent border-t-slate-800" />
+                                    </div>
+                                )}
+                            </div>
                             {listingEstMarketReach != null && (
-                                <div className="group relative whitespace-nowrap">
+                                <div className="group/reach relative whitespace-nowrap">
                                     <div className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md shadow-sm w-max cursor-help">
                                         <span className="text-[9px] font-bold text-indigo-500 uppercase">Reach</span>
                                         <span className="text-[10px] font-black text-indigo-700">{formatReach(Number(listingEstMarketReach))}</span>
                                     </div>
-                                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-64 p-2 bg-slate-800 text-white text-[11px] font-normal leading-tight rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all pointer-events-none z-50 whitespace-normal">
+                                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-64 p-2 bg-slate-800 text-white text-[11px] font-normal leading-tight rounded shadow-lg opacity-0 invisible group-hover/reach:opacity-100 group-hover/reach:visible transition-all pointer-events-none z-50 whitespace-normal">
                                         The estimated total of monthly search impressions available for your listing. Unlike raw volume, this score is weighted by AI to reflect your actual ranking potential based on niche relevance and buyer intent.
                                         <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-r-slate-800 border-y-transparent border-l-transparent"></div>
                                     </div>
@@ -361,9 +379,18 @@ const SidebarSkeleton = ({ phase }) => (
                 {/* Relevance */}
                 <div>
                     <div className="flex items-center justify-between mb-1">
-                         <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                           <Target size={14} className="text-slate-400" /> Relevance
-                         </span>
+                         <div className="group/rel relative">
+                             <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 cursor-help">
+                               <Target size={14} className="text-slate-400" /> Relevance
+                               <Info size={10} className="text-slate-300" />
+                             </span>
+                             {!isPreAnalysis && (
+                                 <div className="absolute left-0 bottom-full mb-2 w-56 p-2 bg-slate-800 text-white text-[11px] font-normal leading-tight rounded-lg shadow-lg opacity-0 invisible group-hover/rel:opacity-100 group-hover/rel:visible transition-all pointer-events-none z-50">
+                                     {getMetricTooltip('relevance', listingRelevance)}
+                                     <div className="absolute top-full left-4 border-4 border-transparent border-t-slate-800" />
+                                 </div>
+                             )}
+                         </div>
                          <span className={`text-sm font-bold ${isPreAnalysis ? 'text-slate-400' : relTier.text}`}>
                            {isPreAnalysis ? '--' : (listingRelevance || 0)}
                          </span>
@@ -373,9 +400,18 @@ const SidebarSkeleton = ({ phase }) => (
                 {/* Conversion */}
                 <div>
                     <div className="flex items-center justify-between mb-1">
-                         <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                           <ShoppingCart size={14} className="text-slate-400" /> Buy intent
-                         </span>
+                         <div className="group/buy relative">
+                             <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 cursor-help">
+                               <ShoppingCart size={14} className="text-slate-400" /> Buy intent
+                               <Info size={10} className="text-slate-300" />
+                             </span>
+                             {!isPreAnalysis && (
+                                 <div className="absolute left-0 bottom-full mb-2 w-56 p-2 bg-slate-800 text-white text-[11px] font-normal leading-tight rounded-lg shadow-lg opacity-0 invisible group-hover/buy:opacity-100 group-hover/buy:visible transition-all pointer-events-none z-50">
+                                     {getMetricTooltip('buyIntent', listingConversion)}
+                                     <div className="absolute top-full left-4 border-4 border-transparent border-t-slate-800" />
+                                 </div>
+                             )}
+                         </div>
                          <span className={`text-sm font-bold ${isPreAnalysis ? 'text-slate-400' : convTier.text}`}>
                            {isPreAnalysis ? '--' : (listingConversion || 0)}
                          </span>
@@ -385,9 +421,18 @@ const SidebarSkeleton = ({ phase }) => (
                 {/* Competition */}
                 <div>
                     <div className="flex items-center justify-between mb-1">
-                         <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                           <BarChart2 size={14} className="text-slate-400" title="How saturated the market is for your selected keywords (lower is better)" /> Competition
-                         </span>
+                         <div className="group/comp relative">
+                             <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 cursor-help">
+                               <BarChart2 size={14} className="text-slate-400" /> Competition
+                               <Info size={10} className="text-slate-300" />
+                             </span>
+                             {!isPreAnalysis && (
+                                 <div className="absolute left-0 bottom-full mb-2 w-56 p-2 bg-slate-800 text-white text-[11px] font-normal leading-tight rounded-lg shadow-lg opacity-0 invisible group-hover/comp:opacity-100 group-hover/comp:visible transition-all pointer-events-none z-50">
+                                     {getMetricTooltip('competition', listingCompetition)}
+                                     <div className="absolute top-full left-4 border-4 border-transparent border-t-slate-800" />
+                                 </div>
+                             )}
+                         </div>
                          <span className={`text-sm font-bold ${isPreAnalysis ? 'text-slate-400' : compTier.text}`}>
                            {isPreAnalysis ? '--' : (listingCompetition || 0)}
                          </span>
@@ -433,43 +478,38 @@ const SidebarSkeleton = ({ phase }) => (
     );
   };
 
-  function getActionableInsight(results) {
-    if (!results) return null;
-
-    const metrics = [
-      {
-        key: 'visibility',
-        value: results.listing_visibility ?? 0,
-        Icon: TrendingUp,
-        text: 'Low visibility — consider adding higher-volume keywords from the Suggestions below.',
-        color: 'amber',
-      },
-      {
-        key: 'relevance',
-        value: results.listing_relevance ?? 0,
-        Icon: Target,
-        text: 'Low relevance — swap generic terms for keywords more specific to your product.',
-        color: 'amber',
-      },
-      {
-        key: 'conversion',
-        value: results.listing_conversion ?? 0,
-        Icon: ShoppingCart,
-        text: 'Low conversion intent — add keywords with occasions (gift, birthday) or recipients (for mom, for teacher).',
-        color: 'amber',
-      },
-      {
-        key: 'competition',
-        value: 100 - (results.listing_competition ?? 0),
-        Icon: Shield,
-        text: 'High competition — replace saturated keywords with long-tail alternatives from Suggestions.',
-        color: 'rose',
-      },
-    ];
-
-    const weakest = metrics.reduce((w, m) => m.value < w.value ? m : w);
-    if (weakest.value >= 60) return null;
-    return weakest;
+  function getMetricTooltip(metric, value) {
+    const v = Number(value) || 0;
+    const tips = {
+      visibility: [
+        [80, "Excellent reach — your keywords attract high search traffic."],
+        [60, "Good reach — consider adding broader keywords to expand further."],
+        [40, "Moderate reach — add higher-volume terms from Suggestions."],
+        [0,  "Low reach — focus on broader, higher-volume keywords."],
+      ],
+      relevance: [
+        [80, "Excellent relevance — keywords match your product perfectly."],
+        [60, "Good relevance — a few keywords may be off-topic."],
+        [40, "Moderate relevance — review Product fit column for mismatches."],
+        [0,  "Low relevance — add more product-specific terms."],
+      ],
+      buyIntent: [
+        [80, "Strong buyer intent — your keywords attract ready-to-purchase shoppers."],
+        [60, "Good buyer intent — review keywords with MODERATE intent in Suggestions."],
+        [40, "Moderate buyer intent — prioritize HIGH intent keywords."],
+        [0,  "Low buyer intent — switch to more transactional terms."],
+      ],
+      competition: [
+        [80, "Excellent positioning — low competition gives you better ranking chances."],
+        [60, "Good positioning — watch for high-competition keywords to replace."],
+        [40, "Moderate competition — try long-tail alternatives from Suggestions."],
+        [0,  "High competition — replace saturated keywords with long-tail alternatives."],
+      ],
+    };
+    const tiers = tips[metric];
+    if (!tiers) return null;
+    const tier = tiers.find(([threshold]) => v >= threshold);
+    return tier?.[1] ?? null;
   }
 
   const ResultsDisplay = ({ results, isGeneratingDraft, onGenerateDraft, isSeoLoading,
@@ -498,7 +538,12 @@ const SidebarSkeleton = ({ phase }) => (
     // Favorite Keyword Bank Props
     user,
     currentListing,
-    refreshFavoritesKey
+    refreshFavoritesKey,
+    // Generate SEO Props
+    onGenerateSEO,
+    isGeneratingSEO,
+    canGenerateSEO,
+    seoGenerationCount,
   }) => {
     const [displayedTitle, setDisplayedTitle] = useState("");
     const [displayedDescription, setDisplayedDescription] = useState("");
@@ -857,23 +902,48 @@ const SidebarSkeleton = ({ phase }) => (
                   onToggle={onSeoAnalysisOpenChange}
                   className="border-indigo-100/50"
                   title={
-                      <div className="flex items-center gap-3">
-                          <StepBadge number={2} />
-                          <BarChart3 size={16} className="text-indigo-600" />
-                          <span className="text-sm font-bold text-slate-900">Keyword Research</span>
-                          {results?.listing_strength != null && (
-                              <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${
-                                  (results.listing_strength ?? results.global_strength) >= 80
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                      : (results.listing_strength ?? results.global_strength) >= 50
-                                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                          : 'bg-rose-50 text-rose-700 border-rose-200'
-                              }`}>
-                                  Score: {results.listing_strength ?? results.global_strength}
-                              </span>
-                          )}
-                          {isSeoLoading && (
-                              <Loader2 size={14} className="text-indigo-500 animate-spin" />
+                      <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-3">
+                              <StepBadge number={2} />
+                              <BarChart3 size={16} className="text-indigo-600" />
+                              <span className="text-sm font-bold text-slate-900">Keyword Research</span>
+                              {results?.listing_strength != null && (
+                                  <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${
+                                      (results.listing_strength ?? results.global_strength) >= 80
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                          : (results.listing_strength ?? results.global_strength) >= 50
+                                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                              : 'bg-rose-50 text-rose-700 border-rose-200'
+                                  }`}>
+                                      Score: {results.listing_strength ?? results.global_strength}
+                                  </span>
+                              )}
+                              {isSeoLoading && (
+                                  <Loader2 size={14} className="text-indigo-500 animate-spin" />
+                              )}
+                          </div>
+                          {canGenerateSEO && (
+                              <button
+                                  onClick={e => { e.stopPropagation(); onGenerateSEO(); onSeoAnalysisOpenChange(true); }}
+                                  disabled={isGeneratingSEO}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                      isGeneratingSEO
+                                          ? 'opacity-70 cursor-not-allowed'
+                                          : 'hover:-translate-y-0.5 hover:shadow-md'
+                                  } ${
+                                      (seoGenerationCount ?? 0) > 0
+                                          ? 'bg-slate-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-50'
+                                          : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
+                                  }`}
+                              >
+                                  <Sparkles size={13} className={isGeneratingSEO ? 'animate-spin' : ''} />
+                                  {isGeneratingSEO
+                                      ? 'Generating...'
+                                      : (seoGenerationCount ?? 0) > 0
+                                          ? `Re-generate · 4 tokens`
+                                          : `Generate SEO · 8 tokens`
+                                  }
+                              </button>
                           )}
                       </div>
                   }
@@ -902,28 +972,6 @@ const SidebarSkeleton = ({ phase }) => (
                       />
                   ))}
 
-                  {/* Actionable Insight Banner */}
-                  {(() => {
-                    const insight = getActionableInsight(results);
-                    if (!insight) return null;
-                    const InsightIcon = insight.Icon;
-                    return (
-                      <div className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border ${
-                        insight.color === 'rose'
-                          ? 'bg-rose-50 border-rose-200'
-                          : 'bg-amber-50 border-amber-200'
-                      }`}>
-                        <InsightIcon className={`w-4 h-4 flex-shrink-0 ${
-                          insight.color === 'rose' ? 'text-rose-500' : 'text-amber-500'
-                        }`} />
-                        <p className={`text-xs font-medium ${
-                          insight.color === 'rose' ? 'text-rose-700' : 'text-amber-700'
-                        }`}>
-                          {insight.text}
-                        </p>
-                      </div>
-                    );
-                  })()}
 
                   {/* Strategy Tuner — between AuditHeader and Keyword Table */}
                   {results && (

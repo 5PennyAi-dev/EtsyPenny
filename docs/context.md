@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-03-28*
+*Dernière mise à jour : 2026-03-29*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -1846,6 +1846,41 @@ Moved "Billing" above "Settings" in the sidebar navigation.
 - `preserveAspectRatio="none"` ensures full card width
 - Empty state when < 2 data points
 
+### Generate SEO Button — Moved to Keyword Research Header
+- Removed standalone full-width indigo "GENERATE SEO" button bar between Product Details and Keyword Research
+- Button now lives inside the Keyword Research accordion header (right-aligned, before chevron)
+- First run: filled indigo "Generate SEO · 8 tokens"; Re-run: outlined "Re-generate · 4 tokens"
+- `e.stopPropagation()` prevents section collapse on click; auto-expands section on generate
+- Hidden when `canGenerateSEO` is false (no image analysis or product type)
+- New props passed from ProductStudio → ResultsDisplay: `onGenerateSEO`, `isGeneratingSEO`, `canGenerateSEO`, `seoGenerationCount`
+
+### AI Provider Router — Retry + Model Fallback
+- Added exponential backoff retry (3 attempts: 1s, 2s, 4s) to `lib/ai/provider-router.ts`
+- Retries on transient errors: 429, 500, 503, 504, and network errors
+- Fails immediately on non-recoverable errors: 400, 401, 403
+- Added Gemini model fallback chains: if primary model exhausts retries, tries next model (e.g. `gemini-2.5-flash` → `gemini-2.5-pro` → `gemini-2.5-flash-lite`)
+- Non-Gemini providers: retry only, no cross-model fallback
+- Extracted `callWithAdapter()` helper and `GEMINI_FALLBACK_CHAINS` constant
+- All existing callers (`server.mjs`, `api/` routes, `lib/seo/`) benefit automatically via `runAI()`
+
+### Score Tooltips — Replace Action Banner
+- Removed `getActionableInsight()` function and the amber/rose action banner from ResultsDisplay
+- Added `getMetricTooltip(metric, value)` — returns tier-based tooltip text (4 tiers per metric)
+- Each metric label in Technical Analysis grid now has a hover tooltip (Visibility, Relevance, Buy intent, Competition)
+- Uses existing CSS `group-hover` pattern with named groups (`group/vis`, `group/rel`, `group/buy`, `group/comp`)
+- Small `Info` icon (10px) added as hover hint on each label
+- Overall score circle also has a tooltip with 4-tier assessment
+- Tooltips hidden in pre-analysis state
+- Migrated existing "Reach" badge tooltip to named group (`group/reach`) to avoid conflicts
+
+### Login Page Redesign
+- Full visual rewrite of `src/pages/LoginPage.jsx` — same auth logic preserved
+- 60/40 split layout: dark left panel (marketing) + light right panel (auth form)
+- Left panel: PennySEO logo + "Beta — Free to try" badge, headline, subtitle, product screenshot with tilt + bottom fade, 3-column feature grid, trust line
+- Right panel: tab switcher (Sign in / Create account), dynamic headers per tab, Google OAuth + email form, contextual bottom link, Terms/Privacy links, reassurance badges (Secure, 30 free tokens, No credit card)
+- Mobile: left panel hidden, form full-width with mobile logo
+- Screenshot referenced from `public/keyword-performance-preview.png`
+
 ### Session Handover
 - Scoring pipeline now resilient — won't crash on AI JSON errors (falls back to score 4)
 - Transactional emails working — `await` is critical in serverless webhook handlers
@@ -1854,3 +1889,6 @@ Moved "Billing" above "Settings" in the sidebar navigation.
 - Admin access control is frontend-only (sufficient for beta) — system tables don't have RLS
 - Visibility calibration updated — check new expected ranges if adjusting formula again
 - Recalculate Scores now uses tuner values — both score paths are consistent
+- AI provider router now has retry + fallback — all AI calls auto-recover from transient failures
+- Login page redesigned — screenshot asset must exist at `public/keyword-performance-preview.png`
+- Generate SEO button moved into Keyword Research header — cleaner layout, same functionality

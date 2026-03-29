@@ -2,33 +2,8 @@ import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-import { Loader2, Mail, Lock, AlertCircle, ArrowRight, Eye, EyeOff, Sparkles, Target, TrendingUp } from 'lucide-react';
+import { Loader2, Mail, Lock, AlertCircle, ArrowRight, Eye, EyeOff, Sparkles, Target, TrendingUp, Shield } from 'lucide-react';
 import pennyseoLogo from '../assets/pennyseo-logo.png';
-
-function StatCard({ icon: Icon, label, value, color, delay }) {
-  return (
-    <div
-      className="flex items-center gap-3.5 rounded-xl px-4 py-3.5 border animate-login-slide-up"
-      style={{
-        background: 'rgba(255,255,255,0.08)',
-        backdropFilter: 'blur(12px)',
-        borderColor: 'rgba(255,255,255,0.12)',
-        animationDelay: `${delay}s`,
-      }}
-    >
-      <div
-        className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0"
-        style={{ background: color }}
-      >
-        <Icon size={18} />
-      </div>
-      <div>
-        <div className="text-[13px] text-white/60 tracking-wide">{label}</div>
-        <div className="text-xl font-bold text-white tracking-tight">{value}</div>
-      </div>
-    </div>
-  );
-}
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24">
@@ -132,121 +107,155 @@ const LoginPage = () => {
 
       <div className="flex min-h-screen" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-        {/* ===== LEFT PANEL — Brand Story ===== */}
-        <div className="hidden lg:flex lg:w-1/2 min-h-screen relative overflow-hidden flex-col items-start justify-center px-[60px] py-0"
-          style={{
-            background: 'linear-gradient(135deg, #0f172a 0%, #3730a3 50%, #4f46e5 100%)',
-          }}
+        {/* ===== LEFT PANEL — Marketing (60%) ===== */}
+        <div
+          className="hidden lg:flex lg:w-[60%] min-h-screen relative overflow-hidden flex-col justify-between px-10 py-8"
+          style={{ background: 'linear-gradient(160deg, #0f0e2a 0%, #1e1b4b 40%, #312e81 100%)' }}
         >
           {/* Grid pattern overlay */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               backgroundImage:
-                'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
-              backgroundSize: '40px 40px',
+                'linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)',
+              backgroundSize: '48px 48px',
             }}
           />
           {/* Soft glow accent */}
           <div
             className="absolute pointer-events-none"
             style={{
-              top: '20%', left: '-20%', width: '60%', height: '60%',
-              background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)',
+              top: '15%', right: '-10%', width: '50%', height: '50%',
+              background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)',
             }}
           />
 
+          {/* TOP — Logo + Headline + Subtitle */}
           <div className="relative z-10">
-            {/* Logo */}
-            <div className="mb-8 animate-login-fade-in">
+            {/* Logo + Beta badge */}
+            <div className="flex items-center gap-3 animate-login-fade-in">
               <img
                 src={pennyseoLogo}
                 alt="PennySEO"
-                className="w-auto brightness-0 invert"
-                style={{ height: '52px', marginLeft: '-8px' }}
+                className="w-36 h-auto brightness-0 invert"
               />
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-400/30 tracking-wide">
+                Beta — Free to try
+              </span>
             </div>
 
             {/* Headline */}
             <h1
-              className="leading-tight mb-5 animate-login-slide-up"
-              style={{
-                fontSize: 'clamp(32px, 3.5vw, 44px)',
-                fontFamily: "'Instrument Serif', serif",
-                fontWeight: 400,
-                color: 'white',
-                lineHeight: 1.15,
-                animationDelay: '0.1s',
-              }}
+              className="text-3xl font-bold text-white mt-6 mb-3 animate-login-slide-up"
+              style={{ lineHeight: 1.2, animationDelay: '0.1s' }}
             >
               Your listings deserve
               <br />
-              <span
-                className="italic"
-                style={{
-                  background: 'linear-gradient(90deg, #f97316, #fbbf24)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}
-              >
-                to be found.
-              </span>
+              <span className="text-amber-400">to be found.</span>
             </h1>
 
             {/* Subtitle */}
             <p
-              className="text-base leading-relaxed max-w-[400px] mb-8 animate-login-slide-up"
-              style={{ color: 'rgba(255,255,255,0.6)', animationDelay: '0.2s' }}
+              className="text-sm text-indigo-200 max-w-xs leading-relaxed animate-login-slide-up"
+              style={{ animationDelay: '0.2s' }}
             >
-              AI-powered SEO that analyzes your product mockups
-              and generates optimized tags, titles, and descriptions
-              for Etsy.
+              AI-powered SEO that analyzes your product photos and generates
+              optimized tags, titles, and descriptions backed by real Etsy search data.
             </p>
+          </div>
 
-            {/* Value prop stat cards */}
-            <div className="flex flex-col gap-3 max-w-[360px]">
-              <StatCard
-                icon={Sparkles}
-                label="Vision AI Analysis"
-                value="In seconds"
-                color="rgba(99,102,241,0.8)"
-                delay={0.4}
-              />
-              <StatCard
-                icon={Target}
-                label="Keywords generated"
-                value="130+ per listing"
-                color="rgba(249,115,22,0.8)"
-                delay={0.5}
-              />
-              <StatCard
-                icon={TrendingUp}
-                label="Enriched with"
-                value="Live market data"
-                color="rgba(16,185,129,0.8)"
-                delay={0.6}
-              />
+          {/* MIDDLE — Screenshot */}
+          <div
+            className="relative z-10 mx-auto w-[75%] mt-6 animate-login-slide-up"
+            style={{ animationDelay: '0.3s' }}
+          >
+            <img
+              src="/keyword-performance-preview.png"
+              alt="PennySEO Keyword Performance"
+              className="w-full rounded-lg shadow-xl border border-white/10"
+              style={{ transform: 'rotate(-1.5deg)' }}
+            />
+            {/* Bottom fade */}
+            <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#1e1b4b] to-transparent rounded-b-lg pointer-events-none" />
+          </div>
+
+          {/* BOTTOM — Features + Trust line */}
+          <div className="relative z-10 mt-8">
+            <div
+              className="grid grid-cols-3 gap-8 animate-login-slide-up"
+              style={{ animationDelay: '0.5s' }}
+            >
+              <div>
+                <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
+                  <Sparkles size={18} /> Vision AI
+                </div>
+                <div className="text-indigo-300/70 text-xs mt-1">Analysis in seconds</div>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
+                  <Target size={18} /> 130+ keywords
+                </div>
+                <div className="text-indigo-300/70 text-xs mt-1">Real search volume</div>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
+                  <TrendingUp size={18} /> Live data
+                </div>
+                <div className="text-indigo-300/70 text-xs mt-1">CPC, competition & trends</div>
+              </div>
             </div>
+
+            <p
+              className="text-sm text-indigo-400/60 mt-5 animate-login-fade-in"
+              style={{ animationDelay: '0.7s' }}
+            >
+              Trusted by Etsy sellers during beta
+            </p>
           </div>
         </div>
 
-        {/* ===== RIGHT PANEL — Auth Form ===== */}
-        <div className="flex-1 flex items-center justify-center bg-slate-50 px-6 py-10 lg:px-10">
-          <div className="w-full max-w-[400px] animate-login-fade-in" style={{ animationDelay: '0.2s' }}>
+        {/* ===== RIGHT PANEL — Auth Form (40%) ===== */}
+        <div className="flex-1 lg:w-[40%] flex items-center justify-center bg-slate-50 px-6 py-12 lg:px-12">
+          <div className="w-full max-w-xs animate-login-fade-in" style={{ animationDelay: '0.15s' }}>
+
+            {/* Mobile logo (hidden on desktop) */}
+            <div className="lg:hidden mb-8 flex justify-center">
+              <img src={pennyseoLogo} alt="PennySEO" className="h-10 object-contain" />
+            </div>
+
+            {/* Tab switcher */}
+            <div className="flex border-b border-slate-200 mb-8">
+              <button
+                onClick={() => { setView('sign_in'); setError(null); }}
+                className={`pb-3 px-1 mr-6 text-sm font-semibold border-b-2 transition-colors ${
+                  view === 'sign_in'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                Sign in
+              </button>
+              <button
+                onClick={() => { setView('sign_up'); setError(null); }}
+                className={`pb-3 px-1 text-sm font-semibold border-b-2 transition-colors ${
+                  view === 'sign_up'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                Create account
+              </button>
+            </div>
 
             {/* Header */}
-            <div className="mb-9">
-              <h2 className="text-[26px] font-bold text-slate-900 tracking-tight mb-2">
-                {view === 'sign_in' ? 'Welcome back' : 'Create your account'}
+            <div className="mb-8">
+              <h2 className="text-[26px] font-bold text-slate-900 tracking-tight mb-1.5">
+                {view === 'sign_in' ? 'Welcome back' : 'Start for free'}
               </h2>
               <p className="text-sm text-slate-500">
-                {view === 'sign_in' ? "Don't have an account? " : 'Already have an account? '}
-                <button
-                  onClick={() => { setView(view === 'sign_in' ? 'sign_up' : 'sign_in'); setError(null); }}
-                  className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors"
-                >
-                  {view === 'sign_in' ? 'Sign up for free' : 'Sign in'}
-                </button>
+                {view === 'sign_in'
+                  ? 'Sign in to your account'
+                  : 'No credit card required · 30 tokens included'}
               </p>
             </div>
 
@@ -282,7 +291,7 @@ const LoginPage = () => {
                 <label className="block text-[13px] font-semibold text-slate-700 mb-1.5">
                   Email address
                 </label>
-                <div className="relative group">
+                <div className="relative">
                   <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 flex items-center pointer-events-none">
                     <Mail size={16} />
                   </div>
@@ -310,7 +319,7 @@ const LoginPage = () => {
                     </a>
                   )}
                 </div>
-                <div className="relative group">
+                <div className="relative">
                   <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 flex items-center pointer-events-none">
                     <Lock size={16} />
                   </div>
@@ -352,8 +361,19 @@ const LoginPage = () => {
               </button>
             </form>
 
-            {/* Footer */}
-            <p className="text-xs text-slate-400 text-center mt-8 leading-relaxed">
+            {/* Contextual link below form */}
+            <p className="text-sm text-slate-500 text-center mt-5">
+              {view === 'sign_in' ? "Don't have an account? " : 'Already have an account? '}
+              <button
+                onClick={() => { setView(view === 'sign_in' ? 'sign_up' : 'sign_in'); setError(null); }}
+                className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors"
+              >
+                {view === 'sign_in' ? 'Create one for free' : 'Sign in'}
+              </button>
+            </p>
+
+            {/* Footer — Terms */}
+            <p className="text-xs text-slate-400 text-center mt-6 leading-relaxed">
               By {view === 'sign_up' ? 'creating an account' : 'continuing'}, you agree to our{' '}
               <Link to="/terms" className="text-slate-500 underline hover:text-slate-700">
                 Terms of Service
@@ -363,6 +383,19 @@ const LoginPage = () => {
                 Privacy Policy
               </a>
             </p>
+
+            {/* Reassurance badges */}
+            <div className="flex items-center justify-center gap-6 mt-6">
+              <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                <Shield size={12} /> Secure
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                <Sparkles size={12} /> 30 free tokens
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                <ArrowRight size={12} className="rotate-180" /> No credit card
+              </span>
+            </div>
 
           </div>
         </div>

@@ -31,6 +31,19 @@ CREATE TABLE public.customers (
   CONSTRAINT customers_pkey PRIMARY KEY (id),
   CONSTRAINT customers_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
+CREATE TABLE public.feedback (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  name text,
+  email text,
+  type text NOT NULL CHECK (type = ANY (ARRAY['bug'::text, 'suggestion'::text, 'question'::text, 'other'::text])),
+  message text NOT NULL,
+  page text,
+  status text DEFAULT 'new'::text CHECK (status = ANY (ARRAY['new'::text, 'read'::text, 'resolved'::text])),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT feedback_pkey PRIMARY KEY (id),
+  CONSTRAINT feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
 CREATE TABLE public.keyword_cache (
   tag text NOT NULL,
   search_volume integer,
@@ -141,6 +154,7 @@ CREATE TABLE public.listings (
   listing_relevance smallint,
   listing_raw_visibility_index smallint,
   is_generating_seo boolean DEFAULT false,
+  seo_generation_count integer DEFAULT 0,
   CONSTRAINT listings_pkey PRIMARY KEY (id),
   CONSTRAINT listings_niche_id_fkey FOREIGN KEY (niche_id) REFERENCES public.niches(id),
   CONSTRAINT listings_sub_niche_id_fkey FOREIGN KEY (sub_niche_id) REFERENCES public.sub_niches(id),
@@ -197,6 +211,20 @@ CREATE TABLE public.niches (
   CONSTRAINT niches_pkey PRIMARY KEY (id),
   CONSTRAINT niches_theme_id_fkey FOREIGN KEY (theme_id) REFERENCES public.themes(id)
 );
+CREATE TABLE public.plans (
+  id text NOT NULL,
+  display_name text NOT NULL,
+  tokens_per_month integer NOT NULL,
+  add_custom_limit integer NOT NULL,
+  add_favorite_limit integer,
+  stripe_price_id_monthly text,
+  stripe_price_id_yearly text,
+  price_monthly_usd numeric,
+  price_yearly_usd numeric,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT plans_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.prices (
   id text NOT NULL,
   product_id text,
@@ -249,6 +277,18 @@ CREATE TABLE public.profiles (
   signature_text text,
   subscription_credits_balance integer DEFAULT 0,
   bonus_credits_balance integer DEFAULT 0,
+  subscription_plan text DEFAULT 'free'::text,
+  subscription_status text DEFAULT 'active'::text,
+  subscription_id text,
+  stripe_customer_id text,
+  subscription_end_at timestamp with time zone,
+  tokens_monthly_balance integer DEFAULT 30,
+  tokens_bonus_balance integer DEFAULT 0,
+  tokens_reset_at timestamp with time zone DEFAULT (now() + '1 mon'::interval),
+  add_custom_used integer DEFAULT 0,
+  add_favorite_used integer DEFAULT 0,
+  counters_reset_at timestamp with time zone DEFAULT (now() + '1 mon'::interval),
+  role text NOT NULL DEFAULT 'user'::text CHECK (role = ANY (ARRAY['user'::text, 'admin'::text])),
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
@@ -281,6 +321,30 @@ CREATE TABLE public.subscriptions (
   CONSTRAINT subscriptions_pkey PRIMARY KEY (id),
   CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT subscriptions_price_id_fkey FOREIGN KEY (price_id) REFERENCES public.prices(id)
+);
+CREATE TABLE public.system_ai_config (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  task_key text NOT NULL UNIQUE,
+  task_label text NOT NULL,
+  task_description text,
+  provider text NOT NULL DEFAULT 'gemini'::text,
+  model_id text NOT NULL DEFAULT 'gemini-2.5-flash'::text,
+  temperature real DEFAULT 1.0,
+  max_tokens integer DEFAULT 8192,
+  is_vision boolean DEFAULT false,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT system_ai_config_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_model FOREIGN KEY (model_id) REFERENCES public.system_ai_models(id)
+);
+CREATE TABLE public.system_ai_models (
+  id text NOT NULL,
+  provider text NOT NULL,
+  display_name text NOT NULL,
+  supports_vision boolean DEFAULT false,
+  cost_tier text DEFAULT 'standard'::text,
+  is_active boolean DEFAULT true,
+  sort_order integer DEFAULT 0,
+  CONSTRAINT system_ai_models_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.system_niches (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -320,11 +384,35 @@ CREATE TABLE public.token_costs (
   amount integer NOT NULL,
   CONSTRAINT token_costs_pkey PRIMARY KEY (action_type)
 );
+CREATE TABLE public.token_packs (
+  id text NOT NULL DEFAULT (gen_random_uuid())::text,
+  name text NOT NULL,
+  token_amount integer NOT NULL,
+  price_usd numeric NOT NULL,
+  stripe_price_id text NOT NULL,
+  active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT token_packs_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.token_prices (
   action_type text NOT NULL,
   amount integer NOT NULL,
   description text,
   CONSTRAINT token_prices_pkey PRIMARY KEY (action_type)
+);
+CREATE TABLE public.token_transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['subscription_credit'::text, 'pack_purchase'::text, 'deduction'::text, 'reset'::text, 'refund'::text])),
+  amount integer NOT NULL,
+  action text,
+  listing_id uuid,
+  balance_after integer NOT NULL,
+  description text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT token_transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT token_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT token_transactions_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(id)
 );
 CREATE TABLE public.tones (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -428,4 +516,11 @@ CREATE TABLE public.user_settings (
   CONSTRAINT user_settings_trending_dropping_id_fkey FOREIGN KEY (trending_dropping_id) REFERENCES public.system_seo_constants(id),
   CONSTRAINT user_settings_promising_competition_id_fkey FOREIGN KEY (promising_competition_id) REFERENCES public.system_seo_constants(id),
   CONSTRAINT user_settings_promising_min_score_id_fkey FOREIGN KEY (promising_min_score_id) REFERENCES public.system_seo_constants(id)
+);
+CREATE TABLE public.waitlist (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  email text NOT NULL UNIQUE,
+  created_at timestamp with time zone DEFAULT now(),
+  source text DEFAULT 'landing_page'::text,
+  CONSTRAINT waitlist_pkey PRIMARY KEY (id)
 );
