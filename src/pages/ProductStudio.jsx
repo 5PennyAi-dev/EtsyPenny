@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
+import { StepBadge } from '../components/ui/StepBadge';
 import InsufficientTokensModal from '../components/billing/InsufficientTokensModal';
 import QuotaExceededModal from '../components/billing/QuotaExceededModal';
 import { toast } from 'sonner';
@@ -1132,7 +1133,8 @@ const ProductStudio = () => {
                   niche_score: k.niche_score,
                   competition: parseFloat(k.competition) || 0,
                   cpc: parseFloat(k.cpc) || 0
-              }))
+              })),
+              parameters: getStrategyValues(strategySelections)
           });
 
           const { strength } = response.data;
@@ -1974,12 +1976,13 @@ const ProductStudio = () => {
                   className="px-4 py-3 border-b border-indigo-50 bg-indigo-50/50 flex justify-between items-center cursor-pointer hover:bg-indigo-100/50 transition-colors group select-none"
               >
                   <div className="flex items-center gap-3">
+                      <StepBadge number={1} />
                       <div className={`p-2 rounded-lg transition-all ${isFormCollapsed ? 'bg-indigo-100 text-indigo-600' : 'bg-white text-indigo-600 shadow-sm'}`}>
                         <Shirt size={18} />
                       </div>
                       <div className="flex flex-col">
                         <h2 className="font-bold text-slate-900 flex items-center gap-2">
-                            SEO LISTING
+                            Product Details
                             <ChevronUp size={16} className={`text-slate-400 transition-transform duration-300 ${isFormCollapsed ? 'rotate-180' : ''}`} />
                         </h2>
                         {isFormCollapsed && <span className="text-xs text-slate-500 font-medium animate-in fade-in slide-in-from-left-2">Click to expand & edit</span>}

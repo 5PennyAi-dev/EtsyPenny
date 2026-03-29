@@ -483,8 +483,11 @@ app.post('/api/seo/recalculate-scores', async (req, res) => {
       ai_selection_count: selected_keywords.length // treat ALL passed keywords as selected
     };
 
+    // Merge with incoming strategy parameters (from tuner) if provided
+    const finalParams = { ...params, ...(req.body.parameters || {}) };
+
     // 3. Calculate strength from user-selected keywords
-    const { strength } = selectAndScore(selected_keywords, params);
+    const { strength } = selectAndScore(selected_keywords, finalParams);
 
     if (!strength) {
       return res.status(400).json({ error: 'Could not calculate strength from provided keywords' });
@@ -492,7 +495,7 @@ app.post('/api/seo/recalculate-scores', async (req, res) => {
 
     // 4. Persist to DB
     const selectedTags = selected_keywords.map(k => k.keyword);
-    await persistStrength(listing_id, strength, selectedTags, params);
+    await persistStrength(listing_id, strength, selectedTags, finalParams);
 
     console.log(`   ✅ Recalculate complete for ${listing_id} — LSI: ${strength.listing_strength}`);
     return res.json({ success: true, strength });

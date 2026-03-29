@@ -46,8 +46,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ai_selection_count: selected_keywords.length,
     };
 
+    // Merge with incoming strategy parameters (from tuner) if provided
+    const finalParams = { ...params, ...(req.body.parameters || {}) };
+
     // 3. Calculate strength from user-selected keywords
-    const { strength } = selectAndScore(selected_keywords, params);
+    const { strength } = selectAndScore(selected_keywords, finalParams);
 
     if (!strength) {
       return res.status(400).json({ error: 'Could not calculate strength from provided keywords' });
@@ -55,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 4. Persist to DB
     const selectedTags = selected_keywords.map((k: { keyword?: string }) => k.keyword);
-    await persistStrength(listing_id, strength, selectedTags, params);
+    await persistStrength(listing_id, strength, selectedTags, finalParams);
 
     console.info(`[recalculate-scores] complete listing=${listing_id} LSI=${strength.listing_strength}`);
     return res.json({ success: true, strength });

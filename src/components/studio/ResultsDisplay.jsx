@@ -14,6 +14,7 @@ import CreatePresetModal from './CreatePresetModal';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import SeoBadge from './SeoBadge';
+import { StepBadge } from '../ui/StepBadge';
 
 const Sparkline = ({ data }) => {
   if (!data || data.length === 0) return <div className="text-slate-300 text-xs">-</div>;
@@ -65,7 +66,7 @@ function formatVolume(vol) {
   return vol.toString();
 }
 
-const CopyButton = ({ text, label = "Copy", className = "", tooltipSide = "top" }) => {
+const CopyButton = ({ text, label = "Copy", className = "" }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = (e) => {
@@ -76,34 +77,28 @@ const CopyButton = ({ text, label = "Copy", className = "", tooltipSide = "top" 
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const positionClasses = tooltipSide === "top" 
-    ? "bottom-full mb-2" 
-    : "top-full mt-2";
-    
-  const arrowClasses = tooltipSide === "top"
-    ? "top-full border-t-slate-800 border-b-transparent border-l-transparent border-r-transparent"
-    : "bottom-full border-b-slate-800 border-t-transparent border-l-transparent border-r-transparent";
-
   return (
-    <div className={`relative group/copy inline-flex ${className}`}>
-      <button
-        onClick={handleCopy}
-        className={`flex items-center justify-center p-1 rounded-md transition-all duration-200
-          ${copied 
-            ? 'text-emerald-500 bg-emerald-50' 
-            : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'
-          }`}
-        type="button"
-      >
-        {copied ? <Check size={14} /> : <Copy size={14} />}
-      </button>
-      
-      {/* Tooltip */}
-      <div className={`absolute left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] font-medium text-white bg-slate-800 rounded shadow-lg opacity-0 group-hover/copy:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 ${positionClasses}`}>
-        {copied ? 'Copied!' : label}
-        <div className={`absolute left-1/2 -translate-x-1/2 border-4 ${arrowClasses}`}></div>
-      </div>
-    </div>
+    <button
+      onClick={handleCopy}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+        copied
+          ? 'text-emerald-600 bg-emerald-50'
+          : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'
+      } ${className}`}
+      type="button"
+    >
+      {copied ? (
+        <>
+          <Check className="w-3.5 h-3.5" />
+          <span>Copied!</span>
+        </>
+      ) : (
+        <>
+          <Copy className="w-3.5 h-3.5" />
+          <span>{label}</span>
+        </>
+      )}
+    </button>
   );
 };
 
@@ -863,8 +858,9 @@ const SidebarSkeleton = ({ phase }) => (
                   className="border-indigo-100/50"
                   title={
                       <div className="flex items-center gap-3">
+                          <StepBadge number={2} />
                           <BarChart3 size={16} className="text-indigo-600" />
-                          <span className="text-sm font-bold text-slate-900">SEO Analysis</span>
+                          <span className="text-sm font-bold text-slate-900">Keyword Research</span>
                           {results?.listing_strength != null && (
                               <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${
                                   (results.listing_strength ?? results.global_strength) >= 80
@@ -957,11 +953,10 @@ const SidebarSkeleton = ({ phase }) => (
                         <TrendingUp size={16} className={`text-indigo-600 ${!results ? 'text-slate-400' : ''}`} />
                         <span className="text-sm font-bold text-slate-900">Keyword Performance</span>
                          {results && (
-                            <CopyButton 
-                                text={selectedTags.join(', ')} 
-                                label="Copy selected keywords to clipboard." 
-                                className="mx-2 text-slate-400 hover:text-indigo-600" 
-                                tooltipSide="right" 
+                            <CopyButton
+                                text={selectedTags.join(', ')}
+                                label="Copy"
+                                className="mx-2"
                             />
                          )}
                          {results && (
@@ -1456,8 +1451,9 @@ const SidebarSkeleton = ({ phase }) => (
              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 min-h-[400px] flex flex-col transition-all duration-500">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <StepBadge number={3} />
                             <Info size={16} className="text-indigo-600" />
-                            Listing Info
+                            Listing Editor
                         </h3>
                          <div className="flex items-center gap-2">
                              {/* Optimize Button - Moved to Header */}

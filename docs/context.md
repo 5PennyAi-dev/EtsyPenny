@@ -1807,9 +1807,50 @@ Moved "Billing" above "Settings" in the sidebar navigation.
 - Welcome screen: personalized greeting, 4-step flow cards (Upload & analyze → Generate SEO → Generate draft → Copy to Etsy)
 - Disappears automatically when user creates first listing (`total_listings > 0`)
 
+---
+
+## Session — 2026-03-29
+
+### SEO Studio Section Rename + Step Badges
+- Renamed the 3 SEO Studio sections: "SEO LISTING" → "Product Details", "SEO Analysis" → "Keyword Research", "Listing Info" → "Listing Editor"
+- Added numbered indigo circle badges (①②③) via new `src/components/ui/StepBadge.jsx` shared component
+- Visual-only change — no logic/state modified
+
+### CopyButton Upgrade (Ghost Style with Label)
+- Replaced icon-only CopyButton in `ResultsDisplay.jsx` with ghost button showing icon + text label
+- Default: `Copy` icon + label in slate-500; Hover: indigo-600 + bg-indigo-50; Copied: green Check + "Copied!" (2s timeout)
+- Removed tooltip system (no longer needed with visible label)
+- Tags already copied as comma-separated values
+
+### Visibility Score Calibration
+- **Log ceiling**: `500,000` → `5,000,000` in `lib/seo/select-and-score.ts` (and test mirror)
+- **DesirabilityWeight**: `0.4 + (nS/10) + (tS/10)` → `0.7 + (nS/20) + (tS/20)` — range narrowed from 0.6–2.4 to 0.8–1.7
+- Fixes: REACH 186K was scoring Visibility 92 (now ~72), REACH 549K was 100 (now ~88)
+
+### Recalculate Scores — Strategy Tuner Fix
+- Bug: "Recalculate Scores" ignored strategy tuner values, used only saved DB defaults
+- Fix: Frontend now sends `parameters: getStrategyValues(strategySelections)` in the recalculate payload
+- Backend (`server.mjs` + `api/seo/recalculate-scores.ts`): added `finalParams = { ...params, ...(req.body.parameters || {}) }` merge step
+- Both Apply Strategy and Recalculate Scores now produce identical results for the same tuner position
+
+### Dashboard — Next Actions Inline Stats
+- Added contextual stats to each Next Actions row: token cost for ANALYZED/DRAFT_READY, avg score for SEO_READY, lowest score for low-score row
+- Token cost turns amber when it exceeds user's token balance
+- Stats positioned at true horizontal center via `absolute left-1/2 -translate-x-1/2`
+- New props: `tokenBalance`, `avgScore`, `lowestScore` passed from Dashboard.jsx
+
+### Dashboard — 30-Day Score Evolution Chart (Shop Health)
+- Pure SVG area chart in `ShopHealth.jsx` — no new dependencies (consistent with existing Sparkline pattern)
+- Indigo gradient fill + stroke, hover tooltip shows date + score, trend badge (↑/↓ X pts)
+- Data: queries `listings_global_eval` for last 30 days, groups by day for daily avg
+- `preserveAspectRatio="none"` ensures full card width
+- Empty state when < 2 data points
+
 ### Session Handover
 - Scoring pipeline now resilient — won't crash on AI JSON errors (falls back to score 4)
 - Transactional emails working — `await` is critical in serverless webhook handlers
 - Sentry monitoring live on frontend + all 14 backend routes
 - `analyseShop` / My Shop hidden until Etsy API license — code preserved, just hidden from UI
 - Admin access control is frontend-only (sufficient for beta) — system tables don't have RLS
+- Visibility calibration updated — check new expected ranges if adjusting formula again
+- Recalculate Scores now uses tuner values — both score paths are consistent

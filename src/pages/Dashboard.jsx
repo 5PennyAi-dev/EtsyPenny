@@ -62,6 +62,8 @@ export default function Dashboard() {
   const [listings, setListings] = useState([]);
   const [trending, setTrending] = useState([]);
   const [bankStats, setBankStats] = useState({ keywords: 0, presets: 0, gems: 0 });
+  const [lowestScore, setLowestScore] = useState(null);
+  const [scoreHistory, setScoreHistory] = useState([]);
 
   useEffect(() => {
     if (!user) return;
@@ -71,7 +73,8 @@ export default function Dashboard() {
   async function fetchDashboardData() {
     setLoading(true);
     try {
-      const [countsRes, listingsRes, trendingRes, bankRes, presetsRes, gemsRes] = await Promise.all([
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+      const [countsRes, listingsRes, trendingRes, bankRes, presetsRes, gemsRes, minScoreRes, scoreHistoryRes] = await Promise.all([
         supabase
           .from('v_dashboard_status_counts')
           .select('*')
@@ -103,6 +106,19 @@ export default function Dashboard() {
           .gte('last_volume', 1000)
           .lte('last_competition', 0.4)
           .gte('last_cpc', 1.0),
+        supabase
+          .from('listings_global_eval')
+          .select('listing_strength')
+          .lt('listing_strength', 50)
+          .order('listing_strength', { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('listings_global_eval')
+          .select('listing_strength, updated_at')
+          .not('listing_strength', 'is', null)
+          .gte('updated_at', thirtyDaysAgo)
+          .order('updated_at', { ascending: true }),
       ]);
 
       setStatusCounts(countsRes.data || {});
@@ -113,6 +129,21 @@ export default function Dashboard() {
         presets: presetsRes.count || 0,
         gems: gemsRes.count || 0,
       });
+      setLowestScore(minScoreRes.data?.listing_strength ?? null);
+
+      // Group score history by day for the evolution chart
+      const groups = {};
+      (scoreHistoryRes.data || []).forEach(item => {
+        const day = item.updated_at.substring(0, 10);
+        if (!groups[day]) groups[day] = [];
+        groups[day].push(item.listing_strength);
+      });
+      setScoreHistory(
+        Object.entries(groups).map(([date, scores]) => ({
+          date,
+          avg: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+        }))
+      );
     } catch (err) {
       console.error('Dashboard fetch error:', err);
     } finally {
@@ -293,6 +324,9 @@ export default function Dashboard() {
                 counts={statusCounts}
                 onNavigate={handleListingAction}
                 onNewListing={handleNewListing}
+                tokenBalance={(profile?.tokens_monthly_balance || 0) + (profile?.tokens_bonus_balance || 0)}
+                avgScore={statusCounts?.avg_seo_score}
+                lowestScore={lowestScore}
               />
 
               {/* Two-column row */}
@@ -304,6 +338,7 @@ export default function Dashboard() {
                   avgConversion={statusCounts?.avg_conversion}
                   avgCompetition={statusCounts?.avg_competition}
                   listingsBelow50={statusCounts?.listings_below_50 || 0}
+                  scoreHistory={scoreHistory}
                 />
                 <KeywordBankStats
                   keywords={bankStats.keywords}

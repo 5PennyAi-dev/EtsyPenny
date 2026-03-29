@@ -73,11 +73,11 @@ export function selectAndScore(keywords: Keyword[], params: Params): { keywords:
       const vol = Math.min(1000000, kw.search_volume || 0);
       const nS = kw.niche_score ?? 5;
       const tS = kw.transactional_score ?? 5;
-      const dw = 0.4 + (nS / 10) + (tS / 10);
+      const dw = 0.7 + (nS / 20) + (tS / 20);
       totalMarketReach += vol * dw;
       totalPowerIndex += Math.sqrt(vol) * dw;
     });
-    const ceil = 500000;
+    const ceil = 5000000;
     const visibility = Math.min(100, Math.round((Math.log10(Math.max(1, totalMarketReach)) / Math.log10(ceil)) * 100));
     const avgTrans = selected.reduce((a, k) => a + (Number(k.transactional_score) || 5), 0) / selected.length;
     const avgCPC = selected.reduce((a, k) => a + (Number(k.cpc) || 0), 0) / selected.length;
