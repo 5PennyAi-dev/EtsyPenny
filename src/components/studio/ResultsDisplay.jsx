@@ -891,7 +891,7 @@ const SidebarSkeleton = ({ phase }) => (
       <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
         
         {/* Main + Sidebar Flex Layout */}
-        <div className="flex flex-col lg:flex-row gap-8 items-start">
+        <div className="flex flex-col 3xl:flex-row gap-8 items-start">
           
           {/* --- MAIN CONTENT (Fluid width) --- */}
           <div className="flex-1 min-w-0 space-y-8">
@@ -1029,11 +1029,11 @@ const SidebarSkeleton = ({ phase }) => (
                 }
                 headerActions={
                     results && (
-                    <div className="flex items-center gap-2">
-                         
+                    <div className="flex items-center gap-2 flex-wrap">
 
-                         <button 
-                            onClick={(e) => { 
+
+                         <button
+                            onClick={(e) => {
                                 e.stopPropagation();
                                 const selectedKeywordsData = primaryAnalytics.filter(k => selectedTags.includes(k.keyword));
                                 onRecalculateScores?.(selectedKeywordsData); 
@@ -1076,7 +1076,7 @@ const SidebarSkeleton = ({ phase }) => (
                     )
                 }
             >
-                <div className="border-t border-slate-100">
+                <div className="border-t border-slate-100 overflow-x-auto">
                     <table className="w-full text-sm text-left" style={{ borderSpacing: 0 }}>
                         <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                             <tr>
@@ -1495,7 +1495,7 @@ const SidebarSkeleton = ({ phase }) => (
         </div>
 
         {/* --- SIDEBAR: DRAFTING (33% width) --- */}
-        <div className="w-full lg:w-1/3 lg:flex-shrink-0 sticky top-8 space-y-4">
+        <div className="w-full 3xl:w-1/3 3xl:flex-shrink-0 3xl:sticky 3xl:top-8 space-y-4">
              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 min-h-[400px] flex flex-col transition-all duration-500">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
