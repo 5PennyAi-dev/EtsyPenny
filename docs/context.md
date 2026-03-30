@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-03-29*
+*Dernière mise à jour : 2026-03-30*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -1892,3 +1892,36 @@ Moved "Billing" above "Settings" in the sidebar navigation.
 - AI provider router now has retry + fallback — all AI calls auto-recover from transient failures
 - Login page redesigned — screenshot asset must exist at `public/keyword-performance-preview.png`
 - Generate SEO button moved into Keyword Research header — cleaner layout, same functionality
+
+---
+
+## Session 2026-03-30: SEO Studio Full-Width Layout Redesign
+
+### Layout Restructure
+- Replaced 2-column layout (Sections 1+2 left, Section 3 right sidebar) with full-width single-column stacked layout
+- Section 3 (Listing Editor) now shares a bottom row with Recent Listings in a 60/40 grid split (`xl:grid-cols-[3fr_2fr]`)
+- Below 1280px (`xl` breakpoint), bottom row stacks vertically
+- Removed custom `3xl: 1600px` Tailwind breakpoint (no longer needed)
+- Section 2 (Keyword Research) now uses full viewport width — keyword table no longer cramped
+- Added `overflow-x-auto` to keyword table as safety net
+- Added `flex-wrap` to Keyword Performance header actions (Recalculate Scores / Save as Preset)
+
+### Section 3 Collapsible
+- Wrapped Listing Editor in `<Accordion>` component (matching Sections 1 and 2)
+- Title, StepBadge, and "Optimize with AI" button moved into Accordion header/headerActions
+- Defaults to open (`defaultOpen={true}`)
+- Added `p-5` padding to Accordion content area
+
+### Recent Listings Alignment
+- Removed `mt-8` from `RecentOptimizations.jsx` root div — was causing vertical misalignment with Listing Editor in the grid layout
+
+### Files Modified
+- `src/components/studio/ResultsDisplay.jsx` — layout restructure, Accordion wrapper for Section 3
+- `src/components/studio/RecentOptimizations.jsx` — removed `mt-8`
+- `tailwind.config.js` — removed `3xl` breakpoint
+
+### Session Handover
+- Layout is now fully linear/stacked — no sidebar on any screen size
+- Bottom row uses Tailwind grid with `xl:` breakpoint for responsive 60/40 split
+- All three sections are collapsible via Accordion component
+- No logic, API, or state management changes — layout only

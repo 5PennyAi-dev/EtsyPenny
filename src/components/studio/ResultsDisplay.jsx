@@ -891,10 +891,10 @@ const SidebarSkeleton = ({ phase }) => (
       <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
         
         {/* Main + Sidebar Flex Layout */}
-        <div className="flex flex-col 3xl:flex-row gap-8 items-start">
+        <div className="flex flex-col gap-8 w-full">
           
           {/* --- MAIN CONTENT (Fluid width) --- */}
-          <div className="flex-1 min-w-0 space-y-8">
+          <div className="space-y-8">
   
               {/* === PARENT: SEO Analysis Accordion === */}
               <Accordion
@@ -1494,31 +1494,32 @@ const SidebarSkeleton = ({ phase }) => (
 
         </div>
 
-        {/* --- SIDEBAR: DRAFTING (33% width) --- */}
-        <div className="w-full 3xl:w-1/3 3xl:flex-shrink-0 3xl:sticky 3xl:top-8 space-y-4">
-             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 min-h-[400px] flex flex-col transition-all duration-500">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                            <StepBadge number={3} />
-                            <Info size={16} className="text-indigo-600" />
-                            Listing Editor
-                        </h3>
-                         <div className="flex items-center gap-2">
-                             {/* Optimize Button - Moved to Header */}
-                             <button 
-                                onClick={handleMagicDraft}
-                                disabled={selectedTags.length === 0}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shadow-sm border
-                                    ${selectedTags.length === 0 
-                                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' 
-                                        : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 hover:shadow-indigo-200'}`}
-                             >
-                                <Sparkles size={14} /> Optimize with AI
-                               <span className="text-xs bg-indigo-500/30 text-indigo-100 px-1.5 py-0.5 rounded-full">1 token</span>
-                             </button>
-                         </div>
+        {/* --- BOTTOM ROW: Listing Editor (60%) + Recent Listings (40%) --- */}
+        <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-6 items-start">
+             <Accordion
+                defaultOpen={true}
+                title={
+                    <div className="flex items-center gap-2">
+                        <StepBadge number={3} />
+                        <Info size={16} className="text-indigo-600" />
+                        <span className="text-sm font-bold text-slate-900">Listing Editor</span>
                     </div>
-
+                }
+                headerActions={
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleMagicDraft(); }}
+                        disabled={selectedTags.length === 0}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shadow-sm border
+                            ${selectedTags.length === 0
+                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 hover:shadow-indigo-200'}`}
+                    >
+                        <Sparkles size={14} /> Optimize with AI
+                        <span className="text-xs bg-indigo-500/30 text-indigo-100 px-1.5 py-0.5 rounded-full">1 token</span>
+                    </button>
+                }
+             >
+                <div className="min-h-[300px] flex flex-col p-5">
                     {isGeneratingDraft ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-center py-8 space-y-6 animate-in fade-in">
                             <div className="relative">
@@ -1684,10 +1685,13 @@ const SidebarSkeleton = ({ phase }) => (
                             )}
                         </div>
                     )}
-             </div>
+                </div>
+             </Accordion>
 
-             {/* Recent Listings — below Listing Info */}
-             {children}
+             {/* Recent Listings (40% on xl, full width below) */}
+             <div>
+               {children}
+             </div>
         </div>
       </div>
 

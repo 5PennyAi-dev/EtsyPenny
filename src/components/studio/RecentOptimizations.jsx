@@ -69,7 +69,7 @@ const RecentOptimizations = ({ onViewResults }) => {
   if (recentListings.length === 0) return null;
 
   return (
-    <div className="mt-8">
+    <div>
       <Accordion
         defaultOpen={false}
         title={
