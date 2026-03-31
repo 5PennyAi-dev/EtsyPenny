@@ -229,6 +229,9 @@ const ProductStudio = () => {
       }
       if (contextRef.current) {
         contextRef.current.value = analysisContext.context || "";
+        // Auto-resize to fit content
+        contextRef.current.style.height = 'auto';
+        contextRef.current.style.height = Math.min(contextRef.current.scrollHeight, 200) + 'px';
       }
     }
   }, [analysisContext]);
@@ -1512,10 +1515,21 @@ const ProductStudio = () => {
         // All current pool stats are relevant (single eval)
         const relevantStats = stats || [];
 
+        // Fetch original Etsy score if this listing is linked from etsy_listings
+        let etsyOriginalScore = null;
+        const { data: etsyRow } = await supabase
+          .from('etsy_listings')
+          .select('original_score')
+          .eq('listing_id', listing.id)
+          .maybeSingle();
+        etsyOriginalScore = etsyRow?.original_score ?? null;
+
         const constructedResults = {
             title: listing.generated_title,
             description: listing.generated_description,
             imageUrl: listing.image_url,
+            source: listing.source,
+            etsyOriginalScore,
             // Global Eval Data (single source of truth: listings_global_eval)
             global_strength: activeEvalData?.global_strength,
             status_label: activeEvalData?.status_label,
@@ -1864,7 +1878,7 @@ const ProductStudio = () => {
       onRelaunchSEO={handleRelaunchSEO}
       onGenerateSEO={() => { const data = getFormData({ validate: true }); if (data) handleAnalyze(data); }}
       isGeneratingSEO={!!isLoading}
-      canGenerateSEO={!!(selectedImage || results?.imageUrl) && isImageAnalyzedState && !!productTypeName}
+      canGenerateSEO={!!(selectedImage || results?.imageUrl) && isImageAnalyzedState}
       seoGenerationCount={seoGenerationCount}
       isSeoLoading={isSeoLoading}
       showSeoCancelLink={showSeoCancelLink}
@@ -2112,8 +2126,10 @@ const ProductStudio = () => {
                                  id="context"
                                  rows="3"
                                  placeholder="Describe your product, its unique features, target audience, or any specific keywords you want to target..."
-                                 className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 resize-none"
+                                 className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 resize-none overflow-y-auto"
+                                 style={{ maxHeight: 200 }}
                                  defaultValue={analysisContext?.context || ""}
+                                 onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px'; }}
                                />
                              </div>
                            </div>

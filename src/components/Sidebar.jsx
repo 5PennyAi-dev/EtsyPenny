@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutDashboard, LayoutList, Shirt, LineChart, FlaskConical, ShoppingBag, Settings, User, LogOut, ShieldAlert, CreditCard, Coins, MessageSquareText } from 'lucide-react';
+import { LayoutDashboard, LayoutList, Shirt, LineChart, FlaskConical, Store, Settings, User, LogOut, ShieldAlert, CreditCard, Coins, MessageSquareText } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBulkProgress } from '../context/BulkProgressContext';
@@ -18,8 +18,7 @@ const Sidebar = () => {
     { name: 'SEO Studio', icon: Shirt, path: '/studio' },
     { name: 'SEO History', icon: LineChart, path: '/history' },
     { name: 'SEO Lab', icon: FlaskConical, path: '/lab' },
-    // TODO: re-enable when Etsy API license is approved
-    // { name: 'My Shop', icon: ShoppingBag, path: '/shop' },
+    { name: 'My Shop', icon: Store, path: '/shop' },
     { name: 'Billing', icon: CreditCard, path: '/billing' },
   ];
 

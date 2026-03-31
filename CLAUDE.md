@@ -58,6 +58,7 @@ npm run preview   # Preview production build
 - `src/lib/supabase.js` — Supabase client singleton
 - `api/` — Vercel serverless functions (production backend): `analyze-image`, `generate-keywords`, `reset-pool`, `recalculate-scores`, `generate-draft`, `user-keyword`, `add-from-favorite`, `health`, `feedback`, `emails/welcome`, `stripe/webhook`, `stripe/create-checkout`, `stripe/create-portal`
 - `lib/email/` — Email sending: `send-email.ts` (Resend HTTP wrapper), `templates/` (welcome, subscription-confirmation, token-pack-confirmation, layout)
+- `lib/etsy/` — Etsy API v3 client: `etsy-client.ts` (fetchShopListings, fetchListingsByIds, token refresh), `score-etsy-listing.ts` (scoring orchestrator for imported listings)
 - `lib/sentry.ts` — Shared Sentry init helper for backend (lazy, Vercel-only)
 - `server.mjs` — Local Express dev server (mirrors Vercel functions for local development)
 - `vercel.json` — Vercel deployment config (rewrites `/api/*` to serverless functions)
@@ -91,6 +92,9 @@ npm run preview   # Preview production build
 | `POST /api/seo/generate-draft` | Generate Etsy title + description from selected keywords via Gemini |
 | `POST /api/seo/user-keyword` | Add single custom keyword with live DataForSEO enrichment + AI scoring |
 | `POST /api/seo/add-from-favorite` | Batch-add keywords from Favorites bank (skips DataForSEO, uses cached metrics) |
+| `GET /api/etsy/shop-listings` | Browse Etsy shop listings (paginated, with images) |
+| `POST /api/etsy/import-listings` | Import Etsy listings into PennySEO (plan-limited) |
+| `POST /api/etsy/score-listings` | Score imported Etsy listings (image analysis + tag scoring, 3 tokens/listing, max 5) |
 | `GET /api/health` | Health check |
 
 **Key shared modules (in `lib/`):**
@@ -138,6 +142,8 @@ The `analyseShop` feature in `BrandProfilePage.jsx` is hidden via `{false && ...
 - **`system_themes`** / **`system_niches`** — Global taxonomy (admin-managed)
 - **`user_custom_themes`** / **`user_custom_niches`** — Per-user custom taxonomy (RLS enabled)
 - **`user_custom_product_types`** — Per-user custom product types (RLS enabled)
+- **`etsy_shop_connections`** — Links PennySEO user to Etsy shop (OAuth tokens, sync status)
+- **`etsy_listings`** — Snapshot of imported Etsy listing data (immutable after import, scored separately)
 - **`profiles`** — User profiles (fetched in AuthContext)
 - **`product_types`** — System product categorization lookup
 - **`v_combined_product_types`** — Union view of system + user custom product types
@@ -171,6 +177,11 @@ DATAFORSEO_PASSWORD        # DataForSEO API password
 N8N_WEBHOOK_SECRET         # Shared secret for edge function auth (x-api-key header)
 RESEND_API_KEY             # Resend API key (transactional emails)
 VITE_SENTRY_DSN            # Sentry DSN (frontend + backend error monitoring)
+ETSY_API_KEY               # Etsy App API keystring
+ETSY_SHARED_SECRET         # Etsy shared secret (x-api-key = keystring:secret)
+ETSY_ACCESS_TOKEN          # OAuth access token (expires every 1h, auto-refreshed)
+ETSY_REFRESH_TOKEN         # OAuth refresh token (permanent)
+ETSY_SHOP_ID               # Etsy shop ID (numeric)
 API_PORT                   # Express server port (defaults to 3001)
 ```
 

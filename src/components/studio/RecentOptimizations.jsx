@@ -103,11 +103,14 @@ const RecentOptimizations = ({ onViewResults }) => {
                 onClick={() => onViewResults(listing.id)}
               >
                 {/* Image — fixed 36px */}
-                <div style={{ width: 36, flexShrink: 0 }}>
+                <div style={{ width: 36, flexShrink: 0, position: 'relative' }}>
                   {listing.image_url
                     ? <img src={listing.image_url} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} />
                     : <div style={{ width: 36, height: 36, borderRadius: 6, background: '#f1f5f9' }} />
                   }
+                  {listing.source === 'etsy' && (
+                    <span style={{ position: 'absolute', top: -4, left: -4, background: '#f97316', color: 'white', fontSize: 9, fontWeight: 700, lineHeight: 1, padding: '2px 4px', borderRadius: 4 }}>Etsy</span>
+                  )}
                 </div>
 
                 {/* Product Name + Theme — grows but capped */}

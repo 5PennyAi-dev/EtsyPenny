@@ -83,11 +83,14 @@ export default function ListingsTable({ listings = [], onAction }) {
             style={{ ...ROW_GRID, padding: '8px 0', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}
             onClick={() => onAction(listing.id, listing.computed_status)}
           >
-            <div>
+            <div style={{ position: 'relative' }}>
               {listing.image_url
                 ? <img src={listing.image_url} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />
                 : <div style={{ width: 32, height: 32, borderRadius: 6, background: '#f1f5f9' }} />
               }
+              {listing.source === 'etsy' && (
+                <span style={{ position: 'absolute', top: -4, left: -4, background: '#f97316', color: 'white', fontSize: 9, fontWeight: 700, lineHeight: 1, padding: '2px 4px', borderRadius: 4 }}>Etsy</span>
+              )}
             </div>
 
             <div style={{ overflow: 'hidden' }}>

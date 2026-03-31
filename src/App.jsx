@@ -6,7 +6,7 @@ import ProductStudio from './pages/ProductStudio';
 import LoginPage from './pages/LoginPage';
 import HistoryPage from './pages/HistoryPage';
 import Dashboard from './pages/Dashboard';
-import BrandProfilePage from './pages/BrandProfilePage';
+import MyShopPage from './pages/MyShopPage';
 import SEOLab from './pages/SEOLab';
 import AdminSystemPage from './pages/AdminSystemPage';
 import UserSettings from './pages/UserSettings';
@@ -56,7 +56,7 @@ function App() {
             path="/shop" 
             element={
               <ProtectedRoute>
-                <BrandProfilePage />
+                <MyShopPage />
               </ProtectedRoute>
             } 
           />

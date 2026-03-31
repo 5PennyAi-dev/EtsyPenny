@@ -5,6 +5,7 @@ export const TOKEN_COSTS = {
   generate_keywords: 8,
   rerun_keywords: 4,
   generate_draft: 1,
+  etsy_score: 3,
 } as const;
 
 export type TokenAction = keyof typeof TOKEN_COSTS;

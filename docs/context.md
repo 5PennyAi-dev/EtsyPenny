@@ -1925,3 +1925,131 @@ Moved "Billing" above "Settings" in the sidebar navigation.
 - Bottom row uses Tailwind grid with `xl:` breakpoint for responsive 60/40 split
 - All three sections are collapsible via Accordion component
 - No logic, API, or state management changes — layout only
+
+---
+
+### March 30th, 2026 — Etsy Import Phase 1: Database Schema + API Backend
+
+**Context**: PennySEO now has personal access to the Etsy Open API v3. This session implements the foundational backend for importing Etsy shop listings.
+
+### New Tables
+- **`etsy_shop_connections`** — Links a PennySEO user to their Etsy shop (OAuth tokens, sync status). RLS enabled.
+- **`etsy_listings`** — Immutable snapshot of imported Etsy listing data (title, description, tags, images, state). RLS enabled.
+- **ALTER `plans`** — Added `etsy_import_limit` column (free=10, starter=50, growth=150, pro=300).
+
+### New Shared Module
+- **`lib/etsy/etsy-client.ts`** — Etsy API v3 client with token refresh, 401 retry, batch fetching. Uses native `fetch` with 15s timeout. Module-level in-memory token cache for serverless cold starts.
+
+### New API Routes
+- **`GET /api/etsy/shop-listings`** — Browse Etsy shop listings (paginated, with images). Personal access phase uses env var `ETSY_SHOP_ID`.
+- **`POST /api/etsy/import-listings`** — Import selected Etsy listings into `etsy_listings` table. Checks plan import limits, skips duplicates, auto-creates shop connection.
+
+### Architecture Decisions
+- Import is free (0 tokens) — scoring is a separate phase
+- Personal access phase: API key + OAuth token in env vars. Full per-user OAuth comes later.
+- `etsy_listings` stores original Etsy data as immutable snapshots — never mutated after import
+- `x-api-key` header format: `keystring:shared_secret` (both from env vars)
+
+### Files Created
+- `supabase/migrations/20260330_create_etsy_tables.sql`
+- `lib/etsy/etsy-client.ts`
+- `api/etsy/shop-listings.ts`
+- `api/etsy/import-listings.ts`
+
+### Files Modified
+- `server.mjs` — Added 2 dev mirror routes for Etsy
+- `CLAUDE.md` — Updated routes table, tables list, env vars, key directories
+
+### Session Handover
+- Backend is complete for Etsy import Phase 1
+- Migration needs to be applied to Supabase
+- Next: Phase 2 (frontend UI for browsing/importing) and Phase 3 (SEO scoring of imported listings)
+
+---
+
+### March 30th, 2026 — Etsy Import Phase 3: Scoring Pipeline
+
+**Context**: Users can import Etsy listings (Phase 1-2). Phase 3 adds scoring: the existing SEO pipeline runs on imported Etsy tags — image analysis + DataForSEO enrichment + AI scoring + composite strength. Cost: 3 tokens/listing.
+
+### New Shared Module
+- **`lib/etsy/score-etsy-listing.ts`** — Orchestrates scoring a single Etsy listing: downloads image → uploads to Supabase storage → creates `listings` row → runs Gemini Vision analysis → enriches tags via DataForSEO → AI scores niche + transactional → computes composite listing strength → persists results. Creates a linked `listings` row so scored Etsy listings appear in the main PennySEO pipeline.
+
+### New API Route
+- **`POST /api/etsy/score-listings`** — Scores up to 5 imported listings sequentially. Validates ownership + pending status, checks token balance (3/listing), processes via `scoreEtsyListing()`, deducts tokens per successful scoring.
+
+### Token System
+- Added `etsy_score: 3` to `TOKEN_COSTS` in `lib/tokens/token-middleware.ts`
+
+### Frontend Updates
+- **EtsyListingGrid**: Cards now show scoring status (pending/scoring/scored/error) with colored score badge, progress bar for scored listings
+- **ImportActionBar**: Dual-mode — shows "Import" for unimported selections and "Score N (M tokens)" for imported-but-unscored selections
+- **MyShopPage**: Added scoring handler, token balance awareness, scorable count computation
+
+### Files Created
+- `lib/etsy/score-etsy-listing.ts`
+- `api/etsy/score-listings.ts`
+
+### Files Modified
+- `lib/tokens/token-middleware.ts` — Added `etsy_score: 3`
+- `server.mjs` — Added score-listings dev route
+- `src/components/shop/EtsyListingGrid.jsx` — Scored state rendering
+- `src/components/shop/ImportActionBar.jsx` — Score button
+- `src/pages/MyShopPage.jsx` — Scoring state + handler
+
+### Session Handover
+- Full Etsy import pipeline complete (Phase 1-3): browse → import → score
+- Scored listings create linked `listings` rows visible in Dashboard/Studio
+- Next: Phase 4 (before/after comparison UI, re-optimization with PennySEO-generated keywords)
+
+---
+
+### March 30th, 2026 — Etsy Import Phase 4 + UX Polish
+
+**Context**: Built the Before/After comparison UI, fixed scoring pipeline status flow, added Etsy source badges, and polished the MyShop page layout.
+
+### Phase 4: Before/After Comparison
+- **BeforeAfterCard component**: Shows original Etsy score vs PennySEO optimized score with delta bar. Hides "After" column when not re-optimized — shows "Optimize in Studio →" CTA instead.
+- **Replaced cards with compact table**: Inline grid table with thumbnail, title, color-coded scores (red/amber/green/indigo), "Optimize →" pill for unoptimized, ↑/↓ delta arrows, "Open in Studio" link. Paginated (5 rows per page).
+- **Before/After in Keyword Performance header**: ProductStudio fetches `etsy_listings.original_score` for Etsy listings. ResultsDisplay shows `Before: X → After: Y (+Z)` next to "Keyword Performance" title.
+- **ShopStatsBar avg improvement**: 4th card swaps between "Imported" count and "Avg. improvement" when optimized listings exist. Only counts listings with genuinely different PennySEO scores.
+
+### Scoring Pipeline Fixes
+- **Status fix**: `score-etsy-listing.ts` no longer sets `status_id = SEO_DONE` after scoring. Listings stay at `NEW` status so "Generate SEO" button remains visible in ProductStudio.
+- **Generate SEO button visibility**: Relaxed `canGenerateSEO` condition — no longer requires `productTypeName`. Button shows whenever image analysis is done.
+- **Re-generate flow**: ResultsDisplay button calls `onRelaunchSEO()` (confirmation modal + existing context) for re-generation, `onGenerateSEO()` for first-time only.
+- **Token cost**: Added `etsy_score: 3` to `TOKEN_COSTS`.
+
+### Etsy Source Badge
+- **`source` column**: Added `TEXT DEFAULT 'manual'` to `listings` table. `v_dashboard_listings` view recreated to include it.
+- **`score-etsy-listing.ts`**: Sets `source: 'etsy'` on listing insert.
+- **Orange "Etsy" badge**: Displayed on listing thumbnails in Dashboard (ListingsTable), ListingsByStatusPage, RecentOptimizations, and SEO Studio (AuditHeader).
+
+### MyShop Page UX Polish
+- **Exclusive selection mode**: Clicking imported vs non-imported listings switches between "import" and "score" modes with toast notification.
+- **Compact grid**: 3→5 columns, square aspect ratio images, tighter padding.
+- **Status filter pills**: All · Imported · Scored · Optimized with colored pill styling (slate/amber/emerald) matching tag badge pattern.
+- **Status bottom borders**: 3px colored bottom border on cards (slate=imported, amber=scored, green=optimized).
+- **Description textarea auto-resize**: Adjusts height to fit Etsy descriptions, capped at 200px with scroll.
+
+### Files Created
+- `src/components/shop/BeforeAfterCard.jsx`
+- `supabase/migrations/20260330_add_source_to_listings.sql`
+
+### Files Modified
+- `lib/etsy/score-etsy-listing.ts` — Removed SEO_DONE status, added `source: 'etsy'`
+- `lib/tokens/token-middleware.ts` — Added `etsy_score: 3`
+- `src/pages/MyShopPage.jsx` — Before/After table, filter pills, scoring handler, comparison data
+- `src/components/shop/EtsyListingGrid.jsx` — Status borders, delta badge, square images, selectable imported cards
+- `src/components/shop/ImportActionBar.jsx` — Exclusive mode (import vs score)
+- `src/components/shop/ShopStatsBar.jsx` — Avg improvement card
+- `src/pages/ProductStudio.jsx` — canGenerateSEO fix, etsyOriginalScore fetch, source in results, textarea auto-resize
+- `src/components/studio/ResultsDisplay.jsx` — onRelaunchSEO, Before/After in KW header, Etsy badge on thumbnail
+- `src/components/dashboard/ListingsTable.jsx` — Etsy badge
+- `src/components/studio/RecentOptimizations.jsx` — Etsy badge
+- `src/pages/ListingsByStatusPage.jsx` — Etsy badge
+
+### Session Handover
+- Full Etsy import pipeline (Phases 1-4) is feature-complete
+- Users can: browse Etsy shop → import listings → score existing tags → re-optimize with PennySEO → see before/after improvement
+- Etsy source badge visible across all listing views
+- MyShop page has compact grid, status filters, paginated comparison table

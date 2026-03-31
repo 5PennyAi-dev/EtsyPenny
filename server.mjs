@@ -30,6 +30,8 @@ import { sendEmail } from './lib/email/send-email.ts';
 import { welcomeEmail } from './lib/email/templates/welcome.ts';
 import { subscriptionEmail } from './lib/email/templates/subscription-confirmation.ts';
 import { tokenPackEmail } from './lib/email/templates/token-pack-confirmation.ts';
+import { fetchShopListings, fetchListingsByIds } from './lib/etsy/etsy-client.ts';
+import { scoreEtsyListing } from './lib/etsy/score-etsy-listing.ts';
 
 const app = express();
 // JSON body parser for all routes EXCEPT Stripe webhook (needs raw body)
@@ -1555,6 +1557,263 @@ app.post('/api/stripe/create-portal', async (req, res) => {
   }
 });
 
+// ─── ETSY ─────────────────────────────────────────────────
+
+app.get('/api/etsy/shop-listings', async (req, res) => {
+  try {
+    const user_id = req.query.user_id;
+    if (!user_id) {
+      return res.status(400).json({ error: 'Missing required query param: user_id' });
+    }
+
+    const limit = Math.min(Number(req.query.limit) || 25, 100);
+    const offset = Number(req.query.offset) || 0;
+    const state = req.query.state || 'active';
+
+    const shopId = process.env.ETSY_SHOP_ID;
+    if (!shopId) {
+      return res.status(500).json({ error: 'ETSY_SHOP_ID not configured' });
+    }
+
+    console.info(`🔍 [shop-listings] user=${user_id} limit=${limit} offset=${offset}`);
+
+    const data = await fetchShopListings(shopId, { limit, offset, state });
+
+    const results = data.results.map((listing) => {
+      const primaryImage = listing.images?.find((img) => img.rank === 1) ?? listing.images?.[0];
+      return {
+        etsy_listing_id: listing.listing_id,
+        title: listing.title,
+        description: listing.description,
+        tags: listing.tags,
+        tag_count: listing.tags?.length ?? 0,
+        image_url: primaryImage?.url_fullxfull ?? null,
+        thumbnail_url: primaryImage?.url_570xN ?? null,
+        etsy_url: listing.url,
+        state: listing.state,
+      };
+    });
+
+    return res.json({ count: data.count, results });
+  } catch (error) {
+    console.error('❌ [shop-listings] Error:', error.message);
+    return res.status(500).json({ error: 'Failed to fetch shop listings', details: error.message });
+  }
+});
+
+app.post('/api/etsy/import-listings', async (req, res) => {
+  try {
+    const { user_id, etsy_listing_ids } = req.body;
+
+    if (!user_id || !Array.isArray(etsy_listing_ids) || etsy_listing_ids.length === 0) {
+      return res.status(400).json({ error: 'Missing required fields: user_id, etsy_listing_ids (non-empty array)' });
+    }
+
+    console.info(`📥 [import-listings] user=${user_id} requested=${etsy_listing_ids.length}`);
+
+    // 1. Check import limit
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('subscription_plan')
+      .eq('id', user_id)
+      .single();
+
+    const { data: plan } = await supabaseAdmin
+      .from('plans')
+      .select('etsy_import_limit')
+      .eq('id', profile?.subscription_plan ?? 'free')
+      .single();
+
+    const importLimit = plan?.etsy_import_limit ?? 10;
+
+    const { count: existingCount } = await supabaseAdmin
+      .from('etsy_listings')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user_id);
+
+    const currentCount = existingCount ?? 0;
+    const remaining = Math.max(0, importLimit - currentCount);
+
+    if (remaining === 0) {
+      return res.status(402).json({
+        error: 'Etsy import limit reached for your plan',
+        limit: importLimit,
+        used: currentCount,
+      });
+    }
+
+    // 2. Filter out already-imported
+    const { data: existing } = await supabaseAdmin
+      .from('etsy_listings')
+      .select('etsy_listing_id')
+      .eq('user_id', user_id)
+      .in('etsy_listing_id', etsy_listing_ids);
+
+    const existingIds = new Set((existing ?? []).map((r) => r.etsy_listing_id));
+    const newIds = etsy_listing_ids.filter((id) => !existingIds.has(id));
+    const skipped = etsy_listing_ids.length - newIds.length;
+
+    const idsToImport = newIds.slice(0, remaining);
+
+    if (idsToImport.length === 0) {
+      return res.json({ imported: 0, skipped, limit_remaining: remaining, listings: [] });
+    }
+
+    // 3. Fetch full details from Etsy
+    const etsyListings = await fetchListingsByIds(idsToImport);
+
+    // 4. Get or create shop connection
+    const shopId = process.env.ETSY_SHOP_ID;
+    if (!shopId) {
+      return res.status(500).json({ error: 'ETSY_SHOP_ID not configured' });
+    }
+
+    const { data: connection } = await supabaseAdmin
+      .from('etsy_shop_connections')
+      .upsert(
+        {
+          user_id,
+          etsy_shop_id: Number(shopId),
+          shop_name: 'My Etsy Shop',
+          is_active: true,
+          last_synced_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,etsy_shop_id' },
+      )
+      .select('id')
+      .single();
+
+    if (!connection) {
+      return res.status(500).json({ error: 'Failed to create shop connection' });
+    }
+
+    // 5. Insert etsy_listings rows
+    const rows = etsyListings.map((listing) => {
+      const primaryImage = listing.images?.find((img) => img.rank === 1) ?? listing.images?.[0];
+      return {
+        user_id,
+        connection_id: connection.id,
+        etsy_listing_id: listing.listing_id,
+        original_title: listing.title,
+        original_description: listing.description,
+        original_tags: listing.tags ?? [],
+        original_image_url: primaryImage?.url_fullxfull ?? null,
+        thumbnail_url: primaryImage?.url_570xN ?? null,
+        etsy_url: listing.url,
+        etsy_state: listing.state,
+        tag_count: listing.tags?.length ?? 0,
+      };
+    });
+
+    const { data: inserted, error: insertError } = await supabaseAdmin
+      .from('etsy_listings')
+      .insert(rows)
+      .select();
+
+    if (insertError) throw insertError;
+
+    const imported = inserted?.length ?? 0;
+    console.info(`   ✅ [import-listings] imported=${imported} skipped=${skipped}`);
+
+    return res.json({
+      imported,
+      skipped,
+      limit_remaining: remaining - imported,
+      listings: inserted,
+    });
+  } catch (error) {
+    console.error('❌ [import-listings] Error:', error.message);
+    return res.status(500).json({ error: 'Failed to import listings', details: error.message });
+  }
+});
+
+app.post('/api/etsy/score-listings', async (req, res) => {
+  try {
+    const { user_id, etsy_listing_ids } = req.body;
+
+    if (!user_id || !Array.isArray(etsy_listing_ids) || etsy_listing_ids.length === 0) {
+      return res.status(400).json({ error: 'Missing required fields: user_id, etsy_listing_ids (non-empty array)' });
+    }
+
+    if (etsy_listing_ids.length > 5) {
+      return res.status(400).json({ error: 'Maximum 5 listings per scoring request' });
+    }
+
+    console.info(`\n🔍 [score-listings] user=${user_id} requested=${etsy_listing_ids.length}`);
+
+    // 1. Fetch and validate
+    const { data: listings, error: fetchErr } = await supabaseAdmin
+      .from('etsy_listings')
+      .select('*')
+      .in('id', etsy_listing_ids)
+      .eq('user_id', user_id)
+      .eq('scoring_status', 'pending');
+
+    if (fetchErr) throw fetchErr;
+    if (!listings || listings.length === 0) {
+      return res.status(400).json({ error: 'No valid pending listings found for scoring' });
+    }
+
+    // 2. Token check
+    const totalCost = listings.length * 3;
+    const tokenCheck = await checkTokenBalance(user_id, 'etsy_score');
+    if (!tokenCheck.allowed || tokenCheck.balance < totalCost) {
+      return res.status(402).json({
+        error: 'Insufficient tokens for scoring',
+        required: totalCost,
+        balance: tokenCheck.balance,
+      });
+    }
+
+    // 3. Set scoring status
+    await supabaseAdmin
+      .from('etsy_listings')
+      .update({ scoring_status: 'scoring' })
+      .in('id', listings.map((l) => l.id));
+
+    // 4. Fetch user settings
+    const { data: settings } = await supabaseAdmin
+      .from('v_user_seo_active_settings')
+      .select('*')
+      .eq('user_id', user_id)
+      .maybeSingle();
+
+    // 5. Process sequentially
+    const results = [];
+    let successCount = 0;
+
+    for (const listing of listings) {
+      console.info(`   📊 Scoring ${successCount + 1}/${listings.length}...`);
+      const result = await scoreEtsyListing({
+        etsyListing: listing,
+        userId: user_id,
+        userSettings: settings || {},
+      });
+      results.push(result);
+      if (result.score !== null) successCount++;
+    }
+
+    // 6. Deduct tokens
+    let tokensDeducted = 0;
+    for (let i = 0; i < successCount; i++) {
+      await deductTokens(user_id, 'etsy_score', 3);
+      tokensDeducted += 3;
+    }
+
+    console.info(`   ✅ [score-listings] scored=${successCount} failed=${listings.length - successCount} tokens=${tokensDeducted}\n`);
+
+    return res.json({
+      scored: successCount,
+      failed: listings.length - successCount,
+      results,
+      tokens_deducted: tokensDeducted,
+    });
+  } catch (error) {
+    console.error('❌ [score-listings] Error:', error.message);
+    return res.status(500).json({ error: 'Failed to score listings', details: error.message });
+  }
+});
+
 // ─── START ────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🚀 EtsyPenny API server running on http://localhost:${PORT}`);
@@ -1569,5 +1828,8 @@ app.listen(PORT, () => {
   console.log(`   POST /api/stripe/webhook`);
   console.log(`   POST /api/stripe/create-checkout`);
   console.log(`   POST /api/stripe/create-portal`);
+  console.log(`   GET  /api/etsy/shop-listings`);
+  console.log(`   POST /api/etsy/import-listings`);
+  console.log(`   POST /api/etsy/score-listings`);
   console.log(`   GET  /api/health\n`);
 });

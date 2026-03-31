@@ -195,6 +195,7 @@ const SidebarSkeleton = ({ phase }) => (
   const AuditHeader = ({
     score,
     imageUrl,
+    source,
     listingVisibility,
     listingEstMarketReach,
     listingConversion,
@@ -313,8 +314,11 @@ const SidebarSkeleton = ({ phase }) => (
         <div className="lg:w-auto lg:flex-shrink-0 py-3 px-4 xl:px-6 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-row items-center justify-center gap-4 xl:gap-8">
             {/* Thumbnail — takes up left space */}
             {imageUrl && (
-                <div className="h-24 w-24 rounded-2xl border border-slate-200 bg-slate-100 overflow-hidden flex-shrink-0 shadow-sm max-w-[6rem]">
+                <div className="h-24 w-24 rounded-2xl border border-slate-200 bg-slate-100 overflow-hidden flex-shrink-0 shadow-sm max-w-[6rem] relative">
                     <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                    {source === 'etsy' && (
+                      <span className="absolute top-1 left-1 bg-orange-500 text-white text-[9px] font-bold leading-none px-1 py-0.5 rounded">Etsy</span>
+                    )}
                 </div>
             )}
             {/* Label + Gauge grouped together on the right */}
@@ -541,6 +545,7 @@ const SidebarSkeleton = ({ phase }) => (
     refreshFavoritesKey,
     // Generate SEO Props
     onGenerateSEO,
+    onRelaunchSEO,
     isGeneratingSEO,
     canGenerateSEO,
     seoGenerationCount,
@@ -924,7 +929,15 @@ const SidebarSkeleton = ({ phase }) => (
                           </div>
                           {canGenerateSEO && (
                               <button
-                                  onClick={e => { e.stopPropagation(); onGenerateSEO(); onSeoAnalysisOpenChange(true); }}
+                                  onClick={e => {
+                                      e.stopPropagation();
+                                      if ((seoGenerationCount ?? 0) > 0 && onRelaunchSEO) {
+                                          onRelaunchSEO();
+                                      } else {
+                                          onGenerateSEO();
+                                          onSeoAnalysisOpenChange(true);
+                                      }
+                                  }}
                                   disabled={isGeneratingSEO}
                                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                                       isGeneratingSEO
@@ -957,6 +970,7 @@ const SidebarSkeleton = ({ phase }) => (
                       <AuditHeader
                           score={results.listing_strength ?? results.global_strength}
                           imageUrl={results.imageUrl}
+                          source={results.source}
                           statusLabel={results.status_label}
                           strategicVerdict={results.strategic_verdict}
                           improvementPriority={results.improvement_priority}
@@ -1000,6 +1014,18 @@ const SidebarSkeleton = ({ phase }) => (
                     <div className="flex items-center gap-2">
                         <TrendingUp size={16} className={`text-indigo-600 ${!results ? 'text-slate-400' : ''}`} />
                         <span className="text-sm font-bold text-slate-900">Keyword Performance</span>
+                         {results?.etsyOriginalScore != null && results?.listing_strength != null &&
+                          results.etsyOriginalScore !== results.listing_strength && (() => {
+                            const d = results.listing_strength - results.etsyOriginalScore;
+                            return (
+                              <span className="text-xs font-normal text-slate-500 ml-1.5">
+                                Before: {results.etsyOriginalScore} → After: {results.listing_strength}
+                                <span className={d > 0 ? ' text-emerald-600 font-medium' : ' text-rose-600 font-medium'}>
+                                  {' '}({d > 0 ? '+' : ''}{d})
+                                </span>
+                              </span>
+                            );
+                          })()}
                          {results && (
                             <CopyButton
                                 text={selectedTags.join(', ')}
