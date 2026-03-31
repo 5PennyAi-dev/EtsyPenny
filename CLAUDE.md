@@ -58,7 +58,7 @@ npm run preview   # Preview production build
 - `src/lib/supabase.js` — Supabase client singleton
 - `api/` — Vercel serverless functions (production backend): `analyze-image`, `generate-keywords`, `reset-pool`, `recalculate-scores`, `generate-draft`, `user-keyword`, `add-from-favorite`, `health`, `feedback`, `emails/welcome`, `stripe/webhook`, `stripe/create-checkout`, `stripe/create-portal`
 - `lib/email/` — Email sending: `send-email.ts` (Resend HTTP wrapper), `templates/` (welcome, subscription-confirmation, token-pack-confirmation, layout)
-- `lib/etsy/` — Etsy API v3 client: `etsy-client.ts` (fetchShopListings, fetchListingsByIds, token refresh), `score-etsy-listing.ts` (scoring orchestrator for imported listings)
+- `lib/etsy/` — Etsy API v3 client: `etsy-client.ts` (fetchShopListings, fetchListingsByIds, updateEtsyListing, token refresh), `score-etsy-listing.ts` (scoring orchestrator for imported listings)
 - `lib/sentry.ts` — Shared Sentry init helper for backend (lazy, Vercel-only)
 - `server.mjs` — Local Express dev server (mirrors Vercel functions for local development)
 - `vercel.json` — Vercel deployment config (rewrites `/api/*` to serverless functions)
@@ -95,6 +95,7 @@ npm run preview   # Preview production build
 | `GET /api/etsy/shop-listings` | Browse Etsy shop listings (paginated, with images) |
 | `POST /api/etsy/import-listings` | Import Etsy listings into PennySEO (plan-limited) |
 | `POST /api/etsy/score-listings` | Score imported Etsy listings (image analysis + tag scoring, 3 tokens/listing, max 5) |
+| `POST /api/etsy/export-listings` | Push optimized SEO data (tags/title/description) to Etsy listings (free, max 5) |
 | `GET /api/health` | Health check |
 
 **Key shared modules (in `lib/`):**
@@ -143,7 +144,8 @@ The `analyseShop` feature in `BrandProfilePage.jsx` is hidden via `{false && ...
 - **`user_custom_themes`** / **`user_custom_niches`** — Per-user custom taxonomy (RLS enabled)
 - **`user_custom_product_types`** — Per-user custom product types (RLS enabled)
 - **`etsy_shop_connections`** — Links PennySEO user to Etsy shop (OAuth tokens, sync status)
-- **`etsy_listings`** — Snapshot of imported Etsy listing data (immutable after import, scored separately)
+- **`etsy_listings`** — Snapshot of imported Etsy listing data (immutable after import, scored separately). Tracks `export_status` and `last_exported_at`.
+- **`etsy_export_logs`** — Export history: snapshot before/after, fields exported, status (RLS enabled)
 - **`profiles`** — User profiles (fetched in AuthContext)
 - **`product_types`** — System product categorization lookup
 - **`v_combined_product_types`** — Union view of system + user custom product types

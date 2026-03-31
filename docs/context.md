@@ -2053,3 +2053,42 @@ Moved "Billing" above "Settings" in the sidebar navigation.
 - Users can: browse Etsy shop → import listings → score existing tags → re-optimize with PennySEO → see before/after improvement
 - Etsy source badge visible across all listing views
 - MyShop page has compact grid, status filters, paginated comparison table
+
+---
+
+### March 31st, 2026 — Etsy Export Phase 1: Backend
+
+**Context**: Users can import, score, and optimize Etsy listings. This session adds the ability to push optimized data back to Etsy.
+
+### New Table
+- **`etsy_export_logs`** — Stores export history with before/after JSONB snapshots, fields exported, and status. RLS enabled (SELECT + INSERT for own rows).
+
+### Schema Changes
+- **ALTER `etsy_listings`** — Added `export_status` ('pending'|'exported'|'partial'|'error') and `last_exported_at` columns.
+
+### New Method
+- **`updateEtsyListing()`** in `lib/etsy/etsy-client.ts` — PATCH call to Etsy API v3 `updateListing`. Sends only requested fields (title, description, tags) as `application/x-www-form-urlencoded`. Personal access phase (ETSY_SHOP_ID from env vars). Extended `etsyFetch()` to support non-GET methods with body.
+
+### New API Route
+- **`POST /api/etsy/export-listings`** — Exports up to 5 listings sequentially. Per-listing field selection (each listing specifies which fields to export). Validates ownership + optimization state, snapshots before values, calls Etsy API, logs to `etsy_export_logs`, updates `etsy_listings.export_status`. Free (no token cost).
+
+### Architecture Decisions
+- Export is free (0 tokens) — user already paid for analysis + SEO generation
+- Per-listing field selection — each listing in the batch can export different field combinations
+- Snapshot before/after stored in `etsy_export_logs` for audit trail and future revert feature
+- Sequential processing with individual error handling (one failure doesn't abort the batch)
+- Tag query uses `is_current_eval = true` (same filter as `generate-draft.ts`) ordered by `opportunity_score` desc, max 13, each max 20 chars
+
+### Files Created
+- `supabase/migrations/20260331_etsy_export.sql`
+- `api/etsy/export-listings.ts`
+
+### Files Modified
+- `lib/etsy/etsy-client.ts` — Extended `etsyFetch()` with method/body support, added `updateEtsyListing()`
+- `server.mjs` — Added export-listings dev mirror route + import
+- `CLAUDE.md` — Updated routes table, tables list, key directories
+
+### Session Handover
+- Backend is complete for Etsy export Phase 1
+- Migration needs to be applied to Supabase
+- Next: Phase 2 (ExportToEtsyModal component + single export from ProductStudio)

@@ -88,22 +88,34 @@ export async function getAccessToken(): Promise<string> {
 
 // ─── Internal fetch with 401 retry ───────────────────
 
-async function etsyFetch(url: string, retry = true): Promise<Response> {
+interface EtsyFetchOptions {
+  method?: string;
+  body?: URLSearchParams;
+  contentType?: string;
+}
+
+async function etsyFetch(url: string, options?: EtsyFetchOptions, retry = true): Promise<Response> {
   const token = await getAccessToken();
-  const headers = {
+  const headers: Record<string, string> = {
     'x-api-key': getXApiKey(),
     'Authorization': `Bearer ${token}`,
   };
 
+  if (options?.contentType) {
+    headers['Content-Type'] = options.contentType;
+  }
+
   const res = await fetch(url, {
+    method: options?.method ?? 'GET',
     headers,
+    body: options?.body,
     signal: AbortSignal.timeout(REQUEST_TIMEOUT),
   });
 
   if (res.status === 401 && retry) {
     console.info('[etsy-client] Got 401, attempting token refresh…');
     await refreshAccessToken();
-    return etsyFetch(url, false);
+    return etsyFetch(url, options, false);
   }
 
   if (!res.ok) {
@@ -151,4 +163,60 @@ export async function fetchListingsByIds(
   }
 
   return results;
+}
+
+export async function updateEtsyListing(
+  listingId: number,
+  fields: {
+    title?: string;
+    description?: string;
+    tags?: string[];
+  },
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  const shopId = process.env.ETSY_SHOP_ID;
+  if (!shopId) throw new Error('Missing ETSY_SHOP_ID env var');
+
+  // Build form-urlencoded body with only provided fields
+  const body = new URLSearchParams();
+
+  if (fields.title !== undefined) {
+    if (fields.title.length > 140) {
+      return { success: false, error: `Title exceeds 140 chars (${fields.title.length})` };
+    }
+    body.append('title', fields.title);
+  }
+
+  if (fields.description !== undefined) {
+    body.append('description', fields.description);
+  }
+
+  if (fields.tags !== undefined) {
+    if (fields.tags.length > 13) {
+      return { success: false, error: `Max 13 tags allowed, got ${fields.tags.length}` };
+    }
+    const invalidTag = fields.tags.find(t => t.length > 20);
+    if (invalidTag) {
+      return { success: false, error: `Tag exceeds 20 chars: "${invalidTag}"` };
+    }
+    body.append('tags', fields.tags.join(','));
+  }
+
+  const url = `${ETSY_BASE}/shops/${shopId}/listings/${listingId}`;
+  console.info(`[Etsy Export] PATCH listing shopId=${shopId} listingId=${listingId} fields=${[...body.keys()].join(',')}`);
+
+  try {
+    const res = await etsyFetch(url, {
+      method: 'PATCH',
+      body,
+      contentType: 'application/x-www-form-urlencoded',
+    });
+
+    const data = await res.json();
+    console.info(`[Etsy Export] Success for listing ${listingId}`);
+    return { success: true, data };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error(`[Etsy Export] Failed for listing ${listingId}:`, message);
+    return { success: false, error: message };
+  }
 }
