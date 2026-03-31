@@ -26,6 +26,7 @@ export interface EtsyListingResult {
   tags: string[];
   url: string;
   state: string;
+  taxonomy_id?: number;
   images?: EtsyListingImage[];
 }
 
@@ -37,6 +38,12 @@ export interface EtsyListingsResponse {
 // ─── Token cache (in-memory, module-level) ────────────
 
 let _cachedAccessToken: string | null = null;
+
+// ─── Taxonomy cache (in-memory, 1h TTL) ──────────────
+
+let _taxonomyCache: Map<number, string> | null = null;
+let _taxonomyCacheTime = 0;
+const TAXONOMY_CACHE_TTL = 60 * 60 * 1000;
 
 // ─── Helpers ──────────────────────────────────────────
 
@@ -173,41 +180,43 @@ export async function updateEtsyListing(
     tags?: string[];
   },
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-  const shopId = process.env.ETSY_SHOP_ID;
-  if (!shopId) throw new Error('Missing ETSY_SHOP_ID env var');
-
-  // Build form-urlencoded body with only provided fields
-  const body = new URLSearchParams();
-
-  if (fields.title !== undefined) {
-    if (fields.title.length > 140) {
-      return { success: false, error: `Title exceeds 140 chars (${fields.title.length})` };
-    }
-    body.append('title', fields.title);
-  }
-
-  if (fields.description !== undefined) {
-    body.append('description', fields.description);
-  }
-
-  if (fields.tags !== undefined) {
-    if (fields.tags.length > 13) {
-      return { success: false, error: `Max 13 tags allowed, got ${fields.tags.length}` };
-    }
-    const invalidTag = fields.tags.find(t => t.length > 20);
-    if (invalidTag) {
-      return { success: false, error: `Tag exceeds 20 chars: "${invalidTag}"` };
-    }
-    body.append('tags', fields.tags.join(','));
-  }
-
-  const url = `${ETSY_BASE}/shops/${shopId}/listings/${listingId}`;
-  console.info(`[Etsy Export] PATCH listing shopId=${shopId} listingId=${listingId} fields=${[...body.keys()].join(',')}`);
-
   try {
+    const shopId = process.env.ETSY_SHOP_ID;
+    if (!shopId) {
+      return { success: false, error: 'Missing ETSY_SHOP_ID env var' };
+    }
+
+    // Build form-urlencoded body with only provided fields
+    const body = new URLSearchParams();
+
+    if (fields.title !== undefined) {
+      if (fields.title.length > 140) {
+        return { success: false, error: `Title exceeds 140 chars (${fields.title.length})` };
+      }
+      body.append('title', fields.title);
+    }
+
+    if (fields.description !== undefined) {
+      body.append('description', fields.description);
+    }
+
+    if (fields.tags !== undefined) {
+      if (fields.tags.length > 13) {
+        return { success: false, error: `Max 13 tags allowed, got ${fields.tags.length}` };
+      }
+      const invalidTag = fields.tags.find(t => t.length > 20);
+      if (invalidTag) {
+        return { success: false, error: `Tag exceeds 20 chars: "${invalidTag}"` };
+      }
+      body.append('tags', fields.tags.join(','));
+    }
+
+    const url = `${ETSY_BASE}/shops/${shopId}/listings/${listingId}`;
+    console.info(`[Etsy Export] PATCH listing shopId=${shopId} listingId=${listingId} fields=${[...body.keys()].join(',')}`);
+
     const res = await etsyFetch(url, {
       method: 'PATCH',
-      body,
+      body: body,
       contentType: 'application/x-www-form-urlencoded',
     });
 
@@ -219,4 +228,31 @@ export async function updateEtsyListing(
     console.error(`[Etsy Export] Failed for listing ${listingId}:`, message);
     return { success: false, error: message };
   }
+}
+
+export async function getSellerTaxonomyNodes(): Promise<Map<number, string>> {
+  if (_taxonomyCache && Date.now() - _taxonomyCacheTime < TAXONOMY_CACHE_TTL) {
+    return _taxonomyCache;
+  }
+
+  const url = `${ETSY_BASE}/seller-taxonomy/nodes`;
+  console.info('[etsy-client] Fetching seller taxonomy nodes...');
+
+  const res = await etsyFetch(url);
+  const data = await res.json() as { count: number; results: any[] };
+
+  const map = new Map<number, string>();
+  function walk(nodes: any[], path: string[]) {
+    for (const node of nodes) {
+      const fullPath = [...path, node.name];
+      map.set(node.id, fullPath.join(' > '));
+      if (node.children?.length) walk(node.children, fullPath);
+    }
+  }
+  walk(data.results || [], []);
+
+  _taxonomyCache = map;
+  _taxonomyCacheTime = Date.now();
+  console.info(`[etsy-client] Taxonomy cached: ${map.size} nodes`);
+  return map;
 }

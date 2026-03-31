@@ -2090,5 +2090,155 @@ Moved "Billing" above "Settings" in the sidebar navigation.
 
 ### Session Handover
 - Backend is complete for Etsy export Phase 1
-- Migration needs to be applied to Supabase
+- Migration applied to Supabase
 - Next: Phase 2 (ExportToEtsyModal component + single export from ProductStudio)
+
+---
+
+### March 31st, 2026 — Etsy Export Phase 2: Frontend Modal + Single Export
+
+**Context**: Backend for Etsy export is complete (Phase 1). This session adds the frontend modal and single-listing export from ProductStudio.
+
+### New Component
+- **`ExportToEtsyModal.jsx`** (`src/components/shop/`) — Reusable modal for pushing optimized SEO to Etsy. Supports single and batch modes. Per-field selection (Tags, Title, Description) with before/after preview. Tags diff visualization (removed/added/unchanged pills). Global defaults + per-listing overrides for batch mode. Portal-based with framer-motion animations.
+
+### ProductStudio Integration
+- **Push to Etsy button** in ResultsDisplay sidebar: orange `bg-[#F56400]` button below "Save listing", visible only for Etsy-sourced listings (`source === 'etsy'`).
+- **Guard UX for manual listings**: When `source !== 'etsy'`, shows hint text: "Copy your optimized tags, title, and description to paste directly into your Etsy listing".
+- **Etsy listing data fetch**: `handleLoadListing` now fetches full `etsy_listings` row (etsy_listing_id, original values, export_status, last_exported_at) instead of just original_score.
+- **Export handler**: `handlePushToEtsy` receives selectedTags + displayed title/description from ResultsDisplay, combines with etsyListingData, opens ExportToEtsyModal.
+- **Last exported indicator**: Shows "Last pushed: {date}" below Push button when `export_status === 'exported'`.
+- **Post-export refresh**: After successful export, refreshes etsyListingData to update export_status display.
+
+### Files Created
+- `src/components/shop/ExportToEtsyModal.jsx`
+
+### Files Modified
+- `src/components/studio/ResultsDisplay.jsx` — Push to Etsy button, manual listing guard UX, ExternalLink import, 3 new props (onPushToEtsy, etsyExportStatus, etsyLastExportedAt)
+- `src/pages/ProductStudio.jsx` — ExportToEtsyModal import, etsyListingData state, expanded etsy_listings fetch, handlePushToEtsy handler, modal render, new ResultsDisplay props
+
+### Session Handover
+- Single-listing export from ProductStudio is functional
+- Modal supports batch mode structure (global + per-listing overrides) but batch integration is Phase 3
+- Next: Phase 3 (batch export from MyShop page with multi-select + ExportActionBar)
+
+---
+
+### March 31st, 2026 — Etsy Export Phase 3: Batch Export from MyShop
+
+**Context**: Single-listing export works (Phase 2). This session adds batch export from MyShop page, completing the full export pipeline.
+
+### ImportActionBar — 3rd Mode
+- **Export mode**: "Push to Etsy (N)" button in Etsy orange (`bg-[#F56400]`) when optimized listings are selected. Max 5 per batch enforced with warning text. Uses existing exclusive selection mode logic extended to 3 modes (import/score/export).
+
+### EtsyListingGrid — Export Status
+- **All cards now selectable**: Removed the `isSelectable` restriction that blocked scored/optimized cards. Mode exclusivity handled by MyShopPage.
+- **Exported badge**: Green check dot (bottom-left) on cards with `export_status === 'exported'`.
+- **Error badge**: Rose alert dot for `export_status === 'error'`.
+- **Border**: Blue bottom border for exported listings (overrides green/optimized).
+
+### MyShopPage — Batch Export Wiring
+- **3-way selection mode**: `selectionMode` derives 'import', 'score', or 'export' based on selected listing status. `handleToggleSelect` extended with 3-way mode detection and toast notifications.
+- **Exported filter pill**: Blue "Exported" pill added to status filter bar with count.
+- **`getListingStatus`**: Now returns 'exported' when `export_status === 'exported'`.
+- **Export handler**: `handleBatchExport` fetches optimized data (generated_title, generated_description, selected keywords via `is_current_eval`) for selected listings, builds modal props, opens `ExportToEtsyModal` in batch mode.
+- **Post-export**: Clears selection, refreshes imported listings data.
+
+### ShopStatsBar
+- **Exported count**: 5th card (blue, ExternalLink icon) shown when exported listings exist. Grid switches to 5-column layout automatically.
+
+### Files Modified
+- `src/components/shop/EtsyListingGrid.jsx` — All cards selectable, export status badge + border
+- `src/components/shop/ImportActionBar.jsx` — Export mode button + props (onExport, exportCount)
+- `src/pages/MyShopPage.jsx` — 3-way mode logic, exported filter, handleBatchExport, ExportToEtsyModal render
+- `src/components/shop/ShopStatsBar.jsx` — Exported count card, dynamic grid columns
+
+### Session Handover
+- Full Etsy export pipeline complete (Phases 1-3)
+- Users can: import → score → optimize in Studio → push to Etsy (single from Studio or batch from MyShop)
+- MyShop shows export status on cards with filter and stats support
+
+---
+
+### March 31st, 2026 — Etsy Direct-to-Studio (Skip Scoring)
+
+**Context**: Users had to score existing Etsy tags (3 tokens) before they could optimize in Studio. This adds a free path that skips scoring and goes straight to Studio.
+
+### New Shared Module
+- **`lib/etsy/prepare-etsy-image.ts`** — Downloads image from Etsy CDN (15s timeout), uploads to Supabase `mockups_bucket`, returns storage URL. Shared by `score-etsy-listing.ts` and `prepare-listing`.
+
+### New API Route
+- **`POST /api/etsy/prepare-listing`** — Lightweight preparation: downloads Etsy image, creates `listings` row (source='etsy', is_image_analysed=false), links to `etsy_listings`. No AI analysis, no scoring, no token cost. Idempotent (returns existing listing_id if already prepared).
+
+### MyShop UI Changes
+- **"Open in Studio →"** link on imported (unscored, unprepared) cards — calls prepare-listing then navigates to ProductStudio via `location.state.listingId`
+- Spinner on card during preparation (`preparingListingId` state)
+
+### Architecture Decision
+- Scoring existing tags is now optional — provides "Before" score for comparison but is not required for optimization
+- Two paths from imported listing: direct-to-Studio (free) or score-then-Studio (3 tokens)
+
+### Files Created
+- `lib/etsy/prepare-etsy-image.ts` (shared image download/upload helper)
+- `api/etsy/prepare-listing.ts`
+
+### Files Modified
+- `lib/etsy/score-etsy-listing.ts` — Refactored to use shared `downloadAndUploadEtsyImage()`
+- `server.mjs` — Added prepare-listing dev mirror route + import
+- `src/components/shop/EtsyListingGrid.jsx` — "Open in Studio →" action on imported cards, new props (onOpenInStudio, preparingListingId, listingId)
+- `src/pages/MyShopPage.jsx` — handleOpenInStudio handler, preparingListingId state, passed to grid
+- `CLAUDE.md` — Updated routes table
+
+### Session Handover
+- Two paths from imported Etsy listing: direct-to-Studio (free) or score-then-Studio (3 tokens)
+- Scoring is now optional — provides before/after comparison only
+- ProductStudio handles prepared listings naturally (image displays, Analyze Design enabled, Etsy badge shows)
+
+---
+
+### March 31st, 2026 — Etsy Category → Product Type Import
+
+**Context**: When Etsy listings were prepared for Studio, product type was always empty. Users had to select it manually.
+
+### Schema Change
+- **ALTER `etsy_listings`**: Added `taxonomy_id` (bigint) and `etsy_category` (text) columns.
+
+### New Functions
+- **`getSellerTaxonomyNodes()`** in `lib/etsy/etsy-client.ts` — Fetches Etsy's full seller taxonomy tree (~1500 nodes), flattens to `Map<id, path>`, caches 1 hour in-memory.
+- **`matchProductType()`** in `lib/etsy/match-product-type.ts` — 3-step matching: exact (ilike) → fuzzy (strip plural, partial contains) → auto-create in `user_custom_product_types`. Only auto-creates when category depth >= 2. Handles race conditions on insert.
+
+### Pipeline Changes
+- **Import**: `import-listings` now stores `taxonomy_id` and resolved `etsy_category` on each imported listing.
+- **Prepare-listing**: Uses `matchProductType()` to pre-fill `product_type_id` on the `listings` row.
+- **Score-etsy-listing**: Same `matchProductType()` logic applied. Added `etsy_category` to input interface.
+
+### Architecture Decisions
+- 3-step matching avoids false negatives: exact → fuzzy (singularize + partial contains) → auto-create
+- Auto-create only when Etsy category depth >= 2 (avoids vague root categories like "Clothing")
+- Naturally plural words preserved (Pants, Glasses, etc.)
+- Taxonomy tree cached in-memory (1h TTL) to avoid repeated API calls
+
+### Files Created
+- `supabase/migrations/20260401_etsy_category.sql`
+- `lib/etsy/match-product-type.ts`
+
+### Files Modified
+- `lib/etsy/etsy-client.ts` — Added `taxonomy_id` to interface, `getSellerTaxonomyNodes()`
+- `api/etsy/import-listings.ts` — Store taxonomy_id + etsy_category at import
+- `api/etsy/prepare-listing.ts` — Pre-fill product_type_id via matchProductType()
+- `lib/etsy/score-etsy-listing.ts` — Pre-fill product_type_id, added etsy_category to input
+- `server.mjs` — Mirror routes updated (import + prepare)
+- `CLAUDE.md` — Updated etsy_listings description
+
+### Bug Fixes (same session)
+- **Supabase `.catch()` crash**: Replaced `.catch(() => {})` on Supabase query builders (not Promises) with proper `try/catch` in export-listings error handler
+- **Prepared listing auto-resume spinner**: Added `isJustCreated` guard in ProductStudio `handleLoadListing` — listings with `created_at ≈ updated_at` (within 10s) skip the analysis spinner auto-resume
+- **Prepared listing initial state**: Form stays open and SEO accordion stays closed for unanalyzed listings
+- **Import limit hardcoded to 10**: Frontend `MyShopPage` was using `Math.max(0, 10 - count)` as fallback. Fixed to fetch actual `plans.etsy_import_limit` based on `profile.subscription_plan`
+- **Etsy description polluting AI**: Stopped pre-filling `user_description` with Etsy marketing copy in prepare-listing and score-etsy-listing (set to `null` instead)
+
+### Session Handover
+- Etsy category auto-maps to PennySEO product type on import + prepare/score
+- Custom product types auto-created when no match found (depth >= 2)
+- Product type combobox in Studio pre-filled for Etsy listings
+- All bug fixes applied: export error handling, spinner, import limit, description pollution

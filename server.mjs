@@ -30,8 +30,10 @@ import { sendEmail } from './lib/email/send-email.ts';
 import { welcomeEmail } from './lib/email/templates/welcome.ts';
 import { subscriptionEmail } from './lib/email/templates/subscription-confirmation.ts';
 import { tokenPackEmail } from './lib/email/templates/token-pack-confirmation.ts';
-import { fetchShopListings, fetchListingsByIds, updateEtsyListing } from './lib/etsy/etsy-client.ts';
+import { fetchShopListings, fetchListingsByIds, updateEtsyListing, getSellerTaxonomyNodes } from './lib/etsy/etsy-client.ts';
 import { scoreEtsyListing } from './lib/etsy/score-etsy-listing.ts';
+import { downloadAndUploadEtsyImage } from './lib/etsy/prepare-etsy-image.ts';
+import { matchProductType } from './lib/etsy/match-product-type.ts';
 
 const app = express();
 // JSON body parser for all routes EXCEPT Stripe webhook (needs raw body)
@@ -1634,6 +1636,8 @@ app.post('/api/etsy/import-listings', async (req, res) => {
     const currentCount = existingCount ?? 0;
     const remaining = Math.max(0, importLimit - currentCount);
 
+    console.info(`   Plan: ${profile?.subscription_plan ?? 'null'}, Limit: ${importLimit}, Used: ${currentCount}, Remaining: ${remaining}`);
+
     if (remaining === 0) {
       return res.status(402).json({
         error: 'Etsy import limit reached for your plan',
@@ -1687,7 +1691,15 @@ app.post('/api/etsy/import-listings', async (req, res) => {
       return res.status(500).json({ error: 'Failed to create shop connection' });
     }
 
-    // 5. Insert etsy_listings rows
+    // 5. Resolve Etsy taxonomy for category mapping
+    let taxonomyMap = new Map();
+    try {
+      taxonomyMap = await getSellerTaxonomyNodes();
+    } catch (err) {
+      console.warn('[import-listings] Failed to fetch taxonomy nodes, continuing without:', err.message);
+    }
+
+    // 6. Insert etsy_listings rows
     const rows = etsyListings.map((listing) => {
       const primaryImage = listing.images?.find((img) => img.rank === 1) ?? listing.images?.[0];
       return {
@@ -1702,6 +1714,8 @@ app.post('/api/etsy/import-listings', async (req, res) => {
         etsy_url: listing.url,
         etsy_state: listing.state,
         tag_count: listing.tags?.length ?? 0,
+        taxonomy_id: listing.taxonomy_id ?? null,
+        etsy_category: listing.taxonomy_id ? (taxonomyMap.get(listing.taxonomy_id) ?? null) : null,
       };
     });
 
@@ -1811,6 +1825,96 @@ app.post('/api/etsy/score-listings', async (req, res) => {
   } catch (error) {
     console.error('❌ [score-listings] Error:', error.message);
     return res.status(500).json({ error: 'Failed to score listings', details: error.message });
+  }
+});
+
+// ─── ETSY PREPARE (direct-to-Studio, free) ───────────────
+app.post('/api/etsy/prepare-listing', async (req, res) => {
+  try {
+    const { user_id, etsy_listing_id } = req.body;
+
+    if (!user_id || !etsy_listing_id) {
+      return res.status(400).json({ error: 'Missing required fields: user_id, etsy_listing_id' });
+    }
+
+    console.info(`\n📦 [prepare-listing] user=${user_id} etsy_listing=${etsy_listing_id}`);
+
+    // 1. Fetch and validate ownership
+    const { data: etsyListing, error: fetchErr } = await supabaseAdmin
+      .from('etsy_listings')
+      .select('id, etsy_listing_id, listing_id, original_title, original_description, original_image_url, user_id, etsy_category')
+      .eq('id', etsy_listing_id)
+      .single();
+
+    if (fetchErr || !etsyListing) {
+      return res.status(404).json({ error: 'Etsy listing not found' });
+    }
+    if (etsyListing.user_id !== user_id) {
+      return res.status(403).json({ error: 'Listing does not belong to this user' });
+    }
+
+    // 2. Idempotent: return existing if already prepared
+    if (etsyListing.listing_id) {
+      const { data: existing } = await supabaseAdmin
+        .from('listings')
+        .select('id, image_url')
+        .eq('id', etsyListing.listing_id)
+        .single();
+
+      if (existing) {
+        console.info(`   ✅ [prepare-listing] Already prepared: listing_id=${existing.id}`);
+        return res.json({ listing_id: existing.id, image_url: existing.image_url });
+      }
+    }
+
+    // 3. Download + upload image
+    const STATUS_NEW = 'ac083a90-43fa-4ff5-a62d-5cd6bb5edbcc';
+    let imageUrl = '';
+    if (etsyListing.original_image_url) {
+      imageUrl = await downloadAndUploadEtsyImage(etsyListing.original_image_url, user_id);
+      console.info('   [prepare-listing] Image uploaded to storage');
+    }
+
+    // 4. Match product type from Etsy category
+    let productTypeId = null;
+    try {
+      productTypeId = await matchProductType(etsyListing.etsy_category, user_id);
+    } catch (err) {
+      console.warn('[prepare-listing] Product type matching failed:', err.message);
+    }
+
+    // 5. Create listings row
+    const { data: listing, error: insertErr } = await supabaseAdmin
+      .from('listings')
+      .insert({
+        user_id,
+        title: etsyListing.original_title,
+        user_description: null,
+        image_url: imageUrl,
+        status_id: STATUS_NEW,
+        is_image_analysed: false,
+        source: 'etsy',
+        ...(productTypeId ? { product_type_id: productTypeId } : {}),
+      })
+      .select('id, image_url')
+      .single();
+
+    if (insertErr || !listing) {
+      throw new Error(`Failed to create listing: ${insertErr?.message}`);
+    }
+
+    // 5. Link back to etsy_listings
+    await supabaseAdmin
+      .from('etsy_listings')
+      .update({ listing_id: listing.id })
+      .eq('id', etsy_listing_id);
+
+    console.info(`   ✅ [prepare-listing] Done: listing_id=${listing.id}\n`);
+
+    return res.json({ listing_id: listing.id, image_url: listing.image_url });
+  } catch (error) {
+    console.error('❌ [prepare-listing] Error:', error.message);
+    return res.status(500).json({ error: 'Failed to prepare listing', details: error.message });
   }
 });
 
@@ -1951,24 +2055,27 @@ app.post('/api/etsy/export-listings', async (req, res) => {
         const message = itemError instanceof Error ? itemError.message : 'Unknown error';
         console.error(`   ❌ [export-listings] Failed for ${etsy_listing_id}:`, message);
 
-        await supabaseAdmin.from('etsy_export_logs').insert({
-          user_id,
-          etsy_listing_id: etsy_listing_id || 0,
-          listing_id: listing_id || null,
-          fields_exported: fields || [],
-          snapshot_before: {},
-          snapshot_after: {},
-          status: 'error',
-          error_message: message,
-        }).catch(() => {});
+        try {
+          await supabaseAdmin.from('etsy_export_logs').insert({
+            user_id,
+            etsy_listing_id: etsy_listing_id || 0,
+            listing_id: listing_id || null,
+            fields_exported: fields || [],
+            snapshot_before: {},
+            snapshot_after: {},
+            status: 'error',
+            error_message: message,
+          });
+        } catch (_) { /* don't mask the real error */ }
 
         if (etsy_listing_id) {
-          await supabaseAdmin
-            .from('etsy_listings')
-            .update({ export_status: 'error' })
-            .eq('etsy_listing_id', etsy_listing_id)
-            .eq('user_id', user_id)
-            .catch(() => {});
+          try {
+            await supabaseAdmin
+              .from('etsy_listings')
+              .update({ export_status: 'error' })
+              .eq('etsy_listing_id', etsy_listing_id)
+              .eq('user_id', user_id);
+          } catch (_) { /* don't mask the real error */ }
         }
 
         results.push({ etsy_listing_id, status: 'error', fields_exported: fields || [], error: message });
@@ -2005,6 +2112,7 @@ app.listen(PORT, () => {
   console.log(`   GET  /api/etsy/shop-listings`);
   console.log(`   POST /api/etsy/import-listings`);
   console.log(`   POST /api/etsy/score-listings`);
+  console.log(`   POST /api/etsy/prepare-listing`);
   console.log(`   POST /api/etsy/export-listings`);
   console.log(`   GET  /api/health\n`);
 });

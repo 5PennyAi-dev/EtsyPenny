@@ -160,25 +160,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error(`[export-listings] Failed for ${etsy_listing_id}:`, message);
 
         // Always log export attempt (even on error)
-        await supabaseAdmin.from('etsy_export_logs').insert({
-          user_id,
-          etsy_listing_id: etsy_listing_id || 0,
-          listing_id: listing_id || null,
-          fields_exported: fields || [],
-          snapshot_before: {},
-          snapshot_after: {},
-          status: 'error',
-          error_message: message,
-        }).catch(() => {}); // Don't let log failure mask the real error
+        try {
+          await supabaseAdmin.from('etsy_export_logs').insert({
+            user_id,
+            etsy_listing_id: etsy_listing_id || 0,
+            listing_id: listing_id || null,
+            fields_exported: fields || [],
+            snapshot_before: {},
+            snapshot_after: {},
+            status: 'error',
+            error_message: message,
+          });
+        } catch (_) { /* don't mask the real error */ }
 
         // Update etsy_listings status if we have the listing
         if (etsy_listing_id) {
-          await supabaseAdmin
-            .from('etsy_listings')
-            .update({ export_status: 'error' })
-            .eq('etsy_listing_id', etsy_listing_id)
-            .eq('user_id', user_id)
-            .catch(() => {});
+          try {
+            await supabaseAdmin
+              .from('etsy_listings')
+              .update({ export_status: 'error' })
+              .eq('etsy_listing_id', etsy_listing_id)
+              .eq('user_id', user_id);
+          } catch (_) { /* don't mask the real error */ }
         }
 
         results.push({

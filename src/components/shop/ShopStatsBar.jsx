@@ -1,4 +1,4 @@
-import { ShoppingBag, Tag, CheckCircle, Download, TrendingUp } from 'lucide-react';
+import { ShoppingBag, Tag, CheckCircle, Download, TrendingUp, ExternalLink } from 'lucide-react';
 
 const baseCards = [
   {
@@ -83,17 +83,33 @@ export default function ShopStatsBar({ etsyListings = [], importedListings = [],
     ? Math.round(optimizedPairs.reduce((sum, d) => sum + (d.pennySeoScore - d.original_score), 0) / optimizedCount)
     : null;
 
+  // Exported count
+  const exportedCount = importedListings.filter(l => l.export_status === 'exported').length;
+
   // Show improvement card if any optimized listings exist, otherwise show imported card
   const fourthCard = optimizedCount > 0 ? improvementCard : importedCard;
   const cards = [...baseCards, fourthCard];
 
+  // Add exported card when applicable
+  if (exportedCount > 0) {
+    cards.push({
+      key: 'exported',
+      label: 'Exported',
+      icon: ExternalLink,
+      iconBg: 'bg-blue-100',
+      iconColor: 'text-blue-600',
+      getValue: () => exportedCount,
+      getSub: () => 'pushed to Etsy',
+    });
+  }
+
   const props = {
     totalCount, activeCount, avgTags: Number(avgTags) || 0, fullTagsCount,
-    importedCount, avgImprovement, optimizedCount,
+    importedCount, avgImprovement, optimizedCount, exportedCount,
   };
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className={`grid grid-cols-2 ${cards.length > 4 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
       {cards.map((card) => {
         const Icon = card.icon;
         const valueColor = card.getValueColor ? card.getValueColor(props) : 'text-slate-800';

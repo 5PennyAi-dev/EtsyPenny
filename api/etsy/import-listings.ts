@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
-import { fetchListingsByIds } from '../../lib/etsy/etsy-client.js';
+import { fetchListingsByIds, getSellerTaxonomyNodes } from '../../lib/etsy/etsy-client.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -41,6 +41,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const currentCount = existingCount ?? 0;
     const remaining = Math.max(0, importLimit - currentCount);
+
+    console.info(`[import-listings] Plan: ${profile?.subscription_plan ?? 'null'}, Limit: ${importLimit}, Used: ${currentCount}, Remaining: ${remaining}, Requesting: ${etsy_listing_ids.length}`);
 
     if (remaining === 0) {
       return res.status(402).json({
@@ -96,7 +98,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Failed to create shop connection' });
     }
 
-    // ── 5. Insert etsy_listings rows ───────────────────
+    // ── 5. Resolve Etsy taxonomy for category mapping ───
+    let taxonomyMap: Map<number, string> = new Map();
+    try {
+      taxonomyMap = await getSellerTaxonomyNodes();
+    } catch (err) {
+      console.warn('[import-listings] Failed to fetch taxonomy nodes, continuing without:', (err as Error).message);
+    }
+
+    // ── 6. Insert etsy_listings rows ───────────────────
     const rows = etsyListings.map((listing) => {
       const primaryImage = listing.images?.find((img) => img.rank === 1) ?? listing.images?.[0];
       return {
@@ -111,6 +121,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         etsy_url: listing.url,
         etsy_state: listing.state,
         tag_count: listing.tags?.length ?? 0,
+        taxonomy_id: listing.taxonomy_id ?? null,
+        etsy_category: listing.taxonomy_id ? (taxonomyMap.get(listing.taxonomy_id) ?? null) : null,
       };
     });
 

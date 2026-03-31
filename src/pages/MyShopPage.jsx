@@ -9,6 +9,7 @@ import Layout from '@/components/Layout';
 import ShopStatsBar from '@/components/shop/ShopStatsBar';
 import EtsyListingGrid from '@/components/shop/EtsyListingGrid';
 import ImportActionBar from '@/components/shop/ImportActionBar';
+import ExportToEtsyModal from '@/components/shop/ExportToEtsyModal';
 const scoreColor = (s) => s >= 85 ? '#4f46e5' : s >= 70 ? '#22c55e' : s >= 50 ? '#f59e0b' : '#ef4444';
 
 export default function MyShopPage() {
@@ -27,18 +28,34 @@ export default function MyShopPage() {
   const [isScoring, setIsScoring] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [baPage, setBaPage] = useState(0);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportModalData, setExportModalData] = useState([]);
+  const [preparingListingId, setPreparingListingId] = useState(null);
+
+  // Plan-based import limit
+  const [planImportLimit, setPlanImportLimit] = useState(10);
+  useEffect(() => {
+    if (!profile?.subscription_plan) return;
+    supabase.from('plans').select('etsy_import_limit').eq('id', profile.subscription_plan).single()
+      .then(({ data }) => { if (data?.etsy_import_limit) setPlanImportLimit(data.etsy_import_limit); });
+  }, [profile?.subscription_plan]);
 
   // Derived state
-  const importLimit = importResult?.limit_remaining ?? Math.max(0, 10 - importedListings.length);
+  const importLimit = importResult?.limit_remaining ?? Math.max(0, planImportLimit - importedListings.length);
   const importedIds = new Set(importedListings.map((l) => l.etsy_listing_id));
   const tokenBalance = (profile?.tokens_monthly_balance ?? 0) + (profile?.tokens_bonus_balance ?? 0);
 
-  // Derive exclusive selection mode: 'import' | 'score' | null
+  // Derive exclusive selection mode: 'import' | 'score' | 'export' | null
   const selectionMode = selectedIds.size === 0
     ? null
     : [...selectedIds].some((id) => !importedIds.has(id))
       ? 'import'
-      : 'score';
+      : [...selectedIds].some((id) => {
+          const imp = importedListings.find(l => l.etsy_listing_id === id);
+          return imp && imp.scoring_status === 'scored' && imp.listing_id;
+        })
+        ? 'export'
+        : 'score';
 
   // Comparison listings: scored + linked to a listings row
   const comparisonListings = importedListings.filter(
@@ -63,6 +80,7 @@ export default function MyShopPage() {
     const imp = importedListings.find((l) => l.etsy_listing_id === etsyListingId);
     if (!imp) return 'not_imported';
     if (imp.scoring_status !== 'scored') return 'imported';
+    if (imp.export_status === 'exported') return 'exported';
     const pennySeo = imp.listings?.listings_global_eval?.[0]?.listing_strength ?? null;
     if (pennySeo != null && pennySeo !== imp.original_score) return 'optimized';
     return 'scored';
@@ -73,6 +91,7 @@ export default function MyShopPage() {
     imported: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'imported').length,
     scored: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'scored').length,
     optimized: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'optimized').length,
+    exported: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'exported').length,
   };
 
   const filteredListings = statusFilter === 'all'
@@ -84,6 +103,7 @@ export default function MyShopPage() {
     { key: 'imported', label: 'Imported', bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-300', activeBg: 'bg-slate-500' },
     { key: 'scored', label: 'Scored', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', activeBg: 'bg-amber-500' },
     { key: 'optimized', label: 'Optimized', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', activeBg: 'bg-emerald-600' },
+    { key: 'exported', label: 'Exported', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', activeBg: 'bg-blue-500' },
   ];
 
   // ─── Fetch imported listings from DB ────────────────
@@ -181,15 +201,20 @@ export default function MyShopPage() {
     }
   };
 
-  // ─── Toggle selection (exclusive mode) ──────────────
+  // ─── Toggle selection (exclusive mode: import / score / export) ──
   const handleToggleSelect = (etsyListingId) => {
     const clickedIsImported = importedIds.has(etsyListingId);
-    const clickedMode = clickedIsImported ? 'score' : 'import';
+    const clickedMode = !clickedIsImported ? 'import' : (() => {
+      const imp = importedListings.find(l => l.etsy_listing_id === etsyListingId);
+      return (imp?.scoring_status === 'scored' && imp?.listing_id) ? 'export' : 'score';
+    })();
+
+    const modeLabels = { import: 'import mode', score: 'scoring mode', export: 'export mode' };
 
     setSelectedIds((prev) => {
       // If switching modes, clear previous selections and start fresh
       if (selectionMode && selectionMode !== clickedMode) {
-        toast.info(clickedMode === 'score' ? 'Switched to scoring mode' : 'Switched to import mode', { duration: 2000 });
+        toast.info(`Switched to ${modeLabels[clickedMode]}`, { duration: 2000 });
         return new Set([etsyListingId]);
       }
 
@@ -253,6 +278,74 @@ export default function MyShopPage() {
       }
     } finally {
       setIsScoring(false);
+    }
+  };
+
+  // ─── Batch export handler ───────────────────────────
+  const handleBatchExport = async () => {
+    const selectedEtsyListings = importedListings.filter(el =>
+      selectedIds.has(el.etsy_listing_id) && el.scoring_status === 'scored' && el.listing_id
+    );
+
+    if (selectedEtsyListings.length === 0) {
+      toast.error('No exportable listings selected');
+      return;
+    }
+
+    const listingIds = selectedEtsyListings.map(el => el.listing_id);
+
+    try {
+      const [{ data: listingsData }, { data: keywordsData }] = await Promise.all([
+        supabase.from('listings').select('id, generated_title, generated_description, image_url').in('id', listingIds),
+        supabase.from('listing_seo_stats').select('listing_id, tag').in('listing_id', listingIds).eq('is_current_eval', true),
+      ]);
+
+      const modalListings = selectedEtsyListings.map(el => {
+        const listing = listingsData?.find(l => l.id === el.listing_id);
+        const tags = keywordsData?.filter(k => k.listing_id === el.listing_id).map(k => k.tag).slice(0, 13) || [];
+        return {
+          etsy_listing_id: el.etsy_listing_id,
+          listing_id: el.listing_id,
+          title: el.original_title,
+          description: el.original_description,
+          tags: el.original_tags || [],
+          optimized_title: listing?.generated_title,
+          optimized_description: listing?.generated_description,
+          optimized_tags: tags,
+          image_url: el.thumbnail_url || listing?.image_url,
+          display_title: listing?.generated_title || el.original_title,
+        };
+      }).filter(item => item.optimized_tags.length > 0 || item.optimized_title);
+
+      if (modalListings.length === 0) {
+        toast.error('Selected listings have no optimized SEO data. Open them in Studio first.');
+        return;
+      }
+
+      setExportModalData(modalListings);
+      setShowExportModal(true);
+    } catch (err) {
+      toast.error('Failed to load listing data for export');
+      console.error('[export] Error loading data:', err);
+    }
+  };
+
+  // ─── Open in Studio (prepare-listing, free) ────────
+  const handleOpenInStudio = async (etsyListingRowId) => {
+    const etsyRow = importedListings.find(l => l.etsy_listing_id === etsyListingRowId);
+    if (!etsyRow) return;
+
+    setPreparingListingId(etsyListingRowId);
+    try {
+      const { data } = await axios.post('/api/etsy/prepare-listing', {
+        user_id: user.id,
+        etsy_listing_id: etsyRow.id,
+      });
+      navigate('/studio', { state: { listingId: data.listing_id } });
+    } catch (error) {
+      toast.error('Failed to prepare listing: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setPreparingListingId(null);
     }
   };
 
@@ -466,6 +559,8 @@ export default function MyShopPage() {
             importedListings={importedListings}
             selectedIds={selectedIds}
             onToggleSelect={handleToggleSelect}
+            onOpenInStudio={handleOpenInStudio}
+            preparingListingId={preparingListingId}
           />
         )}
 
@@ -496,6 +591,23 @@ export default function MyShopPage() {
           isScoring={isScoring}
           onScore={handleScore}
           tokenBalance={tokenBalance}
+          onExport={handleBatchExport}
+          exportCount={selectedIds.size}
+        />
+      )}
+
+      {/* Export to Etsy Modal */}
+      {showExportModal && exportModalData.length > 0 && (
+        <ExportToEtsyModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          onSuccess={() => {
+            setShowExportModal(false);
+            setSelectedIds(new Set());
+            fetchImported();
+          }}
+          listings={exportModalData}
+          user={user}
         />
       )}
     </Layout>

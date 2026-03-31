@@ -3,7 +3,7 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, Lightbulb, AlertTriangle, Target, Loader2,
   Info, Plus, Minus, Save, ArrowUpRight, ArrowDownRight, ShoppingCart,
   Pin, Tag, User, Zap, DollarSign, Award, BarChart3, History, Folder, Shield, BarChart2,
-  FileText, Image as ImageIcon
+  FileText, Image as ImageIcon, ExternalLink
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -549,6 +549,10 @@ const SidebarSkeleton = ({ phase }) => (
     isGeneratingSEO,
     canGenerateSEO,
     seoGenerationCount,
+    // Etsy Export Props
+    onPushToEtsy,
+    etsyExportStatus,
+    etsyLastExportedAt,
   }) => {
     const [displayedTitle, setDisplayedTitle] = useState("");
     const [displayedDescription, setDisplayedDescription] = useState("");
@@ -1707,6 +1711,37 @@ const SidebarSkeleton = ({ phase }) => (
                                         <Save size={14} />
                                         Save listing
                                     </button>
+
+                                    {/* Push to Etsy (Etsy-sourced listings only) */}
+                                    {results?.source === 'etsy' && onPushToEtsy && (
+                                        <div className="mt-2">
+                                            <button
+                                                onClick={() => onPushToEtsy({
+                                                    selectedTags,
+                                                    displayedTitle,
+                                                    displayedDescription,
+                                                })}
+                                                disabled={!results}
+                                                className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#F56400] text-white text-sm font-medium rounded-lg hover:bg-[#E05A00] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                <ExternalLink size={14} />
+                                                Push to Etsy
+                                            </button>
+                                            {etsyExportStatus === 'exported' && etsyLastExportedAt && (
+                                                <p className="text-xs text-slate-400 text-center mt-1">
+                                                    Last pushed: {new Date(etsyLastExportedAt).toLocaleDateString()}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Manual listing hint (non-Etsy) */}
+                                    {results?.source !== 'etsy' && results?.title && (
+                                        <p className="text-xs text-slate-400 mt-3 text-center leading-relaxed">
+                                            Copy your optimized tags, title, and description<br />
+                                            to paste directly into your Etsy listing
+                                        </p>
+                                    )}
                                 </div>
                             )}
                         </div>

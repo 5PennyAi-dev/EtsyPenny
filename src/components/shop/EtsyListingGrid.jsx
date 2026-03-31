@@ -55,20 +55,21 @@ function StatusBadge({ scoringStatus, originalScore }) {
   );
 }
 
-function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringStatus, originalScore, pennySeoScore }) {
+function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringStatus, originalScore, pennySeoScore, exportStatus, listingId, onOpenInStudio, isPreparing }) {
   const tagCount = listing.tag_count ?? 0;
   const isScored = scoringStatus === 'scored' && originalScore != null;
   const hasDelta = isScored && pennySeoScore != null && pennySeoScore !== originalScore;
   const delta = hasDelta ? pennySeoScore - originalScore : 0;
-  // Selectable: not imported, OR imported with pending/error status (can score or retry)
-  const isSelectable = !isImported || scoringStatus === 'pending' || scoringStatus === 'error';
+  // All cards are selectable — exclusive mode logic in MyShopPage prevents mixing
+  const isSelectable = true;
 
-  // Status bottom border color
+  // Status bottom border color (exported takes priority over optimized)
   const cardStatus = !isImported ? null
+    : exportStatus === 'exported' ? 'exported'
     : (scoringStatus !== 'scored') ? 'imported'
     : (pennySeoScore != null && pennySeoScore !== originalScore) ? 'optimized'
     : 'scored';
-  const statusBorderColor = { imported: '#94a3b8', scored: '#f59e0b', optimized: '#22c55e' }[cardStatus];
+  const statusBorderColor = { imported: '#94a3b8', scored: '#f59e0b', optimized: '#22c55e', exported: '#3b82f6' }[cardStatus];
 
   return (
     <div
@@ -127,6 +128,18 @@ function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringS
             </span>
           </div>
         )}
+
+        {/* Export status badge — bottom-left */}
+        {exportStatus === 'exported' && (
+          <div className="absolute bottom-2 left-2 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-sm">
+            <Check className="w-3 h-3 text-white" strokeWidth={3} />
+          </div>
+        )}
+        {exportStatus === 'error' && (
+          <div className="absolute bottom-2 left-2 w-5 h-5 bg-rose-500 rounded-full flex items-center justify-center shadow-sm">
+            <AlertCircle className="w-3 h-3 text-white" strokeWidth={3} />
+          </div>
+        )}
       </div>
 
       {/* Text content */}
@@ -156,12 +169,23 @@ function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringS
             <span className="text-xs text-slate-400">&mdash;</span>
           )}
         </div>
+
+        {/* Open in Studio — for imported but not yet scored/prepared listings */}
+        {isImported && scoringStatus === 'pending' && !listingId && onOpenInStudio && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpenInStudio(listing.etsy_listing_id); }}
+            disabled={isPreparing}
+            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors disabled:text-indigo-400"
+          >
+            {isPreparing ? 'Preparing...' : 'Open in Studio →'}
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-export default function EtsyListingGrid({ listings = [], importedIds, importedListings = [], selectedIds, onToggleSelect }) {
+export default function EtsyListingGrid({ listings = [], importedIds, importedListings = [], selectedIds, onToggleSelect, onOpenInStudio, preparingListingId }) {
   if (listings.length === 0) {
     return (
       <div className="text-center py-12 text-slate-400">
@@ -191,6 +215,10 @@ export default function EtsyListingGrid({ listings = [], importedIds, importedLi
             scoringStatus={imported?.scoring_status}
             originalScore={imported?.original_score}
             pennySeoScore={imported?.listings?.listings_global_eval?.[0]?.listing_strength ?? null}
+            exportStatus={imported?.export_status}
+            listingId={imported?.listing_id}
+            onOpenInStudio={onOpenInStudio}
+            isPreparing={preparingListingId === listing.etsy_listing_id}
           />
         );
       })}

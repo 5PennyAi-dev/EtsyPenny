@@ -7,6 +7,8 @@
  */
 
 import { supabaseAdmin } from '../supabase/server.js';
+import { downloadAndUploadEtsyImage } from './prepare-etsy-image.js';
+import { matchProductType } from './match-product-type.js';
 import { runAI } from '../ai/provider-router.js';
 import { extractJson } from '../ai/extract-json.js';
 import {
@@ -34,6 +36,7 @@ export interface ScoreEtsyListingInput {
     original_tags: string[];
     original_image_url: string;
     thumbnail_url: string;
+    etsy_category?: string;
   };
   userId: string;
   userSettings: Record<string, unknown>;
@@ -64,35 +67,30 @@ export async function scoreEtsyListing(
 
     let storageUrl = '';
     if (etsyListing.original_image_url) {
-      const imgRes = await fetch(etsyListing.original_image_url);
-      if (!imgRes.ok) throw new Error(`Failed to download Etsy image: ${imgRes.status}`);
-      const buffer = Buffer.from(await imgRes.arrayBuffer());
-
-      const filename = `${userId}/${crypto.randomUUID()}.jpg`;
-      const { error: uploadErr } = await supabaseAdmin.storage
-        .from('mockups_bucket')
-        .upload(filename, buffer, { contentType: 'image/jpeg', upsert: false });
-      if (uploadErr) throw new Error(`Storage upload failed: ${uploadErr.message}`);
-
-      const { data: { publicUrl } } = supabaseAdmin.storage
-        .from('mockups_bucket')
-        .getPublicUrl(filename);
-      storageUrl = publicUrl;
+      storageUrl = await downloadAndUploadEtsyImage(etsyListing.original_image_url, userId);
       console.info('[score-etsy] Image uploaded to storage');
     }
 
-    // ── 2. Create listings row ────────────────────────────
+    // ── 2. Match product type from Etsy category ──────────
+
+    let productTypeId: string | null = null;
+    try {
+      productTypeId = await matchProductType(etsyListing.etsy_category, userId);
+    } catch (_) { /* non-critical */ }
+
+    // ── 3. Create listings row ────────────────────────────
 
     const { data: listing, error: insertErr } = await supabaseAdmin
       .from('listings')
       .insert({
         user_id: userId,
         title: etsyListing.original_title,
-        user_description: etsyListing.original_description,
+        user_description: null,
         image_url: storageUrl,
         status_id: STATUS_NEW,
         is_image_analysed: false,
         source: 'etsy',
+        ...(productTypeId ? { product_type_id: productTypeId } : {}),
       })
       .select('id')
       .single();

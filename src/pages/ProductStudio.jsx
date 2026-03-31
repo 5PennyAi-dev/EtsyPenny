@@ -16,6 +16,7 @@ import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { StepBadge } from '../components/ui/StepBadge';
 import InsufficientTokensModal from '../components/billing/InsufficientTokensModal';
 import QuotaExceededModal from '../components/billing/QuotaExceededModal';
+import ExportToEtsyModal from '../components/shop/ExportToEtsyModal';
 import { toast } from 'sonner';
 
 const IMAGE_ANALYSIS_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
@@ -111,6 +112,11 @@ const ProductStudio = () => {
   // Billing Modal State
   const [insufficientTokensModal, setInsufficientTokensModal] = useState({ isOpen: false, balance: 0, required: 0, action: null });
   const [quotaExceededModal, setQuotaExceededModal] = useState({ isOpen: false, used: 0, limit: 0, quotaType: null });
+
+  // Etsy Export Modal State
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportModalData, setExportModalData] = useState([]);
+  const [etsyListingData, setEtsyListingData] = useState(null);
 
   // Active Session State for "New Listing" flow
   const [isNewListingActive, setIsNewListingActive] = useState(false);
@@ -994,6 +1000,25 @@ const ProductStudio = () => {
 
 
 
+  // ─── Push to Etsy handler ──────────────────────────
+  const handlePushToEtsy = ({ selectedTags, displayedTitle, displayedDescription }) => {
+    if (!etsyListingData) return;
+
+    setExportModalData([{
+      etsy_listing_id: etsyListingData.etsy_listing_id,
+      listing_id: listingId,
+      title: etsyListingData.original_title,
+      description: etsyListingData.original_description,
+      tags: etsyListingData.original_tags || [],
+      optimized_title: displayedTitle,
+      optimized_description: displayedDescription,
+      optimized_tags: selectedTags.slice(0, 13),
+      image_url: results?.imageUrl,
+      display_title: displayedTitle || etsyListingData.original_title,
+    }]);
+    setShowExportModal(true);
+  };
+
   const handleSaveListingInfo = async (title, description) => {
     if (!listingId) {
         toast.error("No active listing to save.");
@@ -1410,6 +1435,7 @@ const ProductStudio = () => {
     setIsNewListingActive(true);    // Manually activate the form for a new session
     setIsSeoAnalysisOpen(false);    // Collapse SEO Analysis accordion for fresh start
     setClassificationOpen(false);   // Collapse AI Classification accordion
+    setEtsyListingData(null);       // Clear Etsy export data
     // Reset form fields
     setThemeName(""); setThemeId("");
     setNicheName(""); setNicheId("");
@@ -1515,14 +1541,15 @@ const ProductStudio = () => {
         // All current pool stats are relevant (single eval)
         const relevantStats = stats || [];
 
-        // Fetch original Etsy score if this listing is linked from etsy_listings
+        // Fetch Etsy listing data if this listing is linked from etsy_listings
         let etsyOriginalScore = null;
         const { data: etsyRow } = await supabase
           .from('etsy_listings')
-          .select('original_score')
+          .select('etsy_listing_id, original_title, original_description, original_tags, original_score, export_status, last_exported_at')
           .eq('listing_id', listing.id)
           .maybeSingle();
         etsyOriginalScore = etsyRow?.original_score ?? null;
+        setEtsyListingData(etsyRow);
 
         const constructedResults = {
             title: listing.generated_title,
@@ -1619,15 +1646,24 @@ const ProductStudio = () => {
       });
 
       setShowResults(true);
-      setIsFormCollapsed(true);
-      setIsSeoAnalysisOpen(true); // Auto-expand SEO Analysis accordion when loading a listing
+      if (isAnalysed || hasSeoResults) {
+        setIsFormCollapsed(true);
+        setIsSeoAnalysisOpen(true);
+      } else {
+        // Freshly prepared listing (e.g. Etsy direct-to-Studio) — show form, not SEO section
+        setIsFormCollapsed(false);
+        setIsSeoAnalysisOpen(false);
+      }
       setClassificationOpen(true); // Auto-expand AI Classification accordion
       setIsLoading(false);
 
       // Check for pending Image Analysis to resume polling and spinner
       if (listing.image_url && !isAnalysed) {
           const updatedAgo = Date.now() - new Date(listing.updated_at).getTime();
-          if (updatedAgo < 5 * 60 * 1000) {
+          // Freshly created listings (created_at ≈ updated_at) haven't started analysis yet — skip auto-resume
+          const isJustCreated = listing.created_at && listing.updated_at &&
+            Math.abs(new Date(listing.updated_at) - new Date(listing.created_at)) < 10000;
+          if (updatedAgo < 5 * 60 * 1000 && !isJustCreated) {
               // Analysis likely still in progress (updated < 5 min ago)
               isWaitingForImageAnalysisRef.current = true;
               imageAnalysisTriggeredAtRef.current = new Date(Date.now() - 60000).toISOString();
@@ -1908,6 +1944,11 @@ const ProductStudio = () => {
       // Favorite Keyword Bank Props
       user={user}
       currentListing={currentListingContext}
+
+      // Etsy Export Props
+      onPushToEtsy={handlePushToEtsy}
+      etsyExportStatus={etsyListingData?.export_status}
+      etsyLastExportedAt={etsyListingData?.last_exported_at}
     >
         <RecentOptimizations onViewResults={handleLoadListing} />
     </ResultsDisplay>
@@ -2359,6 +2400,26 @@ const ProductStudio = () => {
         limit={quotaExceededModal.limit}
         quotaType={quotaExceededModal.quotaType}
       />
+
+      {showExportModal && exportModalData.length > 0 && (
+        <ExportToEtsyModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          onSuccess={() => {
+            setShowExportModal(false);
+            // Refresh etsyListingData to update export_status
+            if (listingId) {
+              supabase.from('etsy_listings')
+                .select('etsy_listing_id, original_title, original_description, original_tags, original_score, export_status, last_exported_at')
+                .eq('listing_id', listingId)
+                .maybeSingle()
+                .then(({ data }) => { if (data) setEtsyListingData(data); });
+            }
+          }}
+          listings={exportModalData}
+          user={user}
+        />
+      )}
 
     </Layout>
   );

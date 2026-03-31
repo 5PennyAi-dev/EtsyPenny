@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Loader2, ExternalLink } from 'lucide-react';
 
 export default function ImportActionBar({
   selectedCount,
@@ -9,6 +9,8 @@ export default function ImportActionBar({
   isScoring,
   onScore,
   tokenBalance = 0,
+  onExport,
+  exportCount = 0,
 }) {
   const exceedsImportLimit = selectedCount > limitRemaining;
   const scoreCost = selectedCount * 3;
@@ -81,6 +83,30 @@ export default function ImportActionBar({
               ) : (
                 `Score ${selectedCount} (${scoreCost} tokens)`
               )}
+            </button>
+          </>
+        )}
+
+        {/* Export mode */}
+        {selectionMode === 'export' && (
+          <>
+            {exportCount > 5 && (
+              <span className="text-xs text-rose-600 font-medium">
+                Max 5 per batch
+              </span>
+            )}
+
+            <button
+              onClick={onExport}
+              disabled={exportCount === 0 || exportCount > 5}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${
+                exportCount === 0 || exportCount > 5
+                  ? 'bg-[#F56400]/50 cursor-not-allowed'
+                  : 'bg-[#F56400] hover:bg-[#E05A00]'
+              }`}
+            >
+              <ExternalLink className="w-4 h-4" />
+              Push to Etsy ({exportCount})
             </button>
           </>
         )}
