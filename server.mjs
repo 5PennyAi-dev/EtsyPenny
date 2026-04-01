@@ -2095,7 +2095,12 @@ app.post('/api/etsy/export-listings', async (req, res) => {
   }
 });
 
+// ─── EXPORT FOR TESTING ──────────────────────────────────
+export { app };
+
 // ─── START ────────────────────────────────────────────────
+const isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
+if (isDirectRun) {
 app.listen(PORT, () => {
   console.log(`\n🚀 EtsyPenny API server running on http://localhost:${PORT}`);
   console.log(`   POST /api/seo/analyze-image`);
@@ -2116,3 +2121,4 @@ app.listen(PORT, () => {
   console.log(`   POST /api/etsy/export-listings`);
   console.log(`   GET  /api/health\n`);
 });
+}

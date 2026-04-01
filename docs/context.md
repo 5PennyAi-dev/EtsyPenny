@@ -848,6 +848,23 @@
 - **State Preservation**: Fixed form hydration bugs where user-typed instructions were cleared during AI analysis.
 
 ### Latest Developments
+- **2026-04-01: Automated Test Framework (Vitest)**
+  - **Setup**: Installed Vitest + @vitest/coverage-v8 + supertest. Created `vitest.config.ts` with node environment, 10s timeout, and setup file for env vars.
+  - **Layer 1 — Unit Tests** (`tests/unit/`): 47 tests for pure backend logic:
+    - `concept-diversity.test.ts` — `getCanonicalConcept`, `extractProductTypeWords` (10 tests)
+    - `filter-logic.test.ts` — `applySEOFilter` (16 tests: scoring, sorting, pinned/user-added bypass, concept diversity, AI selection quota, pool limits)
+    - `select-and-score.test.ts` — `selectAndScore` + strength formulas (21 tests)
+  - **Layer 2 — Integration Tests** (`tests/integration/`): 33 tests for Express API routes via supertest:
+    - `reset-pool.test.ts` — POST /api/seo/reset-pool (7 tests)
+    - `recalculate-scores.test.ts` — POST /api/seo/recalculate-scores (7 tests)
+    - `user-keyword.test.ts` — POST /api/seo/user-keyword (8 tests)
+    - `add-from-favorite.test.ts` — POST /api/seo/add-from-favorite (10 tests incl. DataForSEO NOT called verification)
+  - **Mock Infrastructure** (`tests/mocks/`): Chainable Supabase mock client, mocks for runAI, enrichKeywords, scoreKeywords, persistStrength, checkQuota/incrementQuota, Stripe, email, Etsy client. Uses `vi.hoisted()` pattern for mock variables referenced by `vi.mock()` factories.
+  - **Shared Fixtures** (`tests/fixtures/sample-keywords.ts`): 20 realistic Etsy keywords with pinned/user-added mix, concept duplicates, varied metrics.
+  - **server.mjs Change**: Added `export { app }` and guarded `app.listen()` with `isDirectRun` check so tests can import the Express app without starting a server.
+  - **npm Scripts**: `test` (vitest run), `test:watch` (vitest), `test:coverage` (vitest run --coverage)
+  - **Total**: 80 tests, all passing in ~1.3s.
+
 - **2026-03-19: User-Keyword API Integration & Testing**
   - **New Feature**: Implemented `POST /api/seo/user-keyword` in `server.mjs`.
   - **Functionality**: Manual keyword addition with live DataForSEO enrichment, AI scoring, and pool re-ranking.
