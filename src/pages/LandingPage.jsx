@@ -73,6 +73,10 @@ const LandingPage = () => {
           />
         </div>
         <div className="hidden md:flex items-center gap-4">
+          <Link to="/docs/getting-started" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
+            Docs
+          </Link>
+          <span className="text-slate-300">|</span>
           <Link to="/pricing" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
             Pricing
           </Link>

@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-03-30*
+*Dernière mise à jour : 2026-03-31*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -2242,3 +2242,56 @@ Moved "Billing" above "Settings" in the sidebar navigation.
 - Custom product types auto-created when no match found (depth >= 2)
 - Product type combobox in Studio pre-filled for Etsy listings
 - All bug fixes applied: export error handling, spinner, import limit, description pollution
+
+---
+
+## Session 2026-03-31: In-App User Documentation System
+
+### Overview
+Built a complete in-app documentation system at `/docs` with its own layout, navigation, and 12 content pages. Public routes (no auth required). No new dependencies — uses React Router nested routes, Tailwind, and Lucide icons.
+
+### Architecture
+- **`DocsLayout`** — Three-column layout: fixed left nav sidebar (w-64), centered content area (max-w-3xl), sticky right "On this page" TOC (w-48, xl+ only). Mobile responsive with hamburger drawer. Uses React Router `<Outlet>` for nested page rendering.
+- **`DocComponents`** — Reusable primitives: `DocPage`, `Section` (h2 with auto-id for TOC anchoring), `Step`, `Tip`, `Warning`, `TokenTable`, `DefList`, `InlineCode`. TOC auto-generated via `IntersectionObserver` on `h2[id]` elements.
+- **`docsNavigation.js`** — Config array supporting single pages and grouped sections.
+
+### Pages (12 total)
+1. **Getting Started** — Two paths (Etsy import vs. new photo), full workflow overview, token costs table
+2. **Analyzing your product** — Image upload, visual fields, theme/niche/sub-niche, product type, description
+3. **Keyword Research** — Table columns, smart badges, 13-keyword selection, audit header, strategy tuner, adding keywords, saving to bank
+4. **Generating your listing** — Draft generation, title/description output, Etsy preview, copy buttons, saving
+5. **Favorite Tags** — Keyword bank table, filtering, grouped view, stale refresh, bulk/individual actions
+6. **Presets** — Creating, managing, applying presets, creating from Studio
+7. **Etsy Import** — Shop connection, browsing/importing, scoring, before/after, opening in Studio, filtering, exporting
+8. **Dashboard** — Quick stats, pipeline bar, next actions, shop health, recent listings, trending keywords, onboarding
+9. **Billing & Tokens** — Token costs, quotas, plans, token packs, billing page overview, billing FAQ
+10. **Settings** — Strategy weights, badge sensitivity, analysis constraints, custom themes/niches
+11. **Understanding Your Scores** — Each score dimension explained with "How to improve" guidance
+12. **FAQ** — 11 Q&A pairs with cross-links
+
+### Navigation Integration
+- **App Sidebar** — "Help" link with `BookOpen` icon in footer section (above Settings)
+- **Landing Page** — "Docs" link added to top nav bar (before Pricing)
+
+### Files Created
+- `src/config/docsNavigation.js`
+- `src/components/docs/DocsLayout.jsx`
+- `src/components/docs/DocComponents.jsx`
+- `src/pages/docs/GettingStartedPage.jsx`
+- `src/pages/docs/AnalyzingProductPage.jsx`
+- `src/pages/docs/KeywordResearchPage.jsx`
+- `src/pages/docs/GeneratingListingPage.jsx`
+- `src/pages/docs/FavoriteTagsPage.jsx`
+- `src/pages/docs/PresetsPage.jsx`
+- `src/pages/docs/EtsyImportPage.jsx`
+- `src/pages/docs/DashboardPage.jsx`
+- `src/pages/docs/BillingPage.jsx`
+- `src/pages/docs/SettingsPage.jsx`
+- `src/pages/docs/ScoresPage.jsx`
+- `src/pages/docs/FAQPage.jsx`
+- `src/pages/docs/DocPlaceholderPage.jsx`
+
+### Files Modified
+- `src/App.jsx` — 12 doc routes under `/docs` nested layout
+- `src/components/Sidebar.jsx` — Help link in footer
+- `src/pages/LandingPage.jsx` — Docs link in nav bar

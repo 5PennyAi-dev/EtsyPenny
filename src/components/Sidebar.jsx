@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutDashboard, LayoutList, Shirt, LineChart, FlaskConical, Store, Settings, User, LogOut, ShieldAlert, CreditCard, Coins, MessageSquareText } from 'lucide-react';
+import { LayoutDashboard, LayoutList, Shirt, LineChart, FlaskConical, Store, Settings, User, LogOut, ShieldAlert, CreditCard, Coins, MessageSquareText, BookOpen } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBulkProgress } from '../context/BulkProgressContext';
@@ -118,8 +118,15 @@ const Sidebar = () => {
         </div>
       )}
 
-      {/* Settings, Admin, Feedback */}
+      {/* Help, Settings, Admin, Feedback */}
       <div className="px-4 py-2 border-t border-slate-100 space-y-0.5">
+        <Link
+          to="/docs/getting-started"
+          className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+        >
+          <BookOpen size={20} className="text-slate-400" />
+          Help
+        </Link>
         <Link
           to="/settings"
           className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
