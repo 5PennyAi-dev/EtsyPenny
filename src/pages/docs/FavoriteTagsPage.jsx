@@ -1,4 +1,4 @@
-import { DocPage, Section, Tip, DefList } from '@/components/docs/DocComponents';
+import { DocPage, Section, Tip, DefList, DocImage, DocLink } from '@/components/docs/DocComponents';
 
 const tableColumns = [
   {
@@ -116,13 +116,13 @@ export default function FavoriteTagsPage() {
         The Favorite Tags tab in the SEO Lab is your personal keyword bank — a growing
         library of keywords you've saved across all your listings. Over time, it becomes
         your most valuable SEO asset: a curated collection of proven keywords you can
-        reuse, track, and organize.
+        reuse, track, and organize into <DocLink to="/docs/lab/presets">presets</DocLink>.
       </p>
 
       <Section title="Saving keywords to your bank">
         <p>There are two ways to add keywords to your Favorite Tags:</p>
         <p>
-          From the <strong>Keyword Performance table</strong> in the SEO Studio, click the
+          From the <DocLink to="/docs/studio/keywords">Keyword Performance table</DocLink> in the SEO Studio, click the
           star icon on any keyword row. It turns gold and the keyword is saved to your bank
           with all its data (volume, competition, CPC, trend history).
         </p>
@@ -144,6 +144,11 @@ export default function FavoriteTagsPage() {
           You can sort by any column by clicking the header. The table is paginated —
           choose 10, 25, or 50 rows per page.
         </p>
+        <DocImage
+          src="/docs/seolab-favorites-table.png"
+          alt="SEO Lab Favorite Tags table with filter pills, keyword tags with trending indicators, and volume data"
+          caption="Your Favorite Tags library with filter pills and keyword data"
+        />
       </Section>
 
       <Section title="Filtering your keywords">
@@ -172,6 +177,11 @@ export default function FavoriteTagsPage() {
           and usage ratio. This gives you a bird's-eye view of where your keyword strength
           is concentrated.
         </p>
+        <DocImage
+          src="/docs/seolab-grouped-view.png"
+          alt="Grouped view showing keywords organized by Theme and Niche with aggregate stats per group"
+          caption="Grouped view organizes your keywords by Theme and Niche"
+        />
       </Section>
 
       <Section title="Refreshing stale keywords">

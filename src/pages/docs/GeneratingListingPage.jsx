@@ -1,4 +1,4 @@
-import { DocPage, Section, Tip } from '@/components/docs/DocComponents';
+import { DocPage, Section, Tip, DocImage, DocLink } from '@/components/docs/DocComponents';
 
 export default function GeneratingListingPage() {
   return (
@@ -7,7 +7,7 @@ export default function GeneratingListingPage() {
       subtitle="Turn your keywords into a ready-to-use Etsy listing"
     >
       <p>
-        Once you've selected your 13 keywords, PennySEO writes a complete Etsy listing
+        Once you've <DocLink to="/docs/studio/keywords">selected your 13 keywords</DocLink>, PennySEO writes a complete Etsy listing
         for you — an optimized title and a compelling description that naturally weave in
         your selected tags.
       </p>
@@ -45,6 +45,11 @@ export default function GeneratingListingPage() {
           title like "Funny Cat Mug - Personalized Gift for Cat Mom - Ceramic Coffee Cup"
           works just as well as arranging those same words differently.
         </p>
+        <DocImage
+          src="/docs/listing-editor.png"
+          alt="Listing Editor showing a generated title with quality bar, generated description, and copy buttons"
+          caption="The Listing Editor with a generated title and description ready to copy"
+        />
         <Tip>
           Don't worry about making the title sound like a natural sentence. On Etsy,
           titles are keyword containers separated by dashes. Buyers scan them, they don't
@@ -70,6 +75,11 @@ export default function GeneratingListingPage() {
           appear in Etsy search results — with your product thumbnail and the generated
           title. This gives you a quick visual check before copying anything over.
         </p>
+        <DocImage
+          src="/docs/listing-etsy-preview.png"
+          alt="Mini Etsy search preview card showing product thumbnail and generated title"
+          caption="See how your listing will look in Etsy search results"
+        />
       </Section>
 
       <Section title="Copying to Etsy">

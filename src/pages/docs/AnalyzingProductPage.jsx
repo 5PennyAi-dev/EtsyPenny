@@ -1,4 +1,4 @@
-import { DocPage, Section, Tip } from '@/components/docs/DocComponents';
+import { DocPage, Section, Tip, DocImage, DocLink } from '@/components/docs/DocComponents';
 
 export default function AnalyzingProductPage() {
   return (
@@ -11,6 +11,12 @@ export default function AnalyzingProductPage() {
         analysis step extracts visual details from your photo and classifies your product
         into the right category.
       </p>
+
+      <DocImage
+        src="/docs/studio-product-setup.png"
+        alt="Product Studio showing the image upload area, product type selector, and description field"
+        caption="The Product Setup block before analysis — upload your image and select a product type"
+      />
 
       <Section title="Uploading your image">
         <p>
@@ -30,6 +36,11 @@ export default function AnalyzingProductPage() {
           generate more relevant keywords. But if something looks off, you can adjust any
           field manually.
         </p>
+        <DocImage
+          src="/docs/studio-analyse-button.png"
+          alt="Analyse Design button with 1 token badge"
+          caption="The Analyse Design button with its token cost badge"
+        />
         <Tip>
           The AI works best with images where the product is the main focus. If your photo
           has a busy background or multiple products, the analysis may be less accurate.
@@ -59,8 +70,13 @@ export default function AnalyzingProductPage() {
         <p>
           All three are selected from PennySEO's taxonomy. If the AI suggestion doesn't
           fit, pick a better match from the dropdown. You can also create your own custom
-          themes and niches in <strong>Settings</strong>.
+          themes and niches in <DocLink to="/docs/settings">Settings</DocLink>.
         </p>
+        <DocImage
+          src="/docs/studio-ai-classification.png"
+          alt="AI Classification accordion expanded showing visual analysis fields and Theme/Niche/Sub-niche dropdowns"
+          caption="AI Classification section after analysis — visual fields and taxonomy are filled automatically"
+        />
         <Tip>
           Getting the Theme and Niche right matters more than any other field. A
           "Minimalist" mug and a "Vintage" mug will get very different keyword suggestions.
@@ -105,8 +121,8 @@ export default function AnalyzingProductPage() {
         <p>
           Once the analysis is complete, the <strong>"AI Classification"</strong> section
           expands to show your visual fields, Theme, and Niche. The{' '}
-          <strong>"Generate SEO"</strong> button becomes available in the Keyword Research
-          section below.
+          <strong>"Generate SEO"</strong> button becomes available in the{' '}
+          <DocLink to="/docs/studio/keywords">Keyword Research</DocLink> section below.
         </p>
         <p>
           Your analysis is saved automatically. If you come back later, everything will be

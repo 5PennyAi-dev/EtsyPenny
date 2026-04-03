@@ -1,5 +1,6 @@
 import { Sparkles, Loader2, SlidersHorizontal, TrendingUp, BarChart2, ShoppingCart, Target, DollarSign, Info } from 'lucide-react';
 import Accordion from '../ui/Accordion';
+import HelpLink from '../ui/HelpLink';
 
 const LEVELS = ['Low', 'Regular', 'High', 'Aggressive'];
 const LEVEL_LABELS = ['Low', 'Regular', 'High', 'Aggr.'];
@@ -141,6 +142,7 @@ const StrategyTuner = ({ listingId, onApplyStrategy, isApplyingStrategy, selecti
         <div className="flex items-center gap-2">
           <SlidersHorizontal size={16} className="text-indigo-600" />
           <span className="text-sm font-bold text-slate-900">Advanced SEO Strategy Tuner</span>
+          <HelpLink to="/docs/studio/keywords" tooltip="How the Strategy Tuner works" />
         </div>
       }
     >

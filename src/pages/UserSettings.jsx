@@ -22,6 +22,7 @@ import {
   Tags
 } from 'lucide-react';
 import { toast } from 'sonner';
+import HelpLink from '../components/ui/HelpLink';
 
 
 
@@ -251,6 +252,7 @@ export default function UserSettings() {
               <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                 <Settings className="text-indigo-600" size={24} />
                 Personal SEO Optimizer
+                <HelpLink to="/docs/settings" tooltip="Guide to Settings" />
               </h1>
               <p className="text-slate-500 text-sm mt-1">
                 Customize your underlying SEO scoring algorithms and sensitivity thresholds.

@@ -8,6 +8,7 @@ import ImageUpload from '../components/studio/ImageUpload';
 import ProductTypeCombobox from '../components/studio/ProductTypeCombobox';
 import Accordion from '../components/ui/Accordion';
 import ResultsDisplay from '../components/studio/ResultsDisplay';
+import HelpLink from '../components/ui/HelpLink';
 import RecentOptimizations from '../components/studio/RecentOptimizations';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
@@ -2042,6 +2043,7 @@ const ProductStudio = () => {
                       <div className="flex flex-col">
                         <h2 className="font-bold text-slate-900 flex items-center gap-2">
                             Product Details
+                            <HelpLink to="/docs/studio/analyzing" tooltip="How to analyze your product" />
                             <ChevronUp size={16} className={`text-slate-400 transition-transform duration-300 ${isFormCollapsed ? 'rotate-180' : ''}`} />
                         </h2>
                         {isFormCollapsed && <span className="text-xs text-slate-500 font-medium animate-in fade-in slide-in-from-left-2">Click to expand & edit</span>}

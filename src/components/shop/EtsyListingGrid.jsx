@@ -79,7 +79,7 @@ function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringS
       } ${isSelected ? 'ring-2 ring-indigo-500' : ''} ${
         isSelectable ? 'cursor-pointer hover:shadow-md' : ''
       }`}
-      style={statusBorderColor ? { borderBottom: `3px solid ${statusBorderColor}` } : undefined}
+      style={statusBorderColor ? { borderBottom: `7px solid ${statusBorderColor}` } : undefined}
     >
       {/* Image */}
       <div className="aspect-square relative bg-slate-100">

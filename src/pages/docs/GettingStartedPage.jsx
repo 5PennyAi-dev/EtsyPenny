@@ -1,4 +1,4 @@
-import { DocPage, Section, Tip, TokenTable } from '@/components/docs/DocComponents';
+import { DocPage, Section, Tip, TokenTable, DocLink } from '@/components/docs/DocComponents';
 import { ArrowRight } from 'lucide-react';
 
 const tokenRows = [
@@ -14,16 +14,22 @@ const nextSteps = [
     title: 'Save keywords you like',
     description:
       'Click the star icon on any keyword to save it to your Keyword Bank in the SEO Lab for reuse across listings.',
+    linkTo: '/docs/lab/favorites',
+    linkText: 'Keyword Bank',
   },
   {
     title: 'Try the Strategy Tuner',
     description:
       'Adjust the sliders to prioritize reach, competition, buyer intent, and more.',
+    linkTo: '/docs/studio/keywords',
+    linkText: 'Strategy Tuner',
   },
   {
     title: 'Check your Dashboard',
     description:
       "Track your shop's overall SEO health and see which listings need attention.",
+    linkTo: '/docs/dashboard',
+    linkText: 'Dashboard',
   },
 ];
 
@@ -50,13 +56,13 @@ export default function GettingStartedPage() {
           If you already have listings on Etsy, this is the fastest way to start.
         </p>
         <p>
-          Go to <strong>My Shop</strong> from the sidebar and connect your Etsy account.
+          Go to <DocLink to="/docs/etsy-import">My Shop</DocLink> from the sidebar and connect your Etsy account.
           Browse your existing listings, select the ones you'd like to optimize, and
           click <strong>Import</strong>. Importing is free and doesn't cost any tokens.
         </p>
         <p>
           Once imported, you can optionally score your existing tags (3 tokens per listing)
-          to see how your current SEO performs. Then open any listing in the Studio to
+          to see how your current SEO performs. Then <DocLink to="/docs/studio/analyzing">open any listing in the Studio</DocLink> to
           optimize it with PennySEO — your product image, title, and category are already
           filled in.
         </p>
@@ -72,7 +78,7 @@ export default function GettingStartedPage() {
           If you're creating a new listing or don't have an Etsy shop yet, start here.
         </p>
         <p>
-          Go to <strong>SEO Studio</strong> from the sidebar. Upload a product photo and
+          Go to <DocLink to="/docs/studio/analyzing">SEO Studio</DocLink> from the sidebar. Upload a product photo and
           click <strong>"Analyse Design"</strong> (1 token). The AI examines your image
           and fills in visual details automatically: style, colors, target audience, and
           more. It also suggests a Theme and Niche for your product.
@@ -139,7 +145,9 @@ export default function GettingStartedPage() {
                 className="text-indigo-500 flex-shrink-0 mt-1"
               />
               <div>
-                <p className="font-semibold text-slate-900">{item.title}</p>
+                <p className="font-semibold text-slate-900">
+                  {item.linkTo ? <DocLink to={item.linkTo}>{item.title}</DocLink> : item.title}
+                </p>
                 <p className="text-base text-slate-600 mt-0.5">
                   {item.description}
                 </p>
@@ -154,12 +162,12 @@ export default function GettingStartedPage() {
         <TokenTable rows={tokenRows} />
         <p>
           Some actions use your plan's monthly quota instead of tokens: adding custom
-          keywords and adding keywords from your Favorites bank. Check the Billing page
-          for your plan's limits.
+          keywords and adding keywords from your Favorites bank. Check the{' '}
+          <DocLink to="/docs/billing">Billing page</DocLink> for your plan's limits.
         </p>
         <p>
           You start with 30 free tokens per month. Need more? Visit the{' '}
-          <strong>Billing</strong> page to see plans and token packs.
+          <DocLink to="/docs/billing">Billing</DocLink> page to see plans and token packs.
         </p>
       </Section>
     </DocPage>

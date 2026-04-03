@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import RadialGauge from './RadialGauge';
 import { Activity, Target, ShoppingCart, Swords, TrendingUp, TrendingDown } from 'lucide-react';
+import HelpLink from '@/components/ui/HelpLink';
 
 const subMetrics = [
   { key: 'visibility', label: 'Visibility', icon: Activity, color: 'text-blue-600', bg: 'bg-blue-100' },
@@ -136,7 +137,7 @@ export default function ShopHealth({ avgScore, avgVisibility, avgRelevance, avgC
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-5">
-      <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-4">Shop health</h3>
+      <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2">Shop health <HelpLink to="/docs/scores" tooltip="Understanding your scores" /></h3>
 
       <div className="flex items-start gap-6">
         {/* Main gauge */}

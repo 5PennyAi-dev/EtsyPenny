@@ -10,6 +10,7 @@ import ShopStatsBar from '@/components/shop/ShopStatsBar';
 import EtsyListingGrid from '@/components/shop/EtsyListingGrid';
 import ImportActionBar from '@/components/shop/ImportActionBar';
 import ExportToEtsyModal from '@/components/shop/ExportToEtsyModal';
+import HelpLink from '@/components/ui/HelpLink';
 const scoreColor = (s) => s >= 85 ? '#4f46e5' : s >= 70 ? '#22c55e' : s >= 50 ? '#f59e0b' : '#ef4444';
 
 export default function MyShopPage() {
@@ -412,6 +413,7 @@ export default function MyShopPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-slate-800">My Etsy Shop</h1>
+            <HelpLink to="/docs/etsy-import" tooltip="How Etsy import works" />
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               Connected

@@ -6,6 +6,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Layout from '../components/Layout';
+import HelpLink from '../components/ui/HelpLink';
 
 const PACKS = [
   { name: '50 tokens', tokens: 50, price: 5, priceId: 'price_1TF0gQGxl45RKlyAsXzyORjo', perToken: '0.10' },
@@ -117,7 +118,7 @@ const BillingPage = () => {
   return (
     <Layout>
       <div className="max-w-5xl mx-auto px-6 py-8">
-        <h1 className="text-2xl font-bold mb-6">Billing</h1>
+        <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">Billing <HelpLink to="/docs/billing" tooltip="How tokens and billing work" /></h1>
 
         {/* Plan + Token Balance Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">

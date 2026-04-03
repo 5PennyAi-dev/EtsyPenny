@@ -227,7 +227,7 @@ export default function DocsLayout() {
       {/* Main content + right TOC */}
       <div className="lg:ml-64 min-h-screen">
         <div className="flex">
-          <div className="flex-1 min-w-0 max-w-3xl px-8 sm:px-12 py-12">
+          <div className="flex-1 min-w-0 max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl px-8 sm:px-12 py-12">
             <Outlet />
           </div>
           {/* Right sidebar — table of contents */}

@@ -1,4 +1,4 @@
-import { DocPage, Section, Tip, DefList } from '@/components/docs/DocComponents';
+import { DocPage, Section, Tip, DefList, DocImage, DocLink } from '@/components/docs/DocComponents';
 import { Flame, Leaf, Star, ArrowRight } from 'lucide-react';
 
 const tableColumns = [
@@ -160,7 +160,7 @@ export default function KeywordResearchPage() {
 
       <Section title="Generating keywords">
         <p>
-          Once your product is analyzed (image + product type), click{' '}
+          Once your product is <DocLink to="/docs/studio/analyzing">analyzed</DocLink> (image + product type), click{' '}
           <strong>"Generate SEO"</strong> in the Keyword Research accordion header (8
           tokens, or 4 tokens to re-generate).
         </p>
@@ -175,6 +175,11 @@ export default function KeywordResearchPage() {
           The AI pre-selects the best 13 keywords — Etsy's maximum tag limit. The Keyword
           Research section opens automatically when results are ready.
         </p>
+        <DocImage
+          src="/docs/keywords-table.png"
+          alt="Keyword Performance table showing keywords with scores, badges, volume, trend sparklines, and selection checkboxes"
+          caption="The Keyword Performance table — your keywords scored and ranked with real Etsy search data"
+        />
       </Section>
 
       <Section title="Reading the Keyword Performance table">
@@ -238,6 +243,11 @@ export default function KeywordResearchPage() {
           Hover over any metric to see a tooltip explaining what your score means and how
           to improve it.
         </p>
+        <DocImage
+          src="/docs/keywords-audit-header.png"
+          alt="Audit Header showing the overall score gauge, visibility, relevance, buy intent, competition metrics, and estimated value"
+          caption="The Audit Header gives you a snapshot of your listing's SEO health"
+        />
       </Section>
 
       <Section title="Adding more keywords">
@@ -247,6 +257,11 @@ export default function KeywordResearchPage() {
           Keywords you add appear in the table and are auto-selected. They're marked with
           a special icon so you can distinguish them from AI-generated keywords.
         </p>
+        <DocImage
+          src="/docs/keywords-add-custom.png"
+          alt="Inline custom keyword input row at the bottom of the keyword table"
+          caption="Add a custom keyword directly in the table"
+        />
       </Section>
 
       <Section title="The Strategy Tuner">
@@ -261,6 +276,11 @@ export default function KeywordResearchPage() {
           pool with the new weights. This doesn't generate new keywords — it re-evaluates
           and re-selects from your existing pool.
         </p>
+        <DocImage
+          src="/docs/keywords-strategy-tuner.png"
+          alt="Strategy Tuner with five sliders at different positions and the Apply strategy button"
+          caption="The Strategy Tuner — adjust weights to re-rank your keyword pool"
+        />
         <Tip>
           The default "Regular" setting works well for most products. Try "High" on
           Ranking ease if you're a new shop with no reviews yet — it helps you target
@@ -271,11 +291,11 @@ export default function KeywordResearchPage() {
       <Section title="Saving keywords to your bank">
         <p>
           Click the star icon on any keyword row to save it to your{' '}
-          <strong>Keyword Bank</strong> in the SEO Lab. Saved keywords can be reused
+          <DocLink to="/docs/lab/favorites">Keyword Bank</DocLink> in the SEO Lab. Saved keywords can be reused
           across multiple listings, grouped into presets, and tracked over time.
         </p>
         <p>
-          You can also click <strong>"Save as Preset"</strong> in the table header to save
+          You can also click <DocLink to="/docs/lab/presets">"Save as Preset"</DocLink> in the table header to save
           your current selection as a reusable keyword strategy.
         </p>
       </Section>

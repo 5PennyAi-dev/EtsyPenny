@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom';
-import { DocPage } from '@/components/docs/DocComponents';
+import { DocPage, DocLink } from '@/components/docs/DocComponents';
 
 const faqItems = [
   {
@@ -32,12 +31,7 @@ const faqItems = [
         competitive (high competition), or too broad (low buy intent). Check the Audit
         Header breakdown to see which dimension is pulling your score down, then swap
         keywords accordingly. See the{' '}
-        <Link
-          to="/docs/scores"
-          className="text-indigo-600 hover:text-indigo-700 font-medium underline underline-offset-2"
-        >
-          Understanding Your Scores
-        </Link>{' '}
+        <DocLink to="/docs/scores">Understanding Your Scores</DocLink>{' '}
         page for specific improvement tips for each dimension.
       </>
     ),
@@ -69,7 +63,7 @@ const faqItems = [
     answer: (
       <>
         Every 2–3 weeks is a good habit. Search trends shift seasonally and with cultural
-        moments. The SEO Lab flags keywords older than 21 days as "stale." Regular
+        moments. The <DocLink to="/docs/lab/favorites">SEO Lab</DocLink> flags keywords older than 21 days as "stale." Regular
         refreshing ensures your data stays accurate and you catch new trends early.
       </>
     ),

@@ -3,7 +3,6 @@ import Layout from '../components/Layout';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
 import { 
     Search, Filter, MoreHorizontal, Eye, Trash2,
     ChevronLeft, ChevronRight, FileDown, Loader2,
@@ -13,6 +12,12 @@ import { useNavigate } from 'react-router-dom';
 import { pdf } from '@react-pdf/renderer';
 import ListingPDFDocument from '../components/pdf/ListingPDFDocument';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
+
+// Map long DB status names to short display labels
+const STATUS_DISPLAY = {
+    'Listing completed': 'Optimized',
+    'SEO analysis completed': 'Analyzed',
+};
 
 // Numeric metric columns that default to descending (highest first)
 const NUMERIC_COLS = [
@@ -52,9 +57,20 @@ const SortableHeader = ({ label, column, sort, onSort, className = '', style }) 
     );
 };
 
+const useIsNarrow = () => {
+    const [isNarrow, setIsNarrow] = useState(window.innerWidth < 1600);
+    useEffect(() => {
+        const handler = () => setIsNarrow(window.innerWidth < 1600);
+        window.addEventListener('resize', handler);
+        return () => window.removeEventListener('resize', handler);
+    }, []);
+    return isNarrow;
+};
+
 const HistoryPage = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const isNarrow = useIsNarrow();
     const [listings, setListings] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -235,20 +251,20 @@ const HistoryPage = () => {
 
     return (
         <Layout>
-            <div className="h-screen flex flex-col p-8 gap-6 overflow-hidden w-[85%] mx-auto">
+            <div className="h-screen flex flex-col p-8 gap-6 overflow-hidden w-full">
 
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Historique des Optimisations</h1>
-                        <p className="text-slate-500 text-sm mt-1">Retrouvez et gérez toutes vos générations IA.</p>
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">SEO History</h1>
+                        <p className="text-slate-500 text-sm mt-1">Find and manage all your AI-generated listings.</p>
                     </div>
                     <div className="flex items-center gap-3">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                             <input
                                 type="text"
-                                placeholder="Rechercher..."
+                                placeholder="Search..."
                                 value={searchTerm}
                                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                                 className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-64 shadow-sm"
@@ -260,9 +276,9 @@ const HistoryPage = () => {
                                 onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
                                 className="pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 appearance-none shadow-sm cursor-pointer"
                             >
-                                <option value="all">Tous les status</option>
-                                <option value="completed">Terminé</option>
-                                <option value="processing">En cours</option>
+                                <option value="all">All statuses</option>
+                                <option value="completed">Completed</option>
+                                <option value="processing">In progress</option>
                             </select>
                             <Filter size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         </div>
@@ -271,7 +287,7 @@ const HistoryPage = () => {
 
                 {/* Table */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
-                    <div className="overflow-auto flex-1 min-h-0">
+                    <div className="overflow-x-hidden overflow-y-auto flex-1 min-h-0">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200 text-xs sticky top-0 z-10">
                                 <tr>
@@ -282,11 +298,11 @@ const HistoryPage = () => {
                                     <SortableHeader label="Theme"            column="theme"                         sort={sort} onSort={handleSort} style={{ width: '18%' }} />
                                     <SortableHeader label="Score"            column="listing_strength"              sort={sort} onSort={handleSort} className="text-center" />
                                     <SortableHeader label="Visibility"       column="listing_visibility"            sort={sort} onSort={handleSort} className="text-center" />
-                                    <SortableHeader label="Visibility index" column="listing_raw_visibility_index"  sort={sort} onSort={handleSort} className="text-center whitespace-nowrap" />
+                                    {!isNarrow && <SortableHeader label="Visibility index" column="listing_raw_visibility_index"  sort={sort} onSort={handleSort} className="text-center whitespace-nowrap" />}
                                     <SortableHeader label="Relevance"        column="listing_relevance"             sort={sort} onSort={handleSort} className="text-center" />
-                                    <SortableHeader label="Conversion"       column="listing_conversion"            sort={sort} onSort={handleSort} className="text-center" />
+                                    {!isNarrow && <SortableHeader label="Conversion"       column="listing_conversion"            sort={sort} onSort={handleSort} className="text-center" />}
                                     <SortableHeader label="Competition"      column="listing_competition"           sort={sort} onSort={handleSort} className="text-center" />
-                                    <SortableHeader label="Market index"     column="listing_profit"                sort={sort} onSort={handleSort} className="text-center whitespace-nowrap" />
+                                    {!isNarrow && <SortableHeader label="Market index"     column="listing_profit"                sort={sort} onSort={handleSort} className="text-center whitespace-nowrap" />}
                                     <SortableHeader label="Status"           column="status_name"                   sort={sort} onSort={handleSort} className="text-center" />
                                     <SortableHeader label="Date"             column="listing_created_at"            sort={sort} onSort={handleSort} className="text-right" />
 
@@ -296,9 +312,9 @@ const HistoryPage = () => {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {isLoading ? (
-                                    <tr><td colSpan="13" className="px-6 py-12 text-center text-slate-400">Loading history...</td></tr>
+                                    <tr><td colSpan={isNarrow ? 10 : 13} className="px-6 py-12 text-center text-slate-400">Loading history...</td></tr>
                                 ) : paginatedListings.length === 0 ? (
-                                    <tr><td colSpan="13" className="px-6 py-12 text-center text-slate-400">No optimizations found.</td></tr>
+                                    <tr><td colSpan={isNarrow ? 10 : 13} className="px-6 py-12 text-center text-slate-400">No optimizations found.</td></tr>
                                 ) : paginatedListings.map((item) => {
                                     const listingId = item.listing_id;
                                     const theme = item.theme || '';
@@ -307,6 +323,7 @@ const HistoryPage = () => {
                                     const score = item.listing_strength ? Math.round(item.listing_strength) : null;
                                     const displayTitle = item.original_title || 'Untitled Product';
                                     const status = item.status_name || 'New';
+                                    const displayStatus = STATUS_DISPLAY[status] || status;
                                     const statusColor =
                                         status === 'Listing completed'      ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                                         status === 'SEO analysis completed' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
@@ -337,26 +354,26 @@ const HistoryPage = () => {
                                                 </div>
                                             </td>
                                             <td className="px-2 py-3 text-center"><MetricCell value={item.listing_visibility} /></td>
-                                            <td className="px-2 py-3 text-center"><MetricCell value={item.listing_raw_visibility_index} /></td>
+                                            {!isNarrow && <td className="px-2 py-3 text-center"><MetricCell value={item.listing_raw_visibility_index} /></td>}
                                             <td className="px-2 py-3 text-center"><MetricCell value={item.listing_relevance} /></td>
-                                            <td className="px-2 py-3 text-center"><MetricCell value={item.listing_conversion} /></td>
+                                            {!isNarrow && <td className="px-2 py-3 text-center"><MetricCell value={item.listing_conversion} /></td>}
                                             <td className="px-2 py-3 text-center"><MetricCell value={item.listing_competition} /></td>
-                                            <td className="px-2 py-3 text-center"><MetricCell value={item.listing_profit} /></td>
+                                            {!isNarrow && <td className="px-2 py-3 text-center"><MetricCell value={item.listing_profit} /></td>}
                                             <td className="px-2 py-3 text-center">
                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${statusColor}`}>
-                                                    {status}
+                                                    {displayStatus}
                                                 </span>
                                             </td>
                                             <td className="px-2 py-3 text-right whitespace-nowrap text-xs text-slate-500">
-                                                {format(new Date(item.listing_created_at), 'dd MMM yyyy', { locale: fr })}
+                                                {format(new Date(item.listing_created_at), 'dd MMM yyyy')}
                                             </td>
                                             <td className="px-2 py-3 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
                                                         onClick={() => handleViewResults(listingId)}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors shadow-sm hover:shadow whitespace-nowrap"
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors shadow-sm hover:shadow whitespace-nowrap"
                                                     >
-                                                        SHOW SEO <Eye size={12} />
+                                                        Open <Eye size={12} />
                                                     </button>
                                                     <div className="relative group/menu">
                                                         <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { DocPage, Section, Tip, TokenTable, DefList } from '@/components/docs/DocComponents';
+import { DocPage, Section, Tip, TokenTable, DefList, DocImage } from '@/components/docs/DocComponents';
 import { ArrowRight } from 'lucide-react';
 
 const tokenCosts = [
@@ -172,6 +172,11 @@ export default function DocsBillingPage() {
 
       <Section title="The Billing page">
         <p>Access the Billing page from the sidebar. It shows:</p>
+        <DocImage
+          src="/docs/billing-page.png"
+          alt="Billing page showing current plan, token balance progress bar, usage stats, and transaction history"
+          caption="The Billing page — manage your plan, tokens, and view transaction history"
+        />
         <DefList items={billingPageSections} />
       </Section>
 

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Lightbulb, AlertTriangle } from 'lucide-react';
 
 export function DocPage({ title, subtitle, children }) {
@@ -117,10 +119,38 @@ export function DefList({ items, icon: Icon }) {
   );
 }
 
+export function DocImage({ src, alt, caption }) {
+  const [show, setShow] = useState(true);
+  if (!show) return null;
+  return (
+    <figure className="my-6">
+      <div className="rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+        <img
+          src={src}
+          alt={alt}
+          className="w-full h-auto"
+          onError={() => setShow(false)}
+        />
+      </div>
+      {caption && (
+        <figcaption className="text-sm text-slate-500 mt-2 text-center">{caption}</figcaption>
+      )}
+    </figure>
+  );
+}
+
 export function InlineCode({ children }) {
   return (
     <code className="px-1.5 py-0.5 bg-slate-100 text-indigo-700 rounded text-[0.9em] font-medium">
       {children}
     </code>
+  );
+}
+
+export function DocLink({ to, children }) {
+  return (
+    <Link to={to} className="text-indigo-600 hover:text-indigo-800 font-medium">
+      {children}
+    </Link>
   );
 }

@@ -1,4 +1,4 @@
-import { DocPage, Section, DefList } from '@/components/docs/DocComponents';
+import { DocPage, Section, DefList, DocLink } from '@/components/docs/DocComponents';
 
 const colorCoding = [
   {
@@ -75,7 +75,7 @@ export default function ScoresPage() {
           listing; a generic "wall art" keyword is less so.
         </p>
         <HowToImprove>
-          Make sure your Theme, Niche, and Product Type are accurate. The AI uses these to
+          Make sure your <DocLink to="/docs/studio/analyzing">Theme, Niche, and Product Type</DocLink> are accurate. The AI uses these to
           judge relevance. If they're wrong, relevance scores across all keywords will
           suffer. Also prefer specific, descriptive keywords over broad generic ones.
         </HowToImprove>
@@ -104,7 +104,8 @@ export default function ScoresPage() {
         </p>
         <HowToImprove>
           Swap some high-competition keywords for lower-competition alternatives. Long-tail
-          keywords (3+ words) typically have lower competition. Use the Strategy Tuner with
+          keywords (3+ words) typically have lower competition. Use the{' '}
+          <DocLink to="/docs/studio/keywords">Strategy Tuner</DocLink> with
           "Ranking ease" set to High to find these automatically.
         </HowToImprove>
       </Section>

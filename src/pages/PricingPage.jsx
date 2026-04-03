@@ -4,6 +4,7 @@ import { Check, Zap, Crown, Rocket, Sparkles, ChevronDown, Shield, Package, Coin
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/pennyseo-logo.png';
+import HelpLink from '../components/ui/HelpLink';
 
 const PLANS = [
   {
@@ -191,7 +192,8 @@ const PricingPage = () => {
         </h1>
         <p className="text-lg text-slate-500 max-w-2xl mx-auto mb-10">
           Start free and scale as you grow. Every plan includes AI-powered image analysis,
-          keyword generation, and listing optimization.
+          keyword generation, and listing optimization.{' '}
+          <HelpLink to="/docs/billing" label="Learn about tokens and plans" />
         </p>
 
         {/* Monthly / Yearly Toggle */}

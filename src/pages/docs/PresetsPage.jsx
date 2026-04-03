@@ -1,4 +1,4 @@
-import { DocPage, Section, Tip, DefList } from '@/components/docs/DocComponents';
+import { DocPage, Section, Tip, DefList, DocImage, DocLink } from '@/components/docs/DocComponents';
 import { ArrowRight } from 'lucide-react';
 
 const createSteps = [
@@ -44,7 +44,8 @@ export default function PresetsPage() {
       subtitle="Create reusable keyword strategies"
     >
       <p>
-        Presets let you bundle up to 10 keywords into a named group that you can apply to
+        Presets let you bundle up to 10 keywords from your{' '}
+        <DocLink to="/docs/lab/favorites">Favorite Tags</DocLink> into a named group that you can apply to
         any listing with one click. Think of them as keyword recipes — a "Funny Nurse
         Gifts" preset, a "Minimalist Home Décor" preset, a "Holiday Gift Guide" preset —
         ready to deploy whenever you need them.
@@ -61,6 +62,11 @@ export default function PresetsPage() {
           average volume, average competition, and average CPC — so you can gauge the
           strength of your preset before saving.
         </p>
+        <DocImage
+          src="/docs/seolab-create-preset.png"
+          alt="Create Preset modal with keyword selection, filter pills, and live summary stats"
+          caption="Creating a preset — select keywords and see live aggregate stats"
+        />
         <Tip>
           Etsy allows 13 tags per listing. Presets cap at 10 to leave room for
           listing-specific keywords that make each product unique.
@@ -77,6 +83,11 @@ export default function PresetsPage() {
           displayed as styled pills. From the expanded view you can:
         </p>
         <DefList items={manageActions} icon={ArrowRight} />
+        <DocImage
+          src="/docs/seolab-presets-table.png"
+          alt="Presets table with an expanded preset showing keyword pills and aggregate stats"
+          caption="A preset expanded to show its keywords and aggregate stats"
+        />
       </Section>
 
       <Section title="Applying a preset to a listing">
@@ -92,8 +103,8 @@ export default function PresetsPage() {
           the SEO Lab.
         </p>
         <p>
-          You can also apply presets from within the SEO Studio. In the Keyword Performance
-          table, click the star icon in the header to open the Favorites picker, switch to
+          You can also apply presets from within the SEO Studio. In the{' '}
+          <DocLink to="/docs/studio/keywords">Keyword Performance table</DocLink>, click the star icon in the header to open the Favorites picker, switch to
           the <strong>Presets</strong> tab, and select a preset. Its keywords are added
           directly to your current listing.
         </p>

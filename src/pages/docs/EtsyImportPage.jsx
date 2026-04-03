@@ -1,4 +1,4 @@
-import { DocPage, Section, Tip, DefList } from '@/components/docs/DocComponents';
+import { DocPage, Section, Tip, DefList, DocImage, DocLink } from '@/components/docs/DocComponents';
 
 const statusFilters = [
   { term: 'All', description: 'Every imported listing.' },
@@ -58,6 +58,11 @@ export default function EtsyImportPage() {
           Your plan determines how many listings you can import: Free (10), Starter (50),
           Growth (150), Pro (300).
         </p>
+        <DocImage
+          src="/docs/etsy-import-grid.png"
+          alt="Etsy listing import grid showing product thumbnails with status badges and colored bottom borders"
+          caption="Browse and select your Etsy listings for import"
+        />
         <Tip>
           Start by importing your best-selling or most-viewed listings. Optimizing what
           already gets traffic gives you the fastest ROI.
@@ -96,19 +101,25 @@ export default function EtsyImportPage() {
           The shop stats bar also shows your average improvement across all optimized
           listings — a useful metric to track your overall progress.
         </p>
+        <DocImage
+          src="/docs/etsy-before-after.png"
+          alt="Before/After comparison table showing original Etsy scores versus PennySEO optimized scores with improvement deltas"
+          caption="Before/After comparison — see exactly how much PennySEO improves your listings"
+        />
       </Section>
 
       <Section title="Opening in the Studio">
         <p>
-          From any imported listing, click <strong>"Open in Studio"</strong> to start
+          From any imported listing, click <DocLink to="/docs/studio/analyzing">"Open in Studio"</DocLink> to start
           optimizing. PennySEO pre-fills everything for you: your product image is
           downloaded and uploaded, your Etsy category is mapped to a PennySEO product type,
           and your listing is ready for the full SEO workflow.
         </p>
         <p>
-          From there, the process is the same as any other listing: analyze the design,
-          generate keywords, select your 13 tags, and generate an optimized title and
-          description.
+          From there, the process is the same as any other listing:{' '}
+          <DocLink to="/docs/studio/analyzing">analyze the design</DocLink>,{' '}
+          <DocLink to="/docs/studio/keywords">generate keywords</DocLink>, select your 13 tags, and{' '}
+          <DocLink to="/docs/studio/generating">generate an optimized listing</DocLink>.
         </p>
         <Tip>
           When you open an Etsy listing in the Studio, leave the Description field empty

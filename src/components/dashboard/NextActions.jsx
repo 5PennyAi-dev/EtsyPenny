@@ -9,6 +9,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { LISTING_STATUSES, STATUS_PIPELINE } from '@/lib/listingStatuses';
+import HelpLink from '@/components/ui/HelpLink';
 
 const STATUS_TO_URL = {
   NEW: 'new',
@@ -84,7 +85,7 @@ export default function NextActions({ counts = {}, onNavigate, onNewListing, tok
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4">
-      <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Next actions</h3>
+      <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-2">Next actions <HelpLink to="/docs/dashboard" tooltip="How the Dashboard works" /></h3>
       <div className="space-y-2">
         {actionableStatuses.map((key) => {
           const status = LISTING_STATUSES[key];

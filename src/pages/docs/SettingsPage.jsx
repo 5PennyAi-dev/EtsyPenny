@@ -1,4 +1,4 @@
-import { DocPage, Section, Tip, DefList } from '@/components/docs/DocComponents';
+import { DocPage, Section, Tip, DefList, DocImage, DocLink } from '@/components/docs/DocComponents';
 import { ArrowRight } from 'lucide-react';
 
 const strategyWeights = [
@@ -90,6 +90,12 @@ export default function DocsSettingsPage() {
         well. But if you want more control, it's all here.
       </p>
 
+      <DocImage
+        src="/docs/settings-page.png"
+        alt="Settings page showing SEO Strategy Weights accordion with segmented controls"
+        caption="Settings — fine-tune how PennySEO ranks and selects keywords"
+      />
+
       <Section title="SEO Strategy Weights">
         <p>
           Five sliders that control how PennySEO ranks and selects keywords across all your
@@ -129,7 +135,8 @@ export default function DocsSettingsPage() {
         <DefList items={shopIdentity} icon={ArrowRight} />
         <p>
           Custom themes and niches appear alongside PennySEO's built-in taxonomy in all
-          dropdown menus throughout the app. They're scoped to your account — other users
+          dropdown menus throughout the app, including the{' '}
+          <DocLink to="/docs/studio/analyzing">Studio</DocLink>. They're scoped to your account — other users
           don't see them.
         </p>
       </Section>

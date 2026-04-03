@@ -1,4 +1,4 @@
-import { DocPage, Section, Tip, DefList } from '@/components/docs/DocComponents';
+import { DocPage, Section, Tip, DefList, DocImage, DocLink } from '@/components/docs/DocComponents';
 
 const quickStats = [
   {
@@ -32,6 +32,12 @@ export default function DashboardPage() {
         The Dashboard gives you a bird's-eye view of your SEO progress across all your
         listings. It shows what's working, what needs attention, and what to do next.
       </p>
+
+      <DocImage
+        src="/docs/dashboard-full.png"
+        alt="Full PennySEO Dashboard showing Quick Stats, Pipeline Bar, Shop Health gauges, Recent Listings, and Trending Keywords"
+        caption="Your Dashboard — the SEO command center for your shop"
+      />
 
       <Section title="Quick Stats">
         <p>The top row displays four key metrics at a glance:</p>
@@ -93,7 +99,7 @@ export default function DashboardPage() {
         <p>
           A table showing your most recently updated listings with thumbnail, product name,
           keyword count, SEO score, status, date, and an action button to open the listing
-          in the Studio.
+          in the <DocLink to="/docs/studio/analyzing">Studio</DocLink>.
         </p>
         <p>
           Etsy-imported listings show an orange <strong>"Etsy"</strong> badge on their

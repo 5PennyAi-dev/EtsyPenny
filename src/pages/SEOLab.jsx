@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import CreatePresetModal from '../components/studio/CreatePresetModal';
 import ApplyPresetModal from '../components/studio/ApplyPresetModal';
+import HelpLink from '../components/ui/HelpLink';
 
 // --- Sparkline (copied from ResultsDisplay for self-containment) ---
 const Sparkline = ({ data }) => {
@@ -1459,6 +1460,7 @@ const SEOLab = () => {
           >
             Favorite Tags
           </button>
+          {view === 'keywords' && <HelpLink to="/docs/lab/favorites" tooltip="How to use your keyword bank" />}
           <button
             onClick={() => setView('presets')}
             className={`py-3 px-1 text-sm font-semibold transition-colors border-b-2 flex items-center gap-2 ${
@@ -1470,6 +1472,7 @@ const SEOLab = () => {
             My Presets
             {presets.length > 0 && <span className="text-xs bg-slate-100 text-slate-600 py-0.5 px-2 rounded-full">{presets.length}</span>}
           </button>
+          {view === 'presets' && <HelpLink to="/docs/lab/presets" tooltip="How presets work" />}
         </div>
 
         {/* Filter Pills - Only on keywords view */}

@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import SeoBadge from './SeoBadge';
 import { StepBadge } from '../ui/StepBadge';
+import HelpLink from '../ui/HelpLink';
 
 const Sparkline = ({ data }) => {
   if (!data || data.length === 0) return <div className="text-slate-300 text-xs">-</div>;
@@ -326,6 +327,7 @@ const SidebarSkeleton = ({ phase }) => (
                 <h3 className="text-base font-black text-slate-800 leading-tight">
                     Listing overall<br/>score
                 </h3>
+                <HelpLink to="/docs/scores" tooltip="What your scores mean" />
                 <div className="flex-shrink-0 mt-0.5">
                     <RadialGauge value={score} tier={mainTier} />
                 </div>
@@ -625,15 +627,16 @@ const SidebarSkeleton = ({ phase }) => (
   
 
   
-    // Auto-resize description with robust handling
+    // Auto-resize description up to max height, then scroll
     useLayoutEffect(() => {
       if (descriptionRef.current) {
-          // Reset height to auto to correctly calculate scrollHeight
           descriptionRef.current.style.height = 'auto';
-          // Set height to scrollHeight
-          descriptionRef.current.style.height = descriptionRef.current.scrollHeight + 'px';
+          const maxH = 300;
+          const scrollH = descriptionRef.current.scrollHeight;
+          descriptionRef.current.style.height = Math.min(scrollH, maxH) + 'px';
+          descriptionRef.current.style.overflowY = scrollH > maxH ? 'auto' : 'hidden';
       }
-    }, [displayedDescription, isGeneratingDraft]); // Add isGeneratingDraft to trigger on mount/visible
+    }, [displayedDescription, isGeneratingDraft]);
     
     // Sync local state when results change (e.g. after draft generation)
     useEffect(() => {
@@ -916,6 +919,7 @@ const SidebarSkeleton = ({ phase }) => (
                               <StepBadge number={2} />
                               <BarChart3 size={16} className="text-indigo-600" />
                               <span className="text-sm font-bold text-slate-900">Keyword Research</span>
+                              <HelpLink to="/docs/studio/keywords" tooltip="How keyword research works" />
                               {results?.listing_strength != null && (
                                   <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${
                                       (results.listing_strength ?? results.global_strength) >= 80
@@ -1018,6 +1022,7 @@ const SidebarSkeleton = ({ phase }) => (
                     <div className="flex items-center gap-2">
                         <TrendingUp size={16} className={`text-indigo-600 ${!results ? 'text-slate-400' : ''}`} />
                         <span className="text-sm font-bold text-slate-900">Keyword Performance</span>
+                        <HelpLink to="/docs/studio/keywords" tooltip="How to read the keyword table" />
                          {results?.etsyOriginalScore != null && results?.listing_strength != null &&
                           results.etsyOriginalScore !== results.listing_strength && (() => {
                             const d = results.listing_strength - results.etsyOriginalScore;
@@ -1533,6 +1538,7 @@ const SidebarSkeleton = ({ phase }) => (
                         <StepBadge number={3} />
                         <Info size={16} className="text-indigo-600" />
                         <span className="text-sm font-bold text-slate-900">Listing Editor</span>
+                        <HelpLink to="/docs/studio/generating" tooltip="How listing generation works" />
                     </div>
                 }
                 headerActions={
@@ -1633,7 +1639,7 @@ const SidebarSkeleton = ({ phase }) => (
                                             value={displayedDescription}
                                             onChange={(e) => setDisplayedDescription(e.target.value)}
                                             placeholder="Product description will appear here..."
-                                            className="w-full px-3 py-2 text-sm text-slate-700 bg-slate-50/50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none transition-all custom-scrollbar overflow-hidden min-h-[200px]"
+                                            className="w-full px-3 py-2 text-sm text-slate-700 bg-slate-50/50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none transition-all custom-scrollbar min-h-[200px]"
                                         />
                                     </div>
 
