@@ -87,8 +87,8 @@ export default function ImportActionBar({
           </>
         )}
 
-        {/* Export mode */}
-        {selectionMode === 'export' && (
+        {/* TODO: re-enable when Etsy API license is approved */}
+        {false && selectionMode === 'export' && (
           <>
             {exportCount > 5 && (
               <span className="text-xs text-rose-600 font-medium">

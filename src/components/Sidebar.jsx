@@ -18,7 +18,7 @@ const Sidebar = () => {
     { name: 'SEO Studio', icon: Shirt, path: '/studio' },
     { name: 'SEO History', icon: LineChart, path: '/history' },
     { name: 'SEO Lab', icon: FlaskConical, path: '/lab' },
-    { name: 'My Shop', icon: Store, path: '/shop' },
+    // { name: 'My Shop', icon: Store, path: '/shop' }, // TODO: re-enable when Etsy API license is approved
     { name: 'Billing', icon: CreditCard, path: '/billing' },
   ];
 

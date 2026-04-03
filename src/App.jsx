@@ -67,14 +67,8 @@ function App() {
               </ProtectedRoute>
             } 
           />
-          <Route 
-            path="/shop" 
-            element={
-              <ProtectedRoute>
-                <MyShopPage />
-              </ProtectedRoute>
-            } 
-          />
+          {/* TODO: re-enable when Etsy API license is approved */}
+          <Route path="/shop" element={<Navigate to="/dashboard" replace />} />
           <Route 
             path="/lab" 
             element={
