@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-import { Loader2, Mail, Lock, AlertCircle, ArrowRight, Eye, EyeOff, Sparkles, Target, TrendingUp, Shield } from 'lucide-react';
+import { Loader2, Mail, Lock, AlertCircle, CheckCircle, ArrowRight, Eye, EyeOff, Sparkles, Target, TrendingUp, Shield } from 'lucide-react';
 import pennyseoLogo from '../assets/pennyseo-logo.png';
 
 const GoogleIcon = () => (
@@ -19,9 +19,11 @@ const LoginPage = () => {
   const location = useLocation();
   const from = location.state?.from?.pathname || '/studio';
 
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('sign_in');
+  const [signupSuccess, setSignupSuccess] = useState(false);
+  const [view, setView] = useState(searchParams.get('mode') === 'sign_up' ? 'sign_up' : 'sign_in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -46,6 +48,7 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSignupSuccess(false);
 
     try {
       if (view === 'sign_up') {
@@ -68,7 +71,7 @@ const LoginPage = () => {
           return;
         }
         if (data.user) {
-          setError('Please check your email for the confirmation link.');
+          setSignupSuccess(true);
           setLoading(false);
           return;
         }
@@ -226,7 +229,7 @@ const LoginPage = () => {
             {/* Tab switcher */}
             <div className="flex border-b border-slate-200 mb-8">
               <button
-                onClick={() => { setView('sign_in'); setError(null); }}
+                onClick={() => { setView('sign_in'); setError(null); setSignupSuccess(false); }}
                 className={`pb-3 px-1 mr-6 text-sm font-semibold border-b-2 transition-colors ${
                   view === 'sign_in'
                     ? 'border-indigo-600 text-indigo-600'
@@ -236,7 +239,7 @@ const LoginPage = () => {
                 Sign in
               </button>
               <button
-                onClick={() => { setView('sign_up'); setError(null); }}
+                onClick={() => { setView('sign_up'); setError(null); setSignupSuccess(false); }}
                 className={`pb-3 px-1 text-sm font-semibold border-b-2 transition-colors ${
                   view === 'sign_up'
                     ? 'border-indigo-600 text-indigo-600'
@@ -275,6 +278,17 @@ const LoginPage = () => {
               <span className="text-[13px] text-slate-400 whitespace-nowrap">or continue with email</span>
               <div className="flex-1 h-px bg-slate-200" />
             </div>
+
+            {/* Signup Success */}
+            {signupSuccess && (
+              <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-start gap-3 text-sm mb-4">
+                <CheckCircle size={18} className="shrink-0 mt-0.5" />
+                <div>
+                  <span>Almost there! Check your inbox for a confirmation link to activate your account.</span>
+                  <p className="text-xs text-slate-400 mt-1">Didn't receive it? Check your spam folder.</p>
+                </div>
+              </div>
+            )}
 
             {/* Error Alert */}
             {error && (
@@ -365,7 +379,7 @@ const LoginPage = () => {
             <p className="text-sm text-slate-500 text-center mt-5">
               {view === 'sign_in' ? "Don't have an account? " : 'Already have an account? '}
               <button
-                onClick={() => { setView(view === 'sign_in' ? 'sign_up' : 'sign_in'); setError(null); }}
+                onClick={() => { setView(view === 'sign_in' ? 'sign_up' : 'sign_in'); setError(null); setSignupSuccess(false); }}
                 className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors"
               >
                 {view === 'sign_in' ? 'Create one for free' : 'Sign in'}

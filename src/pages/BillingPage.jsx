@@ -9,9 +9,9 @@ import Layout from '../components/Layout';
 import HelpLink from '../components/ui/HelpLink';
 
 const PACKS = [
-  { name: '50 tokens', tokens: 50, price: 5, priceId: 'price_1TF0gQGxl45RKlyAsXzyORjo', perToken: '0.10' },
-  { name: '150 tokens', tokens: 150, price: 12, priceId: 'price_1TF0gvGxl45RKlyAQqgFwnRW', popular: true, perToken: '0.08' },
-  { name: '500 tokens', tokens: 500, price: 35, priceId: 'price_1TF0iEGxl45RKlyAsANZkvst', perToken: '0.07' },
+  { name: '50 tokens', tokens: 50, price: 5, priceId: import.meta.env.VITE_STRIPE_PRICE_PACK_50, perToken: '0.10' },
+  { name: '150 tokens', tokens: 150, price: 12, priceId: import.meta.env.VITE_STRIPE_PRICE_PACK_150, popular: true, perToken: '0.08' },
+  { name: '500 tokens', tokens: 500, price: 35, priceId: import.meta.env.VITE_STRIPE_PRICE_PACK_500, perToken: '0.07' },
 ];
 
 const STATUS_COLORS = {

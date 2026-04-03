@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle, Search, Target, Zap, Star, Upload, Store, Sparkles, TrendingUp, Loader2, Send } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { CheckCircle, Search, Target, Star, Upload, Store, Sparkles, TrendingUp, Loader2, Send, ArrowRight } from 'lucide-react';
+// TODO: re-enable if needed — waitlist uses supabase
+// import { supabase } from '@/lib/supabase';
 import axios from 'axios';
 import logo from '../assets/pennyseo-logo.png';
 import dashboardPreview from '../assets/dashboard_preview.jpg';
 import fivePennyLogo from '../assets/5pennyAi_logo.png';
 
 const LandingPage = () => {
-  const [email, setEmail] = useState('');
-  const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
+  // TODO: re-enable if needed — waitlist state
+  // const [email, setEmail] = useState('');
+  // const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
   // Contact form state
   const [contactName, setContactName] = useState('');
@@ -37,28 +39,25 @@ const LandingPage = () => {
     }
   };
 
-  const handleJoinWaitlist = async (e) => {
-    e.preventDefault();
-    if (!email || !email.includes('@')) return;
-
-    setStatus('loading');
-
-    const { error } = await supabase
-      .from('waitlist')
-      .insert({ email: email.toLowerCase().trim() });
-
-    if (error) {
-      if (error.code === '23505') {
-        setStatus('success'); // Don't reveal if email already exists
-      } else {
-        setStatus('error');
-      }
-    } else {
-      setStatus('success');
-    }
-
-    setEmail('');
-  };
+  // TODO: re-enable if needed — waitlist handler
+  // const handleJoinWaitlist = async (e) => {
+  //   e.preventDefault();
+  //   if (!email || !email.includes('@')) return;
+  //   setStatus('loading');
+  //   const { error } = await supabase
+  //     .from('waitlist')
+  //     .insert({ email: email.toLowerCase().trim() });
+  //   if (error) {
+  //     if (error.code === '23505') {
+  //       setStatus('success');
+  //     } else {
+  //       setStatus('error');
+  //     }
+  //   } else {
+  //     setStatus('success');
+  //   }
+  //   setEmail('');
+  // };
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -81,9 +80,12 @@ const LandingPage = () => {
             Pricing
           </Link>
           <span className="text-slate-300">|</span>
-          <span className="flex items-center gap-2 text-sm font-medium text-slate-500">
-            Powered by <img src={fivePennyLogo} alt="5PennyAi" className="h-5 object-contain" />
-          </span>
+          <Link to="/login" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 px-4 py-1.5 rounded-lg transition-colors">
+            Sign in
+          </Link>
+          <Link to="/login?mode=sign_up" className="text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-1.5 rounded-lg transition-colors">
+            Get started
+          </Link>
         </div>
       </nav>
 
@@ -91,7 +93,7 @@ const LandingPage = () => {
       <section className="max-w-7xl mx-auto px-6 py-12 md:py-20 grid lg:grid-cols-2 gap-12 items-center">
         <div>
           <span className="inline-block px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-sm font-bold mb-6">
-            🚀 Coming Soon for Marketplace Sellers
+            🚀 Now in Open Beta
           </span>
           <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight mb-6">
             Product SEO is no longer a <span className="text-indigo-600">guessing game.</span>
@@ -100,39 +102,18 @@ const LandingPage = () => {
             The first AI-powered tool that <span className="font-bold text-slate-800">sees</span> your product mockups to predict market trends. Rank higher, save time, and sell more.
           </p>
 
-          {status === 'success' ? (
-            <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-xl flex items-center gap-3">
-              <CheckCircle /> You're on the list! We'll be in touch soon.
-            </div>
-          ) : (
-            <>
-              <form onSubmit={handleJoinWaitlist} className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="email"
-                  placeholder="Enter your email address"
-                  required
-                  className="flex-1 px-5 py-4 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none transition-all"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={status === 'loading'}
-                />
-                <button
-                  disabled={status === 'loading'}
-                  className="bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold px-8 py-4 rounded-xl shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 shrink-0"
-                >
-                  {status === 'loading' ? (
-                    <><Loader2 size={18} className="animate-spin" /> Joining...</>
-                  ) : (
-                    <>Join Waitlist <Zap size={18} fill="currentColor" /></>
-                  )}
-                </button>
-              </form>
-              {status === 'error' && (
-                <p className="mt-2 text-sm text-rose-500">Something went wrong, please try again.</p>
-              )}
-            </>
-          )}
-          <p className="mt-4 text-sm text-slate-400">Join 100+ sellers waiting for early access.</p>
+          <div className="flex flex-col sm:flex-row items-start gap-4">
+            <Link
+              to="/login?mode=sign_up"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-4 rounded-xl shadow-lg shadow-indigo-200 transition-all hover:scale-[1.02] flex items-center gap-2"
+            >
+              Get started free <ArrowRight size={18} />
+            </Link>
+          </div>
+          <p className="mt-4 text-sm text-slate-500">
+            Already have an account? <Link to="/login" className="text-indigo-600 font-semibold hover:text-indigo-700">Sign in</Link>
+          </p>
+          <p className="mt-2 text-sm text-slate-400">Free to try · 30 tokens included · No credit card required</p>
         </div>
 
         {/* Dashboard Preview Overlay */}
@@ -155,8 +136,8 @@ const LandingPage = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {[
             { icon: Upload, title: 'Upload Your Product Image', desc: 'Upload a mockup or product photo. Our AI analyzes visual elements like colors, typography, and style.' },
-            { icon: Store, title: 'Connect Your Shop', desc: 'Link your shop profile to personalize SEO recommendations to match your brand voice and identity.' },
-            { icon: Sparkles, title: 'Get Optimized SEO Tags', desc: 'Receive AI-generated titles, descriptions, and keyword tags scored by volume, competition, and buyer intent.' },
+            { icon: Store, title: 'Connect Your Shop (coming soon)', desc: 'Soon, link your Etsy shop directly to import listings and publish optimized content in one click.' },
+            { icon: Sparkles, title: 'Get Optimized Tags, Title & Description', desc: 'Receive AI-generated tags, titles, and descriptions — every keyword scored by volume, competition, and buyer intent.' },
             { icon: TrendingUp, title: 'Publish & Rank Higher', desc: 'Apply the optimized tags to your listings and watch your visibility grow.' },
           ].map(({ icon: Icon, title, desc }, i) => (
             <div key={i} className="text-center space-y-4">

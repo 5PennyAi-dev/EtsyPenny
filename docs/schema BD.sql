@@ -31,6 +31,45 @@ CREATE TABLE public.customers (
   CONSTRAINT customers_pkey PRIMARY KEY (id),
   CONSTRAINT customers_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
+CREATE TABLE public.etsy_listings (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  connection_id uuid NOT NULL,
+  listing_id uuid,
+  etsy_listing_id bigint NOT NULL,
+  original_title text,
+  original_description text,
+  original_tags ARRAY DEFAULT '{}'::text[],
+  original_image_url text,
+  thumbnail_url text,
+  etsy_url text,
+  etsy_state text,
+  tag_count smallint DEFAULT 0,
+  original_score smallint,
+  scoring_status text DEFAULT 'pending'::text CHECK (scoring_status = ANY (ARRAY['pending'::text, 'scoring'::text, 'scored'::text, 'error'::text])),
+  scored_at timestamp with time zone,
+  imported_at timestamp with time zone DEFAULT now(),
+  last_synced_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT etsy_listings_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_el_user FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT fk_el_connection FOREIGN KEY (connection_id) REFERENCES public.etsy_shop_connections(id),
+  CONSTRAINT fk_el_listing FOREIGN KEY (listing_id) REFERENCES public.listings(id)
+);
+CREATE TABLE public.etsy_shop_connections (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  etsy_shop_id bigint NOT NULL,
+  shop_name text,
+  shop_url text,
+  access_token text,
+  refresh_token text,
+  token_expires_at timestamp with time zone,
+  is_active boolean DEFAULT true,
+  connected_at timestamp with time zone DEFAULT now(),
+  last_synced_at timestamp with time zone,
+  CONSTRAINT etsy_shop_connections_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_esc_user FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
 CREATE TABLE public.feedback (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
@@ -155,6 +194,7 @@ CREATE TABLE public.listings (
   listing_raw_visibility_index smallint,
   is_generating_seo boolean DEFAULT false,
   seo_generation_count integer DEFAULT 0,
+  source text DEFAULT 'manual'::text,
   CONSTRAINT listings_pkey PRIMARY KEY (id),
   CONSTRAINT listings_niche_id_fkey FOREIGN KEY (niche_id) REFERENCES public.niches(id),
   CONSTRAINT listings_sub_niche_id_fkey FOREIGN KEY (sub_niche_id) REFERENCES public.sub_niches(id),
@@ -223,6 +263,7 @@ CREATE TABLE public.plans (
   price_yearly_usd numeric,
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
+  etsy_import_limit integer DEFAULT 10,
   CONSTRAINT plans_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.prices (

@@ -11,21 +11,21 @@ export function getStripe(): Stripe {
   return _stripe;
 }
 
-// Price ID → plan ID mapping
+// Price ID → plan ID mapping (reads from STRIPE_PRICE_* env vars)
 export const PRICE_TO_PLAN: Record<string, string> = {
-  'price_1TF0cxGxl45RKlyAP21opNxV': 'starter', // monthly
-  'price_1TF0dqGxl45RKlyALp605XNZ': 'starter', // yearly
-  'price_1TF0ePGxl45RKlyA8F1P5Xo0': 'growth',  // monthly
-  'price_1TF0eiGxl45RKlyAPKRgNgxg': 'growth',  // yearly
-  'price_1TF0fjGxl45RKlyARuGw7Qi0': 'pro',     // monthly
-  'price_1TF0fSGxl45RKlyAJOSBzYrV': 'pro',     // yearly
+  [process.env.STRIPE_PRICE_STARTER_MONTHLY!]: 'starter',
+  [process.env.STRIPE_PRICE_STARTER_YEARLY!]:  'starter',
+  [process.env.STRIPE_PRICE_GROWTH_MONTHLY!]:  'growth',
+  [process.env.STRIPE_PRICE_GROWTH_YEARLY!]:   'growth',
+  [process.env.STRIPE_PRICE_PRO_MONTHLY!]:     'pro',
+  [process.env.STRIPE_PRICE_PRO_YEARLY!]:      'pro',
 };
 
-// Price ID → token pack amount mapping
+// Price ID → token pack amount mapping (reads from STRIPE_PRICE_* env vars)
 export const PRICE_TO_PACK: Record<string, number> = {
-  'price_1TF0gQGxl45RKlyAsXzyORjo': 50,
-  'price_1TF0gvGxl45RKlyAQqgFwnRW': 150,
-  'price_1TF0iEGxl45RKlyAsANZkvst': 500,
+  [process.env.STRIPE_PRICE_PACK_50!]:  50,
+  [process.env.STRIPE_PRICE_PACK_150!]: 150,
+  [process.env.STRIPE_PRICE_PACK_500!]: 500,
 };
 
 export const PLAN_TOKENS: Record<string, number> = {

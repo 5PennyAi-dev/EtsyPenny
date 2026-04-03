@@ -22,8 +22,8 @@ const PLANS = [
   {
     id: 'starter', name: 'Starter', monthlyPrice: 9, yearlyPrice: 90,
     tokens: 100, icon: Sparkles,
-    priceIdMonthly: 'price_1TF0cxGxl45RKlyAP21opNxV',
-    priceIdYearly: 'price_1TF0dqGxl45RKlyALp605XNZ',
+    priceIdMonthly: import.meta.env.VITE_STRIPE_PRICE_STARTER_MONTHLY,
+    priceIdYearly: import.meta.env.VITE_STRIPE_PRICE_STARTER_YEARLY,
     features: [
       '100 tokens/month (10 complete listings)',
       'Everything in Free',
@@ -35,8 +35,8 @@ const PLANS = [
   {
     id: 'growth', name: 'Growth', monthlyPrice: 19, yearlyPrice: 190,
     tokens: 250, icon: Rocket, popular: true,
-    priceIdMonthly: 'price_1TF0ePGxl45RKlyA8F1P5Xo0',
-    priceIdYearly: 'price_1TF0eiGxl45RKlyAPKRgNgxg',
+    priceIdMonthly: import.meta.env.VITE_STRIPE_PRICE_GROWTH_MONTHLY,
+    priceIdYearly: import.meta.env.VITE_STRIPE_PRICE_GROWTH_YEARLY,
     features: [
       '250 tokens/month (25 complete listings)',
       'Everything in Starter',
@@ -49,8 +49,8 @@ const PLANS = [
   {
     id: 'pro', name: 'Pro', monthlyPrice: 39, yearlyPrice: 390,
     tokens: 700, icon: Crown,
-    priceIdMonthly: 'price_1TF0fjGxl45RKlyARuGw7Qi0',
-    priceIdYearly: 'price_1TF0fSGxl45RKlyAJOSBzYrV',
+    priceIdMonthly: import.meta.env.VITE_STRIPE_PRICE_PRO_MONTHLY,
+    priceIdYearly: import.meta.env.VITE_STRIPE_PRICE_PRO_YEARLY,
     features: [
       '700 tokens/month (70 complete listings)',
       'Everything in Growth',
@@ -62,9 +62,9 @@ const PLANS = [
 ];
 
 const PACKS = [
-  { name: '50 tokens', tokens: 50, price: 5, priceId: 'price_1TF0gQGxl45RKlyAsXzyORjo', perToken: '0.10' },
-  { name: '150 tokens', tokens: 150, price: 12, priceId: 'price_1TF0gvGxl45RKlyAQqgFwnRW', popular: true, perToken: '0.08' },
-  { name: '500 tokens', tokens: 500, price: 35, priceId: 'price_1TF0iEGxl45RKlyAsANZkvst', perToken: '0.07' },
+  { name: '50 tokens', tokens: 50, price: 5, priceId: import.meta.env.VITE_STRIPE_PRICE_PACK_50, perToken: '0.10' },
+  { name: '150 tokens', tokens: 150, price: 12, priceId: import.meta.env.VITE_STRIPE_PRICE_PACK_150, popular: true, perToken: '0.08' },
+  { name: '500 tokens', tokens: 500, price: 35, priceId: import.meta.env.VITE_STRIPE_PRICE_PACK_500, perToken: '0.07' },
 ];
 
 const FAQ_ITEMS = [
