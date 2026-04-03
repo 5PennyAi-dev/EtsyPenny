@@ -13,7 +13,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { priceId, userId, mode } = req.body;
     // mode: 'subscription' | 'payment'
 
+    console.log('[create-checkout] received:', { priceId, userId, mode });
+
     if (!priceId || !userId || !mode) {
+      console.error('[create-checkout] 400 — missing field:', {
+        priceId: priceId ?? 'MISSING',
+        userId: userId ?? 'MISSING',
+        mode: mode ?? 'MISSING',
+      });
       return res.status(400).json({ error: 'Missing priceId, userId, or mode' });
     }
 

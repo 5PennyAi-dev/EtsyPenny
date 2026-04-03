@@ -39,6 +39,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   console.info(`[stripe-webhook] event=${event.type} id=${event.id}`);
+  console.info('[stripe-webhook] PRICE_TO_PLAN keys:', Object.keys(PRICE_TO_PLAN));
+  console.info('[stripe-webhook] PRICE_TO_PACK keys:', Object.keys(PRICE_TO_PACK));
 
   try {
     switch (event.type) {
@@ -54,6 +56,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
           const priceId = subscription.items.data[0]?.price?.id;
           const planId = PRICE_TO_PLAN[priceId ?? ''];
+          if (!planId) {
+            console.error('[stripe-webhook] Unknown subscription priceId:', priceId, '— known:', Object.keys(PRICE_TO_PLAN));
+          }
           const newTokens = PLAN_TOKENS[planId ?? ''] ?? 0;
 
           const resetAt = new Date();
@@ -109,6 +114,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
           const priceId = lineItems.data[0]?.price?.id;
           const tokenAmount = PRICE_TO_PACK[priceId ?? ''];
+          if (!tokenAmount) {
+            console.error('[stripe-webhook] Unknown pack priceId:', priceId, '— known:', Object.keys(PRICE_TO_PACK));
+          }
           if (tokenAmount) {
             const { data: profile } = await supabaseAdmin
               .from('profiles')
