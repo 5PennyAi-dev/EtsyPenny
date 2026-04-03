@@ -191,6 +191,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           balance_after: balanceAfter,
           description: `Monthly renewal — ${planId} plan (${newTokens} tokens)`,
         });
+        console.info(`[stripe-webhook] renewal: user=${userId} plan=${planId} tokens=${newTokens}`);
         break;
       }
 

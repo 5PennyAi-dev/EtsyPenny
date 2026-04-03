@@ -52,6 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       mode: mode as 'subscription' | 'payment',
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
       success_url: `${appUrl}/billing?success=true`,
       cancel_url: `${appUrl}/billing?canceled=true`,
       metadata: { user_id: userId },
