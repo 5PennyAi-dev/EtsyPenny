@@ -258,7 +258,7 @@ const LoginPage = () => {
               <p className="text-sm text-slate-500">
                 {view === 'sign_in'
                   ? 'Sign in to your account'
-                  : 'No credit card required · 30 tokens included'}
+                  : 'No credit card required · 15 tokens included'}
               </p>
             </div>
 
@@ -404,7 +404,7 @@ const LoginPage = () => {
                 <Shield size={12} /> Secure
               </span>
               <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                <Sparkles size={12} /> 30 free tokens
+                <Sparkles size={12} /> 15 free tokens
               </span>
               <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
                 <ArrowRight size={12} className="rotate-180" /> No credit card

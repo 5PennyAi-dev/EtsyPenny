@@ -161,8 +161,8 @@ export default function KeywordResearchPage() {
       <Section title="Generating keywords">
         <p>
           Once your product is <DocLink to="/docs/studio/analyzing">analyzed</DocLink> (image + product type), click{' '}
-          <strong>"Generate SEO"</strong> in the Keyword Research accordion header (8
-          tokens, or 4 tokens to re-generate).
+          <strong>"Generate SEO"</strong> in the Keyword Research accordion header (3
+          tokens, or 2 tokens to re-generate).
         </p>
         <p>
           PennySEO generates keywords across six different angles: core product terms,

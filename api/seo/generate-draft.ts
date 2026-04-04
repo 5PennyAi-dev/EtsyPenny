@@ -78,7 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!shop_context) {
         const { data: profile } = await supabaseAdmin
           .from('profiles')
-          .select('shop_name, shop_bio, target_audience, brand_tone, brand_keywords, signature_text')
+          .select('shop_name, shop_bio, target_audience, brand_tone, brand_keywords')
           .eq('id', user_id)
           .single();
 
@@ -89,7 +89,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             target_audience: profile.target_audience,
             brand_tone: profile.brand_tone,
             brand_keywords: profile.brand_keywords,
-            signature_text: profile.signature_text,
           };
         }
       }
@@ -143,7 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 ${briefLines}
 ${shop_context?.shop_name ? `
 # SHOP IDENTITY (secondary — use for sign-off only, NOT for tone)
-- Shop: ${shop_context.shop_name}${shop_context?.brand_tone ? `\n- Brand tone: ${shop_context.brand_tone}` : ''}${shop_context?.signature_text ? `\n- Sign-off: ${shop_context.signature_text}` : ''}` : ''}
+- Shop: ${shop_context.shop_name}${shop_context?.brand_tone ? `\n- Brand tone: ${shop_context.brand_tone}` : ''}` : ''}
 
 ---
 
@@ -189,9 +188,6 @@ Write a 2-section description.
 - Format: markdown bullets (- or •)
 - Include product quality, material, design details, and who it's perfect for
 - Weave in remaining SEO keywords here
-${shop_context?.signature_text ? `
-## Sign-off
-End with exactly: "${shop_context.signature_text}"` : ''}
 
 # OUTPUT FORMAT
 Respond with ONLY this JSON, no other text:

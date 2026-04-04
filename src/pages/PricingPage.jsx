@@ -9,9 +9,9 @@ import HelpLink from '../components/ui/HelpLink';
 const PLANS = [
   {
     id: 'free', name: 'Free', monthlyPrice: 0, yearlyPrice: 0,
-    tokens: 30, icon: Zap, priceIdMonthly: null, priceIdYearly: null,
+    tokens: 15, icon: Zap, priceIdMonthly: null, priceIdYearly: null,
     features: [
-      '30 tokens/month (3 complete listings)',
+      '15 tokens/month (3 complete listings)',
       'AI image analysis',
       '130+ keywords per listing',
       'AI title & description',
@@ -25,7 +25,7 @@ const PLANS = [
     priceIdMonthly: import.meta.env.VITE_STRIPE_PRICE_STARTER_MONTHLY,
     priceIdYearly: import.meta.env.VITE_STRIPE_PRICE_STARTER_YEARLY,
     features: [
-      '100 tokens/month (10 complete listings)',
+      '100 tokens/month (20 complete listings)',
       'Everything in Free',
       '50 custom keywords/month',
       '100 favorites/month',
@@ -38,7 +38,7 @@ const PLANS = [
     priceIdMonthly: import.meta.env.VITE_STRIPE_PRICE_GROWTH_MONTHLY,
     priceIdYearly: import.meta.env.VITE_STRIPE_PRICE_GROWTH_YEARLY,
     features: [
-      '250 tokens/month (25 complete listings)',
+      '250 tokens/month (50 complete listings)',
       'Everything in Starter',
       '150 custom keywords/month',
       '300 favorites/month',
@@ -48,11 +48,11 @@ const PLANS = [
   },
   {
     id: 'pro', name: 'Pro', monthlyPrice: 39, yearlyPrice: 390,
-    tokens: 700, icon: Crown,
+    tokens: 750, icon: Crown,
     priceIdMonthly: import.meta.env.VITE_STRIPE_PRICE_PRO_MONTHLY,
     priceIdYearly: import.meta.env.VITE_STRIPE_PRICE_PRO_YEARLY,
     features: [
-      '700 tokens/month (70 complete listings)',
+      '750 tokens/month (150 complete listings)',
       'Everything in Growth',
       '500 custom keywords/month',
       'Unlimited favorites',
@@ -70,7 +70,7 @@ const PACKS = [
 const FAQ_ITEMS = [
   {
     q: 'What are tokens and how do they work?',
-    a: 'Tokens are the currency of PennySEO. Each action costs a specific number of tokens: image analysis costs 1 token, full keyword generation costs 8 tokens (4 for re-runs), and draft generation costs 1 token. A complete listing optimization uses about 10 tokens total.',
+    a: 'Tokens are the currency of PennySEO. Each action costs a specific number of tokens: image analysis costs 1 token, full keyword generation costs 3 tokens (2 for re-runs), and draft generation costs 1 token. A complete listing optimization uses about 5 tokens total.',
   },
   {
     q: 'How does billing work?',

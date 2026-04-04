@@ -2,8 +2,8 @@ import { supabaseAdmin } from '../supabase/server.js';
 
 export const TOKEN_COSTS = {
   analyze_image: 1,
-  generate_keywords: 8,
-  rerun_keywords: 4,
+  generate_keywords: 3,
+  rerun_keywords: 2,
   generate_draft: 1,
   etsy_score: 3,
 } as const;

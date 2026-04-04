@@ -105,7 +105,7 @@ const BillingPage = () => {
   const subscriptionStatus = profile.subscription_status || 'active';
   const monthlyBalance = profile.tokens_monthly_balance ?? 0;
   const bonusBalance = profile.tokens_bonus_balance ?? 0;
-  const tokensPerMonth = plan?.tokens_per_month ?? 30;
+  const tokensPerMonth = plan?.tokens_per_month ?? 15;
   const monthlyUsed = tokensPerMonth - monthlyBalance;
   const monthlyPercent = tokensPerMonth > 0 ? Math.min((monthlyUsed / tokensPerMonth) * 100, 100) : 0;
 

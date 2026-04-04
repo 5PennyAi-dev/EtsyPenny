@@ -29,8 +29,8 @@ export const PRICE_TO_PACK: Record<string, number> = {
 };
 
 export const PLAN_TOKENS: Record<string, number> = {
-  free: 30,
+  free: 15,
   starter: 100,
   growth: 250,
-  pro: 700,
+  pro: 750,
 };

@@ -113,7 +113,7 @@ const LandingPage = () => {
           <p className="mt-4 text-sm text-slate-500">
             Already have an account? <Link to="/login" className="text-indigo-600 font-semibold hover:text-indigo-700">Sign in</Link>
           </p>
-          <p className="mt-2 text-sm text-slate-400">Free to try · 30 tokens included · No credit card required</p>
+          <p className="mt-2 text-sm text-slate-400">Free to try · 15 tokens included · No credit card required</p>
         </div>
 
         {/* Dashboard Preview Overlay */}

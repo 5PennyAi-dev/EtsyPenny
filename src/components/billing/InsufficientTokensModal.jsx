@@ -3,8 +3,8 @@ import { AlertTriangle, X, Coins, ArrowUpRight } from 'lucide-react';
 
 const ACTION_LABELS = {
   analyze_image: 'Analyze image (1 token)',
-  generate_keywords: 'Generate keywords (8 tokens)',
-  rerun_keywords: 'Re-run keywords (4 tokens)',
+  generate_keywords: 'Generate keywords (3 tokens)',
+  rerun_keywords: 'Re-run keywords (2 tokens)',
   generate_draft: 'Generate draft (1 token)',
 };
 

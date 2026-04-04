@@ -961,8 +961,8 @@ const SidebarSkeleton = ({ phase }) => (
                                   {isGeneratingSEO
                                       ? 'Generating...'
                                       : (seoGenerationCount ?? 0) > 0
-                                          ? `Re-generate · 4 tokens`
-                                          : `Generate SEO · 8 tokens`
+                                          ? `Re-generate · 2 tokens`
+                                          : `Generate SEO · 3 tokens`
                                   }
                               </button>
                           )}

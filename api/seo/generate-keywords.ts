@@ -116,7 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }).eq('id', listing_id);
 
     // Deduct tokens after successful processing
-    const deductAction = tokenCheck.required === 4 ? 'rerun_keywords' as const : 'generate_keywords' as const;
+    const deductAction = tokenCheck.required === 2 ? 'rerun_keywords' as const : 'generate_keywords' as const;
     await deductTokens(user_id, deductAction, tokenCheck.required, listing_id);
 
     console.info(`[generate-keywords] complete listing=${listing_id} selected=${selected.length}/${finalKeywords.length} LSI=${strength?.listing_strength ?? 'N/A'} elapsed=${((Date.now() - t0) / 1000).toFixed(1)}s`);

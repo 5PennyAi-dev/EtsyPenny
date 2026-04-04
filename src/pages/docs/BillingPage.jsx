@@ -5,8 +5,8 @@ import { ArrowRight } from 'lucide-react';
 const tokenCosts = [
   { action: 'Import Etsy listings', cost: 'Free' },
   { action: 'Analyse Design', cost: '1 token' },
-  { action: 'Generate SEO Keywords', cost: '8 tokens' },
-  { action: 'Re-generate SEO Keywords', cost: '4 tokens' },
+  { action: 'Generate SEO Keywords', cost: '3 tokens' },
+  { action: 'Re-generate SEO Keywords', cost: '2 tokens' },
   { action: 'Generate Listing Draft', cost: '1 token' },
   { action: 'Score Etsy Listing', cost: '3 tokens per listing' },
 ];
@@ -28,7 +28,7 @@ const plans = [
   {
     term: 'Free',
     description:
-      '30 tokens per month. Enough to fully optimize about 3 listings. Good for trying PennySEO and seeing results before committing.',
+      '15 tokens per month. Enough to fully optimize about 3 listings. Good for trying PennySEO and seeing results before committing.',
   },
   {
     term: 'Starter',

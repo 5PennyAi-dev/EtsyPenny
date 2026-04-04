@@ -323,7 +323,7 @@ CREATE TABLE public.profiles (
   subscription_id text,
   stripe_customer_id text,
   subscription_end_at timestamp with time zone,
-  tokens_monthly_balance integer DEFAULT 30,
+  tokens_monthly_balance integer DEFAULT 15,
   tokens_bonus_balance integer DEFAULT 0,
   tokens_reset_at timestamp with time zone DEFAULT (now() + '1 mon'::interval),
   add_custom_used integer DEFAULT 0,

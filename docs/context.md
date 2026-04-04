@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-03-31*
+*Dernière mise à jour : 2026-04-04*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -2312,3 +2312,58 @@ Built a complete in-app documentation system at `/docs` with its own layout, nav
 - `src/App.jsx` — 12 doc routes under `/docs` nested layout
 - `src/components/Sidebar.jsx` — Help link in footer
 - `src/pages/LandingPage.jsx` — Docs link in nav bar
+
+---
+
+### April 4th, 2026 — Open Beta Launch & Token Economy Rebalance
+
+- **Open Beta Landing Page** (2026-04-04):
+    - Converted landing page from "Coming Soon" waitlist to open beta signup CTA.
+    - Badge: "Now in Open Beta". Hero CTA: "Get started free →" linking to `/login?mode=sign_up`.
+    - Added "Sign in" (ghost) and "Get started" (filled indigo) nav buttons, replacing "Powered by 5PennyAi" branding.
+    - Updated "How It Works" Step 2: "Connect Your Shop (coming soon)" with updated description.
+    - Updated Step 3 title: "Get Optimized Tags, Title & Description".
+    - Waitlist UI/logic commented out with `// TODO: re-enable if needed` (not deleted).
+    - `LoginPage.jsx` now supports `?mode=sign_up` query param via `useSearchParams` to auto-open sign-up form.
+
+- **Signup Confirmation UX Fix** (2026-04-04):
+    - Signup confirmation message was styled as a red error. Now shows green success banner with `CheckCircle` icon: "Almost there! Check your inbox for a confirmation link to activate your account." + helper text "Didn't receive it? Check your spam folder."
+
+- **Stripe Price IDs to Environment Variables** (2026-04-04):
+    - Moved all 9 hardcoded Stripe Price IDs from code to environment variables.
+    - Backend (`lib/stripe/client.ts`): `PRICE_TO_PLAN` and `PRICE_TO_PACK` read from `process.env.STRIPE_PRICE_*`.
+    - Frontend (`PricingPage.jsx`, `BillingPage.jsx`): read from `import.meta.env.VITE_STRIPE_PRICE_*`.
+    - `.env` updated with both `STRIPE_PRICE_*` (server) and `VITE_STRIPE_PRICE_*` (frontend) vars.
+    - Added diagnostic logging to `api/stripe/create-checkout.ts` and `api/stripe/webhook.ts` for price ID resolution debugging.
+
+- **Stripe Checkout: Promotion Codes** (2026-04-04):
+    - Added `allow_promotion_codes: true` to checkout session creation for BETA50 coupon support.
+
+- **Hide Etsy Features Pending API License** (2026-04-04):
+    - Hidden "My Shop" sidebar link (commented out in nav items array).
+    - `/shop` route redirects to `/dashboard` via `<Navigate>`.
+    - "Push to Etsy" button hidden in `ResultsDisplay.jsx` and `ImportActionBar.jsx` with `{false && ...}`.
+    - All code preserved with `// TODO: re-enable when Etsy API license is approved`.
+
+- **Beta Banner** (2026-04-04):
+    - New `BetaBanner.jsx` component: fixed indigo bar at top of all authenticated pages.
+    - Text: "PennySEO is in Beta — your feedback helps us improve" with "Give feedback →" link opening FeedbackModal.
+    - Integrated in `Layout.jsx` with `pt-9` offset on main content.
+
+- **Signature Text Removal from Drafts** (2026-04-04):
+    - Removed `signature_text` from the draft generation prompt in `api/seo/generate-draft.ts`.
+    - The AI no longer appends shop sign-off sentences to generated descriptions.
+
+- **Token Economy Rebalance** (2026-04-04):
+    - **Cost changes**: SEO keyword generation 8→3 tokens, re-run 4→2 tokens. Total per listing: 10→5.
+    - **Plan changes**: Free plan 30→15 tokens/month, Pro plan 700→750 tokens/month.
+    - Updated `TOKEN_COSTS` in `lib/tokens/token-middleware.ts` and `PLAN_TOKENS` in `lib/stripe/client.ts`.
+    - Updated rerun detection (`=== 4` → `=== 2`) in both `server.mjs` and `api/seo/generate-keywords.ts`.
+    - Updated all UI displays: PricingPage, BillingPage, LandingPage, LoginPage, InsufficientTokensModal, ResultsDisplay.
+    - Updated all doc pages: GettingStartedPage, BillingPage (docs), KeywordResearchPage.
+    - Updated welcome email template.
+    - **Note**: Supabase `profiles.tokens_monthly_balance` column DEFAULT needs migration from 30→15 for new signups.
+    - Complete listings per plan: Free=3, Starter=20, Growth=50, Pro=150.
+
+- **Webhook Renewal Logging** (2026-04-04):
+    - Added `console.info` for successful subscription renewals in `api/stripe/webhook.ts`.

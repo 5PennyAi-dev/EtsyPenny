@@ -286,7 +286,7 @@ app.post('/api/seo/generate-keywords', async (req, res) => {
     }).eq('id', listing_id);
 
     // Deduct tokens after successful processing
-    const deductAction = tokenCheck.required === 4 ? 'rerun_keywords' : 'generate_keywords';
+    const deductAction = tokenCheck.required === 2 ? 'rerun_keywords' : 'generate_keywords';
     await deductTokens(user_id, deductAction, tokenCheck.required, listing_id);
 
     console.log(`   🎉 Pipeline complete in ${((Date.now() - t0) / 1000).toFixed(1)}s\n`);

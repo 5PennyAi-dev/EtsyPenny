@@ -4,7 +4,7 @@ import { ArrowRight } from 'lucide-react';
 const tokenRows = [
   { action: 'Import Etsy listings', cost: 'Free' },
   { action: 'Analyse Design', cost: '1 token' },
-  { action: 'Generate SEO Keywords', cost: '8 tokens (4 to re-generate)' },
+  { action: 'Generate SEO Keywords', cost: '3 tokens (2 to re-generate)' },
   { action: 'Generate Listing Draft', cost: '1 token' },
   { action: 'Score Etsy Listing', cost: '3 tokens per listing' },
 ];
@@ -166,7 +166,7 @@ export default function GettingStartedPage() {
           <DocLink to="/docs/billing">Billing page</DocLink> for your plan's limits.
         </p>
         <p>
-          You start with 30 free tokens per month. Need more? Visit the{' '}
+          You start with 15 free tokens per month. Need more? Visit the{' '}
           <DocLink to="/docs/billing">Billing</DocLink> page to see plans and token packs.
         </p>
       </Section>
