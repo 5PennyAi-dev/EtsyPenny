@@ -19,7 +19,8 @@ import {
   Loader2,
   Sliders,
   Zap,
-  Tags
+  Tags,
+  RotateCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import HelpLink from '../components/ui/HelpLink';
@@ -28,7 +29,7 @@ import HelpLink from '../components/ui/HelpLink';
 
 // ─── Main Component ────────────────────────────────────────────────────────
 export default function UserSettings() {
-  const { user } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -402,6 +403,31 @@ export default function UserSettings() {
           >
             <UserTaxonomyManagement />
           </Accordion>
+
+          {/* ─── Replay Onboarding Tour ──────────────────────────────────── */}
+          {profile?.onboarding_completed && (
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                  <RotateCcw size={18} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-900">Replay onboarding tour</p>
+                  <p className="text-xs text-slate-500">Restart the guided walkthrough next time you visit the Studio.</p>
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  await supabase.from('profiles').update({ onboarding_completed: false }).eq('id', user.id);
+                  await refreshProfile();
+                  toast.success('Onboarding tour will show on your next Studio visit.');
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-indigo-600 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+              >
+                Reset tour
+              </button>
+            </div>
+          )}
 
         </div>
       </div>

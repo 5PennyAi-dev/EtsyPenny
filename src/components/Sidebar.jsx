@@ -14,8 +14,8 @@ const Sidebar = () => {
   
   const navItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-    { name: 'SEO Listings', icon: LayoutList, path: '/listings' },
     { name: 'SEO Studio', icon: Shirt, path: '/studio' },
+    { name: 'SEO Listings', icon: LayoutList, path: '/listings' },
     { name: 'SEO History', icon: LineChart, path: '/history' },
     { name: 'SEO Lab', icon: FlaskConical, path: '/lab' },
     // { name: 'My Shop', icon: Store, path: '/shop' }, // TODO: re-enable when Etsy API license is approved

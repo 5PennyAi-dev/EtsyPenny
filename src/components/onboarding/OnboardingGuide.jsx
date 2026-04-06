@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ArrowRight, PartyPopper, Compass } from 'lucide-react';
+import { ArrowRight, PartyPopper, Compass, Rocket } from 'lucide-react';
 
 const STEPS = [
   {
@@ -127,6 +127,45 @@ function computePosition(targetRect, tooltipEl) {
   };
 }
 
+// ─── Opt-in Prompt Card ────────────────────────────────────────────
+function OptInCard({ onStart, onSkip }) {
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -8, scale: 0.97 }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+        className="bg-white shadow-xl rounded-2xl border border-slate-200 p-6 max-w-md w-full mx-4 text-center pointer-events-auto"
+      >
+        <div className="flex justify-center mb-4">
+          <div className="p-3 bg-indigo-50 rounded-xl">
+            <Rocket size={28} className="text-indigo-500" />
+          </div>
+        </div>
+        <h2 className="text-lg font-bold text-slate-900 mb-1">Want a quick walkthrough?</h2>
+        <p className="text-sm text-slate-500 leading-relaxed mb-5">
+          We'll guide you through creating your first optimized listing in about 2 minutes.
+        </p>
+        <button
+          onClick={onStart}
+          className="w-full py-2.5 px-4 bg-indigo-600 text-white font-semibold text-sm rounded-xl hover:bg-indigo-700 transition-colors"
+        >
+          Start tour
+        </button>
+        <button
+          onClick={onSkip}
+          className="mt-3 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          Skip, I'll explore on my own
+        </button>
+      </motion.div>
+    </div>,
+    document.body
+  );
+}
+
+// ─── Main OnboardingGuide Component ────────────────────────────────
 export default function OnboardingGuide({
   imageUrl,
   productType,
@@ -138,6 +177,7 @@ export default function OnboardingGuide({
   onComplete,
   onActivateForm,
 }) {
+  const [phase, setPhase] = useState('prompt'); // 'prompt' | 'touring'
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0, placement: 'bottom' });
@@ -149,13 +189,18 @@ export default function OnboardingGuide({
 
   const step = STEPS[currentStep];
 
-  // Activate the form on mount so the user can interact
-  useEffect(() => {
+  const handleStartTour = useCallback(() => {
     onActivateForm?.();
-  }, []);
+    setPhase('touring');
+  }, [onActivateForm]);
 
-  // On mount, skip to first incomplete step
+  const handleSkipFromPrompt = useCallback(() => {
+    onComplete?.();
+  }, [onComplete]);
+
+  // On entering touring phase, skip to first incomplete step
   useEffect(() => {
+    if (phase !== 'touring') return;
     const firstIncomplete = getFirstIncompleteStep({ imageUrl, productType, isImageAnalyzed, hasResults });
     if (firstIncomplete >= STEPS.length) {
       onComplete?.();
@@ -163,11 +208,11 @@ export default function OnboardingGuide({
     }
     setCurrentStep(firstIncomplete);
     setIsReady(true);
-  }, []);
+  }, [phase]);
 
   // Find and track target element rect
   const updateTargetRect = useCallback(() => {
-    if (!step) return;
+    if (!step || phase !== 'touring') return;
     const el = document.querySelector(`[data-onboarding="${step.target}"]`);
     if (el) {
       const rect = el.getBoundingClientRect();
@@ -175,10 +220,11 @@ export default function OnboardingGuide({
     } else {
       setTargetRect(null);
     }
-  }, [step]);
+  }, [step, phase]);
 
   // Update rect on step change, and set up observers
   useEffect(() => {
+    if (phase !== 'touring') return;
     updateTargetRect();
 
     // Scroll target into view
@@ -189,11 +235,11 @@ export default function OnboardingGuide({
       const t = setTimeout(updateTargetRect, 500);
       return () => clearTimeout(t);
     }
-  }, [currentStep, step, updateTargetRect]);
+  }, [currentStep, step, updateTargetRect, phase]);
 
   // Poll for target element when it doesn't exist yet (conditional rendering)
   useEffect(() => {
-    if (targetRect) return;
+    if (phase !== 'touring' || targetRect) return;
     const interval = setInterval(() => {
       const el = document.querySelector(`[data-onboarding="${step?.target}"]`);
       if (el) {
@@ -203,10 +249,11 @@ export default function OnboardingGuide({
       }
     }, 500);
     return () => clearInterval(interval);
-  }, [targetRect, step, updateTargetRect]);
+  }, [targetRect, step, updateTargetRect, phase]);
 
   // Recompute position on resize/scroll
   useEffect(() => {
+    if (phase !== 'touring') return;
     const handler = () => updateTargetRect();
     window.addEventListener('resize', handler);
     window.addEventListener('scroll', handler, true);
@@ -214,7 +261,7 @@ export default function OnboardingGuide({
       window.removeEventListener('resize', handler);
       window.removeEventListener('scroll', handler, true);
     };
-  }, [updateTargetRect]);
+  }, [updateTargetRect, phase]);
 
   // Manage z-index on highlighted element
   useEffect(() => {
@@ -225,7 +272,7 @@ export default function OnboardingGuide({
       prevHighlightedRef.current = null;
     }
 
-    if (!step) return;
+    if (!step || phase !== 'touring') return;
     const el = document.querySelector(`[data-onboarding="${step.target}"]`);
     if (el) {
       el.style.position = 'relative';
@@ -240,33 +287,33 @@ export default function OnboardingGuide({
         prevHighlightedRef.current = null;
       }
     };
-  }, [currentStep, step]);
+  }, [currentStep, step, phase]);
 
   // Compute tooltip position after render
   useLayoutEffect(() => {
-    if (targetRect && tooltipRef.current) {
+    if (targetRect && tooltipRef.current && phase === 'touring') {
       const pos = computePosition(targetRect, tooltipRef.current);
       setTooltipPos(pos);
     }
-  }, [targetRect, currentStep]);
+  }, [targetRect, currentStep, phase]);
 
   // Auto-advance: Step 0 — image uploaded
   useEffect(() => {
-    if (currentStep !== 0 || !imageUrl) return;
+    if (phase !== 'touring' || currentStep !== 0 || !imageUrl) return;
     advanceTimerRef.current = setTimeout(() => setCurrentStep(1), 400);
     return () => clearTimeout(advanceTimerRef.current);
-  }, [currentStep, imageUrl]);
+  }, [currentStep, imageUrl, phase]);
 
   // Auto-advance: Step 1 — product type selected
   useEffect(() => {
-    if (currentStep !== 1 || !productType) return;
+    if (phase !== 'touring' || currentStep !== 1 || !productType) return;
     advanceTimerRef.current = setTimeout(() => setCurrentStep(2), 400);
     return () => clearTimeout(advanceTimerRef.current);
-  }, [currentStep, productType]);
+  }, [currentStep, productType, phase]);
 
   // Auto-advance: Step 2 (optional) — blur on description textarea
   useEffect(() => {
-    if (currentStep !== 2) return;
+    if (phase !== 'touring' || currentStep !== 2) return;
     const textarea = contextRef?.current;
     if (!textarea) return;
 
@@ -281,25 +328,21 @@ export default function OnboardingGuide({
       textarea.removeEventListener('blur', handleBlur);
       clearTimeout(advanceTimerRef.current);
     };
-  }, [currentStep, contextRef]);
+  }, [currentStep, contextRef, phase]);
 
   // Auto-advance: Step 3 — analyze started
   useEffect(() => {
-    if (currentStep !== 3 || !isAnalyzing) return;
+    if (phase !== 'touring' || currentStep !== 3 || !isAnalyzing) return;
     advanceTimerRef.current = setTimeout(() => setCurrentStep(4), 400);
     return () => clearTimeout(advanceTimerRef.current);
-  }, [currentStep, isAnalyzing]);
-
-  // Auto-advance: Step 4 — wait for analysis to complete, then show review
-  // (This step requires manual "Next" click — no auto-advance here)
-  // But if isImageAnalyzed was already true when entering step 4, the user already sees the classification.
+  }, [currentStep, isAnalyzing, phase]);
 
   // Auto-advance: Step 5 — SEO generation started
   useEffect(() => {
-    if (currentStep !== 5 || !isGeneratingSEO) return;
+    if (phase !== 'touring' || currentStep !== 5 || !isGeneratingSEO) return;
     advanceTimerRef.current = setTimeout(() => setCurrentStep(6), 400);
     return () => clearTimeout(advanceTimerRef.current);
-  }, [currentStep, isGeneratingSEO]);
+  }, [currentStep, isGeneratingSEO, phase]);
 
   const handleSkipTour = useCallback(() => {
     onComplete?.();
@@ -315,7 +358,12 @@ export default function OnboardingGuide({
     onComplete?.();
   }, [onComplete]);
 
-  // Don't render until ready or if no step
+  // Phase: show opt-in prompt
+  if (phase === 'prompt') {
+    return <OptInCard onStart={handleStartTour} onSkip={handleSkipFromPrompt} />;
+  }
+
+  // Phase: touring — don't render until ready
   if (!isReady || !step) return null;
 
   return createPortal(

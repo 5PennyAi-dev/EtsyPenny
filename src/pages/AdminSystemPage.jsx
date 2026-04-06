@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Layout from '../components/Layout';
 import Accordion from '../components/ui/Accordion';
-import { Settings2, Zap, Edit2, Check, X, Trash2, Plus, ArrowUpDown, ChevronUp, ChevronDown, Globe, Package, Brain, MessageSquare } from 'lucide-react';
+import { Settings2, Zap, Edit2, Check, X, Trash2, Plus, ArrowUpDown, ChevronUp, ChevronDown, Globe, Package, Brain, MessageSquare, Users } from 'lucide-react';
 import TaxonomyManagement from '../components/admin/TaxonomyManagement';
 import ProductTypeManagement from '../components/admin/ProductTypeManagement';
 import AIModelConfig from '../components/admin/AIModelConfig';
+import UserManagement from '../components/admin/UserManagement';
 import { toast } from 'sonner';
 
 export default function AdminSystemPage() {
@@ -470,6 +471,24 @@ export default function AdminSystemPage() {
               </p>
             </div>
           </div>
+
+          {/* User Management */}
+          <Accordion
+            defaultOpen={false}
+            title={
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-violet-50 rounded-lg text-violet-600">
+                  <Users size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 text-left">User Management</h2>
+                  <p className="text-sm text-slate-500 font-normal mt-0.5 text-left">View users, manage tokens, and block access.</p>
+                </div>
+              </div>
+            }
+          >
+            <UserManagement />
+          </Accordion>
 
           {/* Beta Feedback */}
           <Accordion

@@ -1,5 +1,5 @@
 # 🧠 Project Context: EtsyPenny (PennySEO)
-*Dernière mise à jour : 2026-04-04*
+*Dernière mise à jour : 2026-04-06*
 
 ## 1. Project Overview
 - **Goal**: AI-powered visual SEO optimization SaaS for Etsy sellers.
@@ -22,6 +22,11 @@
 - **Components**: Shadcn/UI for professional SaaS aesthetics.
 
 ## 4. Latest Developments
+- [New] **Guided Onboarding Tour**: 8-step interactive tooltip tour in ProductStudio for first-time users. Portal-rendered spotlight overlay with auto-advancing steps. Opt-in prompt card (not auto-start). Persisted via `profiles.onboarding_completed` column. Replay available in User Settings.
+- [New] **Admin User Management**: New accordion in AdminSystemPage with user list (search, plan stats), detail view (tokens, usage, Stripe link), token adjustment (add/remove with admin note logged to `token_transactions`), counter reset, and soft block/unblock (`profiles.is_blocked`). Admin RLS policies on profiles.
+- [Fix] **Keyword Selection Bug**: `persist-seo.ts` was hardcoding `is_current_eval: false` for all keywords. Frontend fallback was selecting ALL keywords instead of top 13. Fixed to set `is_current_eval` from `kw.is_selection_ia`. Also forwarded strategy `parameters` through save-seo edge function to reset-pool.
+- [UI] **Sidebar Reorder**: SEO Studio now appears above SEO Listings in sidebar navigation.
+- [DB] Added `onboarding_completed` (boolean), `is_blocked` (boolean) to profiles. Added `admin_adjustment` to `token_transactions` type constraint. Admin RLS policies on profiles (SELECT/UPDATE).
 - [Completed] Authentication System implemented (Login, SignUp, AuthContext).
 - [Completed] Protected Routes logic and redirection (`/studio`, `/login`).
 - [Completed] Database Schema: `public.profiles` table linked to `auth.users`.
