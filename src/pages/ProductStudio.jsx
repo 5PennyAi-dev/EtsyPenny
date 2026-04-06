@@ -18,6 +18,7 @@ import { StepBadge } from '../components/ui/StepBadge';
 import InsufficientTokensModal from '../components/billing/InsufficientTokensModal';
 import QuotaExceededModal from '../components/billing/QuotaExceededModal';
 import ExportToEtsyModal from '../components/shop/ExportToEtsyModal';
+import OnboardingGuide from '../components/onboarding/OnboardingGuide';
 import { toast } from 'sonner';
 
 const IMAGE_ANALYSIS_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
@@ -141,6 +142,9 @@ const ProductStudio = () => {
   // Block 2 — AI Classification accordion state
   const [classificationOpen, setClassificationOpen] = useState(false);
 
+  // Onboarding tour state
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
   useEffect(() => {
     const fetchUserDefaults = async () => {
       if (!user) return;
@@ -172,6 +176,28 @@ const ProductStudio = () => {
 
     fetchUserDefaults();
   }, [user]);
+
+  // Check if onboarding tour should show
+  useEffect(() => {
+    if (!user || !profile || profile.onboarding_completed || listingId || results) return;
+    supabase
+      .from('listings')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .then(({ count }) => {
+        if (count === 0) setShowOnboarding(true);
+      });
+  }, [user, profile]);
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    try {
+      await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', user.id);
+      await refreshProfile();
+    } catch (err) {
+      console.error('Failed to save onboarding status:', err);
+    }
+  };
 
   // Fetch product types and taxonomy (migrated from OptimizationForm)
   useEffect(() => {
@@ -2107,7 +2133,7 @@ const ProductStudio = () => {
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                            {/* Left Column: Image + Analyse Design */}
                            <div className="md:col-span-1 flex flex-col gap-3">
-                             <div className={`relative rounded-xl overflow-hidden transition-all flex-1 ${isAnalyzingDesign ? 'ring-4 ring-indigo-500/20' : ''}`}>
+                             <div data-onboarding="image-upload" className={`relative rounded-xl overflow-hidden transition-all flex-1 ${isAnalyzingDesign ? 'ring-4 ring-indigo-500/20' : ''}`}>
                                <ImageUpload
                                  key={`img-${formKey}`}
                                  onFileSelect={setSelectedImage}
@@ -2138,6 +2164,7 @@ const ProductStudio = () => {
                                )}
                              </div>
                              <button
+                               data-onboarding="analyze-button"
                                onClick={handleAnalyzeDesign}
                                disabled={(!selectedImage && !results?.imageUrl) || isAnalyzingDesign}
                                className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-indigo-300 text-indigo-600 font-medium text-sm hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
@@ -2154,7 +2181,7 @@ const ProductStudio = () => {
                                <Package size={16} className="text-indigo-500" />
                                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Product Details</h3>
                              </div>
-                             <div>
+                             <div data-onboarding="product-type">
                                <ProductTypeCombobox
                                  groupedOptions={groupedProductTypes}
                                  value={productTypeName}
@@ -2162,7 +2189,7 @@ const ProductStudio = () => {
                                  disabled={false}
                                />
                              </div>
-                             <div className="space-y-1">
+                             <div data-onboarding="product-description" className="space-y-1">
                                <label htmlFor="context" className="text-sm font-medium text-slate-700">Description / Instructions</label>
                                <textarea
                                  ref={contextRef}
@@ -2181,6 +2208,7 @@ const ProductStudio = () => {
 
                        {/* ═══ BLOCK 2: AI CLASSIFICATION (Accordion) ═══ */}
                        {(visualAnalysis.aesthetic || analysisContext?.theme_name) && (
+                         <div data-onboarding="ai-classification">
                          <Accordion
                            title={
                              <div className="flex items-center gap-2">
@@ -2350,6 +2378,7 @@ const ProductStudio = () => {
                              </div>
                            </div>
                          </Accordion>
+                         </div>
                        )}
 
 
@@ -2420,6 +2449,20 @@ const ProductStudio = () => {
           }}
           listings={exportModalData}
           user={user}
+        />
+      )}
+
+      {showOnboarding && (
+        <OnboardingGuide
+          imageUrl={selectedImage || results?.imageUrl}
+          productType={productTypeName}
+          contextRef={contextRef}
+          isAnalyzing={isAnalyzingDesign}
+          isImageAnalyzed={isImageAnalyzedState}
+          isGeneratingSEO={isSeoLoading}
+          hasResults={!!results?.analytics?.length}
+          onComplete={handleOnboardingComplete}
+          onActivateForm={() => setIsNewListingActive(true)}
         />
       )}
 

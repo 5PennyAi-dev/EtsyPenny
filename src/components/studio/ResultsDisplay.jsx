@@ -900,7 +900,7 @@ const SidebarSkeleton = ({ phase }) => (
     };
   
     return (
-      <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+      <div data-onboarding="results-display" className="animate-in fade-in slide-in-from-bottom-8 duration-700">
         
         {/* Main + Sidebar Flex Layout */}
         <div className="flex flex-col gap-8 w-full">
@@ -937,6 +937,7 @@ const SidebarSkeleton = ({ phase }) => (
                           </div>
                           {canGenerateSEO && (
                               <button
+                                  data-onboarding="generate-button"
                                   onClick={e => {
                                       e.stopPropagation();
                                       if ((seoGenerationCount ?? 0) > 0 && onRelaunchSEO) {
@@ -1543,6 +1544,7 @@ const SidebarSkeleton = ({ phase }) => (
                 }
                 headerActions={
                     <button
+                        data-onboarding="optimize-button"
                         onClick={(e) => { e.stopPropagation(); handleMagicDraft(); }}
                         disabled={selectedTags.length === 0}
                         className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shadow-sm border
