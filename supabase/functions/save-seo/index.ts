@@ -31,7 +31,7 @@ serve(async (req) => {
     // N8N often wraps the webhook body in an array if it's processing batches.
     const payload = Array.isArray(rawPayload) ? rawPayload[0] : rawPayload;
     
-    const { listing_id, results, trigger_reset_pool } = payload;
+    const { listing_id, results, trigger_reset_pool, parameters } = payload;
 
     if (!listing_id || !results) {
       return new Response(JSON.stringify({ error: 'Bad Request: Missing listing_id or results' }), {
@@ -224,7 +224,7 @@ serve(async (req) => {
                 fetch(`${resetPoolUrl}/api/seo/reset-pool`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ listing_id })
+                    body: JSON.stringify({ listing_id, parameters })
                 }).catch(err => console.error("Failed to trigger resetPool:", err));
             }
         } catch (resetPoolErr) {

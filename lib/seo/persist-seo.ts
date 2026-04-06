@@ -48,11 +48,12 @@ export async function persistSeo(
           keyword: kw.keyword, search_volume: kw.search_volume, competition: kw.competition, cpc: kw.cpc,
           volume_history: kw.volume_history, niche_score: kw.niche_score, transactional_score: kw.transactional_score,
           is_selection_ia: kw.is_selection_ia, is_user_added: kw.is_user_added, is_pinned: kw.is_pinned,
-          is_current_pool: true, is_current_eval: false,
+          is_current_pool: true, is_current_eval: kw.is_selection_ia,
         })),
       },
     },
     trigger_reset_pool: true,
+    parameters: params,
   };
 
   const saveRes = await fetch(`${SUPABASE_URL}/functions/v1/save-seo`, {
