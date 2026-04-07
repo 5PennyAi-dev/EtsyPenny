@@ -320,8 +320,8 @@ export default function UserSettings() {
             </div>
           </Accordion>
 
-          {/* ─── Accordion 3: Analysis Constraints (Premium) ───────────── */}
-          <Accordion
+          {/* ─── Accordion 3: Analysis Constraints (Premium) — hidden until premium plans are live ───────────── */}
+          {/* <Accordion
             defaultOpen={false}
             title={
               <div className="flex items-center gap-3">
@@ -344,24 +344,21 @@ export default function UserSettings() {
           >
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* AI Selection Count */}
                 <div className="bg-white rounded-xl border border-amber-200/60 p-5 shadow-sm">
                   <label className="block text-sm font-semibold text-slate-900 mb-1">AI Selection Count</label>
                   <p className="text-xs text-slate-500 mb-3 line-clamp-2">Keywords to select for AI analysis (default 13).</p>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="1"
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-colors"
                     value={settings.ai_selection_count || ''}
                     onChange={(e) => handleSettingChange('ai_selection_count', parseInt(e.target.value) || 0)}
                   />
                 </div>
-                
-                {/* Working Pool Size */}
                 <div className="bg-white rounded-xl border border-amber-200/60 p-5 shadow-sm">
                   <label className="block text-sm font-semibold text-slate-900 mb-1">Working Pool Size</label>
                   <p className="text-xs text-slate-500 mb-3 line-clamp-2">Number of keywords in the workspace (default ~25).</p>
-                  <input 
+                  <input
                     type="number"
                     min="10"
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-colors"
@@ -369,13 +366,11 @@ export default function UserSettings() {
                     onChange={(e) => handleSettingChange('working_pool_count', parseInt(e.target.value) || 0)}
                   />
                 </div>
-                
-                {/* Concept Diversity */}
                 <div className="bg-white rounded-xl border border-amber-200/60 p-5 shadow-sm">
                   <label className="block text-sm font-semibold text-slate-900 mb-1">Concept Diversity</label>
                   <p className="text-xs text-slate-500 mb-3 line-clamp-2">Max keywords per initial word concept (default 2).</p>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="1"
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-colors"
                     value={settings.concept_diversity_limit || ''}
@@ -384,7 +379,7 @@ export default function UserSettings() {
                 </div>
               </div>
             </div>
-          </Accordion>
+          </Accordion> */}
 
           {/* ─── Accordion 4: My Shop Identity ─────────────────────────── */}
           <Accordion
