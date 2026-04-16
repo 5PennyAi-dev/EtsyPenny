@@ -90,135 +90,86 @@ const LoginPage = () => {
   };
 
   return (
-    <>
-      <style>{`
-        @keyframes login-slide-up {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes login-fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        .animate-login-slide-up {
-          animation: login-slide-up 0.6s ease both;
-        }
-        .animate-login-fade-in {
-          animation: login-fade-in 0.5s ease both;
-        }
-      `}</style>
+    <div className="min-h-screen bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen grid lg:grid-cols-[3fr_2fr]">
 
-      <div className="flex min-h-screen" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-
-        {/* ===== LEFT PANEL — Marketing (60%) ===== */}
-        <div
-          className="hidden lg:flex lg:w-[60%] min-h-screen relative overflow-hidden flex-col justify-between px-10 py-5"
-          style={{ background: 'linear-gradient(160deg, #0f0e2a 0%, #1e1b4b 40%, #312e81 100%)' }}
-        >
-          {/* Grid pattern overlay */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage:
-                'linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)',
-              backgroundSize: '48px 48px',
-            }}
-          />
-          {/* Soft glow accent */}
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              top: '15%', right: '-10%', width: '50%', height: '50%',
-              background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)',
-            }}
-          />
-
-          {/* TOP — Logo + Headline + Subtitle */}
-          <div className="relative z-10">
-            {/* Logo + Beta badge */}
-            <div className="flex items-center gap-3 animate-login-fade-in">
-              <img
-                src={pennyseoLogo}
-                alt="PennySEO"
-                className="w-36 h-auto brightness-0 invert"
-              />
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-400/30 tracking-wide">
+        {/* ===== LEFT COLUMN — Brand & Value Proposition ===== */}
+        <div className="hidden lg:flex min-h-screen flex-col justify-center p-8 lg:p-12 bg-gradient-to-br from-white via-indigo-50/50 to-white">
+          <div className="space-y-6 w-full">
+            {/* Logo + Beta pill */}
+            <div className="flex items-center gap-3">
+              <img src={pennyseoLogo} alt="PennySEO" className="w-40 h-auto" />
+              <span className="inline-flex items-center bg-indigo-50 text-indigo-700 text-xs font-medium px-3 py-1 rounded-full">
                 Beta — Free to try
               </span>
             </div>
 
             {/* Headline */}
-            <h1
-              className="text-3xl font-bold text-white mt-4 mb-2 animate-login-slide-up"
-              style={{ lineHeight: 1.2, animationDelay: '0.1s' }}
-            >
+            <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 leading-tight">
               Your listings deserve
               <br />
-              <span className="text-amber-400">to be found.</span>
+              <span className="text-indigo-600">to be found.</span>
             </h1>
 
             {/* Subtitle */}
-            <p
-              className="text-sm text-indigo-200 max-w-xs leading-relaxed animate-login-slide-up"
-              style={{ animationDelay: '0.2s' }}
-            >
+            <p className="text-base text-slate-600 max-w-md leading-relaxed">
               Upload your product photo. Get scored keywords, optimized titles, and
               descriptions — backed by real search volume and buyer intent data.
             </p>
-          </div>
 
-          {/* MIDDLE — Screenshots (stacked) */}
-          <div
-            className="relative z-10 mx-auto max-w-lg w-full mt-2 animate-login-slide-up"
-            style={{ animationDelay: '0.3s', transform: 'rotate(-1.5deg)' }}
-          >
-            <div className="flex flex-col gap-1">
-              <img
-                src="/login-audit-header.png"
-                alt="PennySEO Listing Audit Header"
-                className="block w-full h-auto rounded-lg shadow-xl border border-white/10"
-              />
-              <img
-                src="/login-keyword-table.png"
-                alt="PennySEO Keyword Performance Table"
-                className="block w-full h-auto rounded-lg shadow-xl border border-white/10"
-              />
+            {/* Product preview — images scale with column width, safety-capped at 50vh */}
+            <div className="relative w-[85%] overflow-hidden rounded-xl border border-slate-200 shadow-sm max-h-[50vh]">
+              <div className="flex flex-col gap-1">
+                <img
+                  src="/login-audit-header.png"
+                  alt="PennySEO Listing Audit Header"
+                  className="w-full h-auto"
+                />
+                <img
+                  src="/login-keyword-table.png"
+                  alt="PennySEO Keyword Performance Table"
+                  className="w-full h-auto"
+                />
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-20 pointer-events-none bg-gradient-to-t from-white to-transparent" />
             </div>
-            {/* Bottom fade */}
-            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#1e1b4b] to-transparent rounded-b-lg pointer-events-none" />
-          </div>
 
-          {/* BOTTOM — Features + Trust line */}
-          <div className="relative z-10 mt-2">
-            <div
-              className="grid grid-cols-3 gap-6 animate-login-slide-up"
-              style={{ animationDelay: '0.5s' }}
-            >
-              <div>
-                <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
-                  <Camera size={18} /> Photo analysis
+            {/* Feature badges — single horizontal row */}
+            <div className="flex flex-row flex-nowrap gap-4 pt-2 flex-shrink-0">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                  <Camera size={16} className="text-indigo-600" />
                 </div>
-                <div className="text-indigo-300/70 text-xs mt-1">Drop an image, get keywords</div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-900">Photo analysis</div>
+                  <div className="text-xs text-slate-500 truncate">Drop an image, get keywords</div>
+                </div>
               </div>
-              <div>
-                <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
-                  <Target size={18} /> Smart scoring
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+                  <Target size={16} className="text-amber-600" />
                 </div>
-                <div className="text-indigo-300/70 text-xs mt-1">Every keyword ranked by buyer intent</div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-900">Smart scoring</div>
+                  <div className="text-xs text-slate-500 truncate">Ranked by buyer intent</div>
+                </div>
               </div>
-              <div>
-                <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
-                  <TrendingUp size={18} /> Real Google data
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                  <TrendingUp size={16} className="text-emerald-600" />
                 </div>
-                <div className="text-indigo-300/70 text-xs mt-1">Volume, competition & trends</div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-900">Real Google data</div>
+                  <div className="text-xs text-slate-500 truncate">Volume, competition & trends</div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ===== RIGHT PANEL — Auth Form (40%) ===== */}
-        <div className="flex-1 lg:w-[40%] flex items-center justify-center bg-slate-50 px-6 py-6 lg:px-12">
-          <div className="w-full max-w-xs animate-login-fade-in" style={{ animationDelay: '0.15s' }}>
+        {/* ===== RIGHT COLUMN — Auth Form ===== */}
+        <div className="flex items-center justify-center p-8 lg:p-12 bg-white">
+          <div className="w-full max-w-sm">
 
             {/* Mobile logo (hidden on desktop) */}
             <div className="lg:hidden mb-8 flex justify-center">
@@ -251,7 +202,7 @@ const LoginPage = () => {
 
             {/* Header */}
             <div className="mb-5">
-              <h2 className="text-[26px] font-bold text-slate-900 tracking-tight mb-1.5">
+              <h2 className="text-2xl font-bold text-slate-900 tracking-tight mb-1.5">
                 {view === 'sign_in' ? 'Welcome back' : 'Start for free'}
               </h2>
               <p className="text-sm text-slate-500">
@@ -265,7 +216,7 @@ const LoginPage = () => {
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2.5 py-3 px-5 bg-white border-[1.5px] border-slate-200 rounded-[10px] text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:-translate-y-px hover:shadow-md transition-all disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2.5 py-3 px-5 bg-white border-[1.5px] border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50"
             >
               <GoogleIcon />
               Continue with Google
@@ -314,7 +265,7 @@ const LoginPage = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full py-3 pl-10 pr-3.5 border-[1.5px] border-slate-200 rounded-[10px] text-sm text-slate-800 bg-white placeholder-slate-400 outline-none transition-all focus:border-indigo-600 focus:ring-[3px] focus:ring-indigo-600/10"
+                    className="w-full py-3 pl-10 pr-3.5 border-[1.5px] border-slate-200 rounded-xl text-sm text-slate-800 bg-white placeholder-slate-400 outline-none transition-all focus:border-indigo-600 focus:ring-[3px] focus:ring-indigo-600/10"
                     style={{ fontFamily: "'DM Sans', sans-serif" }}
                   />
                 </div>
@@ -343,7 +294,7 @@ const LoginPage = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={6}
-                    className="w-full py-3 pl-10 pr-10 border-[1.5px] border-slate-200 rounded-[10px] text-sm text-slate-800 bg-white placeholder-slate-400 outline-none transition-all focus:border-indigo-600 focus:ring-[3px] focus:ring-indigo-600/10"
+                    className="w-full py-3 pl-10 pr-10 border-[1.5px] border-slate-200 rounded-xl text-sm text-slate-800 bg-white placeholder-slate-400 outline-none transition-all focus:border-indigo-600 focus:ring-[3px] focus:ring-indigo-600/10"
                     style={{ fontFamily: "'DM Sans', sans-serif" }}
                   />
                   <button
@@ -360,7 +311,7 @@ const LoginPage = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3.5 px-5 bg-indigo-600 text-white text-[15px] font-semibold rounded-[10px] border-none tracking-wide hover:bg-indigo-800 hover:-translate-y-px hover:shadow-lg hover:shadow-indigo-500/30 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none transition-all"
+                className="w-full flex items-center justify-center gap-2 py-3 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl border-none tracking-wide disabled:opacity-70 disabled:cursor-not-allowed transition-all"
                 style={{ fontFamily: "'DM Sans', sans-serif" }}
               >
                 {loading ? (
@@ -414,7 +365,7 @@ const LoginPage = () => {
         </div>
 
       </div>
-    </>
+    </div>
   );
 };
 
