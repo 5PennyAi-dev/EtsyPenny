@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-import { Loader2, Mail, Lock, AlertCircle, CheckCircle, ArrowRight, Eye, EyeOff, Sparkles, Target, TrendingUp, Shield } from 'lucide-react';
+import { Loader2, Mail, Lock, AlertCircle, CheckCircle, ArrowRight, Eye, EyeOff, Sparkles, Camera, Target, TrendingUp, Shield } from 'lucide-react';
 import pennyseoLogo from '../assets/pennyseo-logo.png';
 
 const GoogleIcon = () => (
@@ -112,7 +112,7 @@ const LoginPage = () => {
 
         {/* ===== LEFT PANEL — Marketing (60%) ===== */}
         <div
-          className="hidden lg:flex lg:w-[60%] min-h-screen relative overflow-hidden flex-col justify-between px-10 py-8"
+          className="hidden lg:flex lg:w-[60%] min-h-screen relative overflow-hidden flex-col justify-between px-10 py-5"
           style={{ background: 'linear-gradient(160deg, #0f0e2a 0%, #1e1b4b 40%, #312e81 100%)' }}
         >
           {/* Grid pattern overlay */}
@@ -149,7 +149,7 @@ const LoginPage = () => {
 
             {/* Headline */}
             <h1
-              className="text-3xl font-bold text-white mt-6 mb-3 animate-login-slide-up"
+              className="text-3xl font-bold text-white mt-4 mb-2 animate-login-slide-up"
               style={{ lineHeight: 1.2, animationDelay: '0.1s' }}
             >
               Your listings deserve
@@ -162,63 +162,62 @@ const LoginPage = () => {
               className="text-sm text-indigo-200 max-w-xs leading-relaxed animate-login-slide-up"
               style={{ animationDelay: '0.2s' }}
             >
-              AI-powered SEO that analyzes your product photos and generates
-              optimized tags, titles, and descriptions backed by real Etsy search data.
+              Upload your product photo. Get scored keywords, optimized titles, and
+              descriptions — backed by real search volume and buyer intent data.
             </p>
           </div>
 
-          {/* MIDDLE — Screenshot */}
+          {/* MIDDLE — Screenshots (stacked) */}
           <div
-            className="relative z-10 mx-auto w-[75%] mt-6 animate-login-slide-up"
-            style={{ animationDelay: '0.3s' }}
+            className="relative z-10 mx-auto max-w-lg w-full mt-2 animate-login-slide-up"
+            style={{ animationDelay: '0.3s', transform: 'rotate(-1.5deg)' }}
           >
-            <img
-              src="/keyword-performance-preview.png"
-              alt="PennySEO Keyword Performance"
-              className="w-full rounded-lg shadow-xl border border-white/10"
-              style={{ transform: 'rotate(-1.5deg)' }}
-            />
+            <div className="flex flex-col gap-1">
+              <img
+                src="/login-audit-header.png"
+                alt="PennySEO Listing Audit Header"
+                className="block w-full h-auto rounded-lg shadow-xl border border-white/10"
+              />
+              <img
+                src="/login-keyword-table.png"
+                alt="PennySEO Keyword Performance Table"
+                className="block w-full h-auto rounded-lg shadow-xl border border-white/10"
+              />
+            </div>
             {/* Bottom fade */}
-            <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#1e1b4b] to-transparent rounded-b-lg pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#1e1b4b] to-transparent rounded-b-lg pointer-events-none" />
           </div>
 
           {/* BOTTOM — Features + Trust line */}
-          <div className="relative z-10 mt-8">
+          <div className="relative z-10 mt-2">
             <div
-              className="grid grid-cols-3 gap-8 animate-login-slide-up"
+              className="grid grid-cols-3 gap-6 animate-login-slide-up"
               style={{ animationDelay: '0.5s' }}
             >
               <div>
                 <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
-                  <Sparkles size={18} /> Vision AI
+                  <Camera size={18} /> Photo analysis
                 </div>
-                <div className="text-indigo-300/70 text-xs mt-1">Analysis in seconds</div>
+                <div className="text-indigo-300/70 text-xs mt-1">Drop an image, get keywords</div>
               </div>
               <div>
                 <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
-                  <Target size={18} /> 130+ keywords
+                  <Target size={18} /> Smart scoring
                 </div>
-                <div className="text-indigo-300/70 text-xs mt-1">Real search volume</div>
+                <div className="text-indigo-300/70 text-xs mt-1">Every keyword ranked by buyer intent</div>
               </div>
               <div>
                 <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
-                  <TrendingUp size={18} /> Live data
+                  <TrendingUp size={18} /> Real Google data
                 </div>
-                <div className="text-indigo-300/70 text-xs mt-1">CPC, competition & trends</div>
+                <div className="text-indigo-300/70 text-xs mt-1">Volume, competition & trends</div>
               </div>
             </div>
-
-            <p
-              className="text-sm text-indigo-400/60 mt-5 animate-login-fade-in"
-              style={{ animationDelay: '0.7s' }}
-            >
-              Trusted by Etsy sellers during beta
-            </p>
           </div>
         </div>
 
         {/* ===== RIGHT PANEL — Auth Form (40%) ===== */}
-        <div className="flex-1 lg:w-[40%] flex items-center justify-center bg-slate-50 px-6 py-12 lg:px-12">
+        <div className="flex-1 lg:w-[40%] flex items-center justify-center bg-slate-50 px-6 py-6 lg:px-12">
           <div className="w-full max-w-xs animate-login-fade-in" style={{ animationDelay: '0.15s' }}>
 
             {/* Mobile logo (hidden on desktop) */}
@@ -227,7 +226,7 @@ const LoginPage = () => {
             </div>
 
             {/* Tab switcher */}
-            <div className="flex border-b border-slate-200 mb-8">
+            <div className="flex border-b border-slate-200 mb-5">
               <button
                 onClick={() => { setView('sign_in'); setError(null); setSignupSuccess(false); }}
                 className={`pb-3 px-1 mr-6 text-sm font-semibold border-b-2 transition-colors ${
@@ -251,7 +250,7 @@ const LoginPage = () => {
             </div>
 
             {/* Header */}
-            <div className="mb-8">
+            <div className="mb-5">
               <h2 className="text-[26px] font-bold text-slate-900 tracking-tight mb-1.5">
                 {view === 'sign_in' ? 'Welcome back' : 'Start for free'}
               </h2>
@@ -273,7 +272,7 @@ const LoginPage = () => {
             </button>
 
             {/* Divider */}
-            <div className="flex items-center gap-4 my-6">
+            <div className="flex items-center gap-4 my-4">
               <div className="flex-1 h-px bg-slate-200" />
               <span className="text-[13px] text-slate-400 whitespace-nowrap">or continue with email</span>
               <div className="flex-1 h-px bg-slate-200" />
@@ -322,7 +321,7 @@ const LoginPage = () => {
               </div>
 
               {/* Password */}
-              <div className="mb-6">
+              <div className="mb-4">
                 <div className="flex justify-between items-center mb-1.5">
                   <label className="text-[13px] font-semibold text-slate-700">
                     Password
@@ -376,7 +375,7 @@ const LoginPage = () => {
             </form>
 
             {/* Contextual link below form */}
-            <p className="text-sm text-slate-500 text-center mt-5">
+            <p className="text-sm text-slate-500 text-center mt-4">
               {view === 'sign_in' ? "Don't have an account? " : 'Already have an account? '}
               <button
                 onClick={() => { setView(view === 'sign_in' ? 'sign_up' : 'sign_in'); setError(null); setSignupSuccess(false); }}
@@ -387,7 +386,7 @@ const LoginPage = () => {
             </p>
 
             {/* Footer — Terms */}
-            <p className="text-xs text-slate-400 text-center mt-6 leading-relaxed">
+            <p className="text-xs text-slate-400 text-center mt-4 leading-relaxed">
               By {view === 'sign_up' ? 'creating an account' : 'continuing'}, you agree to our{' '}
               <Link to="/terms" className="text-slate-500 underline hover:text-slate-700">
                 Terms of Service
@@ -399,7 +398,7 @@ const LoginPage = () => {
             </p>
 
             {/* Reassurance badges */}
-            <div className="flex items-center justify-center gap-6 mt-6">
+            <div className="flex items-center justify-center gap-6 mt-4">
               <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
                 <Shield size={12} /> Secure
               </span>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle, Search, Target, Star, Upload, Store, Sparkles, TrendingUp, Loader2, Send, ArrowRight } from 'lucide-react';
+import { CheckCircle, Camera, BarChart3, Award, Upload, Sparkles, TrendingUp, Loader2, Send, ArrowRight } from 'lucide-react';
 // TODO: re-enable if needed — waitlist uses supabase
 // import { supabase } from '@/lib/supabase';
 import axios from 'axios';
@@ -96,10 +96,10 @@ const LandingPage = () => {
             🚀 Now in Open Beta
           </span>
           <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight mb-6">
-            Product SEO is no longer a <span className="text-indigo-600">guessing game.</span>
+            Stop <span className="text-indigo-600">guessing</span> which tags to use.
           </h1>
           <p className="text-xl text-slate-600 mb-8 leading-relaxed">
-            The first AI-powered tool that <span className="font-bold text-slate-800">sees</span> your product mockups to predict market trends. Rank higher, save time, and sell more.
+            Upload your product photo. Get a fully optimized Etsy listing — title, tags, and description — scored by real search volume, buyer intent, and competition. Copy, paste, sell.
           </p>
 
           <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -133,12 +133,11 @@ const LandingPage = () => {
       {/* How It Works */}
       <section className="max-w-7xl mx-auto px-6 py-20">
         <h2 className="text-3xl font-extrabold text-center mb-12">How PennySEO Works</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {[
-            { icon: Upload, title: 'Upload Your Product Image', desc: 'Upload a mockup or product photo. Our AI analyzes visual elements like colors, typography, and style.' },
-            { icon: Store, title: 'Connect Your Shop (coming soon)', desc: 'Soon, link your Etsy shop directly to import listings and publish optimized content in one click.' },
-            { icon: Sparkles, title: 'Get Optimized Tags, Title & Description', desc: 'Receive AI-generated tags, titles, and descriptions — every keyword scored by volume, competition, and buyer intent.' },
-            { icon: TrendingUp, title: 'Publish & Rank Higher', desc: 'Apply the optimized tags to your listings and watch your visibility grow.' },
+            { icon: Upload, title: 'Upload Your Product Photo', desc: "Our AI reads your product's style, colors, typography, and target audience in seconds. No forms to fill — just drop your image." },
+            { icon: Sparkles, title: 'Get Scored Keywords & a Ready-Made Listing', desc: 'Receive AI-generated titles, tags, and descriptions. Every keyword scored by real Google search volume, buyer intent, product fit, and competition.' },
+            { icon: TrendingUp, title: 'Copy to Etsy & Rank Higher', desc: 'Export your optimized tags and listing. Paste them into your Etsy shop and watch your visibility grow.' },
           ].map(({ icon: Icon, title, desc }, i) => (
             <div key={i} className="text-center space-y-4">
               <div className="w-14 h-14 mx-auto bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
@@ -158,24 +157,24 @@ const LandingPage = () => {
           <div className="grid md:grid-cols-3 gap-12">
             <div className="space-y-4">
               <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
-                <Search size={24} />
+                <Camera size={24} />
               </div>
-              <h3 className="text-xl font-bold">AI-Powered Visual Insights</h3>
-              <p className="text-slate-600">Advanced AI technology analyzes your mockups to automatically detect the perfect niche and generate tags backed by real-time SEO stats.</p>
+              <h3 className="text-xl font-bold">Your Photo Is the Brief</h3>
+              <p className="text-slate-600">You don't type keywords. You upload a photo. Our AI reads aesthetic, typography, color palette, and target audience — then builds your entire keyword strategy from what it sees.</p>
             </div>
             <div className="space-y-4">
               <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center">
-                <Target size={24} />
+                <BarChart3 size={24} />
               </div>
-              <h3 className="text-xl font-bold">Precision Strategy Tuner</h3>
-              <p className="text-slate-600">Take control of your visibility. Balance search volume, niche relevance, and competition to target high-value market opportunities.</p>
+              <h3 className="text-xl font-bold">Real Search Data, Not Estimates</h3>
+              <p className="text-slate-600">Every keyword is backed by live Google search volume, CPC, and competition data. You see actual buyer demand — not scraped approximations from marketplace pages.</p>
             </div>
             <div className="space-y-4">
               <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center">
-                <Star size={24} />
+                <Award size={24} />
               </div>
-              <h3 className="text-xl font-bold">Keyword Favorites</h3>
-              <p className="text-slate-600">Build your own library of high-performing keywords. Create custom presets and streamline your workflow across your product catalog.</p>
+              <h3 className="text-xl font-bold">Keywords Scored, Not Just Listed</h3>
+              <p className="text-slate-600">Each keyword gets a composite score across four axes: search volume, buyer intent, relevance to your product, and competition level. Pick the winners, skip the noise.</p>
             </div>
           </div>
         </div>
@@ -248,7 +247,7 @@ const LandingPage = () => {
       {/* Footer */}
       <footer className="py-12 text-center text-slate-400 text-sm">
         &copy; 2026 5PennyAi. All rights reserved. <br />
-        <span className="italic">Designed for Online Sellers, by AI Enthusiasts.</span>
+        <span className="italic">Designed for Online Sellers. by 5PennyAi.</span>
         <div className="mt-4 space-x-4">
           <a href="https://www.iubenda.com/privacy-policy/39387054" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 underline">Privacy Policy</a>
           <a href="https://www.iubenda.com/privacy-policy/39387054/cookie-policy" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 underline">Cookie Policy</a>
