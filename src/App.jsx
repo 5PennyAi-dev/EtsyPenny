@@ -18,19 +18,7 @@ import BillingPage from './pages/BillingPage';
 import ListingsByStatusPage from './pages/ListingsByStatusPage';
 
 import DocsLayout from './components/docs/DocsLayout';
-import GettingStartedPage from './pages/docs/GettingStartedPage';
-import AnalyzingProductPage from './pages/docs/AnalyzingProductPage';
-import KeywordResearchPage from './pages/docs/KeywordResearchPage';
-import GeneratingListingPage from './pages/docs/GeneratingListingPage';
-import FavoriteTagsPage from './pages/docs/FavoriteTagsPage';
-import PresetsPage from './pages/docs/PresetsPage';
-import EtsyImportPage from './pages/docs/EtsyImportPage';
-import DashboardPage from './pages/docs/DashboardPage';
-import DocsBillingPage from './pages/docs/BillingPage';
-import DocsSettingsPage from './pages/docs/SettingsPage';
-import ScoresPage from './pages/docs/ScoresPage';
-import FAQPage from './pages/docs/FAQPage';
-import DocPlaceholderPage from './pages/docs/DocPlaceholderPage';
+import MarkdownArticle from './components/docs/MarkdownArticle';
 
 import { BulkProgressProvider } from './context/BulkProgressContext';
 import { useAuth } from './context/AuthContext';
@@ -125,19 +113,7 @@ function App() {
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/docs" element={<DocsLayout />}>
             <Route index element={<Navigate to="/docs/getting-started" replace />} />
-            <Route path="getting-started" element={<GettingStartedPage />} />
-            <Route path="studio/analyzing" element={<AnalyzingProductPage />} />
-            <Route path="studio/keywords" element={<KeywordResearchPage />} />
-            <Route path="studio/generating" element={<GeneratingListingPage />} />
-            <Route path="lab/favorites" element={<FavoriteTagsPage />} />
-            <Route path="lab/presets" element={<PresetsPage />} />
-            <Route path="etsy-import" element={<EtsyImportPage />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="billing" element={<DocsBillingPage />} />
-            <Route path="settings" element={<DocsSettingsPage />} />
-            <Route path="scores" element={<ScoresPage />} />
-            <Route path="faq" element={<FAQPage />} />
-            <Route path="*" element={<DocPlaceholderPage />} />
+            <Route path="*" element={<MarkdownArticle />} />
           </Route>
           <Route path="/" element={<LandingPage />} />
         </Routes>

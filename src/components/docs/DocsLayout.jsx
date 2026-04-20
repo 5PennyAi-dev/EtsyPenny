@@ -1,8 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { ArrowLeft, Menu, X, ChevronDown } from 'lucide-react';
-import { docsNavigation } from '@/config/docsNavigation';
+import { getAllArticles } from './MarkdownArticle';
 import pennyseoLogo from '@/assets/pennyseo-logo.png';
+
+function buildNavigation() {
+  const articles = getAllArticles();
+  const byCategory = new Map();
+  for (const article of articles) {
+    const cat = article.frontmatter.category || 'General';
+    if (!byCategory.has(cat)) byCategory.set(cat, []);
+    byCategory.get(cat).push(article);
+  }
+
+  const categoryOrder = ['General', 'SEO Studio', 'SEO Lab'];
+  const seen = new Set();
+  const sortedCategories = [
+    ...categoryOrder.filter((c) => byCategory.has(c)),
+    ...Array.from(byCategory.keys()).filter((c) => !categoryOrder.includes(c)),
+  ].filter((c) => (seen.has(c) ? false : seen.add(c)));
+
+  const nav = [];
+  for (const cat of sortedCategories) {
+    const articlesInCat = byCategory.get(cat);
+    if (cat === 'General') {
+      for (const article of articlesInCat) {
+        nav.push({
+          title: article.frontmatter.title,
+          path: `/docs/${article.slug}`,
+        });
+      }
+    } else {
+      nav.push({
+        title: cat,
+        pages: articlesInCat.map((a) => ({
+          title: a.frontmatter.title,
+          path: `/docs/${a.slug}`,
+        })),
+      });
+    }
+  }
+  return nav;
+}
 
 function NavItem({ item, pathname }) {
   const [open, setOpen] = useState(true);
@@ -137,6 +176,7 @@ function TableOfContents() {
 export default function DocsLayout() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const docsNavigation = useMemo(() => buildNavigation(), []);
 
   // Close mobile nav on route change
   useEffect(() => {

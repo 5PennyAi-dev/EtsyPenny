@@ -22,6 +22,7 @@ import { enrichKeywords } from '../seo/enrich-keywords.js';
 import { scoreKeywords } from '../seo/score-keywords.js';
 import { selectAndScore } from '../seo/select-and-score.js';
 import { persistSeo } from '../seo/persist-seo.js';
+import { runResetPool } from '../seo/run-reset-pool.js';
 
 const STATUS_NEW = 'ac083a90-43fa-4ff5-a62d-5cd6bb5edbcc';
 
@@ -214,6 +215,11 @@ export async function scoreEtsyListing(
     // ── 8. Persist results ────────────────────────────────
 
     await persistSeo(listingId, finalKeywords, strength, params);
+
+    // Finalize the pool synchronously (replaces the old fire-and-forget reset-pool
+    // trigger from the save-seo edge function, which left ~50-100 keywords with
+    // is_current_pool=true until the async call eventually landed).
+    await runResetPool(listingId, params);
 
     // Keep status as NEW — scoring is evaluation only, not full SEO generation
     await supabaseAdmin.from('listings').update({

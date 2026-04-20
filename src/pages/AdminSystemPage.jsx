@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Layout from '../components/Layout';
 import Accordion from '../components/ui/Accordion';
-import { Settings2, Zap, Edit2, Check, X, Trash2, Plus, ArrowUpDown, ChevronUp, ChevronDown, Globe, Package, Brain, MessageSquare, Users } from 'lucide-react';
+import { Settings2, Zap, Edit2, Check, X, Trash2, Plus, ArrowUpDown, ChevronUp, ChevronDown, Globe, Package, Brain, MessageSquare, MessagesSquare, Users } from 'lucide-react';
 import TaxonomyManagement from '../components/admin/TaxonomyManagement';
 import ProductTypeManagement from '../components/admin/ProductTypeManagement';
 import AIModelConfig from '../components/admin/AIModelConfig';
 import UserManagement from '../components/admin/UserManagement';
+import HelpConversationsPanel from '../components/admin/HelpConversationsPanel';
 import { toast } from 'sonner';
 
 export default function AdminSystemPage() {
@@ -32,6 +33,9 @@ export default function AdminSystemPage() {
   // Feedback state
   const [feedbackList, setFeedbackList] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  // Help Conversations accordion — lazy-load when opened
+  const [helpAccordionOpen, setHelpAccordionOpen] = useState(false);
 
   const fetchFeedback = async () => {
     try {
@@ -572,6 +576,25 @@ export default function AdminSystemPage() {
                 </div>
               )}
             </div>
+          </Accordion>
+
+          {/* Help Conversations */}
+          <Accordion
+            isOpen={helpAccordionOpen}
+            onToggle={setHelpAccordionOpen}
+            title={
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-sky-50 rounded-lg text-sky-600">
+                  <MessagesSquare size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 text-left">Help Conversations</h2>
+                  <p className="text-sm text-slate-500 font-normal mt-0.5 text-left">Review user questions and flag documentation gaps.</p>
+                </div>
+              </div>
+            }
+          >
+            <HelpConversationsPanel active={helpAccordionOpen} />
           </Accordion>
 
           {/* Table Area 1: SEO Strategy Weights */}

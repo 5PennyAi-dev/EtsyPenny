@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
-import type { AICallParams, AIResponse } from '../types.js';
+import type { AICallParams, AIResponse, AIStreamParams, StreamChunk } from '../types.js';
 
 const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -75,5 +75,64 @@ export async function callGemini(params: AICallParams): Promise<AIResponse> {
     },
     model: params.model,
     provider: 'gemini',
+  };
+}
+
+/**
+ * Streaming sibling of callGemini for plain-text chat use cases.
+ * Intentionally does NOT set responseMimeType — we want raw text, not JSON.
+ * Does not support image input (chatbot is text-only).
+ */
+export async function* callGeminiStream(params: AIStreamParams): AsyncGenerator<StreamChunk> {
+  const client = getClient();
+  const model = client.getGenerativeModel({
+    model: params.model,
+    generationConfig: {
+      temperature: params.temperature,
+      topP: 1,
+      maxOutputTokens: params.maxTokens,
+    },
+    safetySettings,
+    ...(params.systemPrompt ? { systemInstruction: params.systemPrompt } : {}),
+  });
+
+  const contents = params.messages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+
+  let result;
+  try {
+    result = await model.generateContentStream({ contents });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`Gemini generateContentStream failed: ${detail}`);
+  }
+
+  try {
+    for await (const chunk of result.stream) {
+      if (params.signal?.aborted) break;
+      const text = chunk.text();
+      if (text) yield { type: 'delta', text };
+    }
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`Gemini stream iteration failed: ${detail}`);
+  }
+
+  if (params.signal?.aborted) return;
+
+  let final;
+  try {
+    final = await result.response;
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`Gemini final response resolution failed: ${detail}`);
+  }
+
+  yield {
+    type: 'done',
+    tokensInput: final.usageMetadata?.promptTokenCount ?? undefined,
+    tokensOutput: final.usageMetadata?.candidatesTokenCount ?? undefined,
   };
 }

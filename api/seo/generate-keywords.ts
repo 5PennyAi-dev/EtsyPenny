@@ -5,6 +5,7 @@ import { enrichKeywords } from '../../lib/seo/enrich-keywords.js';
 import { scoreKeywords } from '../../lib/seo/score-keywords.js';
 import { selectAndScore } from '../../lib/seo/select-and-score.js';
 import { persistSeo } from '../../lib/seo/persist-seo.js';
+import { runResetPool } from '../../lib/seo/run-reset-pool.js';
 import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 
@@ -107,6 +108,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Step E: Persist via edge function
     await persistSeo(listing_id, finalKeywords as any, strength, params);
+
+    // Step F: Finalize the 25-keyword pool synchronously so the DB reflects the
+    // final is_current_pool / is_current_eval / is_selection_ia flags before we
+    // flip status to SEO_DONE (eliminates the race against the realtime subscription).
+    await runResetPool(listing_id, parameters);
 
     // Update listing flags
     await supabaseAdmin.from('listings').update({

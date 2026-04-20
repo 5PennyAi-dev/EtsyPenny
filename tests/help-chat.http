@@ -1,0 +1,100 @@
+###
+# Curl cookbook for the help chatbot backend.
+#
+# These commands exercise every route. Run against the local Express dev server:
+#   npm run dev:api
+#
+# All routes expect Content-Type: application/json and use user_id in the body
+# (no JWT Bearer parsing — matches existing project convention).
+#
+# Replace <USER_ID> with a real uuid from auth.users. Replace <CONVO_ID> /
+# <MESSAGE_ID> with values echoed back by earlier calls.
+###
+
+
+### 1. Happy path — start a new conversation (SSE)
+# Expected: stream of `data: {...}` frames ending with `{"type":"done", ...}`.
+# Use `-N` to disable curl buffering so you can see chunks as they arrive.
+#
+# curl -N -X POST http://localhost:3001/api/help/chat \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "user_id": "<USER_ID>",
+#     "message": "How do I generate SEO keywords for a listing?",
+#     "pageContext": "/studio",
+#     "history": []
+#   }'
+
+
+### 2. Continue an existing conversation with history
+# Pass the conversationId from #1 plus the last turn in `history`.
+#
+# curl -N -X POST http://localhost:3001/api/help/chat \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "user_id": "<USER_ID>",
+#     "conversationId": "<CONVO_ID>",
+#     "message": "And how many tokens does that cost?",
+#     "pageContext": "/studio",
+#     "history": [
+#       {"role":"user","content":"How do I generate SEO keywords for a listing?"},
+#       {"role":"assistant","content":"<assistant reply from #1>"}
+#     ]
+#   }'
+
+
+### 3. Rate-limit — 21 consecutive sends should trip the limit on the 21st
+# Expected: the 21st returns HTTP 429 with
+#   { "error":"rate_limited", "used":20, "limit":20, "resetAt":"..." }
+#
+# for i in $(seq 1 21); do
+#   echo "--- send $i ---"
+#   curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:3001/api/help/chat \
+#     -H "Content-Type: application/json" \
+#     -d "{\"user_id\":\"<USER_ID>\",\"message\":\"ping $i\",\"history\":[]}"
+# done
+
+
+### 4. Validation — empty message → 400
+#
+# curl -X POST http://localhost:3001/api/help/chat \
+#   -H "Content-Type: application/json" \
+#   -d '{"user_id":"<USER_ID>","message":"","history":[]}'
+
+
+### 5. Validation — missing user_id → 400
+#
+# curl -X POST http://localhost:3001/api/help/chat \
+#   -H "Content-Type: application/json" \
+#   -d '{"message":"hello","history":[]}'
+
+
+### 6. Feedback happy path — thumbs up on an assistant message
+# Use a messageId you got from the `done` chunk of an earlier streaming call.
+# Expected: { "ok": true }
+#
+# curl -X POST http://localhost:3001/api/help/feedback \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "user_id": "<USER_ID>",
+#     "messageId": "<MESSAGE_ID>",
+#     "feedback": 1,
+#     "note": "Helpful!"
+#   }'
+
+
+### 7. Feedback — invalid feedback value → 400
+#
+# curl -X POST http://localhost:3001/api/help/feedback \
+#   -H "Content-Type: application/json" \
+#   -d '{"user_id":"<USER_ID>","messageId":"<MESSAGE_ID>","feedback":5}'
+
+
+### 8. Feedback — non-owned messageId → 404
+# Pass a messageId belonging to another user (RLS doesn't apply here because
+# we use the admin client, so ownership is enforced by the .eq('user_id',...)
+# clause on the UPDATE).
+#
+# curl -X POST http://localhost:3001/api/help/feedback \
+#   -H "Content-Type: application/json" \
+#   -d '{"user_id":"<USER_ID>","messageId":"<FOREIGN_MSG_ID>","feedback":1}'

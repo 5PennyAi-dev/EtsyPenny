@@ -50,7 +50,12 @@ function createQueryBuilder(table: string) {
       return Promise.resolve({ data, error: null });
     });
 
-    builder.insert = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    builder.insert = vi.fn(() => {
+      const b = chainable();
+      (b as any).then = (res: (v: unknown) => void, rej?: (e: unknown) => void) =>
+        Promise.resolve({ data: null, error: null }).then(res, rej);
+      return b;
+    });
 
     builder.upsert = vi.fn(() => {
       const b = chainable();

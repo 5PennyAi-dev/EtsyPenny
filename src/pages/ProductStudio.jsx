@@ -966,10 +966,9 @@ const ProductStudio = () => {
 
         await axios.post('/api/seo/generate-keywords', keywordsPayload);
 
-        // Brief pause to let the save-seo edge function's pool reset fully commit to DB
-        await new Promise(r => setTimeout(r, 1500));
-
-        // Pipeline complete — load results directly from DB
+        // Pipeline complete — load results directly from DB.
+        // generate-keywords now awaits runResetPool() before responding, so the DB
+        // already reflects the final is_current_pool flags by the time we get here.
         toast.success("SEO Analysis completed! Loading results...");
         await handleLoadListing(activeListingId);
         setIsSeoLoading(false);

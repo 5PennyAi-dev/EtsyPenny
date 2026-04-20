@@ -213,25 +213,6 @@ serve(async (req) => {
 
     if (updateListingError) throw updateListingError;
 
-    // 6. Trigger resetPool via API if requested
-    if (trigger_reset_pool) {
-        try {
-            const resetPoolUrl = Deno.env.get('RESET_POOL_API_URL');
-            if (!resetPoolUrl) {
-                console.error('Missing env var: RESET_POOL_API_URL. Cannot trigger resetPool.');
-            } else {
-                // Fire and forget — don't block the response
-                fetch(`${resetPoolUrl}/api/seo/reset-pool`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ listing_id, parameters })
-                }).catch(err => console.error("Failed to trigger resetPool:", err));
-            }
-        } catch (resetPoolErr) {
-            console.error("Error initiating resetPool:", resetPoolErr);
-        }
-    }
-
     return new Response(JSON.stringify({ success: true, message: 'SEO Data Saved Successfully', listing_id }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

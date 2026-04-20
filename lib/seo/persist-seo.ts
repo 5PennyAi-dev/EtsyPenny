@@ -52,6 +52,10 @@ export async function persistSeo(
         })),
       },
     },
+    // Tells the edge function to SKIP the status_id=SEO_DONE / is_generating_seo=false
+    // update on the listings row. The caller is expected to await runResetPool() and
+    // then set the final status itself — this prevents the realtime subscription on
+    // listings from firing before the 25-keyword pool is finalized.
     trigger_reset_pool: true,
     parameters: params,
   };

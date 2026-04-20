@@ -1,8 +1,8 @@
 import { supabaseAdmin } from '../supabase/server.js';
-import { callGemini } from './adapters/gemini-adapter.js';
+import { callGemini, callGeminiStream } from './adapters/gemini-adapter.js';
 import { callAnthropic } from './adapters/anthropic-adapter.js';
 import { callOpenAI } from './adapters/openai-adapter.js';
-import type { AICallParams, AIResponse } from './types.js';
+import type { AICallParams, AIResponse, AIMessage, StreamChunk } from './types.js';
 
 // ── Retry with exponential backoff ──────────────────────────────────
 
@@ -165,6 +165,43 @@ export async function runAI(
 
   console.error(`[provider-router] ${taskKey} all models failed. Chain: ${modelChain.join(' → ')}`);
   throw lastError;
+}
+
+/**
+ * Streaming sibling of runAI. Currently Gemini-only (no fallback chain —
+ * switching models mid-stream isn't possible). On connect failure the
+ * consumer should retry the whole call.
+ *
+ * @param taskKey - Matches a row in system_ai_config (e.g. 'help_chat')
+ * @param messages - Multi-turn conversation history including the current user message
+ * @param options - Optional: system prompt, parameter overrides, abort signal
+ */
+export async function* streamAI(
+  taskKey: string,
+  messages: AIMessage[],
+  options?: {
+    systemPrompt?: string;
+    temperatureOverride?: number;
+    maxTokensOverride?: number;
+    signal?: AbortSignal;
+  }
+): AsyncGenerator<StreamChunk> {
+  const config = await getTaskConfig(taskKey);
+
+  if (config.provider !== 'gemini') {
+    throw new Error(
+      `[streamAI] Streaming only supported for gemini provider; task "${taskKey}" is configured for "${config.provider}"`
+    );
+  }
+
+  yield* callGeminiStream({
+    model: config.model_id,
+    messages,
+    temperature: options?.temperatureOverride ?? config.temperature,
+    maxTokens: options?.maxTokensOverride ?? config.max_tokens,
+    systemPrompt: options?.systemPrompt,
+    signal: options?.signal,
+  });
 }
 
 /**

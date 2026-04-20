@@ -24,6 +24,7 @@ import { persistSeo } from './lib/seo/persist-seo.ts';
 import { persistStrength } from './lib/seo/persist-strength.ts';
 import { applySEOFilter } from './lib/seo/filter-logic.ts';
 import { extractProductTypeWords } from './lib/seo/concept-diversity.ts';
+import { runResetPool } from './lib/seo/run-reset-pool.ts';
 import { checkTokenBalance, deductTokens, checkQuota, incrementQuota } from './lib/tokens/token-middleware.ts';
 import { getStripe, PRICE_TO_PLAN, PRICE_TO_PACK, PLAN_TOKENS } from './lib/stripe/client.ts';
 import { sendEmail } from './lib/email/send-email.ts';
@@ -34,6 +35,8 @@ import { fetchShopListings, fetchListingsByIds, updateEtsyListing, getSellerTaxo
 import { scoreEtsyListing } from './lib/etsy/score-etsy-listing.ts';
 import { downloadAndUploadEtsyImage } from './lib/etsy/prepare-etsy-image.ts';
 import { matchProductType } from './lib/etsy/match-product-type.ts';
+import { checkRateLimit } from './lib/help/rate-limit.ts';
+import { streamHelpReply, ChatInputError } from './lib/help/chat-service.ts';
 
 const app = express();
 // JSON body parser for all routes EXCEPT Stripe webhook (needs raw body)
@@ -277,6 +280,13 @@ app.post('/api/seo/generate-keywords', async (req, res) => {
     await persistSeo(listing_id, finalKeywords, strength, params);
     console.log('   ✅ Saved!');
 
+    // Step F: Finalize the 25-keyword pool synchronously so the DB reflects the
+    // final is_current_pool / is_current_eval / is_selection_ia flags before we
+    // flip status to SEO_DONE (eliminates the race against the realtime subscription).
+    console.log('   Step F: Finalizing pool (reset-pool)...');
+    await runResetPool(listing_id, parameters);
+    console.log('   ✅ Pool finalized!');
+
     // Update listing flags: SEO done, no longer generating
     const STATUS_SEO_DONE = '35660e24-94bb-4586-aa5a-a5027546b4a1';
     await supabaseAdmin.from('listings').update({
@@ -332,119 +342,16 @@ app.post('/api/seo/reset-pool', async (req, res) => {
 
     console.log(`\n🔄 [reset-pool] Starting for listing ${listing_id}`);
 
-    // 1. Fetch keywords for the listing
-    const { data: keywords, error: kwError } = await supabaseAdmin
-      .from('listing_seo_stats')
-      .select('*')
-      .eq('listing_id', listing_id);
-
-    if (kwError) throw kwError;
-    if (!keywords || keywords.length === 0) {
-      return res.status(404).json({ error: 'No keywords found for this listing' });
-    }
-
-    // 2. Fetch the listing owner and product type
-    const { data: listing, error: listingError } = await supabaseAdmin
-      .from('listings')
-      .select('user_id, product_type_id')
-      .eq('id', listing_id)
-      .single();
-
-    if (listingError || !listing) throw listingError || new Error("Listing not found");
-
-    // Resolve product type name for concept diversity
-    let productTypeName = '';
-    if (listing.product_type_id) {
-      const { data: pt } = await supabaseAdmin
-        .from('v_combined_product_types')
-        .select('name')
-        .eq('id', listing.product_type_id)
-        .single();
-      productTypeName = pt?.name || '';
-    }
-
-    // 3. Fetch user settings from view
-    const { data: settings, error: settingsError } = await supabaseAdmin
-      .from('v_user_seo_active_settings')
-      .select('*')
-      .eq('user_id', listing.user_id)
-      .maybeSingle();
-
-    if (settingsError) throw settingsError;
-    const s = settings || {};
-
-    const params = {
-      Volume: s.param_volume ?? 0.25,
-      Competition: s.param_competition ?? 0.10,
-      Transaction: s.param_transaction ?? 0.25,
-      Niche: s.param_niche ?? 0.20,
-      CPC: s.param_cpc ?? 0.20,
-      evergreen_stability_ratio: s.evergreen_stability_ratio ?? 4,
-      evergreen_minimum_volume: s.evergreen_minimum_volume ?? 0.3,
-      evergreen_avg_volume: s.evergreen_avg_volume ?? 50,
-      trending_dropping_threshold: s.trending_dropping_threshold ?? 0.8,
-      trending_current_month_min_volume: s.trending_current_month_min_volume ?? 150,
-      trending_growth_factor: s.trending_growth_factor ?? 1.5,
-      promising_min_score: s.promising_min_score ?? 55,
-      promising_competition: s.promising_competition ?? s.promosing_competition ?? 0.4,
-      ai_selection_count: s.ai_selection_count || 13,
-      working_pool_count: s.working_pool_count || 40,
-      concept_diversity_limit: s.concept_diversity_limit || 2,
-      productTypeWords: extractProductTypeWords(productTypeName),
-    };
-
-    // Override with incoming parameters
-    const finalParams = { ...params, ...(req.body.parameters || {}) };
-
-    // 4. Apply filter
-    const filteredKeywords = applySEOFilter(keywords, finalParams);
-
-    // 4.5 Reset flags for all keywords before applying the new ones
-    await supabaseAdmin
-      .from('listing_seo_stats')
-      .update({
-        is_selection_ia: false,
-        is_current_eval: false,
-        is_current_pool: false
-      })
-      .eq('listing_id', listing_id)
-      .eq('is_competition', false);
-
-    // 5. Update keywords in DB
-    const updates = filteredKeywords.map(kw => ({
-      id: kw.id,
-      listing_id: kw.listing_id,
-      tag: kw.tag,
-      opportunity_score: kw.opportunity_score,
-      is_trending: kw.status.trending,
-      is_evergreen: kw.status.evergreen,
-      is_promising: kw.status.promising,
-      is_selection_ia: kw.is_selection_ia,
-      is_current_eval: kw.is_current_eval,
-      is_current_pool: kw.is_current_pool,
-      is_pinned: kw.is_pinned
-    }));
-
-    const { error: updateError } = await supabaseAdmin
-      .from('listing_seo_stats')
-      .upsert(updates, { onConflict: 'id' });
-
-    if (updateError) throw updateError;
-
-    // 6. Calculate new listing strength and persist
-    // Capture correct selections from applySEOFilter BEFORE selectAndScore mutates them
-    const correctSelectedTags = filteredKeywords.filter(k => k.is_selection_ia).map(k => k.tag);
-    const { strength } = selectAndScore(filteredKeywords, finalParams);
-
-    if (strength) {
-      await persistStrength(listing_id, strength, correctSelectedTags, finalParams);
-    }
+    const result = await runResetPool(listing_id, req.body.parameters || {});
 
     console.log(`   ✅ Pool reset complete for ${listing_id}`);
-    return res.json({ success: true, processed: filteredKeywords.length, top_selections: filteredKeywords.filter(k => k.is_selection_ia).length, strength });
+    return res.json({ success: true, ...result });
 
   } catch (error) {
     console.error('❌ [reset-pool] Error:', error.message || error);
+    if (error.message === 'No keywords found for this listing') {
+      return res.status(404).json({ error: error.message });
+    }
     return res.status(500).json({ error: 'Failed to reset pool.', details: error.message || 'Unknown error' });
   }
 });
@@ -2095,6 +2002,133 @@ app.post('/api/etsy/export-listings', async (req, res) => {
   }
 });
 
+// ─── API ROUTE: POST /api/help/chat ───────────────────────
+app.post('/api/help/chat', async (req, res) => {
+  const { user_id, message, conversationId, pageContext, history } = req.body ?? {};
+
+  if (!user_id || typeof user_id !== 'string') {
+    return res.status(400).json({ error: 'Missing required field: user_id' });
+  }
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    return res.status(400).json({ error: 'Missing required field: message' });
+  }
+  if (message.length > 2000) {
+    return res.status(400).json({ error: 'message exceeds 2000 characters' });
+  }
+  if (conversationId != null && typeof conversationId !== 'string') {
+    return res.status(400).json({ error: 'conversationId must be a string or null' });
+  }
+  if (history != null && !Array.isArray(history)) {
+    return res.status(400).json({ error: 'history must be an array' });
+  }
+
+  console.info(
+    `[help/chat] user=${user_id} convoId=${conversationId ?? 'new'} msgLen=${message.length} page=${pageContext ?? '-'}`
+  );
+
+  try {
+    const rl = await checkRateLimit(user_id);
+    if (!rl.allowed) {
+      return res.status(429).json({
+        error: 'rate_limited',
+        used: rl.used,
+        limit: rl.limit,
+        resetAt: rl.resetAt.toISOString(),
+      });
+    }
+  } catch (err) {
+    console.error('[help/chat] rate-limit check failed:', err?.message ?? err);
+    // fail open
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const controller = new AbortController();
+  req.on('close', () => controller.abort());
+
+  const write = (chunk) => {
+    try {
+      res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+    } catch (err) {
+      console.error('[help/chat] write failed:', err?.message ?? err);
+    }
+  };
+
+  try {
+    for await (const chunk of streamHelpReply({
+      userId: user_id,
+      conversationId: conversationId ?? null,
+      userMessage: message,
+      pageContext: typeof pageContext === 'string' ? pageContext : null,
+      history: Array.isArray(history) ? history : [],
+      signal: controller.signal,
+    })) {
+      if (controller.signal.aborted) break;
+      write(chunk);
+    }
+  } catch (err) {
+    if (err instanceof ChatInputError) {
+      write({ type: 'error', message: err.message });
+    } else {
+      console.error('[help/chat] handler error:', err);
+      const inDev = !process.env.VERCEL_ENV;
+      const detail = err instanceof Error ? err.message : String(err);
+      write({
+        type: 'error',
+        message: inDev
+          ? `Server error: ${detail}`
+          : 'Something went wrong. Please try again.',
+      });
+    }
+  } finally {
+    try { res.end(); } catch { /* socket closed */ }
+  }
+});
+
+// ─── API ROUTE: POST /api/help/feedback ───────────────────
+app.post('/api/help/feedback', async (req, res) => {
+  const { user_id, messageId, feedback, note } = req.body ?? {};
+
+  if (!user_id || typeof user_id !== 'string') {
+    return res.status(400).json({ error: 'Missing required field: user_id' });
+  }
+  if (!messageId || typeof messageId !== 'string') {
+    return res.status(400).json({ error: 'Missing required field: messageId' });
+  }
+  if (feedback !== -1 && feedback !== 1) {
+    return res.status(400).json({ error: 'feedback must be -1 or 1' });
+  }
+  if (note != null && typeof note !== 'string') {
+    return res.status(400).json({ error: 'note must be a string if provided' });
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('help_messages')
+      .update({
+        feedback,
+        feedback_note: typeof note === 'string' && note.trim() ? note.trim() : null,
+      })
+      .eq('id', messageId)
+      .eq('user_id', user_id)
+      .select('id')
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[help/feedback] error:', err?.message ?? err);
+    return res.status(500).json({ error: 'Failed to record feedback' });
+  }
+});
+
 // ─── EXPORT FOR TESTING ──────────────────────────────────
 export { app };
 
@@ -2119,6 +2153,8 @@ app.listen(PORT, () => {
   console.log(`   POST /api/etsy/score-listings`);
   console.log(`   POST /api/etsy/prepare-listing`);
   console.log(`   POST /api/etsy/export-listings`);
+  console.log(`   POST /api/help/chat`);
+  console.log(`   POST /api/help/feedback`);
   console.log(`   GET  /api/health\n`);
 });
 }

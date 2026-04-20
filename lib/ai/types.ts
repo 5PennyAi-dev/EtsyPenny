@@ -18,3 +18,26 @@ export interface AIResponse {
   model: string;
   provider: string;
 }
+
+export interface AIMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AIStreamParams {
+  model: string;
+  messages: AIMessage[];
+  temperature: number;
+  maxTokens: number;
+  systemPrompt?: string;
+  signal?: AbortSignal;
+}
+
+export type StreamChunk =
+  | { type: 'delta'; text: string }
+  | {
+      type: 'done';
+      tokensInput?: number;
+      tokensOutput?: number;
+    }
+  | { type: 'error'; message: string };
