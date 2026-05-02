@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 import Accordion from '../components/ui/Accordion';
 import UserTaxonomyManagement from '../components/settings/UserTaxonomyManagement';
+import EtsyConnectionSection from '../components/settings/EtsyConnectionSection';
 import {
   BarChart3,
   Users,
@@ -398,6 +399,9 @@ export default function UserSettings() {
           >
             <UserTaxonomyManagement />
           </Accordion>
+
+          {/* ─── Etsy shop connection ──────────────────────────────────── */}
+          <EtsyConnectionSection />
 
           {/* ─── Replay Onboarding Tour ──────────────────────────────────── */}
           {profile?.onboarding_completed && (

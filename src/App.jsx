@@ -16,6 +16,7 @@ import TermsPage from './pages/TermsPage';
 import PricingPage from './pages/PricingPage';
 import BillingPage from './pages/BillingPage';
 import ListingsByStatusPage from './pages/ListingsByStatusPage';
+import EtsyCallbackPage from './pages/EtsyCallbackPage';
 
 import DocsLayout from './components/docs/DocsLayout';
 import MarkdownArticle from './components/docs/MarkdownArticle';
@@ -55,8 +56,16 @@ function App() {
               </ProtectedRoute>
             } 
           />
-          {/* TODO: re-enable when Etsy API license is approved */}
-          <Route path="/shop" element={<Navigate to="/dashboard" replace />} />
+
+          <Route
+            path="/shop"
+            element={
+              <ProtectedRoute>
+                <MyShopPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/etsy/callback" element={<EtsyCallbackPage />} />
           <Route 
             path="/lab" 
             element={

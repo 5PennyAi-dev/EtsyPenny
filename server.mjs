@@ -32,9 +32,13 @@ import { welcomeEmail } from './lib/email/templates/welcome.ts';
 import { subscriptionEmail } from './lib/email/templates/subscription-confirmation.ts';
 import { tokenPackEmail } from './lib/email/templates/token-pack-confirmation.ts';
 import { fetchShopListings, fetchListingsByIds, updateEtsyListing, getSellerTaxonomyNodes } from './lib/etsy/etsy-client.ts';
+import { getActiveConnection, EtsyConnectionError } from './lib/etsy/get-connection.ts';
 import { scoreEtsyListing } from './lib/etsy/score-etsy-listing.ts';
 import { downloadAndUploadEtsyImage } from './lib/etsy/prepare-etsy-image.ts';
 import { matchProductType } from './lib/etsy/match-product-type.ts';
+import etsyOauthAuthorize from './api/etsy/oauth/authorize.ts';
+import etsyOauthExchange from './api/etsy/oauth/exchange.ts';
+import etsyOauthDisconnect from './api/etsy/oauth/disconnect.ts';
 import { checkRateLimit } from './lib/help/rate-limit.ts';
 import { streamHelpReply, ChatInputError } from './lib/help/chat-service.ts';
 
@@ -1479,14 +1483,28 @@ app.get('/api/etsy/shop-listings', async (req, res) => {
     const offset = Number(req.query.offset) || 0;
     const state = req.query.state || 'active';
 
-    const shopId = process.env.ETSY_SHOP_ID;
-    if (!shopId) {
-      return res.status(500).json({ error: 'ETSY_SHOP_ID not configured' });
+    let connection;
+    try {
+      connection = await getActiveConnection(user_id, supabaseAdmin);
+    } catch (err) {
+      if (err instanceof EtsyConnectionError) {
+        if (err.code === 'NO_CONNECTION') {
+          return res.status(409).json({ error: 'No Etsy shop connected', code: 'NO_ETSY_CONNECTION' });
+        }
+        if (err.code === 'REFRESH_FAILED') {
+          return res.status(401).json({
+            error: 'Etsy session expired. Please reconnect your shop.',
+            code: 'ETSY_REFRESH_FAILED',
+          });
+        }
+        return res.status(500).json({ error: 'Failed to load Etsy connection' });
+      }
+      throw err;
     }
 
     console.info(`🔍 [shop-listings] user=${user_id} limit=${limit} offset=${offset}`);
 
-    const data = await fetchShopListings(shopId, { limit, offset, state });
+    const data = await fetchShopListings(connection, { limit, offset, state });
 
     const results = data.results.map((listing) => {
       const primaryImage = listing.images?.find((img) => img.rank === 1) ?? listing.images?.[0];
@@ -1570,38 +1588,38 @@ app.post('/api/etsy/import-listings', async (req, res) => {
       return res.json({ imported: 0, skipped, limit_remaining: remaining, listings: [] });
     }
 
+    let etsyConnection;
+    try {
+      etsyConnection = await getActiveConnection(user_id, supabaseAdmin);
+    } catch (err) {
+      if (err instanceof EtsyConnectionError) {
+        if (err.code === 'NO_CONNECTION') {
+          return res.status(409).json({ error: 'No Etsy shop connected', code: 'NO_ETSY_CONNECTION' });
+        }
+        if (err.code === 'REFRESH_FAILED') {
+          return res.status(401).json({
+            error: 'Etsy session expired. Please reconnect your shop.',
+            code: 'ETSY_REFRESH_FAILED',
+          });
+        }
+        return res.status(500).json({ error: 'Failed to load Etsy connection' });
+      }
+      throw err;
+    }
+
     // 3. Fetch full details from Etsy
-    const etsyListings = await fetchListingsByIds(idsToImport);
+    const etsyListings = await fetchListingsByIds(etsyConnection, idsToImport);
 
-    // 4. Get or create shop connection
-    const shopId = process.env.ETSY_SHOP_ID;
-    if (!shopId) {
-      return res.status(500).json({ error: 'ETSY_SHOP_ID not configured' });
-    }
-
-    const { data: connection } = await supabaseAdmin
+    // 4. Touch connection's last_synced_at (row already exists, owned by oauth/exchange)
+    await supabaseAdmin
       .from('etsy_shop_connections')
-      .upsert(
-        {
-          user_id,
-          etsy_shop_id: Number(shopId),
-          shop_name: 'My Etsy Shop',
-          is_active: true,
-          last_synced_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,etsy_shop_id' },
-      )
-      .select('id')
-      .single();
-
-    if (!connection) {
-      return res.status(500).json({ error: 'Failed to create shop connection' });
-    }
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq('id', etsyConnection.id);
 
     // 5. Resolve Etsy taxonomy for category mapping
     let taxonomyMap = new Map();
     try {
-      taxonomyMap = await getSellerTaxonomyNodes();
+      taxonomyMap = await getSellerTaxonomyNodes(etsyConnection);
     } catch (err) {
       console.warn('[import-listings] Failed to fetch taxonomy nodes, continuing without:', err.message);
     }
@@ -1611,7 +1629,7 @@ app.post('/api/etsy/import-listings', async (req, res) => {
       const primaryImage = listing.images?.find((img) => img.rank === 1) ?? listing.images?.[0];
       return {
         user_id,
-        connection_id: connection.id,
+        connection_id: etsyConnection.id,
         etsy_listing_id: listing.listing_id,
         original_title: listing.title,
         original_description: listing.description,
@@ -1842,6 +1860,25 @@ app.post('/api/etsy/export-listings', async (req, res) => {
 
     console.info(`\n📤 [export-listings] user=${user_id} requested=${listings.length}`);
 
+    let etsyConnection;
+    try {
+      etsyConnection = await getActiveConnection(user_id, supabaseAdmin);
+    } catch (err) {
+      if (err instanceof EtsyConnectionError) {
+        if (err.code === 'NO_CONNECTION') {
+          return res.status(409).json({ error: 'No Etsy shop connected', code: 'NO_ETSY_CONNECTION' });
+        }
+        if (err.code === 'REFRESH_FAILED') {
+          return res.status(401).json({
+            error: 'Etsy session expired. Please reconnect your shop.',
+            code: 'ETSY_REFRESH_FAILED',
+          });
+        }
+        return res.status(500).json({ error: 'Failed to load Etsy connection' });
+      }
+      throw err;
+    }
+
     const results = [];
 
     for (const item of listings) {
@@ -1930,7 +1967,7 @@ app.post('/api/etsy/export-listings', async (req, res) => {
         }
 
         // Call Etsy API
-        const etsyResult = await updateEtsyListing(etsy_listing_id, exportPayload);
+        const etsyResult = await updateEtsyListing(etsyConnection, etsy_listing_id, exportPayload);
 
         if (!etsyResult.success) {
           throw new Error(etsyResult.error || 'Etsy API call failed');
@@ -2001,6 +2038,12 @@ app.post('/api/etsy/export-listings', async (req, res) => {
     return res.status(500).json({ error: 'Failed to export listings', details: error.message });
   }
 });
+
+// ─── ETSY OAUTH ───────────────────────────────────────────
+// Vercel-style handlers are req/res-compatible with Express.
+app.post('/api/etsy/oauth/authorize', (req, res) => etsyOauthAuthorize(req, res));
+app.post('/api/etsy/oauth/exchange', (req, res) => etsyOauthExchange(req, res));
+app.post('/api/etsy/oauth/disconnect', (req, res) => etsyOauthDisconnect(req, res));
 
 // ─── API ROUTE: POST /api/help/chat ───────────────────────
 app.post('/api/help/chat', async (req, res) => {
@@ -2133,9 +2176,8 @@ app.post('/api/help/feedback', async (req, res) => {
 export { app };
 
 // ─── START ────────────────────────────────────────────────
-const isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
-if (isDirectRun) {
-app.listen(PORT, () => {
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
   console.log(`\n🚀 EtsyPenny API server running on http://localhost:${PORT}`);
   console.log(`   POST /api/seo/analyze-image`);
   console.log(`   POST /api/seo/generate-keywords`);
@@ -2153,6 +2195,9 @@ app.listen(PORT, () => {
   console.log(`   POST /api/etsy/score-listings`);
   console.log(`   POST /api/etsy/prepare-listing`);
   console.log(`   POST /api/etsy/export-listings`);
+  console.log(`   POST /api/etsy/oauth/authorize`);
+  console.log(`   POST /api/etsy/oauth/exchange`);
+  console.log(`   POST /api/etsy/oauth/disconnect`);
   console.log(`   POST /api/help/chat`);
   console.log(`   POST /api/help/feedback`);
   console.log(`   GET  /api/health\n`);

@@ -1720,7 +1720,6 @@ const SidebarSkeleton = ({ phase }) => (
                                         Save listing
                                     </button>
 
-                                    {/* TODO: re-enable when Etsy API license is approved */}
                                     {false && results?.source === 'etsy' && onPushToEtsy && (
                                         <div className="mt-2">
                                             <button

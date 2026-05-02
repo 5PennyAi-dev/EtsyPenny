@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { fetchListingsByIds, getSellerTaxonomyNodes } from '../../lib/etsy/etsy-client.js';
+import { getActiveConnection, EtsyConnectionError } from '../../lib/etsy/get-connection.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -18,6 +19,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     console.info(`[import-listings] user=${user_id} requested=${etsy_listing_ids.length}`);
+
+    let etsyConnection;
+    try {
+      etsyConnection = await getActiveConnection(user_id, supabaseAdmin);
+    } catch (err: unknown) {
+      if (err instanceof EtsyConnectionError) {
+        if (err.code === 'NO_CONNECTION') {
+          return res.status(409).json({ error: 'No Etsy shop connected', code: 'NO_ETSY_CONNECTION' });
+        }
+        if (err.code === 'REFRESH_FAILED') {
+          return res.status(401).json({
+            error: 'Etsy session expired. Please reconnect your shop.',
+            code: 'ETSY_REFRESH_FAILED',
+          });
+        }
+        Sentry.captureException(err);
+        return res.status(500).json({ error: 'Failed to load Etsy connection' });
+      }
+      throw err;
+    }
 
     // ── 1. Check import limit ──────────────────────────
     const { data: profile } = await supabaseAdmin
@@ -71,37 +92,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ── 3. Fetch full details from Etsy ────────────────
-    const etsyListings = await fetchListingsByIds(idsToImport);
+    const etsyListings = await fetchListingsByIds(etsyConnection, idsToImport);
 
-    // ── 4. Get or create shop connection ───────────────
-    const shopId = process.env.ETSY_SHOP_ID;
-    if (!shopId) {
-      return res.status(500).json({ error: 'ETSY_SHOP_ID not configured' });
-    }
-
-    const { data: connection } = await supabaseAdmin
+    // ── 4. Touch connection's last_synced_at (row already exists, owned by oauth/exchange) ──
+    await supabaseAdmin
       .from('etsy_shop_connections')
-      .upsert(
-        {
-          user_id,
-          etsy_shop_id: Number(shopId),
-          shop_name: 'My Etsy Shop',
-          is_active: true,
-          last_synced_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,etsy_shop_id' },
-      )
-      .select('id')
-      .single();
-
-    if (!connection) {
-      return res.status(500).json({ error: 'Failed to create shop connection' });
-    }
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq('id', etsyConnection.id);
 
     // ── 5. Resolve Etsy taxonomy for category mapping ───
     let taxonomyMap: Map<number, string> = new Map();
     try {
-      taxonomyMap = await getSellerTaxonomyNodes();
+      taxonomyMap = await getSellerTaxonomyNodes(etsyConnection);
     } catch (err) {
       console.warn('[import-listings] Failed to fetch taxonomy nodes, continuing without:', (err as Error).message);
     }
@@ -111,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const primaryImage = listing.images?.find((img) => img.rank === 1) ?? listing.images?.[0];
       return {
         user_id,
-        connection_id: connection.id,
+        connection_id: etsyConnection.id,
         etsy_listing_id: listing.listing_id,
         original_title: listing.title,
         original_description: listing.description,

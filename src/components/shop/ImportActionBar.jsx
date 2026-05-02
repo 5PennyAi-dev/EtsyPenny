@@ -87,7 +87,6 @@ export default function ImportActionBar({
           </>
         )}
 
-        {/* TODO: re-enable when Etsy API license is approved */}
         {false && selectionMode === 'export' && (
           <>
             {exportCount > 5 && (

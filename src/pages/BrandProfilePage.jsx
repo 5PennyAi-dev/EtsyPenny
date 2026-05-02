@@ -202,7 +202,7 @@ const BrandProfilePage = () => {
             </p>
         </div>
 
-        {/* TODO: re-enable when Etsy API license is approved */}
+        {/* TODO: replace analyseShop n8n flow with native Etsy API usage */}
         {false && (
         <div className="bg-gradient-to-r from-indigo-50 to-violet-50 rounded-2xl border border-indigo-100 p-6 shadow-sm">
             <div className="flex items-start gap-4">

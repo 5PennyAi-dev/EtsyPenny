@@ -74,6 +74,7 @@ npm run preview   # Preview production build
 - `docs/styleguide.md` — Visual design spec (in French)
 - `docs/context.md` — Living project history and session handover document
 - `.agent/personas.md` — AI assistant persona definitions for this project
+- `lib/auth/` — Request auth helpers (`verify-request-user.ts` — Supabase JWT verification for API routes)
 - `types/definitions.ts` — TypeScript interfaces for API payloads and data structures
 
 ### Backend: Dual Dev/Production Architecture
@@ -97,6 +98,9 @@ npm run preview   # Preview production build
 | `POST /api/etsy/score-listings` | Score imported Etsy listings (image analysis + tag scoring, 3 tokens/listing, max 5) |
 | `POST /api/etsy/prepare-listing` | Prepare imported Etsy listing for Studio (download image, create listings row, free) |
 | `POST /api/etsy/export-listings` | Push optimized SEO data (tags/title/description) to Etsy listings (free, max 5) |
+| `POST /api/etsy/oauth/authorize` | Initiate Etsy OAuth flow (returns auth URL) |
+| `POST /api/etsy/oauth/exchange` | Exchange auth code for tokens, persist shop connection |
+| `POST /api/etsy/oauth/disconnect` | Deactivate user's Etsy connection |
 | `GET /api/health` | Health check |
 
 **Key shared modules (in `lib/`):**
@@ -108,9 +112,13 @@ npm run preview   # Preview production build
 - `lib/seo/persist-strength.ts` — Shared DB persistence for strength scores
 - `lib/seo/filter-logic.ts` — Opportunity scores, trending/evergreen flags, pool ranking
 
-### n8n Webhook (Hidden — Pending Etsy API License)
+### Etsy integration
 
-The `analyseShop` feature in `BrandProfilePage.jsx` is hidden via `{false && ...}`. The "My Shop" sidebar item is also commented out. Both have `// TODO: re-enable when Etsy API license is approved` comments.
+Per-user OAuth via Etsy API v3. Each user connects their shop through the OAuth flow at `/shop` (or Settings). Tokens persist in `etsy_shop_connections` and refresh automatically with a 60-second buffer via `getActiveConnection()`. App-level identity (`ETSY_API_KEY`, `ETSY_SHARED_SECRET`) is configured via env vars; user-level tokens are never in env vars.
+
+### Hidden Features
+
+- Magic Sync card (`analyseShop` n8n) on `BrandProfilePage.jsx` is wrapped in `{false && ...}` pending replacement strategy. Hidden from UI; n8n webhook still wired in `server.mjs`.
 
 ### Admin Access Control
 
@@ -182,9 +190,7 @@ RESEND_API_KEY             # Resend API key (transactional emails)
 VITE_SENTRY_DSN            # Sentry DSN (frontend + backend error monitoring)
 ETSY_API_KEY               # Etsy App API keystring
 ETSY_SHARED_SECRET         # Etsy shared secret (x-api-key = keystring:secret)
-ETSY_ACCESS_TOKEN          # OAuth access token (expires every 1h, auto-refreshed)
-ETSY_REFRESH_TOKEN         # OAuth refresh token (permanent)
-ETSY_SHOP_ID               # Etsy shop ID (numeric)
+ETSY_OAUTH_REDIRECT_URI    # OAuth callback URL (e.g. https://pennyseo.ai/etsy/callback). Must match the Callback URL configured in the Etsy app dashboard.
 API_PORT                   # Express server port (defaults to 3001)
 ```
 

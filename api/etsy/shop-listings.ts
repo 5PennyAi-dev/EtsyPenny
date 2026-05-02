@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { fetchShopListings } from '../../lib/etsy/etsy-client.js';
+import { getActiveConnection, EtsyConnectionError } from '../../lib/etsy/get-connection.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -19,15 +21,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const offset = Number(req.query.offset) || 0;
     const state = (req.query.state as string) || 'active';
 
-    // Personal access phase: use env var shop ID
-    const shopId = process.env.ETSY_SHOP_ID;
-    if (!shopId) {
-      return res.status(500).json({ error: 'ETSY_SHOP_ID not configured' });
+    let connection;
+    try {
+      connection = await getActiveConnection(user_id, supabaseAdmin);
+    } catch (err: unknown) {
+      if (err instanceof EtsyConnectionError) {
+        if (err.code === 'NO_CONNECTION') {
+          return res.status(409).json({ error: 'No Etsy shop connected', code: 'NO_ETSY_CONNECTION' });
+        }
+        if (err.code === 'REFRESH_FAILED') {
+          return res.status(401).json({
+            error: 'Etsy session expired. Please reconnect your shop.',
+            code: 'ETSY_REFRESH_FAILED',
+          });
+        }
+        Sentry.captureException(err);
+        return res.status(500).json({ error: 'Failed to load Etsy connection' });
+      }
+      throw err;
     }
 
     console.info(`[shop-listings] user=${user_id} limit=${limit} offset=${offset}`);
 
-    const data = await fetchShopListings(shopId, { limit, offset, state });
+    const data = await fetchShopListings(connection, { limit, offset, state });
 
     const results = data.results.map((listing) => {
       const primaryImage = listing.images?.find((img) => img.rank === 1) ?? listing.images?.[0];

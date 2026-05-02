@@ -1,13 +1,20 @@
 /**
- * Shared Etsy API v3 client
+ * Etsy API v3 client.
  *
- * Personal access phase: uses env vars (ETSY_API_KEY, ETSY_SHARED_SECRET,
- * ETSY_ACCESS_TOKEN, ETSY_REFRESH_TOKEN).
- * Full OAuth phase (later): will accept per-user tokens from etsy_shop_connections.
+ * Contract:
+ *   - Every Etsy-calling function takes an `EtsyConnection` as its first arg.
+ *     The connection supplies `accessToken`, `etsyShopId`, etc.
+ *   - This module never reads user-specific tokens from `process.env`. The
+ *     app keystring (`ETSY_API_KEY` + `ETSY_SHARED_SECRET`) is still env —
+ *     that's the application's identity, not a user's credential.
+ *   - On a 401 response this module throws (with the Etsy body included). It
+ *     does NOT attempt to refresh — token refresh lives upstream in
+ *     `lib/etsy/get-connection.ts`.
  */
 
+import type { EtsyConnection } from './get-connection.js';
+
 const ETSY_BASE = 'https://api.etsy.com/v3/application';
-const ETSY_TOKEN_URL = 'https://api.etsy.com/v3/public/oauth/token';
 const REQUEST_TIMEOUT = 15_000;
 
 // ─── Types ────────────────────────────────────────────
@@ -35,11 +42,9 @@ export interface EtsyListingsResponse {
   results: EtsyListingResult[];
 }
 
-// ─── Token cache (in-memory, module-level) ────────────
-
-let _cachedAccessToken: string | null = null;
-
 // ─── Taxonomy cache (in-memory, 1h TTL) ──────────────
+// Seller-taxonomy is global Etsy data, not user-specific — safe to cache
+// process-wide.
 
 let _taxonomyCache: Map<number, string> | null = null;
 let _taxonomyCacheTime = 0;
@@ -54,58 +59,20 @@ export function getXApiKey(): string {
   return `${key}:${secret}`;
 }
 
-export async function refreshAccessToken(): Promise<string> {
-  const clientId = process.env.ETSY_API_KEY;
-  const refreshToken = process.env.ETSY_REFRESH_TOKEN;
-  if (!clientId || !refreshToken) {
-    throw new Error('Missing ETSY_API_KEY or ETSY_REFRESH_TOKEN for token refresh');
-  }
-
-  console.info('[etsy-client] Refreshing access token…');
-
-  const res = await fetch(ETSY_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: clientId,
-      refresh_token: refreshToken,
-    }),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Etsy token refresh failed (${res.status}): ${body}`);
-  }
-
-  const data = await res.json();
-  _cachedAccessToken = data.access_token;
-  console.info('[etsy-client] Access token refreshed successfully');
-  return data.access_token;
-}
-
-export async function getAccessToken(): Promise<string> {
-  if (_cachedAccessToken) return _cachedAccessToken;
-  const envToken = process.env.ETSY_ACCESS_TOKEN;
-  if (!envToken) throw new Error('Missing ETSY_ACCESS_TOKEN');
-  _cachedAccessToken = envToken;
-  return envToken;
-}
-
-// ─── Internal fetch with 401 retry ───────────────────
-
 interface EtsyFetchOptions {
   method?: string;
   body?: URLSearchParams;
   contentType?: string;
 }
 
-async function etsyFetch(url: string, options?: EtsyFetchOptions, retry = true): Promise<Response> {
-  const token = await getAccessToken();
+async function etsyFetch(
+  connection: EtsyConnection,
+  url: string,
+  options?: EtsyFetchOptions,
+): Promise<Response> {
   const headers: Record<string, string> = {
     'x-api-key': getXApiKey(),
-    'Authorization': `Bearer ${token}`,
+    'Authorization': `Bearer ${connection.accessToken}`,
   };
 
   if (options?.contentType) {
@@ -119,14 +86,11 @@ async function etsyFetch(url: string, options?: EtsyFetchOptions, retry = true):
     signal: AbortSignal.timeout(REQUEST_TIMEOUT),
   });
 
-  if (res.status === 401 && retry) {
-    console.info('[etsy-client] Got 401, attempting token refresh…');
-    await refreshAccessToken();
-    return etsyFetch(url, options, false);
-  }
-
   if (!res.ok) {
     const body = await res.text();
+    if (res.status === 401) {
+      throw new Error(`Etsy API 401 Unauthorized: ${body}`);
+    }
     throw new Error(`Etsy API error (${res.status}): ${body}`);
   }
 
@@ -136,35 +100,36 @@ async function etsyFetch(url: string, options?: EtsyFetchOptions, retry = true):
 // ─── Public API ───────────────────────────────────────
 
 export async function fetchShopListings(
-  shopId: string,
+  connection: EtsyConnection,
   options: { limit?: number; offset?: number; state?: string } = {},
 ): Promise<EtsyListingsResponse> {
   const limit = Math.min(options.limit ?? 25, 100);
   const offset = options.offset ?? 0;
   const state = options.state ?? 'active';
+  const shopId = connection.etsyShopId;
 
   const url = `${ETSY_BASE}/shops/${shopId}/listings?state=${state}&limit=${limit}&offset=${offset}&includes=Images`;
   console.info(`[etsy-client] GET shop listings shopId=${shopId} limit=${limit} offset=${offset}`);
 
-  const res = await etsyFetch(url);
+  const res = await etsyFetch(connection, url);
   return res.json() as Promise<EtsyListingsResponse>;
 }
 
 export async function fetchListingsByIds(
+  connection: EtsyConnection,
   listingIds: number[],
 ): Promise<EtsyListingResult[]> {
   if (listingIds.length === 0) return [];
 
   const results: EtsyListingResult[] = [];
 
-  // Etsy batch endpoint max 100 IDs per call
   for (let i = 0; i < listingIds.length; i += 100) {
     const chunk = listingIds.slice(i, i + 100);
     const ids = chunk.join(',');
     const url = `${ETSY_BASE}/listings/batch?listing_ids=${ids}&includes=Images`;
     console.info(`[etsy-client] GET listings batch (${chunk.length} IDs)`);
 
-    const res = await etsyFetch(url);
+    const res = await etsyFetch(connection, url);
     const data = await res.json() as { results: EtsyListingResult[] };
     results.push(...data.results);
   }
@@ -173,6 +138,7 @@ export async function fetchListingsByIds(
 }
 
 export async function updateEtsyListing(
+  connection: EtsyConnection,
   listingId: number,
   fields: {
     title?: string;
@@ -181,12 +147,8 @@ export async function updateEtsyListing(
   },
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    const shopId = process.env.ETSY_SHOP_ID;
-    if (!shopId) {
-      return { success: false, error: 'Missing ETSY_SHOP_ID env var' };
-    }
+    const shopId = connection.etsyShopId;
 
-    // Build form-urlencoded body with only provided fields
     const body = new URLSearchParams();
 
     if (fields.title !== undefined) {
@@ -214,9 +176,9 @@ export async function updateEtsyListing(
     const url = `${ETSY_BASE}/shops/${shopId}/listings/${listingId}`;
     console.info(`[Etsy Export] PATCH listing shopId=${shopId} listingId=${listingId} fields=${[...body.keys()].join(',')}`);
 
-    const res = await etsyFetch(url, {
+    const res = await etsyFetch(connection, url, {
       method: 'PATCH',
-      body: body,
+      body,
       contentType: 'application/x-www-form-urlencoded',
     });
 
@@ -230,7 +192,9 @@ export async function updateEtsyListing(
   }
 }
 
-export async function getSellerTaxonomyNodes(): Promise<Map<number, string>> {
+export async function getSellerTaxonomyNodes(
+  connection: EtsyConnection,
+): Promise<Map<number, string>> {
   if (_taxonomyCache && Date.now() - _taxonomyCacheTime < TAXONOMY_CACHE_TTL) {
     return _taxonomyCache;
   }
@@ -238,7 +202,7 @@ export async function getSellerTaxonomyNodes(): Promise<Map<number, string>> {
   const url = `${ETSY_BASE}/seller-taxonomy/nodes`;
   console.info('[etsy-client] Fetching seller taxonomy nodes...');
 
-  const res = await etsyFetch(url);
+  const res = await etsyFetch(connection, url);
   const data = await res.json() as { count: number; results: any[] };
 
   const map = new Map<number, string>();

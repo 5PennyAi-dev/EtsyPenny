@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Store, RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ import ShopStatsBar from '@/components/shop/ShopStatsBar';
 import EtsyListingGrid from '@/components/shop/EtsyListingGrid';
 import ImportActionBar from '@/components/shop/ImportActionBar';
 import ExportToEtsyModal from '@/components/shop/ExportToEtsyModal';
+import ConnectEtsyEmptyState from '@/components/shop/ConnectEtsyEmptyState';
 import HelpLink from '@/components/ui/HelpLink';
 const scoreColor = (s) => s >= 85 ? '#4f46e5' : s >= 70 ? '#22c55e' : s >= 50 ? '#f59e0b' : '#ef4444';
 
@@ -17,7 +18,8 @@ export default function MyShopPage() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
 
-  const [connectionStatus, setConnectionStatus] = useState('loading');
+  const [connectionStatus, setConnectionStatus] = useState('loading'); // 'loading' | 'connected' | 'no-connection' | 'refresh-failed'
+  const [shopMeta, setShopMeta] = useState({ shop_name: null, shop_url: null });
   const [etsyListings, setEtsyListings] = useState([]);
   const [importedListings, setImportedListings] = useState([]);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -137,8 +139,11 @@ export default function MyShopPage() {
       setConnectionStatus('connected');
     } catch (err) {
       console.error('[MyShopPage] Failed to fetch Etsy listings:', err);
-      if (err.response?.status === 500 && err.response?.data?.error?.includes('ETSY_SHOP_ID')) {
-        setConnectionStatus('not_connected');
+      const code = err.response?.data?.code;
+      if (err.response?.status === 409 && code === 'NO_ETSY_CONNECTION') {
+        setConnectionStatus('no-connection');
+      } else if (err.response?.status === 401 && code === 'ETSY_REFRESH_FAILED') {
+        setConnectionStatus('refresh-failed');
       } else {
         toast.error('Failed to fetch Etsy listings');
       }
@@ -154,39 +159,24 @@ export default function MyShopPage() {
     async function init() {
       const { data: connection } = await supabase
         .from('etsy_shop_connections')
-        .select('id')
+        .select('id, shop_name, shop_url')
         .eq('user_id', user.id)
         .eq('is_active', true)
+        .order('connected_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (connection) {
-        setConnectionStatus('connected');
-        await Promise.all([fetchImported(), fetchEtsyListings(0)]);
+        setShopMeta({ shop_name: connection.shop_name, shop_url: connection.shop_url });
       } else {
-        try {
-          await fetchEtsyListings(0);
-          await fetchImported();
-        } catch {
-          setConnectionStatus('not_connected');
-        }
+        setShopMeta({ shop_name: null, shop_url: null });
       }
+
+      await Promise.all([fetchImported(), fetchEtsyListings(0)]);
     }
 
     init();
   }, [user, fetchImported, fetchEtsyListings]);
-
-  // ─── Connect handler ───────────────────────────────
-  const handleConnect = async () => {
-    setIsLoading(true);
-    try {
-      await fetchEtsyListings(0);
-      await fetchImported();
-    } catch {
-      toast.error('Failed to connect to Etsy shop');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // ─── Sync / refresh ────────────────────────────────
   const handleSync = async () => {
@@ -358,37 +348,14 @@ export default function MyShopPage() {
   const hasMore = pagination.offset + pagination.limit < pagination.count;
   const hasSelection = selectedIds.size > 0;
 
-  // ─── Not connected state ────────────────────────────
-  if (connectionStatus === 'not_connected') {
+  // ─── Empty / reconnect states ───────────────────────
+  if (connectionStatus === 'no-connection' || connectionStatus === 'refresh-failed') {
     return (
       <Layout>
-        <div className="min-h-screen bg-slate-50 px-6 lg:px-8 py-6 flex items-center justify-center">
-          <div className="bg-white border border-slate-200 rounded-2xl p-10 max-w-md text-center shadow-sm">
-            <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
-              <Store className="w-8 h-8 text-indigo-600" strokeWidth={2} />
-            </div>
-            <h2 className="text-xl font-semibold text-slate-800 mb-2">Connect your Etsy shop</h2>
-            <p className="text-sm text-slate-500 mb-6">
-              Import your listings and see how your SEO scores compare
-            </p>
-            <button
-              onClick={handleConnect}
-              disabled={isLoading}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:bg-indigo-400"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                'Connect shop'
-              )}
-            </button>
-            <p className="text-xs text-slate-400 mt-4">
-              We only read your listing data. We never modify your Etsy shop.
-            </p>
-          </div>
+        <div className="min-h-screen bg-slate-50 px-6 lg:px-8 py-6">
+          <ConnectEtsyEmptyState
+            variant={connectionStatus === 'refresh-failed' ? 'refresh-failed' : 'no-connection'}
+          />
         </div>
       </Layout>
     );
@@ -416,7 +383,23 @@ export default function MyShopPage() {
             <HelpLink to="/docs/etsy-import" tooltip="How Etsy import works" />
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Connected
+              {shopMeta.shop_name ? (
+                shopMeta.shop_url ? (
+                  <a
+                    href={shopMeta.shop_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 hover:underline"
+                  >
+                    Connected to {shopMeta.shop_name}
+                    <ExternalLink size={11} />
+                  </a>
+                ) : (
+                  <>Connected to {shopMeta.shop_name}</>
+                )
+              ) : (
+                'Connected to your Etsy shop'
+              )}
             </span>
           </div>
           <button

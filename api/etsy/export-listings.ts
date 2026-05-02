@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { updateEtsyListing } from '../../lib/etsy/etsy-client.js';
+import { getActiveConnection, EtsyConnectionError } from '../../lib/etsy/get-connection.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -27,6 +28,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     console.info(`[export-listings] user=${user_id} requested=${listings.length}`);
+
+    let etsyConnection;
+    try {
+      etsyConnection = await getActiveConnection(user_id, supabaseAdmin);
+    } catch (err: unknown) {
+      if (err instanceof EtsyConnectionError) {
+        if (err.code === 'NO_CONNECTION') {
+          return res.status(409).json({ error: 'No Etsy shop connected', code: 'NO_ETSY_CONNECTION' });
+        }
+        if (err.code === 'REFRESH_FAILED') {
+          return res.status(401).json({
+            error: 'Etsy session expired. Please reconnect your shop.',
+            code: 'ETSY_REFRESH_FAILED',
+          });
+        }
+        Sentry.captureException(err);
+        return res.status(500).json({ error: 'Failed to load Etsy connection' });
+      }
+      throw err;
+    }
 
     // ── 2. Process each listing sequentially ────────────
     const results: Array<{
@@ -123,7 +144,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // ── 2e. Call Etsy API ───────────────────────────
-        const etsyResult = await updateEtsyListing(etsy_listing_id, exportPayload);
+        const etsyResult = await updateEtsyListing(etsyConnection, etsy_listing_id, exportPayload);
 
         if (!etsyResult.success) {
           throw new Error(etsyResult.error || 'Etsy API call failed');
