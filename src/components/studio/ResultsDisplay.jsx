@@ -1720,7 +1720,7 @@ const SidebarSkeleton = ({ phase }) => (
                                         Save listing
                                     </button>
 
-                                    {false && results?.source === 'etsy' && onPushToEtsy && (
+                                    {results?.source === 'etsy' && onPushToEtsy && (
                                         <div className="mt-2">
                                             <button
                                                 onClick={() => onPushToEtsy({

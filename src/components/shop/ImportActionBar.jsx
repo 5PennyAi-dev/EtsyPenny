@@ -87,7 +87,7 @@ export default function ImportActionBar({
           </>
         )}
 
-        {false && selectionMode === 'export' && (
+        {selectionMode === 'export' && (
           <>
             {exportCount > 5 && (
               <span className="text-xs text-rose-600 font-medium">
