@@ -22,10 +22,6 @@ export async function verifyRequestUser(
   authHeader: string | undefined,
   supabaseAdmin: SupabaseClient,
 ): Promise<AuthenticatedUser> {
-  
-  console.log('[verify] authHeader present:', !!authHeader);
-  console.log('[verify] authHeader prefix:', authHeader?.substring(0, 20));
-
   if (!authHeader || !/^bearer\s+/i.test(authHeader)) {
     throw new AuthError('Missing or malformed Authorization header', 401);
   }
@@ -34,16 +30,10 @@ export async function verifyRequestUser(
     throw new AuthError('Missing or malformed Authorization header', 401);
   }
 
-  console.log('[verify] token length:', token.length);
-  console.log('[verify] token prefix:', token.substring(0, 30));
-
   const { data, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !data?.user) {
     throw new AuthError('Invalid or expired session', 401);
   }
-  
-  console.log('[verify] supabase result - error:', error?.message);
-  console.log('[verify] supabase result - user id:', data?.user?.id);
 
   return { id: data.user.id, email: data.user.email ?? null };
 }
