@@ -2383,3 +2383,141 @@ Built a complete in-app documentation system at `/docs` with its own layout, nav
 
 - **Webhook Renewal Logging** (2026-04-04):
     - Added `console.info` for successful subscription renewals in `api/stripe/webhook.ts`.
+
+## Session 2026-05-01 / 2026-05-02 — Etsy OAuth Migration (Phases 1-6) + Push-to-Etsy Re-enablement
+
+### Overview
+Replaced single-shop env-var token auth with full per-user Etsy OAuth. Each user now connects their own shop through an in-app flow at `/shop` or Settings. Tokens persist in `etsy_shop_connections` and refresh automatically with a 60-second buffer via `getActiveConnection()`. The legacy env-var path (`ETSY_ACCESS_TOKEN`, `ETSY_REFRESH_TOKEN`, `ETSY_SHOP_ID`) was bridged through a transitional shim during the migration and removed at the end.
+
+Shipped across six phased prompts in two sessions, plus a hotfix for the dev-server `app.listen` guard, plus the post-OAuth Push-to-Etsy UI re-enablement.
+
+### Phase 1 — Foundations (`eeeddf0`)
+- New `supabase/migrations/20260501_etsy_oauth_states.sql` — transient PKCE/state storage, 10-min TTL, service-role-only RLS, `cleanup_expired_etsy_oauth_states()` SECURITY DEFINER function.
+- New `lib/etsy/oauth.ts` — pure OAuth primitives (`generatePKCE`, `generateState`, `buildAuthorizationUrl`, `exchangeCodeForTokens`, `refreshAccessToken`). No DB access. Uses Web Crypto API (Node 20+ / Edge compatible).
+- New `lib/etsy/get-connection.ts` — `getActiveConnection(userId, supabaseAdmin)` loads the user's active row from `etsy_shop_connections`, refreshes if `token_expires_at` is within 60s, persists rotated refresh token. Throws typed `EtsyConnectionError` with codes `NO_CONNECTION | CONNECTION_INACTIVE | REFRESH_FAILED | DB_ERROR`.
+- 18 new unit tests (`tests/unit/etsy-oauth.test.ts` + `etsy-get-connection.test.ts`).
+
+### Phase 2 — OAuth API routes
+- New `lib/auth/verify-request-user.ts` — Supabase JWT bearer verification (replaces legacy "user_id in body" pattern for new routes).
+- New `api/etsy/oauth/authorize.ts` — initiates flow, persists state row, returns auth URL.
+- New `api/etsy/oauth/exchange.ts` — consumes state (single-use), exchanges code, parses `{etsyUserId}.{token}` access token format, fetches `/users/{id}/shops` (handles single-object or `{count, results}` shape), upserts `etsy_shop_connections` (deactivate-then-update-or-insert).
+- New `api/etsy/oauth/disconnect.ts` — sets `is_active=false` for the user's active row, returns deactivated count.
+- All three mounted in `server.mjs` by importing the Vercel handlers (req/res shape compatible with Express).
+- 17 new unit tests (`tests/unit/etsy-oauth-routes.test.ts`).
+- New env var `ETSY_OAUTH_REDIRECT_URI`.
+
+### Phase 3 — Refactor `etsy-client.ts` + transitional shim
+- Refactored `lib/etsy/etsy-client.ts`: every Etsy-calling function now takes `EtsyConnection` as its first arg. Dropped `getAccessToken`, `refreshAccessToken`, the in-process token cache, and the 401-retry-with-refresh logic. On 401, the client now throws (refresh is upstream's job).
+- Functions: `fetchShopListings(connection, opts)`, `fetchListingsByIds(connection, ids)`, `updateEtsyListing(connection, listingId, fields)`, `getSellerTaxonomyNodes(connection)`. `getXApiKey()` kept (app keystring is env, not user credential). 1h taxonomy cache kept (global Etsy data, not user-specific).
+- New transitional shim `lib/etsy/legacy-env-connection.ts` — synchronous, builds a synthetic `EtsyConnection` from the legacy env vars. Used by the 3 routes that hadn't migrated yet.
+- 11 new tests (`tests/unit/etsy-client.test.ts`).
+
+### Phase 4 — Per-user connection swap
+- `api/etsy/{shop,import,export}-listings.ts` swap `getLegacyEnvConnection()` for `await getActiveConnection(user_id, supabaseAdmin)`.
+- New error response contract for the frontend to branch on:
+    - 409 `{ code: 'NO_ETSY_CONNECTION' }` when the user has no active connection.
+    - 401 `{ code: 'ETSY_REFRESH_FAILED' }` when token refresh fails.
+    - 500 for `DB_ERROR` and unexpected.
+- `api/etsy/import-listings.ts`: removed the auto-upsert of `etsy_shop_connections` (the row is now owned by `oauth/exchange`). Replaced with a `last_synced_at`-only update keyed by `etsyConnection.id`. The `etsy_listings.connection_id` FK now uses the real DB row UUID.
+- 10 new tests (`tests/unit/etsy-routes-connection.test.ts`).
+- `score-listings.ts` and `prepare-listing.ts` did not need changes — they don't call `etsy-client.ts`.
+
+### Hotfix — `server.mjs` `app.listen` guard
+The original `isDirectRun` guard checking `import.meta.url.endsWith(process.argv[1])` returned false under `tsx server.mjs` (run via nodemon), so `app.listen()` was never called and `npm run dev:api` exited cleanly with no listener. Fix: replaced with `if (process.env.NODE_ENV !== 'test') { app.listen(...) }`. Vitest sets `NODE_ENV=test` automatically, so the 5 integration tests that import `{ app }` from `server.mjs` no longer collide on a port. Boot banner also updated to list the three OAuth routes.
+
+### Phase 5 — Frontend UX
+- New `src/lib/etsyOAuth.js` — `startEtsyConnect`, `exchangeEtsyCode`, `disconnectEtsy` over a shared `authedFetch` helper that pulls the JWT from `supabase.auth.getSession()`.
+- New `src/pages/EtsyCallbackPage.jsx` — handles `/etsy/callback?code&state` with 4 phases (exchanging / cancelled / no-session / error). StrictMode-safe via `useRef` guard so the single-use state isn't consumed twice in dev.
+- New `src/components/shop/ConnectEtsyEmptyState.jsx` — Etsy-orange branded card with `variant="no-connection" | "refresh-failed"`.
+- New `src/components/settings/EtsyConnectionSection.jsx` — connect/disconnect UI for Settings; uses existing `ConfirmationModal` for the disconnect confirmation.
+- `src/App.jsx` — added public `/etsy/callback` route.
+- `src/components/Sidebar.jsx` — re-enabled "My Shop" nav item (no role gating; everyone sees it).
+- `src/pages/MyShopPage.jsx` — branches on the new 409/401 codes to render the empty state; shop name + URL shown inline in the header pill (replaces the legacy ETSY_SHOP_ID-string sniffing).
+- `src/pages/UserSettings.jsx` — embedded `<EtsyConnectionSection />` between the My Shop Identity accordion and the Replay Onboarding row.
+
+### Phase 6 — Cleanup (`eeeddf0` continued)
+- Deleted `lib/etsy/legacy-env-connection.ts`.
+- Removed `ETSY_ACCESS_TOKEN`, `ETSY_REFRESH_TOKEN`, `ETSY_SHOP_ID` from `CLAUDE.md` env-var list (still used at runtime by user-managed `scripts/etsy-oauth*.mjs` bootstrap helpers, untouched).
+- Replaced multi-phase migration note in `CLAUDE.md` with a steady-state "Etsy integration" section.
+- Replaced "n8n Webhook (Hidden — Pending Etsy API License)" with a slim "Hidden Features" section listing only the still-gated `analyseShop` Magic Sync card.
+- Removed stale `// TODO: re-enable when Etsy API license is approved` comments across the codebase. Replaced the BrandProfilePage one with `// TODO: replace analyseShop n8n flow with native Etsy API usage`.
+- Trimmed a JSDoc reference in `lib/etsy/etsy-client.ts` to the now-deleted shim.
+
+### Push-to-Etsy re-enablement (`77252db`)
+Removed the `{false && ...}` short-circuits around two Etsy export UIs that had been preserved in Phase 6 pending UX confirmation. Backend export route had been live since Phase 4; this just exposes the buttons.
+- `src/components/shop/ImportActionBar.jsx` — batch export from MyShop (`{false && selectionMode === 'export' && (...)}` → `{selectionMode === 'export' && (...)}`)
+- `src/components/studio/ResultsDisplay.jsx` — single-listing export from Studio (`{false && results?.source === 'etsy' && onPushToEtsy && (...)}` → `{results?.source === 'etsy' && onPushToEtsy && (...)}`)
+- `BrandProfilePage.jsx` `analyseShop` Magic Sync gate preserved (separate concern — n8n flow itself is deprecated, unrelated to Etsy license).
+
+### Architecture decisions
+- **Frontend mediates the OAuth callback.** Etsy redirects the browser to the SPA route `/etsy/callback` (not a serverless function), which then calls `POST /api/etsy/oauth/exchange` from the authenticated client. Avoids the awkwardness of Vercel serverless redirects in a Vite SPA and keeps the Supabase session naturally available.
+- **App keystring stays in env vars; user tokens never do.** `ETSY_API_KEY` + `ETSY_SHARED_SECRET` are application identity (sent in `x-api-key`). User access/refresh tokens live exclusively in `etsy_shop_connections`.
+- **`etsy-client.ts` does not refresh.** A 401 throws. Refresh is the responsibility of `getActiveConnection()`, which proactively refreshes within 60s of expiry. This makes the client simple and testable.
+- **Single-use state with single-flight guard.** `etsy_oauth_states` rows are deleted on first consumption. `EtsyCallbackPage` guards against React StrictMode's double-invoke with a `useRef`.
+- **`server.mjs` mounts OAuth routes by importing Vercel handlers** rather than duplicating the logic inline (departs from the pre-existing pattern but avoids ~200 lines of duplication; the Vercel `(req, res)` shape is directly compatible with Express).
+
+### New API routes (active)
+| Route | Purpose |
+|---|---|
+| `POST /api/etsy/oauth/authorize` | Start OAuth flow, return `{ url }` |
+| `POST /api/etsy/oauth/exchange` | Consume state, exchange code, persist connection, return `{ shop }` |
+| `POST /api/etsy/oauth/disconnect` | Deactivate user's active connection |
+
+Existing routes (`shop-listings`, `import-listings`, `score-listings`, `prepare-listing`, `export-listings`) unchanged in shape but now load tokens per-request via `getActiveConnection()` and return 409/401 with `code` fields.
+
+### Tests
+56 new unit tests across the migration:
+- `etsy-oauth.test.ts` — 13 tests for OAuth primitives.
+- `etsy-get-connection.test.ts` — 5 tests for connection lookup + refresh persistence.
+- `etsy-oauth-routes.test.ts` — 17 tests for authorize/exchange/disconnect (auth, validation, state lifecycle, shop fetch, persistence branches).
+- `etsy-client.test.ts` — 11 tests covering all 4 public functions + `getXApiKey`.
+- `etsy-routes-connection.test.ts` — 10 tests for the 409/401/500 branches in the 3 refactored routes.
+
+Total suite: **149/149 passing.**
+
+### Files created (15)
+- `supabase/migrations/20260501_etsy_oauth_states.sql`
+- `lib/etsy/oauth.ts`
+- `lib/etsy/get-connection.ts`
+- `lib/auth/verify-request-user.ts`
+- `api/etsy/oauth/{authorize,exchange,disconnect}.ts`
+- `src/lib/etsyOAuth.js`
+- `src/pages/EtsyCallbackPage.jsx`
+- `src/components/shop/ConnectEtsyEmptyState.jsx`
+- `src/components/settings/EtsyConnectionSection.jsx`
+- `tests/unit/etsy-{oauth,get-connection,oauth-routes,client,routes-connection}.test.ts`
+
+### Files modified
+- `CLAUDE.md` (env vars, integration note, hidden features, directory listings)
+- `lib/etsy/etsy-client.ts` (signature refactor, dropped token caching)
+- `api/etsy/{shop,import,export}-listings.ts` (per-user connection)
+- `server.mjs` (mounts, `NODE_ENV` listen guard, boot banner, OAuth swap)
+- `src/App.jsx` (callback route)
+- `src/components/Sidebar.jsx` (re-enable My Shop)
+- `src/pages/MyShopPage.jsx` (409/401 branches, shop indicator)
+- `src/pages/UserSettings.jsx` (embed `EtsyConnectionSection`)
+- `src/pages/BrandProfilePage.jsx` (TODO replaced)
+- `src/components/shop/ImportActionBar.jsx` (Push-to-Etsy gate removed)
+- `src/components/studio/ResultsDisplay.jsx` (Push-to-Etsy gate removed)
+
+### Files deleted (1)
+- `lib/etsy/legacy-env-connection.ts` (transitional shim, removed in Phase 6)
+
+### Manual steps for the user (post-migration)
+- Delete `ETSY_ACCESS_TOKEN`, `ETSY_REFRESH_TOKEN`, `ETSY_SHOP_ID` from `.env`, `.env.local`, and Vercel project settings (Production + Preview + Development).
+- Optionally clean up `scripts/etsy-oauth.mjs` and `scripts/etsy-oauth_1.mjs` (manual token-bootstrap helpers, no longer needed).
+- Verify in Etsy app dashboard that the registered Callback URL matches `ETSY_OAUTH_REDIRECT_URI` (e.g. `https://pennyseo.ai/etsy/callback` for prod, `http://localhost:5173/etsy/callback` for local dev).
+
+### Commits in this session
+- `eeeddf0` — `feat: per-user Etsy OAuth migration (Phases 1-6)` (30 files, +2792/-207)
+- `91984e5` — `chore: remove debug console.log from verify-request-user`
+- `77252db` — `feat: enable Push-to-Etsy buttons (single + batch export)`
+
+### Session Handover
+Per-user Etsy OAuth is shipped end-to-end and on `main`. Manual smoke (the full handshake through a real Etsy account) was not driven from this session — that's the user's confirmation step on a deployed environment with valid `ETSY_OAUTH_REDIRECT_URI`. Once confirmed, the legacy env vars can be deleted from `.env` / Vercel.
+
+### Next Immediate Steps
+- User: complete the manual smoke against the deployed `/shop` flow (connect, list, import, score, push, disconnect).
+- User: delete legacy env vars per the manual-steps list above.
+- Optional follow-up: replace `analyseShop` (n8n Magic Sync) with a native Etsy API call now that the OAuth client is in place — the existing UI is wrapped in `{false && ...}` on `BrandProfilePage.jsx` waiting for that rewrite.
+
