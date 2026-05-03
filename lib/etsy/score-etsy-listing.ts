@@ -64,41 +64,79 @@ export async function scoreEtsyListing(
   try {
     console.info(`[score-etsy] Starting: "${etsyListing.original_title?.slice(0, 60)}..." (${tagCount} tags)`);
 
-    // ── 1. Download image and upload to Supabase storage ──
+    // ── 1. Idempotency check: reuse existing listings row if prepare-listing already ran ──
 
-    let storageUrl = '';
-    if (etsyListing.original_image_url) {
-      storageUrl = await downloadAndUploadEtsyImage(etsyListing.original_image_url, userId);
-      console.info('[score-etsy] Image uploaded to storage');
-    }
-
-    // ── 2. Match product type from Etsy category ──────────
-
-    let productTypeId: string | null = null;
-    try {
-      productTypeId = await matchProductType(etsyListing.etsy_category, userId);
-    } catch (_) { /* non-critical */ }
-
-    // ── 3. Create listings row ────────────────────────────
-
-    const { data: listing, error: insertErr } = await supabaseAdmin
-      .from('listings')
-      .insert({
-        user_id: userId,
-        title: etsyListing.original_title,
-        user_description: null,
-        image_url: storageUrl,
-        status_id: STATUS_NEW,
-        is_image_analysed: false,
-        source: 'etsy',
-        ...(productTypeId ? { product_type_id: productTypeId } : {}),
-      })
-      .select('id')
+    const { data: etsyRow, error: etsyFetchErr } = await supabaseAdmin
+      .from('etsy_listings')
+      .select('id, listing_id')
+      .eq('id', etsyListing.id)
+      .eq('user_id', userId)
       .single();
 
-    if (insertErr || !listing) throw new Error(`Failed to create listing: ${insertErr?.message}`);
-    listingId = listing.id;
-    console.info(`[score-etsy] Created listing ${listingId}`);
+    if (etsyFetchErr || !etsyRow) {
+      throw new Error(`Etsy listing not found: ${etsyFetchErr?.message ?? etsyListing.id}`);
+    }
+
+    let storageUrl = '';
+    let reusedExistingRow = false;
+
+    if (etsyRow.listing_id) {
+      // REUSE PATH — prepare-listing already created and linked the listings row.
+      const { data: existingListing } = await supabaseAdmin
+        .from('listings')
+        .select('id, image_url')
+        .eq('id', etsyRow.listing_id)
+        .single();
+
+      if (existingListing) {
+        listingId = existingListing.id;
+        storageUrl = existingListing.image_url || '';
+        reusedExistingRow = true;
+        console.info(`[score-etsy] Reusing existing listing ${listingId} (no image re-download)`);
+      } else {
+        // Stale FK — listings row was deleted. Fall through to INSERT path.
+        console.warn(`[score-etsy] Stale FK: etsy_listings.listing_id=${etsyRow.listing_id} not found, will create new listing`);
+      }
+    }
+
+    if (!reusedExistingRow) {
+      // INSERT PATH — direct score, no prior prepare (or stale FK fallback).
+
+      if (etsyListing.original_image_url) {
+        storageUrl = await downloadAndUploadEtsyImage(etsyListing.original_image_url, userId);
+        console.info('[score-etsy] Image uploaded to storage');
+      }
+
+      let productTypeId: string | null = null;
+      try {
+        productTypeId = await matchProductType(etsyListing.etsy_category, userId);
+      } catch (_) { /* non-critical */ }
+
+      const { data: listing, error: insertErr } = await supabaseAdmin
+        .from('listings')
+        .insert({
+          user_id: userId,
+          title: etsyListing.original_title,
+          user_description: null,
+          image_url: storageUrl,
+          status_id: STATUS_NEW,
+          is_image_analysed: false,
+          source: 'etsy',
+          ...(productTypeId ? { product_type_id: productTypeId } : {}),
+        })
+        .select('id')
+        .single();
+
+      if (insertErr || !listing) throw new Error(`Failed to create listing: ${insertErr?.message}`);
+      listingId = listing.id;
+      console.info(`[score-etsy] Created listing ${listingId}`);
+
+      // Link back to etsy_listings — CRITICAL for MyShop visibility.
+      await supabaseAdmin
+        .from('etsy_listings')
+        .update({ listing_id: listingId })
+        .eq('id', etsyListing.id);
+    }
 
     // ── 3. Image analysis (Vision + Taxonomy) ─────────────
 
