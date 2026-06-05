@@ -1,4 +1,4 @@
-import { Package, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Package, Check, Loader2 } from 'lucide-react';
 
 function getTagBadgeClasses(tagCount) {
   if (tagCount === 13) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -18,39 +18,41 @@ function getScoreBarColor(score) {
   return 'bg-rose-500';
 }
 
-function StatusBadge({ scoringStatus, originalScore }) {
-  if (scoringStatus === 'scoring') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100/90 text-indigo-600 backdrop-blur-sm">
-        <Loader2 className="w-3 h-3 animate-spin" strokeWidth={2.5} />
-        Scoring...
-      </span>
-    );
-  }
+function getCardStatus({ isImported, scoringStatus, originalScore, pennySeoScore, exportStatus }) {
+  if (!isImported) return 'fresh';
+  if (exportStatus === 'error') return 'error';
+  if (exportStatus === 'exported') return 'published';
+  if (scoringStatus === 'scoring') return 'scoring';
+  if (scoringStatus === 'error') return 'error';
   if (scoringStatus === 'scored' && originalScore != null) {
+    if (pennySeoScore != null && pennySeoScore !== originalScore) return 'optimized';
+    return 'scored';
+  }
+  return 'imported';
+}
+
+const STATUS_PILL_STYLES = {
+  imported:  { label: 'Imported',  classes: 'bg-slate-200 text-slate-700' },
+  scored:    { label: 'Scored',    classes: 'bg-amber-200 text-amber-900' },
+  optimized: { label: 'Optimized', classes: 'bg-green-200 text-green-900' },
+  published: { label: 'Published', classes: 'bg-blue-200 text-blue-900' },
+  error:     { label: 'Error',     classes: 'bg-rose-200 text-rose-900' },
+};
+
+function StatusPill({ status }) {
+  if (status === 'scoring') {
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold backdrop-blur-sm ${
-        originalScore >= 70 ? 'bg-emerald-100/90 text-emerald-700' :
-        originalScore >= 40 ? 'bg-amber-100/90 text-amber-700' :
-        'bg-rose-100/90 text-rose-700'
-      }`}>
-        {originalScore}
+      <span className="absolute top-1.5 right-1.5 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium tracking-tight bg-indigo-200 text-indigo-900">
+        <Loader2 className="w-2.5 h-2.5 animate-spin" strokeWidth={2.5} />
+        Scoring
       </span>
     );
   }
-  if (scoringStatus === 'error') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100/90 text-rose-600 backdrop-blur-sm">
-        <AlertCircle className="w-3 h-3" strokeWidth={2.5} />
-        Error
-      </span>
-    );
-  }
-  // pending (imported but not scored)
+  const style = STATUS_PILL_STYLES[status];
+  if (!style) return null;
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100/90 text-slate-600 backdrop-blur-sm">
-      <Check className="w-3 h-3" strokeWidth={2.5} />
-      Imported
+    <span className={`absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium tracking-tight ${style.classes}`}>
+      {style.label}
     </span>
   );
 }
@@ -58,28 +60,24 @@ function StatusBadge({ scoringStatus, originalScore }) {
 function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringStatus, originalScore, pennySeoScore, exportStatus, listingId, onOpenInStudio, isPreparing }) {
   const tagCount = listing.tag_count ?? 0;
   const isScored = scoringStatus === 'scored' && originalScore != null;
-  const hasDelta = isScored && pennySeoScore != null && pennySeoScore !== originalScore;
-  const delta = hasDelta ? pennySeoScore - originalScore : 0;
-  // All cards are selectable — exclusive mode logic in MyShopPage prevents mixing
   const isSelectable = true;
 
-  // Status bottom border color (exported takes priority over optimized)
-  const cardStatus = !isImported ? null
-    : exportStatus === 'exported' ? 'exported'
-    : (scoringStatus !== 'scored') ? 'imported'
-    : (pennySeoScore != null && pennySeoScore !== originalScore) ? 'optimized'
-    : 'scored';
-  const statusBorderColor = { imported: '#94a3b8', scored: '#f59e0b', optimized: '#22c55e', exported: '#3b82f6' }[cardStatus];
+  const cardStatus = getCardStatus({ isImported, scoringStatus, originalScore, pennySeoScore, exportStatus });
+
+  // Score pill: shown for scored / optimized / published. Prefer optimized score when available.
+  let scorePillValue = null;
+  if (cardStatus === 'scored') {
+    scorePillValue = originalScore;
+  } else if (cardStatus === 'optimized' || cardStatus === 'published') {
+    scorePillValue = pennySeoScore != null ? pennySeoScore : originalScore;
+  }
 
   return (
     <div
       onClick={() => isSelectable && onToggleSelect(listing.etsy_listing_id)}
-      className={`bg-white border rounded-xl overflow-hidden transition-all ${
-        isImported ? 'border-slate-200 border-l-2 border-l-indigo-300' : 'border-slate-200'
-      } ${isSelected ? 'ring-2 ring-indigo-500' : ''} ${
-        isSelectable ? 'cursor-pointer hover:shadow-md' : ''
-      }`}
-      style={statusBorderColor ? { borderBottom: `7px solid ${statusBorderColor}` } : undefined}
+      className={`bg-white rounded-md overflow-hidden transition-all ${
+        isSelected ? 'border-2 border-indigo-500' : 'border border-slate-200'
+      } ${isSelectable ? 'cursor-pointer hover:shadow-md' : ''}`}
     >
       {/* Image */}
       <div className="aspect-square relative bg-slate-100">
@@ -96,7 +94,7 @@ function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringS
           </div>
         )}
 
-        {/* Checkbox overlay — shown when card is selectable */}
+        {/* Checkbox overlay — top-left */}
         {isSelectable && (
           <div className="absolute top-2 left-2">
             <div
@@ -111,34 +109,14 @@ function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringS
           </div>
         )}
 
-        {/* Status overlay — top-right, always shown for imported cards */}
-        {isImported && (
-          <div className="absolute top-2 right-2">
-            <StatusBadge scoringStatus={scoringStatus} originalScore={originalScore} />
-          </div>
-        )}
+        {/* Status pill — top-right, only for imported (or beyond) */}
+        {cardStatus !== 'fresh' && <StatusPill status={cardStatus} />}
 
-        {/* Delta badge — bottom-right, shown when optimized */}
-        {hasDelta && (
-          <div className="absolute bottom-2 right-2">
-            <span className={`px-1.5 py-0.5 rounded text-xs font-bold backdrop-blur-sm ${
-              delta > 0 ? 'bg-emerald-100/90 text-emerald-700' : 'bg-rose-100/90 text-rose-700'
-            }`}>
-              {delta > 0 ? '+' : ''}{delta}
-            </span>
-          </div>
-        )}
-
-        {/* Export status badge — bottom-left */}
-        {exportStatus === 'exported' && (
-          <div className="absolute bottom-2 left-2 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-sm">
-            <Check className="w-3 h-3 text-white" strokeWidth={3} />
-          </div>
-        )}
-        {exportStatus === 'error' && (
-          <div className="absolute bottom-2 left-2 w-5 h-5 bg-rose-500 rounded-full flex items-center justify-center shadow-sm">
-            <AlertCircle className="w-3 h-3 text-white" strokeWidth={3} />
-          </div>
+        {/* Score pill — bottom-left, for scored / optimized / published */}
+        {scorePillValue != null && (
+          <span className="absolute bottom-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 text-slate-900 font-medium tabular-nums">
+            {scorePillValue}
+          </span>
         )}
       </div>
 

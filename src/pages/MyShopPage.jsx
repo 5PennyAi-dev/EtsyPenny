@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Loader2, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { RefreshCw, Loader2, ExternalLink, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -7,12 +7,46 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import Layout from '@/components/Layout';
 import ShopStatsBar from '@/components/shop/ShopStatsBar';
+import AmorceCard from '@/components/shop/AmorceCard';
 import EtsyListingGrid from '@/components/shop/EtsyListingGrid';
 import ImportActionBar from '@/components/shop/ImportActionBar';
 import ExportToEtsyModal from '@/components/shop/ExportToEtsyModal';
 import ConnectEtsyEmptyState from '@/components/shop/ConnectEtsyEmptyState';
 import HelpLink from '@/components/ui/HelpLink';
-const scoreColor = (s) => s >= 85 ? '#4f46e5' : s >= 70 ? '#22c55e' : s >= 50 ? '#f59e0b' : '#ef4444';
+
+function EmptyResults({ statusFilter, searchQuery, onClearStatus, onClearAll }) {
+  const hasStatus = statusFilter !== 'all';
+  const hasSearch = !!searchQuery.trim();
+
+  if (hasStatus && hasSearch) {
+    return (
+      <div className="py-8 text-center text-sm text-slate-500">
+        No listings match the current filter and search.{' '}
+        <button onClick={onClearAll} className="text-indigo-600 hover:text-indigo-700 font-medium">
+          Clear filters
+        </button>
+      </div>
+    );
+  }
+  if (hasSearch) {
+    return (
+      <div className="py-8 text-center text-sm text-slate-500">
+        No titles match &ldquo;{searchQuery}&rdquo;.
+      </div>
+    );
+  }
+  if (hasStatus) {
+    return (
+      <div className="py-8 text-center text-sm text-slate-500">
+        No listings in this filter.{' '}
+        <button onClick={onClearStatus} className="text-indigo-600 hover:text-indigo-700 font-medium">
+          Show all
+        </button>
+      </div>
+    );
+  }
+  return null;
+}
 
 export default function MyShopPage() {
   const { user, profile } = useAuth();
@@ -30,8 +64,14 @@ export default function MyShopPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isScoring, setIsScoring] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [baPage, setBaPage] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 200);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   const [exportModalData, setExportModalData] = useState([]);
   const [preparingListingId, setPreparingListingId] = useState(null);
 
@@ -48,35 +88,48 @@ export default function MyShopPage() {
   const importedIds = new Set(importedListings.map((l) => l.etsy_listing_id));
   const tokenBalance = (profile?.tokens_monthly_balance ?? 0) + (profile?.tokens_bonus_balance ?? 0);
 
+  // A listing is publishable when it has 13+ selected keywords (is_current_eval=true).
+  // Independent of the visual status pill — a "Scored" listing can be publishable too.
+  const isPublishable = (imp) =>
+    !!imp && !!imp.listing_id && imp.scoring_status === 'scored' && (imp.selected_keyword_count ?? 0) >= 13;
+
   // Derive exclusive selection mode: 'import' | 'score' | 'export' | null
   const selectionMode = selectedIds.size === 0
     ? null
     : [...selectedIds].some((id) => !importedIds.has(id))
       ? 'import'
-      : [...selectedIds].some((id) => {
-          const imp = importedListings.find(l => l.etsy_listing_id === id);
-          return imp && imp.scoring_status === 'scored' && imp.listing_id;
-        })
+      : [...selectedIds].every((id) => isPublishable(importedListings.find((l) => l.etsy_listing_id === id)))
         ? 'export'
         : 'score';
 
-  // Comparison listings: scored + linked to a listings row
-  const comparisonListings = importedListings.filter(
-    (l) => l.scoring_status === 'scored' && l.original_score != null && l.listing_id
-  );
+  // Amorce card + stats bar counts
+  const importedCount = importedListings.length;
+  const optimizedCount = importedListings.filter(
+    (l) => {
+      const ps = l.listings?.listings_global_eval?.[0]?.listing_strength;
+      return ps != null && ps !== l.original_score;
+    }
+  ).length;
+  const publishedCount = importedListings.filter((l) => l.export_status === 'exported').length;
 
-  // Compute comparison data for stats bar — only truly optimized (different PennySEO score)
-  const comparisonData = comparisonListings
-    .map((l) => ({
-      original_score: l.original_score,
-      pennySeoScore: l.listings?.listings_global_eval?.[0]?.listing_strength ?? null,
-    }))
-    .filter((d) => d.pennySeoScore != null && d.pennySeoScore !== d.original_score);
+  const handleOpenStudioWithFirstImported = () => {
+    const candidate = [...importedListings]
+      .filter((l) => {
+        const ps = l.listings?.listings_global_eval?.[0]?.listing_strength;
+        return !(ps != null && ps !== l.original_score);
+      })
+      .sort((a, b) => new Date(b.imported_at) - new Date(a.imported_at))[0];
 
-  // B/A table pagination
-  const BA_PAGE_SIZE = 5;
-  const baPageCount = Math.ceil(comparisonListings.length / BA_PAGE_SIZE);
-  const paginatedComparisons = comparisonListings.slice(baPage * BA_PAGE_SIZE, (baPage + 1) * BA_PAGE_SIZE);
+    if (candidate?.listing_id) {
+      navigate('/studio', { state: { listingId: candidate.listing_id } });
+    } else if (candidate) {
+      handleOpenInStudio(candidate.etsy_listing_id);
+    } else {
+      navigate('/studio');
+    }
+  };
+
+  const handleOpenDocs = (path) => navigate(path);
 
   // ─── Status filter logic ────────────────────────────
   const getListingStatus = (etsyListingId) => {
@@ -97,16 +150,20 @@ export default function MyShopPage() {
     exported: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'exported').length,
   };
 
-  const filteredListings = statusFilter === 'all'
-    ? etsyListings
-    : etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === statusFilter);
+  const filteredListings = useMemo(() => {
+    const lower = debouncedSearch.toLowerCase().trim();
+    return etsyListings
+      .filter((l) => statusFilter === 'all' || getListingStatus(l.etsy_listing_id) === statusFilter)
+      .filter((l) => !lower || (l.title || '').toLowerCase().includes(lower));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etsyListings, statusFilter, debouncedSearch, importedListings]);
 
   const filters = [
     { key: 'all', label: 'All', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', activeBg: 'bg-indigo-600' },
     { key: 'imported', label: 'Imported', bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-300', activeBg: 'bg-slate-500' },
     { key: 'scored', label: 'Scored', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', activeBg: 'bg-amber-500' },
     { key: 'optimized', label: 'Optimized', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', activeBg: 'bg-emerald-600' },
-    { key: 'exported', label: 'Exported', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', activeBg: 'bg-blue-500' },
+    { key: 'exported', label: 'Published', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', activeBg: 'bg-blue-500' },
   ];
 
   // ─── Fetch imported listings from DB ────────────────
@@ -118,12 +175,34 @@ export default function MyShopPage() {
         *,
         listings:listing_id (
           id,
+          generated_title,
+          generated_description,
           listings_global_eval ( listing_strength )
         )
       `)
       .eq('user_id', user.id)
       .order('imported_at', { ascending: false });
-    setImportedListings(data || []);
+
+    const rows = data || [];
+    const linkedIds = rows.map((r) => r.listing_id).filter(Boolean);
+
+    const countsByListingId = {};
+    if (linkedIds.length > 0) {
+      const { data: evalRows } = await supabase
+        .from('listing_seo_stats')
+        .select('listing_id')
+        .in('listing_id', linkedIds)
+        .eq('is_current_eval', true);
+      for (const r of evalRows || []) {
+        countsByListingId[r.listing_id] = (countsByListingId[r.listing_id] || 0) + 1;
+      }
+    }
+
+    const enriched = rows.map((r) => ({
+      ...r,
+      selected_keyword_count: r.listing_id ? (countsByListingId[r.listing_id] || 0) : 0,
+    }));
+    setImportedListings(enriched);
   }, [user]);
 
   // ─── Fetch Etsy API listings ────────────────────────
@@ -197,7 +276,7 @@ export default function MyShopPage() {
     const clickedIsImported = importedIds.has(etsyListingId);
     const clickedMode = !clickedIsImported ? 'import' : (() => {
       const imp = importedListings.find(l => l.etsy_listing_id === etsyListingId);
-      return (imp?.scoring_status === 'scored' && imp?.listing_id) ? 'export' : 'score';
+      return isPublishable(imp) ? 'export' : 'score';
     })();
 
     const modeLabels = { import: 'import mode', score: 'scoring mode', export: 'export mode' };
@@ -412,88 +491,21 @@ export default function MyShopPage() {
           </button>
         </div>
 
-        {/* Stats bar */}
-        <ShopStatsBar etsyListings={etsyListings} importedListings={importedListings} comparisonData={comparisonData} />
+        {/* Amorce card — contextual next-action hint */}
+        <AmorceCard
+          importedCount={importedCount}
+          optimizedCount={optimizedCount}
+          publishedCount={publishedCount}
+          onOpenDocs={handleOpenDocs}
+          onOpenStudioWithFirstImported={handleOpenStudioWithFirstImported}
+        />
 
-        {/* Before / After comparison table */}
-        {comparisonListings.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-lg font-medium text-slate-700">Before / After</h2>
-            <div>
-              <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 100px 140px 80px 120px', gap: 8, padding: '6px 0', borderBottom: '1px solid #e2e8f0' }}>
-                <span />
-                <span style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Title</span>
-                <span style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600, textAlign: 'center' }}>Original</span>
-                <span style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600, textAlign: 'center' }}>PennySEO</span>
-                <span style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600, textAlign: 'center' }}>Δ</span>
-                <span style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600, textAlign: 'right' }}>Action</span>
-              </div>
-              <div style={{ minHeight: comparisonListings.length > BA_PAGE_SIZE ? BA_PAGE_SIZE * 52 : undefined }}>
-                {paginatedComparisons.map((listing, i) => {
-                  const pennySeo = listing.listings?.listings_global_eval?.[0]?.listing_strength ?? null;
-                  const hasOptimized = pennySeo != null && pennySeo !== listing.original_score;
-                  const delta = hasOptimized ? pennySeo - listing.original_score : null;
-                  return (
-                    <div key={listing.id} style={{
-                      display: 'grid', gridTemplateColumns: '48px 1fr 100px 140px 80px 120px',
-                      gap: 8, padding: '8px 0', alignItems: 'center', minHeight: 52,
-                      background: i % 2 === 1 ? '#f8fafc' : 'white',
-                      borderBottom: '1px solid #f1f5f9',
-                    }}>
-                      <img src={listing.thumbnail_url} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} />
-                      <span style={{ fontSize: 13, fontWeight: 500, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {listing.original_title}
-                      </span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: scoreColor(listing.original_score), textAlign: 'center' }}>
-                        {listing.original_score}
-                      </span>
-                      {hasOptimized ? (
-                        <span style={{ fontSize: 14, fontWeight: 700, color: scoreColor(pennySeo), textAlign: 'center' }}>{pennySeo}</span>
-                      ) : (
-                        <div style={{ textAlign: 'center' }}>
-                          <button onClick={() => navigate('/studio', { state: { listingId: listing.listing_id } })}
-                            style={{ fontSize: 12, fontWeight: 600, color: '#4f46e5', background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
-                            Optimize →
-                          </button>
-                        </div>
-                      )}
-                      {delta != null ? (
-                        <span style={{ fontSize: 15, fontWeight: 600, color: delta > 0 ? '#22c55e' : '#ef4444', textAlign: 'center' }}>
-                          {delta > 0 ? '↑ +' : '↓ '}{delta > 0 ? delta : delta}
-                        </span>
-                      ) : <span />}
-                      {hasOptimized ? (
-                        <button onClick={() => navigate('/studio', { state: { listingId: listing.listing_id } })}
-                          style={{ fontSize: 12, color: '#4f46e5', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, textAlign: 'right', width: '100%' }}>
-                          Open in Studio
-                        </button>
-                      ) : <span />}
-                    </div>
-                  );
-                })}
-              </div>
-              {baPageCount > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, paddingTop: 8 }}>
-                  <button
-                    disabled={baPage === 0}
-                    onClick={() => setBaPage((p) => p - 1)}
-                    style={{ fontSize: 12, color: baPage === 0 ? '#cbd5e1' : '#4f46e5', background: 'none', border: 'none', cursor: baPage === 0 ? 'default' : 'pointer', fontWeight: 500 }}
-                  >
-                    « Previous
-                  </button>
-                  <span style={{ fontSize: 12, color: '#64748b' }}>Page {baPage + 1} of {baPageCount}</span>
-                  <button
-                    disabled={baPage >= baPageCount - 1}
-                    onClick={() => setBaPage((p) => p + 1)}
-                    style={{ fontSize: 12, color: baPage >= baPageCount - 1 ? '#cbd5e1' : '#4f46e5', background: 'none', border: 'none', cursor: baPage >= baPageCount - 1 ? 'default' : 'pointer', fontWeight: 500 }}
-                  >
-                    Next »
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Stats bar */}
+        <ShopStatsBar
+          importedCount={importedCount}
+          optimizedCount={optimizedCount}
+          publishedCount={publishedCount}
+        />
 
         {/* Section label + filter pills */}
         <div className="space-y-3">
@@ -514,22 +526,38 @@ export default function MyShopPage() {
             )}
           </div>
 
-          {/* Filter pills */}
-          <div className="flex items-center gap-2">
-            {filters.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setStatusFilter(f.key)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  statusFilter === f.key
-                    ? `${f.activeBg} text-white border-transparent`
-                    : `${f.bg} ${f.text} ${f.border}`
-                }`}
-              >
-                {f.label} · {filterCounts[f.key]}
-              </button>
-            ))}
-          </div>
+          {/* Filter row: pills + search (hidden when shop is empty) */}
+          {etsyListings.length > 0 && (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {filters
+                  .filter((f) => f.key === 'all' || filterCounts[f.key] > 0)
+                  .map((f) => (
+                    <button
+                      key={f.key}
+                      onClick={() => setStatusFilter((prev) => (prev === f.key ? 'all' : f.key))}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                        statusFilter === f.key
+                          ? `${f.activeBg} text-white border-transparent`
+                          : `${f.bg} ${f.text} ${f.border}`
+                      }`}
+                    >
+                      {f.label} · {filterCounts[f.key]}
+                    </button>
+                  ))}
+              </div>
+              <div className="relative shrink-0 min-w-[180px]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" strokeWidth={2} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search titles…"
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Listing grid */}
@@ -538,15 +566,24 @@ export default function MyShopPage() {
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
           </div>
         ) : (
-          <EtsyListingGrid
-            listings={filteredListings}
-            importedIds={importedIds}
-            importedListings={importedListings}
-            selectedIds={selectedIds}
-            onToggleSelect={handleToggleSelect}
-            onOpenInStudio={handleOpenInStudio}
-            preparingListingId={preparingListingId}
-          />
+          filteredListings.length === 0 && etsyListings.length > 0 ? (
+            <EmptyResults
+              statusFilter={statusFilter}
+              searchQuery={debouncedSearch}
+              onClearStatus={() => setStatusFilter('all')}
+              onClearAll={() => { setStatusFilter('all'); setSearchQuery(''); }}
+            />
+          ) : (
+            <EtsyListingGrid
+              listings={filteredListings}
+              importedIds={importedIds}
+              importedListings={importedListings}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              onOpenInStudio={handleOpenInStudio}
+              preparingListingId={preparingListingId}
+            />
+          )
         )}
 
         {/* Load more */}

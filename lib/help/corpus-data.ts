@@ -905,5 +905,5 @@ You can always come back to any saved listing from the Dashboard, History, or SE
 export const HELP_CORPUS_META = {
   "articleCount": 12,
   "totalChars": 55234,
-  "builtAt": "2026-05-02T17:29:36.369Z"
+  "builtAt": "2026-05-02T18:52:50.134Z"
 } as const;

@@ -2521,3 +2521,42 @@ Per-user Etsy OAuth is shipped end-to-end and on `main`. Manual smoke (the full 
 - User: delete legacy env vars per the manual-steps list above.
 - Optional follow-up: replace `analyseShop` (n8n Magic Sync) with a native Etsy API call now that the OAuth client is in place — the existing UI is wrapped in `{false && ...}` on `BrandProfilePage.jsx` waiting for that rewrite.
 
+---
+
+### 2026-05-02 — Database Reset to Clean Pre-Launch State
+
+**Context**: With per-user Etsy OAuth shipped (Phases 1-6) and the commercial license active, the dev/test data accumulated since March 2026 was no longer needed. Reset the database to a single-admin clean state in preparation for the public beta and real users.
+
+### What was deleted
+- 15 test `auth.users` (christian.couillard+test1..6@gmail.com, miyak36313@fabaos.com, vihiyap637@fun4k.com, etc.) + identities (cascade)
+- 310 listings + 25 822 `listing_seo_stats` + 269 `listings_global_eval` + 0 `listing_mockups`
+- All Etsy data: 15 `etsy_listings`, 1 `etsy_shop_connections` (DourliacStudio), 13 `etsy_export_logs`, 0 `etsy_oauth_states`
+- 219 `token_transactions`, 20 `keyword_presets`, 141 `user_keyword_bank`, 35 `user_custom_*`, 14 `user_settings`, 9 `feedback`, 9 `help_conversations` + 34 `help_messages`
+- 1 `waitlist` row
+- The duplicate admin accounts `admin@etsypenny.dev` and `christian.couillard@gmail.com` ("Christian Couillard (Test)")
+
+### What was preserved
+- **Sole user**: `christian.couillard@5pennyai.com` (id `77e2705a-6a79-4555-8b86-f7048f9e12d2`), reset to `role=admin`, `subscription_plan=free`, `tokens_monthly_balance=1000`, `onboarding_completed=false`, all brand profile / Stripe / legacy credit fields nulled out
+- **Global cache**: `keyword_cache` intact (21 895 rows of DataForSEO data — real $ spent)
+- **All system config**: `system_*` tables, `plans`, `prices`, `products`, taxonomy lookup tables, `system_seo_constants`, `system_ai_config`, `system_ai_models`, `tones`, `listing_statuses`, `credit_packs`, `token_packs`, `token_costs`, `token_prices`
+
+### Architecture notes
+- Reset script uses pure DML (no DDL, no temp tables) — Supabase SQL Editor split temp/snapshot tables across pooled connections, breaking the BEGIN/ROLLBACK comparison pattern. Pure `BEGIN ... DELETEs ... UPDATE ... SELECT counts ... ROLLBACK` works cleanly.
+- FK deletion order: `listing_seo_stats` → `listing_mockups` → `listings_global_eval` → `token_transactions`/`credits_usage` → `etsy_export_logs` → `etsy_listings` → `etsy_shop_connections` → `etsy_oauth_states` → `listings` → user-scoped tables (preserve admin) → `profiles` → `auth.users` → `waitlist`. `IS DISTINCT FROM` used for nullable `user_id` columns to also remove orphan rows.
+
+### Pending follow-ups (manual, outside DB)
+- Empty Supabase Storage bucket `mockups_bucket` (~310 orphan listing images)
+- Archive dangling Stripe Customers in dashboard (Live mode): `cus_UDkPnB8kdxWf69`, `cus_UDpbLkIMW0H3J3`, `cus_UEVdDVWV9qJ9b5`, `cus_UGltArVkH288QF`, `cus_UGjNmXJObwJj0R`, `cus_UGkuw03vdF4xuM`, `cus_UDTGj2UhrZWu6P`
+- `git rm scripts/etsy-oauth.mjs scripts/etsy-oauth_1.mjs` (manual OAuth bootstrap helpers, no longer needed)
+- Remove legacy env vars from `.env`, `.env.local`, and Vercel: `ETSY_ACCESS_TOKEN`, `ETSY_REFRESH_TOKEN`, `ETSY_SHOP_ID`
+- Smoke-test the OAuth flow at `/shop` on prod — re-creates the first real `etsy_shop_connections` row via the public handshake
+
+### Files Created
+- `scripts/sql/reset-pennyseo-db.sql` (transactional reset script — keep in repo for reference, not for re-running)
+
+### Session Handover
+- Database is in clean pre-launch state with one admin account
+- All system config preserved; all user-generated data wiped
+- Ready for first real user signups via the public landing page
+- OAuth flow for Etsy is shipped but unverified end-to-end on prod — next operational priority
+
