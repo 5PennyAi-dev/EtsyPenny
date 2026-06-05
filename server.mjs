@@ -2172,6 +2172,17 @@ app.post('/api/help/feedback', async (req, res) => {
   }
 });
 
+// ─── ADMIN ────────────────────────────────────────────────
+app.get('/api/admin/users', async (req, res) => {
+  const { default: handler } = await import('./api/admin/users.ts');
+  return handler(req, res);
+});
+
+app.delete('/api/admin/delete-user', async (req, res) => {
+  const { default: handler } = await import('./api/admin/delete-user.ts');
+  return handler(req, res);
+});
+
 // ─── EXPORT FOR TESTING ──────────────────────────────────
 export { app };
 
@@ -2200,6 +2211,7 @@ if (process.env.NODE_ENV !== 'test') {
   console.log(`   POST /api/etsy/oauth/disconnect`);
   console.log(`   POST /api/help/chat`);
   console.log(`   POST /api/help/feedback`);
+  console.log(`   DELETE /api/admin/delete-user`);
   console.log(`   GET  /api/health\n`);
 });
 }
