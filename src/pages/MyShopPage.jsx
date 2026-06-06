@@ -168,7 +168,7 @@ export default function MyShopPage() {
 
   // ─── Fetch imported listings from DB ────────────────
   const fetchImported = useCallback(async () => {
-    if (!user) return;
+    if (!user) return [];
     const { data } = await supabase
       .from('etsy_listings')
       .select(`
@@ -203,6 +203,7 @@ export default function MyShopPage() {
       selected_keyword_count: r.listing_id ? (countsByListingId[r.listing_id] || 0) : 0,
     }));
     setImportedListings(enriched);
+    return enriched;
   }, [user]);
 
   // ─── Fetch Etsy API listings ────────────────────────
@@ -302,15 +303,32 @@ export default function MyShopPage() {
   // ─── Import handler ─────────────────────────────────
   const handleImport = async () => {
     setIsImporting(true);
+    const justImportedIds = new Set(selectedIds);
     try {
       const { data } = await axios.post('/api/etsy/import-listings', {
         user_id: user.id,
         etsy_listing_ids: Array.from(selectedIds),
       });
       setImportResult(data);
-      toast.success(`${data.imported} listing${data.imported !== 1 ? 's' : ''} imported successfully`);
       setSelectedIds(new Set());
-      await fetchImported();
+
+      // Fetch imported rows, then auto-prepare newly imported listings
+      // so they appear immediately in /listings at "New" status (free operation).
+      const freshImported = await fetchImported();
+      const toPrep = freshImported.filter(
+        (l) => justImportedIds.has(l.etsy_listing_id) && !l.listing_id
+      );
+      if (toPrep.length > 0) {
+        await Promise.all(
+          toPrep.map((row) =>
+            axios.post('/api/etsy/prepare-listing', { user_id: user.id, etsy_listing_id: row.id })
+              .catch((e) => console.error(`[import] prepare failed for ${row.id}:`, e))
+          )
+        );
+        await fetchImported();
+      }
+
+      toast.success(`${data.imported} listing${data.imported !== 1 ? 's' : ''} imported successfully`);
     } catch (err) {
       if (err.response?.status === 402) {
         toast.error(err.response.data.error);
