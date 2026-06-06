@@ -23,17 +23,10 @@ export default function UserManagement() {
 
   const fetchUsers = async () => {
     setLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const { data } = await axios.get('/api/admin/users', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      setUsers(data.users || []);
-    } catch {
-      toast.error('Failed to load users');
-    } finally {
-      setLoading(false);
-    }
+    const { data, error } = await supabase.rpc('admin_list_users');
+    if (error) { toast.error('Failed to load users'); setLoading(false); return; }
+    setUsers(data || []);
+    setLoading(false);
   };
 
   const filteredUsers = useMemo(() =>
