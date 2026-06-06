@@ -31,6 +31,21 @@ CREATE TABLE public.customers (
   CONSTRAINT customers_pkey PRIMARY KEY (id),
   CONSTRAINT customers_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
+CREATE TABLE public.etsy_export_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  etsy_listing_id bigint NOT NULL,
+  listing_id uuid,
+  fields_exported ARRAY NOT NULL,
+  snapshot_before jsonb NOT NULL,
+  snapshot_after jsonb NOT NULL,
+  status text NOT NULL DEFAULT 'success'::text CHECK (status = ANY (ARRAY['success'::text, 'error'::text])),
+  error_message text,
+  exported_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT etsy_export_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_eel_user FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT fk_eel_listing FOREIGN KEY (listing_id) REFERENCES public.listings(id)
+);
 CREATE TABLE public.etsy_listings (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -50,10 +65,26 @@ CREATE TABLE public.etsy_listings (
   scored_at timestamp with time zone,
   imported_at timestamp with time zone DEFAULT now(),
   last_synced_at timestamp with time zone DEFAULT now(),
+  export_status text DEFAULT 'pending'::text CHECK (export_status = ANY (ARRAY['pending'::text, 'exported'::text, 'partial'::text, 'error'::text])),
+  last_exported_at timestamp with time zone,
+  taxonomy_id bigint,
+  etsy_category text,
   CONSTRAINT etsy_listings_pkey PRIMARY KEY (id),
   CONSTRAINT fk_el_user FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT fk_el_connection FOREIGN KEY (connection_id) REFERENCES public.etsy_shop_connections(id),
   CONSTRAINT fk_el_listing FOREIGN KEY (listing_id) REFERENCES public.listings(id)
+);
+CREATE TABLE public.etsy_oauth_states (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  state text NOT NULL UNIQUE,
+  code_verifier text NOT NULL,
+  scopes text NOT NULL,
+  redirect_uri text NOT NULL,
+  expires_at timestamp with time zone NOT NULL DEFAULT (now() + '00:10:00'::interval),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT etsy_oauth_states_pkey PRIMARY KEY (id),
+  CONSTRAINT etsy_oauth_states_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.etsy_shop_connections (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -82,6 +113,32 @@ CREATE TABLE public.feedback (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT feedback_pkey PRIMARY KEY (id),
   CONSTRAINT feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.help_conversations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  title text,
+  page_context text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT help_conversations_pkey PRIMARY KEY (id),
+  CONSTRAINT help_conversations_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.help_messages (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  conversation_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  role text NOT NULL CHECK (role = ANY (ARRAY['user'::text, 'assistant'::text])),
+  content text NOT NULL,
+  feedback smallint NOT NULL DEFAULT 0 CHECK (feedback = ANY (ARRAY['-1'::integer, 0, 1])),
+  feedback_note text,
+  tokens_input integer,
+  tokens_output integer,
+  latency_ms integer,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT help_messages_pkey PRIMARY KEY (id),
+  CONSTRAINT help_messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.help_conversations(id),
+  CONSTRAINT help_messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.keyword_cache (
   tag text NOT NULL,
@@ -323,13 +380,15 @@ CREATE TABLE public.profiles (
   subscription_id text,
   stripe_customer_id text,
   subscription_end_at timestamp with time zone,
-  tokens_monthly_balance integer DEFAULT 15,
+  tokens_monthly_balance integer DEFAULT 30,
   tokens_bonus_balance integer DEFAULT 0,
   tokens_reset_at timestamp with time zone DEFAULT (now() + '1 mon'::interval),
   add_custom_used integer DEFAULT 0,
   add_favorite_used integer DEFAULT 0,
   counters_reset_at timestamp with time zone DEFAULT (now() + '1 mon'::interval),
   role text NOT NULL DEFAULT 'user'::text CHECK (role = ANY (ARRAY['user'::text, 'admin'::text])),
+  onboarding_completed boolean NOT NULL DEFAULT false,
+  is_blocked boolean NOT NULL DEFAULT false,
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
@@ -444,7 +503,7 @@ CREATE TABLE public.token_prices (
 CREATE TABLE public.token_transactions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
-  type text NOT NULL CHECK (type = ANY (ARRAY['subscription_credit'::text, 'pack_purchase'::text, 'deduction'::text, 'reset'::text, 'refund'::text])),
+  type text NOT NULL CHECK (type = ANY (ARRAY['subscription_credit'::text, 'pack_purchase'::text, 'deduction'::text, 'reset'::text, 'refund'::text, 'admin_adjustment'::text])),
   amount integer NOT NULL,
   action text,
   listing_id uuid,

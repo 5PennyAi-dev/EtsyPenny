@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, ChevronLeft, Plus, Minus, Ban, RefreshCw, ExternalLink } from 'lucide-react';
+import { Search, ChevronLeft, Plus, Minus, Ban, RefreshCw, ExternalLink, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
+import axios from 'axios';
+import ConfirmationModal from '../ui/ConfirmationModal';
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -14,25 +16,30 @@ export default function UserManagement() {
   const [tokenAmount, setTokenAmount] = useState('');
   const [tokenNote, setTokenNote] = useState('');
   const [adjusting, setAdjusting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => { fetchUsers(); }, []);
 
   const fetchUsers = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, subscription_plan, subscription_status, tokens_monthly_balance, tokens_bonus_balance, add_custom_used, add_favorite_used, stripe_customer_id, is_blocked, tokens_reset_at, updated_at')
-      .order('updated_at', { ascending: false });
-
-    if (error) { toast.error('Failed to load users'); setLoading(false); return; }
-    setUsers(data || []);
-    setLoading(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data } = await axios.get('/api/admin/users', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      setUsers(data.users || []);
+    } catch {
+      toast.error('Failed to load users');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredUsers = useMemo(() =>
     users.filter(u => {
       const q = search.toLowerCase();
-      return u.full_name?.toLowerCase().includes(q) || u.id.includes(q) || u.subscription_plan?.toLowerCase().includes(q);
+      return u.full_name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.subscription_plan?.toLowerCase().includes(q);
     }),
   [users, search]);
 
@@ -117,6 +124,26 @@ export default function UserManagement() {
     toast.success(block ? 'User blocked' : 'User unblocked');
   };
 
+  // ─── Delete User ────────────────────────────────────────────────
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+    setDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await axios.delete('/api/admin/delete-user', {
+        data: { userId: selectedUser.id },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      toast.success(`Account deleted: ${selectedUser.full_name || selectedUser.id}`);
+      setUsers(prev => prev.filter(u => u.id !== selectedUser.id));
+      setSelectedUser(null);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to delete account');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // ─── Loading State ──────────────────────────────────────────────
   if (loading) {
     return (
@@ -150,7 +177,7 @@ export default function UserManagement() {
                   <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full font-semibold">Blocked</span>
                 )}
               </div>
-              <div className="text-xs text-slate-400 font-mono mt-0.5">{selectedUser.id}</div>
+              <div className="text-xs text-slate-400 mt-0.5">{selectedUser.email || '—'}</div>
             </div>
             {selectedUser.stripe_customer_id && (
               <a
@@ -232,6 +259,36 @@ export default function UserManagement() {
             <Ban size={14} /> {selectedUser.is_blocked ? 'Unblock user' : 'Block user'}
           </button>
         </div>
+
+        {/* Danger zone */}
+        <div className="border border-rose-200 rounded-xl p-4 bg-rose-50/40">
+          <div className="text-xs font-semibold text-rose-700 mb-2 uppercase tracking-wide">Danger zone</div>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-slate-800">Delete this account</div>
+              <div className="text-xs text-slate-500 mt-0.5">Permanently removes all data. Cannot be undone.</div>
+            </div>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              disabled={deleting}
+              className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={14} /> Delete account
+            </button>
+          </div>
+        </div>
+
+        {/* Delete confirmation modal */}
+        <ConfirmationModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleDeleteUser}
+          title="Delete account permanently?"
+          message={`This will permanently delete ${selectedUser.full_name ? `"${selectedUser.full_name}"` : 'this user'} (${selectedUser.id.substring(0, 8)}…) and all their data — listings, keywords, Etsy connection, tokens. This action cannot be undone.`}
+          confirmText="Delete permanently"
+          cancelText="Cancel"
+          type="warning"
+        />
 
         {/* Token modal */}
         {showTokenModal && createPortal(
@@ -352,7 +409,7 @@ export default function UserManagement() {
                   <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full font-semibold">Blocked</span>
                 )}
               </div>
-              <div className="text-[10px] text-slate-400 font-mono">{user.id.substring(0, 16)}...</div>
+              <div className="text-[10px] text-slate-400">{user.email || '—'}</div>
             </div>
             <div>
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${
