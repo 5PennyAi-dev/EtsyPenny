@@ -10,6 +10,7 @@ import {
 } from '../../lib/logic/analyse-image-logic.js';
 import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
+import { getSupabaseEdgeHeaders, getSupabaseServerConfig } from '../../lib/supabase/config.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   initSentry();
@@ -51,9 +52,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Step 3: Taxonomy Retrieval (Supabase)
     const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+    const { url: supabaseUrl, secretKey: supabaseKey } = getSupabaseServerConfig();
+    const supabaseAdmin = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
     const [themesResult, nichesResult] = await Promise.all([
       supabaseAdmin.from('v_combined_themes').select('*'),
@@ -84,14 +86,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const finalAnalysis = mergeAnalysisResults(listing_id, visualAnalysis, taxonomyMapping);
 
     const edgeFnUrl = `${supabaseUrl}/functions/v1/save-image-analysis`;
-    const n8nSecret = process.env.N8N_WEBHOOK_SECRET;
     const saveResponse = await fetch(edgeFnUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseKey}`,
-        'x-api-key': n8nSecret || '',
-      },
+      headers: getSupabaseEdgeHeaders(),
       body: JSON.stringify(finalAnalysis),
     });
 

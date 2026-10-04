@@ -100,45 +100,14 @@ log('# PennySEO Codebase Audit Report v2');
 log(`_Generated: ${new Date().toISOString().slice(0, 16)}_`);
 log(`_Active code files: ${ALL_ACTIVE_CODE.length} | Legacy files: ${LEGACY_FILES.length}_\n`);
 
-// ── 1. N8N DEAD REFERENCES ──────────────────────────────────────────────────
+// ── 1. DEPRECATED SUPABASE KEY VARIABLES ────────────────────────────────────
 
-header('1. N8N Dead References');
+header('1. Deprecated Supabase Key Variables');
 
-log('\nWebhook URL references in active code:');
-const n8nUrlHits = grep(ALL_ACTIVE_CODE, /N8N_WEBHOOK|n8n_webhook|VITE_N8N/i);
-const n8nEnvHits = grep(ENV_FILES, /N8N_WEBHOOK|VITE_N8N/i);
-
-// Categorize: BrandProfilePage is the only legitimate n8n consumer
-const legitimateN8N = [];
-const deadN8N = [];
-[...n8nUrlHits, ...n8nEnvHits].forEach(h => {
-  if (h.file.includes('BrandProfilePage') || 
-      (h.file.includes('.env') && h.text.includes('VITE_N8N_WEBHOOK_URL_TEST') && !h.text.startsWith('#'))) {
-    legitimateN8N.push(h);
-  } else if (h.file.includes('.env') && h.text.includes('N8N_WEBHOOK_SECRET') && !h.text.startsWith('#')) {
-    // N8N_WEBHOOK_SECRET is still used by Supabase Edge Functions — keep
-    legitimateN8N.push(h);
-  } else {
-    deadN8N.push(h);
-  }
-});
-
-if (legitimateN8N.length > 0) {
-  log('\n  Legitimate (analyseShop + Edge Function auth):');
-  legitimateN8N.forEach(h => info(`${h.file}:${h.lineNum} → ${h.text.slice(0, 120)}`));
-}
-if (deadN8N.length > 0) {
-  log('\n  Dead (should remove):');
-  deadN8N.forEach(h => found(`${h.file}:${h.lineNum} → ${h.text.slice(0, 120)}`));
-} else {
-  ok('No dead n8n references (only legitimate analyseShop + Edge Function auth remain)');
-}
-
-log('\nN8N action strings (excluding analyseShop):');
-const deadActions = ['drafting_seo', 'recalculateScore', 'generateInsight', 'competitionAnalysis', 'seo_sniper'];
-for (const action of deadActions) {
-  const hits = grep(ALL_ACTIVE_CODE, new RegExp(`['"]\s*${action}\s*['"]`));
-  hits.forEach(h => found(`Dead action '${action}': ${h.file}:${h.lineNum}`));
+const deprecatedKeyVars = ['VITE_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'];
+for (const variable of deprecatedKeyVars) {
+  const hits = [...grep(ALL_ACTIVE_CODE, new RegExp(variable)), ...grep(ENV_FILES, new RegExp(variable))];
+  hits.forEach(h => found(`Deprecated '${variable}': ${h.file}:${h.lineNum}`));
 }
 
 // ── 2. MULTI-MODE RESIDUE ───────────────────────────────────────────────────
@@ -222,7 +191,7 @@ if (testFiles.length === 0) ok('No test files in tree');
 header('5. Environment Variable Hygiene');
 
 log('\nObsolete env vars (safe to remove):');
-const obsoleteVars = ['VITE_N8N_WEBHOOK_URL_PROD', 'N8N_WEBHOOK_URL_RESET_POOL'];
+const obsoleteVars = ['VITE_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'];
 for (const v of obsoleteVars) {
   const hits = [...grep(ALL_ACTIVE_CODE, new RegExp(v)), ...grep(ENV_FILES, new RegExp(v))];
   hits.forEach(h => found(`'${v}': ${h.file}:${h.lineNum}`));
@@ -233,16 +202,16 @@ for (const envFile of ENV_FILES) {
   try {
     const lines = fs.readFileSync(envFile, 'utf8').split('\n');
     lines.forEach((line, i) => {
-      if (line.startsWith('#') && (line.includes('N8N') || line.includes('WEBHOOK'))) {
+      if (line.startsWith('#') && (line.includes('VITE_SUPABASE_ANON_KEY') || line.includes('SUPABASE_SERVICE_ROLE_KEY'))) {
         warn(`Commented-out: ${envFile}:${i + 1} → ${line.slice(0, 100)}`);
       }
     });
   } catch {}
 }
 
-log('\nLegitimate env vars (keep):');
-info('VITE_N8N_WEBHOOK_URL_TEST — used by BrandProfilePage.jsx (analyseShop)');
-info('N8N_WEBHOOK_SECRET — used by Supabase Edge Functions (save-seo, save-image-analysis)');
+log('\nRequired Supabase env vars:');
+info('VITE_SUPABASE_PUBLISHABLE_KEY — browser client');
+info('SUPABASE_SECRET_KEY — backend client');
 
 // ── 6. CODE HYGIENE ─────────────────────────────────────────────────────────
 
@@ -439,7 +408,7 @@ log(`\nTotal issues: ${TOTAL.issues}`);
 log('\nPriority:');
 log('  1. 🔴 Multi-mode residue — remove seo_mode, broad/balanced/sniper from all active code');
 log('  2. 🔴 Legacy files — delete app/api/seo/ (replaced by api/)');
-log('  3. 🟡 N8N dead refs — clean .env and server.mjs (keep BrandProfilePage + Edge Function secret)');
+log('  3. 🟡 Deprecated Supabase keys — remove old variables after migration validation');
 log('  4. 🟡 Unused imports & orphaned components — reduce bundle size');
 log('  5. 🟡 Code duplication — server.mjs should import from lib/ like api/ does');
 log('  6. 🟡 console.log in production — clean api/ functions');

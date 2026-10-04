@@ -30,12 +30,11 @@ const PERSIST = true;
 // ─── ENV CHECKS ────────────────────────────────────────────
 const GOOGLE_API_KEY       = process.env.GOOGLE_API_KEY;
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const N8N_SECRET           = process.env.N8N_WEBHOOK_SECRET;
+const SUPABASE_SECRET_KEY  = process.env.SUPABASE_SECRET_KEY;
 const DATAFORSEO_LOGIN     = process.env.DATAFORSEO_LOGIN;
 const DATAFORSEO_PASSWORD  = process.env.DATAFORSEO_PASSWORD;
 
-for (const [name, val] of Object.entries({ GOOGLE_API_KEY, SUPABASE_URL: SUPABASE_URL, SUPABASE_SERVICE_KEY, N8N_SECRET })) {
+for (const [name, val] of Object.entries({ GOOGLE_API_KEY, SUPABASE_URL, SUPABASE_SECRET_KEY })) {
   if (!val) { console.error(`❌ Missing required env var: ${name}`); process.exit(1); }
 }
 if (!DATAFORSEO_LOGIN || !DATAFORSEO_PASSWORD || DATAFORSEO_LOGIN.startsWith('your_')) {
@@ -153,8 +152,7 @@ async function stepB(keywords) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-        'x-api-key': N8N_SECRET,
+        apikey: SUPABASE_SECRET_KEY,
       },
       body: JSON.stringify({ keywords }),
     });
@@ -441,8 +439,7 @@ async function stepE(keywords, strength) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-      'x-api-key': N8N_SECRET,
+      apikey: SUPABASE_SECRET_KEY,
     },
     body: JSON.stringify(payload),
   });
@@ -464,7 +461,7 @@ async function main() {
 
   // ── Step 0: Fetch listing data from Supabase ──
   console.log(`\n📦 Step 0: Fetching listing ${LISTING_ID} from Supabase...`);
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY);
 
   const { data: listing, error: listingErr } = await supabase
     .from('listings')

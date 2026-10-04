@@ -1,9 +1,11 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
+import { authenticateSecretKeyRequest } from "../_shared/server-auth.ts"
+import { resolveSupabaseSecretKey } from "../_shared/supabase-secret.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
@@ -13,25 +15,23 @@ serve(async (req) => {
   }
 
   try {
-    // 2. Validate Custom API Key Security (Ensure only N8N can call this)
-    const apiKey = req.headers.get('x-api-key');
-    const expectedApiKey = Deno.env.get('N8N_WEBHOOK_SECRET');
+    // Server-to-server endpoint. Gateway JWT verification is disabled in
+    // supabase/config.toml, so this function validates a named secret key.
+    const authError = await authenticateSecretKeyRequest(
+      req,
+      Deno.env.get('SUPABASE_SECRET_KEYS'),
+      Deno.env.get('PENNYSEO_EDGE_CALLER_KEY_NAME') ?? 'vercel',
+    );
+    if (authError) return authError;
 
-    if (!expectedApiKey || apiKey !== expectedApiKey) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid x-api-key' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // 3. Parse JSON Body from N8N
+    // Parse the backend payload.
     const body = await req.json()
     
     // Extractor variables
     let listing_id = null;
     let visual_analysis = null;
 
-    // Flexible parsing based on possible N8N JSON permutations
+    // Keep compatibility with both direct and legacy array-shaped payloads.
     if (Array.isArray(body) && body.length > 0) {
       const item = body[0];
       listing_id = item.listing_id || item.id;
@@ -71,10 +71,14 @@ serve(async (req) => {
       })
     }
 
-    // Initialize Supabase Client with SERVICE_ROLE_KEY to bypass RLS
+    // Initialize the privileged client with a named modern Supabase secret key.
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      resolveSupabaseSecretKey(
+        Deno.env.get('SUPABASE_SECRET_KEYS'),
+        Deno.env.get('PENNYSEO_SUPABASE_SECRET_KEY_NAME') ?? 'edge_functions',
+      ),
+      { auth: { persistSession: false, autoRefreshToken: false } },
     )
 
     // 4. Map the received JSON data to the public.listings columns

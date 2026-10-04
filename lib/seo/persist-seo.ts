@@ -3,6 +3,8 @@
  * Persists SEO results via the save-seo edge function.
  */
 
+import { getSupabaseEdgeHeaders, getSupabaseServerConfig } from '../supabase/config.js';
+
 interface Keyword {
   keyword: string;
   search_volume: number;
@@ -32,9 +34,7 @@ export async function persistSeo(
   strength: Strength | null,
   params: Params
 ): Promise<unknown> {
-  const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
-  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const N8N_SECRET = process.env.N8N_WEBHOOK_SECRET || '';
+  const { url: supabaseUrl } = getSupabaseServerConfig();
 
   const payload = {
     listing_id: listingId,
@@ -60,13 +60,9 @@ export async function persistSeo(
     parameters: params,
   };
 
-  const saveRes = await fetch(`${SUPABASE_URL}/functions/v1/save-seo`, {
+  const saveRes = await fetch(`${supabaseUrl}/functions/v1/save-seo`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-      'x-api-key': N8N_SECRET,
-    },
+    headers: getSupabaseEdgeHeaders(),
     body: JSON.stringify(payload),
   });
   if (!saveRes.ok) {

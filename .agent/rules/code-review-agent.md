@@ -33,7 +33,6 @@ grep -rn "functionName\|ComponentName" src/ api/ lib/ server.mjs --include="*.js
 ```
 
 **Common false positives to watch for:**
-- `N8N_WEBHOOK_SECRET` — looks like n8n dead code but is used by Supabase Edge Functions as `x-api-key` auth header
 - `product_type_text` — looks deprecated but may be a fallback for legacy data rows
 - Components referenced via dynamic imports or string interpolation
 - CSS classes that match component names
@@ -44,13 +43,9 @@ grep -rn "functionName\|ComponentName" src/ api/ lib/ server.mjs --include="*.js
 - Any reference to `seo_mode`, `activeMode`, `handleModeChange`, `globalEvals`, `allSeoStats` (multi-mode system removed)
 - String literals `'broad'`, `'balanced'`, `'sniper'` in mode-selection context
 - Components: `StrategySwitcher.jsx`, `SEOStrategySelector.jsx`, `SemiCircleGauge.jsx`, `SearchableSelect.jsx`
-- n8n action strings: `drafting_seo`, `recalculateScore`, `generateInsight`, `competitionAnalysis`, `seo_sniper`
-- `VITE_N8N_WEBHOOK_URL_PROD` env var
 - Files in `app/api/seo/` directory
 
 **NOT dead — do not remove:**
-- `VITE_N8N_WEBHOOK_URL_TEST` — still used by BrandProfilePage.jsx (analyseShop)
-- `N8N_WEBHOOK_SECRET` — still used by Edge Functions (save-seo, save-image-analysis, check-keyword-cache)
 - `StrategyTuner.jsx` — active component (the 5 sliders), NOT the same as StrategySwitcher
 - Anything in `api/seo/*.ts` — production serverless functions
 

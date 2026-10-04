@@ -532,7 +532,7 @@ const ProductStudio = () => {
     // Helper: Compare database 'updated_at' against when we started the analysis to ignore stale read-replicas
     const isImageNewerThanTrigger = (updatedAt) => {
         if (!imageAnalysisTriggeredAtRef.current || !updatedAt) return true;
-        // We capture the server's updated_at when we launch the analysis. The final n8n save will definitely be strictly newer.
+        // We capture the server's updated_at when we launch the analysis. The final backend save is strictly newer.
         return new Date(updatedAt).getTime() > new Date(imageAnalysisTriggeredAtRef.current).getTime();
     };
 
@@ -903,7 +903,7 @@ const ProductStudio = () => {
             image_url: publicUrl,
             title: listingName || "Pending Analysis...",
             status_id: STATUS_IDS.NEW, // Reset status to NEW so polling doesn't immediately succeed
-            is_generating_seo: true, // Flag that n8n is actively working on SEO
+            is_generating_seo: true, // Flag that the backend is actively generating SEO
              // Visual Fields
             visual_aesthetic: visualAnalysis.aesthetic,
             visual_typography: visualAnalysis.typography,
@@ -938,7 +938,7 @@ const ProductStudio = () => {
              setListingId(activeListingId);
         }
 
-        // 3. Call generate-keywords API directly (synchronous, ~30s — no N8N)
+        // 3. Call generate-keywords API directly (synchronous, ~30s)
         const keywordsPayload = {
             listing_id: activeListingId,
             user_id: user.id,

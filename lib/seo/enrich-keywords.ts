@@ -3,6 +3,8 @@
  * Cache check + DataForSEO enrichment + Etsy volume conversion.
  */
 
+import { getSupabaseEdgeHeaders, getSupabaseServerConfig } from '../supabase/config.js';
+
 // server.mjs lines 268-271
 export function getEtsyVolume(webVol: number): number {
   if (!webVol || webVol <= 0) return 0;
@@ -19,18 +21,16 @@ interface EnrichedKeyword {
 }
 
 export async function enrichKeywords(keywords: string[]): Promise<EnrichedKeyword[]> {
-  const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
-  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const N8N_SECRET = process.env.N8N_WEBHOOK_SECRET || '';
+  const { url: supabaseUrl } = getSupabaseServerConfig();
   const DATAFORSEO_LOGIN = process.env.DATAFORSEO_LOGIN;
   const DATAFORSEO_PASSWORD = process.env.DATAFORSEO_PASSWORD;
 
   // B1: Cache check
   let cached: Array<{ tag: string; search_volume?: number; competition?: number; cpc?: number; volume_history?: number[] }> = [];
   try {
-    const cacheRes = await fetch(`${SUPABASE_URL}/functions/v1/check-keyword-cache`, {
+    const cacheRes = await fetch(`${supabaseUrl}/functions/v1/check-keyword-cache`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`, 'x-api-key': N8N_SECRET },
+      headers: getSupabaseEdgeHeaders(),
       body: JSON.stringify({ keywords }),
     });
     if (cacheRes.ok) { const d = await cacheRes.json(); cached = d.cachedKeywords || []; }

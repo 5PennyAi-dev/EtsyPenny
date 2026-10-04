@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { authenticateSecretKeyRequest } from "../_shared/server-auth.ts";
+import { resolveSupabaseSecretKey } from "../_shared/supabase-secret.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,14 +16,29 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    // Server-to-server endpoint. A publishable key identifies the project, not
+    // the caller, so this function validates a named secret key.
+    const authError = await authenticateSecretKeyRequest(
+      req,
+      Deno.env.get("SUPABASE_SECRET_KEYS"),
+      Deno.env.get("PENNYSEO_EDGE_CALLER_KEY_NAME") ?? "vercel",
+    );
+    if (authError) return authError;
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error("Missing Supabase environment variables");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+
+    if (!supabaseUrl) {
+      throw new Error("Missing environment variable SUPABASE_URL");
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(
+      supabaseUrl,
+      resolveSupabaseSecretKey(
+        Deno.env.get("SUPABASE_SECRET_KEYS"),
+        Deno.env.get("PENNYSEO_SUPABASE_SECRET_KEY_NAME") ?? "edge_functions",
+      ),
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
 
     // Parse the request body
     const { keywords } = await req.json();

@@ -31,7 +31,6 @@ npm run preview   # Preview production build
 - **Supabase** for auth, database, storage (mockups_bucket), and realtime subscriptions
 - **Vercel Serverless Functions** (`api/`) — production backend for all SEO operations
 - **Local Express API** (`server.mjs`, port 3001) — dev-only mirror of Vercel functions, used via Vite proxy
-- **n8n** webhook — only used for `analyseShop` (currently hidden — pending Etsy API license)
 - **Resend** for transactional emails (welcome, subscription, token pack) via raw fetch API
 - **Sentry** for error monitoring (`@sentry/react` frontend, `@sentry/node` backend)
 - **Multi-provider AI** (Gemini, Anthropic, OpenAI) via configurable provider router — admin assigns any model to any task at runtime via `system_ai_config` table
@@ -116,10 +115,6 @@ npm run preview   # Preview production build
 
 Per-user OAuth via Etsy API v3. Each user connects their shop through the OAuth flow at `/shop` (or Settings). Tokens persist in `etsy_shop_connections` and refresh automatically with a 60-second buffer via `getActiveConnection()`. App-level identity (`ETSY_API_KEY`, `ETSY_SHARED_SECRET`) is configured via env vars; user-level tokens are never in env vars.
 
-### Hidden Features
-
-- Magic Sync card (`analyseShop` n8n) on `BrandProfilePage.jsx` is wrapped in `{false && ...}` pending replacement strategy. Hidden from UI; n8n webhook still wired in `server.mjs`.
-
 ### Admin Access Control
 
 - `profiles.role` column (`'user'` | `'admin'`, default `'user'`)
@@ -175,17 +170,17 @@ Listings progress through statuses tracked by UUID:
 ```
 # Frontend (VITE_ prefix — exposed to browser)
 VITE_SUPABASE_URL          # Supabase project URL
-VITE_SUPABASE_ANON_KEY     # Supabase anonymous key
-VITE_N8N_WEBHOOK_URL_TEST  # n8n webhook endpoint (for remaining n8n actions)
+VITE_SUPABASE_PUBLISHABLE_KEY # Supabase publishable browser key
 
 # Server-side only (used by server.mjs and edge functions)
-SUPABASE_SERVICE_ROLE_KEY  # Admin Supabase key (bypasses RLS)
+SUPABASE_SECRET_KEY        # Modern server key (bypasses RLS)
+PENNYSEO_SUPABASE_SECRET_KEY_NAME # Edge Function key name: "edge_functions"
+PENNYSEO_EDGE_CALLER_KEY_NAME # Backend caller key name: "vercel"
 GOOGLE_API_KEY             # Gemini API key (required)
 ANTHROPIC_API_KEY          # Anthropic API key (optional — needed if tasks assigned to Anthropic)
 OPENAI_API_KEY             # OpenAI API key (optional — needed if tasks assigned to OpenAI)
 DATAFORSEO_LOGIN           # DataForSEO API login
 DATAFORSEO_PASSWORD        # DataForSEO API password
-N8N_WEBHOOK_SECRET         # Shared secret for edge function auth (x-api-key header)
 RESEND_API_KEY             # Resend API key (transactional emails)
 VITE_SENTRY_DSN            # Sentry DSN (frontend + backend error monitoring)
 ETSY_API_KEY               # Etsy App API keystring
@@ -213,7 +208,6 @@ API_PORT                   # Express server port (defaults to 3001)
 - Protected routes wrap content with `ProtectedRoute` (redirects to `/login` if unauthenticated)
 - Supabase queries are made directly in page components (no abstraction layer)
 - Frontend calls `/api/seo/*` endpoints — in dev these are proxied to Express via Vite; in production they hit Vercel serverless functions directly
-- n8n webhook URL accessed via `import.meta.env.VITE_N8N_WEBHOOK_URL_TEST` — `analyseShop` in BrandProfilePage (currently hidden)
 - Node polyfills are enabled for buffer/process/util/stream (needed by @react-pdf/renderer)
 - The style guide document (`docs/styleguide.md`) is written in French
 - `tests/` contains test files; `pennyseo-audit.mjs` at root runs the codebase audit

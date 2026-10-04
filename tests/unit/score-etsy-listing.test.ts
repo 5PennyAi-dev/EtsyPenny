@@ -127,7 +127,7 @@ beforeEach(() => {
   vi.mocked(downloadAndUploadEtsyImage).mockResolvedValue('https://storage/new-image.jpg');
 
   process.env.VITE_SUPABASE_URL = 'https://test.supabase.co';
-  process.env.SUPABASE_SERVICE_ROLE_KEY = 'srk';
+  process.env.SUPABASE_SECRET_KEY = 'test-supabase-secret-key';
 });
 
 afterEach(() => {

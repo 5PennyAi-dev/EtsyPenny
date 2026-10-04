@@ -25,6 +25,7 @@ import { persistStrength } from './lib/seo/persist-strength.ts';
 import { applySEOFilter } from './lib/seo/filter-logic.ts';
 import { extractProductTypeWords } from './lib/seo/concept-diversity.ts';
 import { runResetPool } from './lib/seo/run-reset-pool.ts';
+import { getSupabaseEdgeHeaders, getSupabaseServerConfig } from './lib/supabase/config.ts';
 import { checkTokenBalance, deductTokens, checkQuota, incrementQuota } from './lib/tokens/token-middleware.ts';
 import { getStripe, PRICE_TO_PLAN, PRICE_TO_PACK, PLAN_TOKENS } from './lib/stripe/client.ts';
 import { sendEmail } from './lib/email/send-email.ts';
@@ -52,13 +53,11 @@ app.use((req, res, next) => {
 const PORT = process.env.API_PORT || 3001;
 
 // ─── ENV VALIDATION ───────────────────────────────────────
-const SUPABASE_URL         = process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const N8N_SECRET           = process.env.N8N_WEBHOOK_SECRET;
+const { url: SUPABASE_URL, secretKey: SUPABASE_SECRET_KEY } = getSupabaseServerConfig();
 
 for (const [name, val] of Object.entries({
   GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
-  SUPABASE_URL, SUPABASE_SERVICE_KEY, N8N_SECRET,
+  SUPABASE_URL, SUPABASE_SECRET_KEY,
   DATAFORSEO_LOGIN: process.env.DATAFORSEO_LOGIN,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
 })) {
@@ -66,7 +65,9 @@ for (const [name, val] of Object.entries({
 }
 
 // ─── SUPABASE CLIENT ──────────────────────────────────────
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 // ─── API ROUTE: POST /api/seo/analyze-image ───────────────
 app.post('/api/seo/analyze-image', async (req, res) => {
@@ -148,11 +149,7 @@ app.post('/api/seo/analyze-image', async (req, res) => {
     const edgeFnUrl = `${SUPABASE_URL}/functions/v1/save-image-analysis`;
     const saveResponse = await fetch(edgeFnUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-        'x-api-key': N8N_SECRET,
-      },
+      headers: getSupabaseEdgeHeaders(),
       body: JSON.stringify(finalAnalysis),
     });
 

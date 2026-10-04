@@ -25,7 +25,7 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-// ─── TEST DATA (from n8n pinned examples) ─────────────────
+// ─── TEST DATA (from archived workflow examples) ────────────
 
 const NICHE_TEST = {
   keywords: [

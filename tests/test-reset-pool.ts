@@ -2,14 +2,14 @@ import { createClient } from '@supabase/supabase-js';
 import { applySEOFilter, KeywordInput, FilterParameters } from '../lib/seo/filter-logic';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
   console.error("Missing Supabase credentials in .env");
   process.exit(1);
 }
 
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY);
 
 async function testSupabaseIntegration() {
   const listing_id = '407773d8-6f60-4f10-9cdd-c58aedd16624';

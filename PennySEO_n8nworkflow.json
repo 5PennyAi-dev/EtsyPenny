@@ -1621,7 +1621,7 @@
               "timestamp": "2026-02-16T02:54:59.480Z"
             }
           },
-          "webhookUrl": "https://n8n.srv840060.hstgr.cloud/webhook/9d856f4f-d5ae-4fce-b2da-72f584288dc2",
+          "webhookUrl": "https://example.invalid/webhook/redacted",
           "executionMode": "production"
         },
         "pairedItem": {

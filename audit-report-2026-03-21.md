@@ -9,7 +9,7 @@ Webhook URL references in active code:
 
   Legitimate (analyseShop + Edge Function auth):
   ℹ️  src\pages\BrandProfilePage.jsx:144 → const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL_TEST;
-  ℹ️  .env:19 → VITE_N8N_WEBHOOK_URL_TEST=https://n8n.srv840060.hstgr.cloud/webhook/9d856f4f-d5ae-4fce-b2da-72f584288dc2
+  ℹ️  .env:19 → VITE_N8N_WEBHOOK_URL_TEST=https://example.invalid/webhook/redacted
   ℹ️  .env:28 → N8N_WEBHOOK_SECRET=<REDACTED — Supabase secret key, see .env>
 
   Dead (should remove):

@@ -1,0 +1,8 @@
+[functions.save-seo]
+verify_jwt = false
+
+[functions.save-image-analysis]
+verify_jwt = false
+
+[functions.check-keyword-cache]
+verify_jwt = false

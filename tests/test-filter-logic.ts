@@ -6,7 +6,7 @@ function main() {
     const rawData = fs.readFileSync('../docs/Filter SEO 2.json', 'utf-8');
     const data = JSON.parse(rawData);
 
-    // Extract the mock data from the n8n JSON
+    // Extract the mock data from the archived workflow fixture
     const mockInput = data.pinData["When Executed by Another Workflow"][0].json;
     const keywords = mockInput.result as KeywordInput[];
 

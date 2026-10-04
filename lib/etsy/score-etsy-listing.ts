@@ -23,6 +23,7 @@ import { scoreKeywords } from '../seo/score-keywords.js';
 import { selectAndScore } from '../seo/select-and-score.js';
 import { persistSeo } from '../seo/persist-seo.js';
 import { runResetPool } from '../seo/run-reset-pool.js';
+import { getSupabaseEdgeHeaders, getSupabaseServerConfig } from '../supabase/config.js';
 
 const STATUS_NEW = 'ac083a90-43fa-4ff5-a62d-5cd6bb5edbcc';
 
@@ -174,17 +175,11 @@ export async function scoreEtsyListing(
 
     // Save via edge function
     const finalAnalysis = mergeAnalysisResults(listingId, visualAnalysis, taxonomyMapping);
-    const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
-    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const N8N_SECRET = process.env.N8N_WEBHOOK_SECRET || '';
+    const { url: supabaseUrl } = getSupabaseServerConfig();
 
-    const saveAnalysisRes = await fetch(`${SUPABASE_URL}/functions/v1/save-image-analysis`, {
+    const saveAnalysisRes = await fetch(`${supabaseUrl}/functions/v1/save-image-analysis`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'x-api-key': N8N_SECRET,
-      },
+      headers: getSupabaseEdgeHeaders(),
       body: JSON.stringify(finalAnalysis),
     });
     if (!saveAnalysisRes.ok) {
