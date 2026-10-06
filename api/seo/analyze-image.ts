@@ -56,13 +56,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Step 3: Taxonomy Retrieval (Supabase)
     const { createClient } = await import('@supabase/supabase-js');
     const { url: supabaseUrl, secretKey: supabaseKey } = getSupabaseServerConfig();
-    const supabaseAdmin = createClient(supabaseUrl, supabaseKey, {
+    const taxonomySupabase = createClient(supabaseUrl, supabaseKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
     const [themesResult, nichesResult] = await Promise.all([
-      supabaseAdmin.from('v_combined_themes').select('*'),
-      supabaseAdmin.from('v_combined_niches').select('*'),
+      taxonomySupabase.from('v_combined_themes').select('*'),
+      taxonomySupabase.from('v_combined_niches').select('*'),
     ]);
 
     if (themesResult.error) throw new Error(`Themes: ${themesResult.error.message}`);

@@ -1,0 +1,46 @@
+import { describe, expect, it, vi } from 'vitest';
+
+const CLIENT_KEY = '__analyze_image_client__';
+
+vi.mock('../../lib/supabase/server.js', () => ({
+  supabaseAdmin: new Proxy({}, { get: (_target, property) => (globalThis as any)[CLIENT_KEY][property] }),
+}));
+vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn(() => (globalThis as any).taxonomyClient) }));
+vi.mock('../../lib/ai/provider-router.js', () => ({
+  runAI: vi.fn()
+    .mockResolvedValueOnce({ text: JSON.stringify({ visual_analysis: { aesthetic_style: 'minimal' } }) })
+    .mockResolvedValueOnce({ text: JSON.stringify({ theme: 'Theme', niche: 'Niche', sub_niche: 'Sub' }) }),
+}));
+vi.mock('../../lib/ai/extract-json.js', () => ({ extractJson: (value: string) => value }));
+vi.mock('../../lib/tokens/token-middleware.js', () => ({
+  checkTokenBalance: vi.fn(async () => ({ allowed: true, required: 1 })),
+  deductTokens: vi.fn(async () => ({ success: true })),
+}));
+vi.mock('../../lib/supabase/config.js', () => ({
+  getSupabaseServerConfig: () => ({ url: 'https://example.supabase.co', secretKey: 'test-key' }),
+  getSupabaseEdgeHeaders: () => ({ 'Content-Type': 'application/json', apikey: 'test-key' }),
+}));
+vi.mock('../../lib/sentry.js', () => ({ initSentry: vi.fn(), Sentry: { captureException: vi.fn() } }));
+
+import handler from '../../api/seo/analyze-image.js';
+
+function response() {
+  return { statusCode: 200, body: undefined as any, status(code: number) { this.statusCode = code; return this; }, json(body: any) { this.body = body; return this; } };
+}
+
+it('reaches taxonomy lookup for an authenticated owner without a temporal-dead-zone error', async () => {
+  const listingChain: any = { select: vi.fn(() => listingChain), eq: vi.fn(() => listingChain), maybeSingle: vi.fn(async () => ({ data: { id: 'owned-listing' }, error: null })) };
+  (globalThis as any)[CLIENT_KEY] = {
+    auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'owner' } }, error: null })) },
+    from: vi.fn(() => listingChain),
+  };
+  const taxonomyChain = (rows: any[]) => ({ select: vi.fn(async () => ({ data: rows, error: null })) });
+  (globalThis as any).taxonomyClient = { from: vi.fn((table: string) => taxonomyChain(table === 'v_combined_themes' ? [] : [])) };
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, text: async () => '' })));
+  const res = response();
+
+  await handler({ method: 'POST', headers: { authorization: 'Bearer test-token' }, body: { listing_id: 'owned-listing', mockup_url: 'https://image.example/test.png' } } as any, res as any);
+
+  expect(res.statusCode).toBe(200);
+  expect((globalThis as any).taxonomyClient.from).toHaveBeenCalledWith('v_combined_themes');
+});
