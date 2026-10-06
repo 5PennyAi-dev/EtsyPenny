@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getStripe } from '../../lib/stripe/client.js';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -10,18 +11,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId' });
-    }
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
 
     const stripe = getStripe();
 
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('stripe_customer_id')
-      .eq('id', userId)
+      .eq('id', user.id)
       .single();
 
     if (!profile?.stripe_customer_id) {
@@ -35,10 +32,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return_url: `${appUrl}/billing`,
     });
 
-    console.info(`[create-portal] user=${userId}`);
+    console.info(`[create-portal] user=${user.id}`);
     return res.json({ url: session.url });
 
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[create-portal] Error:', message);

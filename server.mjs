@@ -42,6 +42,7 @@ import etsyOauthExchange from './api/etsy/oauth/exchange.ts';
 import etsyOauthDisconnect from './api/etsy/oauth/disconnect.ts';
 import { checkRateLimit } from './lib/help/rate-limit.ts';
 import { streamHelpReply, ChatInputError } from './lib/help/chat-service.ts';
+import { verifyRequestUser, AuthError } from './lib/auth/verify-request-user.ts';
 
 const app = express();
 // JSON body parser for all routes EXCEPT Stripe webhook (needs raw body)
@@ -1385,9 +1386,10 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 // ─── API ROUTE: POST /api/stripe/create-checkout ──────────
 app.post('/api/stripe/create-checkout', async (req, res) => {
   try {
-    const { priceId, userId, mode } = req.body;
-    if (!priceId || !userId || !mode) {
-      return res.status(400).json({ error: 'Missing priceId, userId, or mode' });
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const { priceId, mode } = req.body;
+    if (!priceId || !mode) {
+      return res.status(400).json({ error: 'Missing priceId or mode' });
     }
 
     const stripe = getStripe();
@@ -1395,19 +1397,19 @@ app.post('/api/stripe/create-checkout', async (req, res) => {
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('stripe_customer_id, full_name')
-      .eq('id', userId)
+      .eq('id', user.id)
       .single();
 
     let customerId = profile?.stripe_customer_id;
     if (!customerId) {
       const customer = await stripe.customers.create({
-        metadata: { user_id: userId },
+        metadata: { user_id: user.id },
       });
       customerId = customer.id;
       await supabaseAdmin
         .from('profiles')
         .update({ stripe_customer_id: customerId })
-        .eq('id', userId);
+        .eq('id', user.id);
     }
 
     const appUrl = process.env.APP_URL || 'http://localhost:5173';
@@ -1419,13 +1421,16 @@ app.post('/api/stripe/create-checkout', async (req, res) => {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${appUrl}/billing?success=true`,
       cancel_url: `${appUrl}/billing?canceled=true`,
-      metadata: { user_id: userId },
+      metadata: { user_id: user.id },
     });
 
-    console.log(`   ✅ [create-checkout] session=${session.id} user=${userId} mode=${mode}`);
+    console.log(`   ✅ [create-checkout] session=${session.id} user=${user.id} mode=${mode}`);
     return res.json({ url: session.url });
 
   } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('[create-checkout] Error:', error.message || error);
     return res.status(500).json({ error: 'Failed to create checkout session', details: error.message });
   }
@@ -1434,17 +1439,14 @@ app.post('/api/stripe/create-checkout', async (req, res) => {
 // ─── API ROUTE: POST /api/stripe/create-portal ────────────
 app.post('/api/stripe/create-portal', async (req, res) => {
   try {
-    const { userId } = req.body;
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId' });
-    }
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
 
     const stripe = getStripe();
 
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('stripe_customer_id')
-      .eq('id', userId)
+      .eq('id', user.id)
       .single();
 
     if (!profile?.stripe_customer_id) {
@@ -1458,10 +1460,13 @@ app.post('/api/stripe/create-portal', async (req, res) => {
       return_url: `${appUrl}/billing`,
     });
 
-    console.log(`   ✅ [create-portal] user=${userId}`);
+    console.log(`   ✅ [create-portal] user=${user.id}`);
     return res.json({ url: session.url });
 
   } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('[create-portal] Error:', error.message || error);
     return res.status(500).json({ error: 'Failed to create portal session', details: error.message });
   }

@@ -68,7 +68,11 @@ const BillingPage = () => {
   async function handleOpenPortal() {
     setPortalLoading(true);
     try {
-      const res = await axios.post('/api/stripe/create-portal', { userId: user.id });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
+      const res = await axios.post('/api/stripe/create-portal', {}, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       window.location.href = res.data.url;
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to open billing portal');
@@ -79,10 +83,13 @@ const BillingPage = () => {
   async function handleBuyPack(priceId) {
     setLoadingPack(priceId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
       const res = await axios.post('/api/stripe/create-checkout', {
         priceId,
-        userId: user.id,
         mode: 'payment',
+      }, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       window.location.href = res.data.url;
     } catch (err) {

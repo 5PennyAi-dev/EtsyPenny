@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Check, Zap, Crown, Rocket, Sparkles, ChevronDown, Shield, Package, Coins } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import logo from '../assets/pennyseo-logo.png';
 import HelpLink from '../components/ui/HelpLink';
 
@@ -103,10 +104,13 @@ const PricingPage = () => {
     }
     setLoadingPlan(priceId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
       const res = await axios.post('/api/stripe/create-checkout', {
         priceId,
-        userId: user.id,
         mode: 'subscription',
+      }, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       window.location.href = res.data.url;
     } catch (err) {
@@ -122,10 +126,13 @@ const PricingPage = () => {
     }
     setLoadingPack(priceId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
       const res = await axios.post('/api/stripe/create-checkout', {
         priceId,
-        userId: user.id,
         mode: 'payment',
+      }, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       window.location.href = res.data.url;
     } catch (err) {

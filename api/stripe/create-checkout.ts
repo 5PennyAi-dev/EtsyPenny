@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getStripe } from '../../lib/stripe/client.js';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -10,18 +11,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { priceId, userId, mode } = req.body;
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const { priceId, mode } = req.body;
     // mode: 'subscription' | 'payment'
 
-    console.log('[create-checkout] received:', { priceId, userId, mode });
+    console.log('[create-checkout] received:', { priceId, mode });
 
-    if (!priceId || !userId || !mode) {
+    if (!priceId || !mode) {
       console.error('[create-checkout] 400 — missing field:', {
         priceId: priceId ?? 'MISSING',
-        userId: userId ?? 'MISSING',
         mode: mode ?? 'MISSING',
       });
-      return res.status(400).json({ error: 'Missing priceId, userId, or mode' });
+      return res.status(400).json({ error: 'Missing priceId or mode' });
     }
 
     const stripe = getStripe();
@@ -30,19 +31,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('stripe_customer_id, full_name')
-      .eq('id', userId)
+      .eq('id', user.id)
       .single();
 
     let customerId = profile?.stripe_customer_id;
     if (!customerId) {
       const customer = await stripe.customers.create({
-        metadata: { user_id: userId },
+        metadata: { user_id: user.id },
       });
       customerId = customer.id;
       await supabaseAdmin
         .from('profiles')
         .update({ stripe_customer_id: customerId })
-        .eq('id', userId);
+        .eq('id', user.id);
     }
 
     const appUrl = process.env.APP_URL || 'http://localhost:5173';
@@ -55,13 +56,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       allow_promotion_codes: true,
       success_url: `${appUrl}/billing?success=true`,
       cancel_url: `${appUrl}/billing?canceled=true`,
-      metadata: { user_id: userId },
+      metadata: { user_id: user.id },
     });
 
-    console.info(`[create-checkout] session=${session.id} user=${userId} mode=${mode}`);
+    console.info(`[create-checkout] session=${session.id} user=${user.id} mode=${mode}`);
     return res.json({ url: session.url });
 
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[create-checkout] Error:', message);
