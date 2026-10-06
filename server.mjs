@@ -70,6 +70,33 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+const protectedSeoPaths = new Set([
+  '/analyze-image', '/generate-keywords', '/reset-pool', '/recalculate-scores',
+  '/generate-draft', '/refresh-keyword-bank', '/user-keyword', '/add-from-favorite',
+]);
+app.use('/api/seo', async (req, res, next) => {
+  if (req.method !== 'POST' || !protectedSeoPaths.has(req.path)) return next();
+  try {
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    if (req.body && typeof req.body === 'object') req.body.user_id = user.id;
+    if (req.body?.listing_id) {
+      const { data: listing } = await supabaseAdmin
+        .from('listings').select('id').eq('id', req.body.listing_id).eq('user_id', user.id).maybeSingle();
+      if (!listing) return res.status(404).json({ error: 'Listing not found' });
+    }
+    if (req.path === '/refresh-keyword-bank') {
+      const ids = req.body?.keyword_bank_ids;
+      if (!Array.isArray(ids) || ids.length !== req.body?.tags?.length) return res.status(400).json({ error: 'keyword_bank_ids must match tags' });
+      const { data: rows } = await supabaseAdmin.from('user_keyword_bank').select('id').eq('user_id', user.id).in('id', ids);
+      if (!rows || rows.length !== ids.length) return res.status(403).json({ error: 'One or more keywords do not belong to this user' });
+    }
+    next();
+  } catch (error) {
+    if (error instanceof AuthError) return res.status(error.status).json({ error: error.message });
+    next(error);
+  }
+});
+
 // ─── API ROUTE: POST /api/seo/analyze-image ───────────────
 app.post('/api/seo/analyze-image', async (req, res) => {
   try {

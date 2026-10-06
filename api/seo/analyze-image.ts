@@ -11,6 +11,8 @@ import {
 import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 import { getSupabaseEdgeHeaders, getSupabaseServerConfig } from '../../lib/supabase/config.js';
+import { supabaseAdmin } from '../../lib/supabase/server.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   initSentry();
@@ -21,15 +23,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const {
       listing_id,
-      user_id,
       mockup_url,
       product_type = '',
       client_description = '',
     } = req.body;
 
-    if (!listing_id || !mockup_url || !user_id) {
-      return res.status(400).json({ error: 'Missing required fields: listing_id, user_id, and mockup_url' });
-    }
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
+    if (!listing_id || !mockup_url) return res.status(400).json({ error: 'Missing required fields: listing_id and mockup_url' });
+    const { data: listing } = await supabaseAdmin.from('listings').select('id').eq('id', listing_id).eq('user_id', user_id).maybeSingle();
+    if (!listing) return res.status(404).json({ error: 'Listing not found' });
 
     console.info(`[analyze-image] listing=${listing_id}`);
 
@@ -104,6 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.json(finalAnalysis);
 
   } catch (error: unknown) {
+    if (error instanceof AuthError) return res.status(error.status).json({ error: error.message });
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [analyze-image] Error:', message);

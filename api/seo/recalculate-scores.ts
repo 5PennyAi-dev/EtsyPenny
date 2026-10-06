@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { selectAndScore } from '../../lib/seo/select-and-score.js';
 import { persistStrength } from '../../lib/seo/persist-strength.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   initSentry();
@@ -12,6 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { listing_id, selected_keywords } = req.body;
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
     if (!listing_id || !selected_keywords?.length) {
       return res.status(400).json({ error: 'Missing listing_id or selected_keywords' });
     }
@@ -23,6 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('listings')
       .select('user_id')
       .eq('id', listing_id)
+      .eq('user_id', user.id)
       .single();
 
     if (listingError || !listing) throw listingError || new Error('Listing not found');
@@ -64,6 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.json({ success: true, strength });
 
   } catch (error: unknown) {
+    if (error instanceof AuthError) return res.status(error.status).json({ error: error.message });
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [recalculate-scores] Error:', message);

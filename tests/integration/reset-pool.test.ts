@@ -59,7 +59,13 @@ vi.mock('../../lib/logic/analyse-image-logic.ts', () => ({
 
 // ── Import app AFTER mocks ───────────────────────────────
 import { app } from '../../server.mjs';
-import request from 'supertest';
+import supertest from 'supertest';
+const request = (expressApp: Parameters<typeof supertest>[0]) => {
+  const agent = supertest(expressApp);
+  const post = agent.post.bind(agent);
+  agent.post = ((path: string) => post(path).set('Authorization', 'Bearer test-token')) as typeof agent.post;
+  return agent;
+};
 
 // ── Test data ────────────────────────────────────────────
 const LISTING_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
@@ -98,6 +104,24 @@ describe('POST /api/seo/reset-pool', () => {
   beforeEach(() => {
     resetSupabaseMocks();
     vi.clearAllMocks();
+    mockSupabaseResponse('listings', [{ user_id: USER_ID }]);
+  });
+
+  it('returns 401 without a bearer token', async () => {
+    const res = await supertest(app).post('/api/seo/reset-pool').send({ listing_id: LISTING_ID });
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 401 for an invalid bearer token', async () => {
+    (mockSupabaseClient.auth.getUser as any).mockResolvedValueOnce({ data: { user: null }, error: new Error('invalid') });
+    const res = await supertest(app).post('/api/seo/reset-pool').set('Authorization', 'Bearer invalid-token').send({ listing_id: LISTING_ID });
+    expect(res.status).toBe(401);
+  });
+
+  it('refuses a listing that is not owned before resetting its pool', async () => {
+    mockSupabaseResponse('listings', []);
+    const res = await request(app).post('/api/seo/reset-pool').send({ listing_id: 'third-party-listing' });
+    expect(res.status).toBe(404);
   });
 
   it('returns 400 if listing_id is missing', async () => {

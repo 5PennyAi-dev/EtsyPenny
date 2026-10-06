@@ -87,6 +87,12 @@ function createQueryBuilder(table: string) {
 
 /** The mock Supabase client — exported for vi.mock() factory. */
 export const mockSupabaseClient = {
+  auth: {
+    getUser: vi.fn(async () => ({
+      data: { user: { id: 'u1u2u3u4-u5u6-7890-abcd-000000000001', email: null } },
+      error: null,
+    })),
+  },
   from: vi.fn((table: string) => createQueryBuilder(table)),
   rpc: vi.fn(() => Promise.resolve({ data: null, error: null })),
 };

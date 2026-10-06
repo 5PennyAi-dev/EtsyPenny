@@ -23,7 +23,13 @@ vi.mock('../../lib/ai/extract-json.ts', () => ({ extractJson: vi.fn((text: strin
 vi.mock('../../lib/logic/analyse-image-logic.ts', () => ({ PROMPT_VISUAL_ANALYST: '', formatTaxonomyLists: vi.fn(() => ''), buildVisualAnalysisContext: vi.fn(() => ''), buildTaxonomyPrompt: vi.fn(() => ''), mergeAnalysisResults: vi.fn(() => ({})) }));
 
 import { app } from '../../server.mjs';
-import request from 'supertest';
+import supertest from 'supertest';
+const request = (expressApp: Parameters<typeof supertest>[0]) => {
+  const agent = supertest(expressApp);
+  const post = agent.post.bind(agent);
+  agent.post = ((path: string) => post(path).set('Authorization', 'Bearer test-token')) as typeof agent.post;
+  return agent;
+};
 import { LISTING_ID, USER_ID } from './_mock-setup.js';
 
 function makeSelectedKeywords(count = 5) {

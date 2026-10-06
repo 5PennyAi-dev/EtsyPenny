@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { runResetPool } from '../../lib/seo/run-reset-pool.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
+import { supabaseAdmin } from '../../lib/supabase/server.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   initSentry();
@@ -10,9 +12,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { listing_id } = req.body;
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
     if (!listing_id) {
       return res.status(400).json({ error: 'Missing listing_id' });
     }
+    const { data: listing } = await supabaseAdmin.from('listings').select('id').eq('id', listing_id).eq('user_id', user.id).maybeSingle();
+    if (!listing) return res.status(404).json({ error: 'Listing not found' });
 
     console.info(`[reset-pool] listing=${listing_id}`);
 
@@ -22,6 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.json({ success: true, ...result });
 
   } catch (error: unknown) {
+    if (error instanceof AuthError) return res.status(error.status).json({ error: error.message });
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [reset-pool] Error:', message);

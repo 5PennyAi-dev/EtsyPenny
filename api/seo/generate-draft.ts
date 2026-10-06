@@ -4,6 +4,7 @@ import { runAI } from '../../lib/ai/provider-router.js';
 import { extractJson } from '../../lib/ai/extract-json.js';
 import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 const STATUS_COMPLETE = '28a11ca0-bcfc-42e0-971d-efc320f78424';
 
@@ -14,11 +15,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    let { listing_id, user_id, keywords, image_url, visual_analysis, categorization, product_details, shop_context } = req.body;
+    let { listing_id, keywords, image_url, visual_analysis, categorization, product_details, shop_context } = req.body;
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
 
-    if (!listing_id || !user_id) {
-      return res.status(400).json({ error: 'Missing listing_id or user_id' });
-    }
+    if (!listing_id) return res.status(400).json({ error: 'Missing listing_id' });
+    const { data: ownedListing } = await supabaseAdmin.from('listings').select('id').eq('id', listing_id).eq('user_id', user_id).maybeSingle();
+    if (!ownedListing) return res.status(404).json({ error: 'Listing not found' });
 
     // If keywords not provided (e.g. bulk action), fetch from DB
     if (!keywords?.length) {
@@ -26,6 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .from('listings')
         .select('*')
         .eq('id', listing_id)
+        .eq('user_id', user_id)
         .single();
 
       const { data: kwRows } = await supabaseAdmin
@@ -233,6 +237,7 @@ Respond with ONLY this JSON, no other text:
     return res.json({ success: true, title, description });
 
   } catch (error: unknown) {
+    if (error instanceof AuthError) return res.status(error.status).json({ error: error.message });
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [generate-draft] Error:', message);

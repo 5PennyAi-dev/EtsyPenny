@@ -7,6 +7,7 @@ import { selectAndScore } from '../../lib/seo/select-and-score.js';
 import { extractProductTypeWords } from '../../lib/seo/concept-diversity.js';
 import { checkQuota, incrementQuota } from '../../lib/tokens/token-middleware.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   initSentry();
@@ -15,13 +16,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const t0 = Date.now();
-  const { listing_id, keyword, user_id } = req.body;
-
-  if (!listing_id || !keyword || !user_id) {
-    return res.status(400).json({ error: 'Missing listing_id, user_id, or keyword' });
-  }
+  const { listing_id, keyword } = req.body;
 
   try {
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
+    if (!listing_id || !keyword) return res.status(400).json({ error: 'Missing listing_id or keyword' });
     // Quota check
     const quotaCheck = await checkQuota(user_id, 'add_custom');
     if (!quotaCheck.allowed) {
@@ -36,6 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('listings')
       .select('*')
       .eq('id', listing_id)
+      .eq('user_id', user_id)
       .single();
 
     if (listingError || !listing) throw new Error('Listing not found');
@@ -180,6 +181,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
   } catch (error: unknown) {
+    if (error instanceof AuthError) return res.status(error.status).json({ error: error.message });
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [user-keyword] Error:', message);

@@ -43,7 +43,13 @@ vi.mock('../../lib/ai/extract-json.ts', () => ({ extractJson: vi.fn((text: strin
 vi.mock('../../lib/logic/analyse-image-logic.ts', () => ({ PROMPT_VISUAL_ANALYST: '', formatTaxonomyLists: vi.fn(() => ''), buildVisualAnalysisContext: vi.fn(() => ''), buildTaxonomyPrompt: vi.fn(() => ''), mergeAnalysisResults: vi.fn(() => ({})) }));
 
 import { app } from '../../server.mjs';
-import request from 'supertest';
+import supertest from 'supertest';
+const request = (expressApp: Parameters<typeof supertest>[0]) => {
+  const agent = supertest(expressApp);
+  const post = agent.post.bind(agent);
+  agent.post = ((path: string) => post(path).set('Authorization', 'Bearer test-token')) as typeof agent.post;
+  return agent;
+};
 import { LISTING_ID, USER_ID, PRODUCT_TYPE_ID, makeListing, makeKeywords } from './_mock-setup.js';
 
 function setupDefaultMocks() {
@@ -58,6 +64,7 @@ describe('POST /api/seo/user-keyword', () => {
   beforeEach(() => {
     resetSupabaseMocks();
     vi.clearAllMocks();
+    mockSupabaseResponse('listings', [makeListing()]);
     checkQuotaMock.mockResolvedValue({ allowed: true });
   });
 
@@ -67,10 +74,9 @@ describe('POST /api/seo/user-keyword', () => {
     expect(res.body.error).toBe('Missing listing_id, user_id, or keyword');
   });
 
-  it('returns 400 if user_id is missing', async () => {
+  it('derives the user from the bearer token when user_id is absent', async () => {
     const res = await request(app).post('/api/seo/user-keyword').send({ listing_id: LISTING_ID, keyword: 'test' });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Missing listing_id, user_id, or keyword');
+    expect(res.status).toBe(200);
   });
 
   it('returns 400 if keyword is missing', async () => {

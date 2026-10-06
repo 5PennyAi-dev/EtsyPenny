@@ -8,6 +8,7 @@ import { persistSeo } from '../../lib/seo/persist-seo.js';
 import { runResetPool } from '../../lib/seo/run-reset-pool.js';
 import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 const STATUS_SEO_DONE = '35660e24-94bb-4586-aa5a-a5027546b4a1';
 
@@ -20,16 +21,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const t0 = Date.now();
   try {
     const {
-      listing_id, user_id,
+      listing_id,
       product_type: bodyProductType, theme: bodyTheme, niche: bodyNiche, sub_niche: bodySub,
       client_description: bodyDesc, visual_aesthetic: bodyAesthetic, visual_target_audience: bodyAudience,
       visual_overall_vibe: bodyVibe, visual_colors: bodyColors, visual_graphics: bodyGraphics,
       parameters = {},
     } = req.body;
 
-    if (!listing_id || !user_id) {
-      return res.status(400).json({ error: 'Missing required fields: listing_id and user_id' });
-    }
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
+    if (!listing_id) return res.status(400).json({ error: 'Missing required field: listing_id' });
+    const { data: ownedListing } = await supabaseAdmin.from('listings').select('id').eq('id', listing_id).eq('user_id', user_id).maybeSingle();
+    if (!ownedListing) return res.status(404).json({ error: 'Listing not found' });
 
     // Token check (generate_keywords vs rerun_keywords cost determined inside)
     const tokenCheck = await checkTokenBalance(user_id, 'generate_keywords', listing_id);
@@ -139,6 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
   } catch (error: unknown) {
+    if (error instanceof AuthError) return res.status(error.status).json({ error: error.message });
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [generate-keywords] Error:', message);
