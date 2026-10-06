@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { downloadAndUploadEtsyImage } from '../../lib/etsy/prepare-etsy-image.js';
 import { matchProductType } from '../../lib/etsy/match-product-type.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 const STATUS_NEW = 'ac083a90-43fa-4ff5-a62d-5cd6bb5edbcc';
 
@@ -14,10 +15,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { user_id, etsy_listing_id } = req.body;
+    const { etsy_listing_id } = req.body;
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
 
-    if (!user_id || !etsy_listing_id) {
-      return res.status(400).json({ error: 'Missing required fields: user_id, etsy_listing_id' });
+    if (!etsy_listing_id) {
+      return res.status(400).json({ error: 'Missing required field: etsy_listing_id' });
     }
 
     console.info(`[prepare-listing] user=${user_id} etsy_listing=${etsy_listing_id}`);
@@ -27,14 +30,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('etsy_listings')
       .select('id, etsy_listing_id, listing_id, original_title, original_description, original_image_url, user_id, etsy_category')
       .eq('id', etsy_listing_id)
+      .eq('user_id', user_id)
       .single();
 
     if (fetchErr || !etsyListing) {
       return res.status(404).json({ error: 'Etsy listing not found' });
-    }
-
-    if (etsyListing.user_id !== user_id) {
-      return res.status(403).json({ error: 'Listing does not belong to this user' });
     }
 
     // ── 2. Idempotent: return existing if already prepared ─
@@ -96,6 +96,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.json({ listing_id: listing.id, image_url: listing.image_url });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [prepare-listing] Error:', message);

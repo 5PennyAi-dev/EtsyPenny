@@ -1476,10 +1476,8 @@ app.post('/api/stripe/create-portal', async (req, res) => {
 
 app.get('/api/etsy/shop-listings', async (req, res) => {
   try {
-    const user_id = req.query.user_id;
-    if (!user_id) {
-      return res.status(400).json({ error: 'Missing required query param: user_id' });
-    }
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
 
     const limit = Math.min(Number(req.query.limit) || 25, 100);
     const offset = Number(req.query.offset) || 0;
@@ -1525,6 +1523,9 @@ app.get('/api/etsy/shop-listings', async (req, res) => {
 
     return res.json({ count: data.count, results });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('❌ [shop-listings] Error:', error.message);
     return res.status(500).json({ error: 'Failed to fetch shop listings', details: error.message });
   }
@@ -1532,10 +1533,12 @@ app.get('/api/etsy/shop-listings', async (req, res) => {
 
 app.post('/api/etsy/import-listings', async (req, res) => {
   try {
-    const { user_id, etsy_listing_ids } = req.body;
+    const { etsy_listing_ids } = req.body;
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
 
-    if (!user_id || !Array.isArray(etsy_listing_ids) || etsy_listing_ids.length === 0) {
-      return res.status(400).json({ error: 'Missing required fields: user_id, etsy_listing_ids (non-empty array)' });
+    if (!Array.isArray(etsy_listing_ids) || etsy_listing_ids.length === 0) {
+      return res.status(400).json({ error: 'Missing required field: etsy_listing_ids (non-empty array)' });
     }
 
     console.info(`📥 [import-listings] user=${user_id} requested=${etsy_listing_ids.length}`);
@@ -1663,6 +1666,9 @@ app.post('/api/etsy/import-listings', async (req, res) => {
       listings: inserted,
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('❌ [import-listings] Error:', error.message);
     return res.status(500).json({ error: 'Failed to import listings', details: error.message });
   }
@@ -1670,10 +1676,12 @@ app.post('/api/etsy/import-listings', async (req, res) => {
 
 app.post('/api/etsy/score-listings', async (req, res) => {
   try {
-    const { user_id, etsy_listing_ids } = req.body;
+    const { etsy_listing_ids } = req.body;
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
 
-    if (!user_id || !Array.isArray(etsy_listing_ids) || etsy_listing_ids.length === 0) {
-      return res.status(400).json({ error: 'Missing required fields: user_id, etsy_listing_ids (non-empty array)' });
+    if (!Array.isArray(etsy_listing_ids) || etsy_listing_ids.length === 0) {
+      return res.status(400).json({ error: 'Missing required field: etsy_listing_ids (non-empty array)' });
     }
 
     if (etsy_listing_ids.length > 5) {
@@ -1750,6 +1758,9 @@ app.post('/api/etsy/score-listings', async (req, res) => {
       tokens_deducted: tokensDeducted,
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('❌ [score-listings] Error:', error.message);
     return res.status(500).json({ error: 'Failed to score listings', details: error.message });
   }
@@ -1758,10 +1769,12 @@ app.post('/api/etsy/score-listings', async (req, res) => {
 // ─── ETSY PREPARE (direct-to-Studio, free) ───────────────
 app.post('/api/etsy/prepare-listing', async (req, res) => {
   try {
-    const { user_id, etsy_listing_id } = req.body;
+    const { etsy_listing_id } = req.body;
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
 
-    if (!user_id || !etsy_listing_id) {
-      return res.status(400).json({ error: 'Missing required fields: user_id, etsy_listing_id' });
+    if (!etsy_listing_id) {
+      return res.status(400).json({ error: 'Missing required field: etsy_listing_id' });
     }
 
     console.info(`\n📦 [prepare-listing] user=${user_id} etsy_listing=${etsy_listing_id}`);
@@ -1771,15 +1784,12 @@ app.post('/api/etsy/prepare-listing', async (req, res) => {
       .from('etsy_listings')
       .select('id, etsy_listing_id, listing_id, original_title, original_description, original_image_url, user_id, etsy_category')
       .eq('id', etsy_listing_id)
+      .eq('user_id', user_id)
       .single();
 
     if (fetchErr || !etsyListing) {
       return res.status(404).json({ error: 'Etsy listing not found' });
     }
-    if (etsyListing.user_id !== user_id) {
-      return res.status(403).json({ error: 'Listing does not belong to this user' });
-    }
-
     // 2. Idempotent: return existing if already prepared
     if (etsyListing.listing_id) {
       const { data: existing } = await supabaseAdmin
@@ -1840,6 +1850,9 @@ app.post('/api/etsy/prepare-listing', async (req, res) => {
 
     return res.json({ listing_id: listing.id, image_url: listing.image_url });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('❌ [prepare-listing] Error:', error.message);
     return res.status(500).json({ error: 'Failed to prepare listing', details: error.message });
   }
@@ -1848,11 +1861,10 @@ app.post('/api/etsy/prepare-listing', async (req, res) => {
 // ─── ETSY EXPORT ─────────────────────────────────────────
 app.post('/api/etsy/export-listings', async (req, res) => {
   try {
-    const { user_id, listings } = req.body;
+    const { listings } = req.body;
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
 
-    if (!user_id) {
-      return res.status(401).json({ error: 'Missing user_id' });
-    }
     if (!Array.isArray(listings) || listings.length === 0) {
       return res.status(400).json({ error: 'Missing or empty listings array' });
     }
@@ -1914,6 +1926,7 @@ app.post('/api/etsy/export-listings', async (req, res) => {
           .from('listings')
           .select('generated_title, generated_description')
           .eq('id', listing_id)
+          .eq('user_id', user_id)
           .single();
 
         if (plErr || !pennyListing) {
@@ -2036,6 +2049,9 @@ app.post('/api/etsy/export-listings', async (req, res) => {
       summary: { total: results.length, success: successCount, errors: results.length - successCount },
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('❌ [export-listings] Error:', error.message);
     return res.status(500).json({ error: 'Failed to export listings', details: error.message });
   }

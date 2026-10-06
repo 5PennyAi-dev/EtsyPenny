@@ -112,6 +112,9 @@ function makeMinimalSupabase() {
     return Object.assign(Promise.resolve({ count: 0, data: [], error: null }), chain);
   });
   return {
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1', email: null } }, error: null }),
+    },
     from: vi.fn(() => chain),
   };
 }
@@ -132,7 +135,7 @@ afterEach(() => {
 
 describe('GET /api/etsy/shop-listings — connection branches', () => {
   function makeReq() {
-    return { method: 'GET', query: { user_id: 'user-1', limit: '5' }, headers: {} } as any;
+    return { method: 'GET', query: { limit: '5' }, headers: { authorization: 'Bearer valid-token' } } as any;
   }
 
   it('returns 409 NO_ETSY_CONNECTION when no connection exists', async () => {
@@ -183,8 +186,8 @@ describe('POST /api/etsy/import-listings — connection branches', () => {
     return {
       method: 'POST',
       query: {},
-      headers: {},
-      body: { user_id: 'user-1', etsy_listing_ids: [101] },
+      headers: { authorization: 'Bearer valid-token' },
+      body: { etsy_listing_ids: [101] },
     } as any;
   }
 
@@ -225,9 +228,8 @@ describe('POST /api/etsy/export-listings — connection branches', () => {
     return {
       method: 'POST',
       query: {},
-      headers: {},
+      headers: { authorization: 'Bearer valid-token' },
       body: {
-        user_id: 'user-1',
         listings: [{ etsy_listing_id: 1, listing_id: 'pl-1', fields: ['title'] }],
       },
     } as any;

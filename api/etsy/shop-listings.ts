@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { fetchShopListings } from '../../lib/etsy/etsy-client.js';
 import { getActiveConnection, EtsyConnectionError } from '../../lib/etsy/get-connection.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   initSentry();
@@ -12,10 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const user_id = req.query.user_id as string;
-    if (!user_id) {
-      return res.status(400).json({ error: 'Missing required query param: user_id' });
-    }
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
 
     const limit = Math.min(Number(req.query.limit) || 25, 100);
     const offset = Number(req.query.offset) || 0;
@@ -23,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let connection;
     try {
-      connection = await getActiveConnection(user_id, supabaseAdmin);
+      connection = await getActiveConnection(user.id, supabaseAdmin);
     } catch (err: unknown) {
       if (err instanceof EtsyConnectionError) {
         if (err.code === 'NO_CONNECTION') {
@@ -41,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw err;
     }
 
-    console.info(`[shop-listings] user=${user_id} limit=${limit} offset=${offset}`);
+    console.info(`[shop-listings] user=${user.id} limit=${limit} offset=${offset}`);
 
     const data = await fetchShopListings(connection, { limit, offset, state });
 
@@ -62,6 +60,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.json({ count: data.count, results });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [shop-listings] Error:', message);

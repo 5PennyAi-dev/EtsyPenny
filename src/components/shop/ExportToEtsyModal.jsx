@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle, Check, ChevronDown, ChevronUp, ExternalLink, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
+import { supabase } from '@/lib/supabase';
 
 // ─── Tags Diff Helper ────────────────────────────────────
 
@@ -181,7 +182,7 @@ const fieldAvailable = (listing, field) => {
   return false;
 };
 
-const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [], user }) => {
+const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [] }) => {
   const isSingle = listings.length === 1;
 
   // Global defaults (batch mode)
@@ -267,8 +268,9 @@ const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [], user }) 
     setIsExporting(true);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Your session has expired. Please sign in again.');
       const payload = {
-        user_id: user?.id,
         listings: listings.map((listing, i) => ({
           etsy_listing_id: listing.etsy_listing_id,
           listing_id: listing.listing_id,
@@ -284,7 +286,9 @@ const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [], user }) 
         return;
       }
 
-      const { data } = await axios.post('/api/etsy/export-listings', payload);
+      const { data } = await axios.post('/api/etsy/export-listings', payload, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
 
       if (data.summary.errors === 0) {
         toast.success(`Successfully pushed to Etsy`);

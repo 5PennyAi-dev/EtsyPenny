@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { updateEtsyListing } from '../../lib/etsy/etsy-client.js';
 import { getActiveConnection, EtsyConnectionError } from '../../lib/etsy/get-connection.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   initSentry();
@@ -12,13 +13,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { user_id, listings } = req.body;
+    const { listings } = req.body;
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
 
     // ── 1. Validate input ───────────────────────────────
-    if (!user_id) {
-      return res.status(401).json({ error: 'Missing user_id' });
-    }
-
     if (!Array.isArray(listings) || listings.length === 0) {
       return res.status(400).json({ error: 'Missing or empty listings array' });
     }
@@ -89,6 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .from('listings')
           .select('generated_title, generated_description')
           .eq('id', listing_id)
+          .eq('user_id', user_id)
           .single();
 
         if (plErr || !pennyListing) {
@@ -226,6 +226,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [export-listings] Error:', message);

@@ -75,6 +75,12 @@ export default function MyShopPage() {
   const [exportModalData, setExportModalData] = useState([]);
   const [preparingListingId, setPreparingListingId] = useState(null);
 
+  const getAuthHeaders = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error('Your session has expired. Please sign in again.');
+    return { Authorization: `Bearer ${session.access_token}` };
+  }, []);
+
   // Plan-based import limit
   const [planImportLimit, setPlanImportLimit] = useState(10);
   useEffect(() => {
@@ -211,8 +217,10 @@ export default function MyShopPage() {
     if (!user) return;
     setIsLoading(true);
     try {
+      const headers = await getAuthHeaders();
       const { data } = await axios.get('/api/etsy/shop-listings', {
-        params: { user_id: user.id, limit: 25, offset },
+        params: { limit: 25, offset },
+        headers,
       });
       setEtsyListings(data.results || []);
       setPagination({ count: data.count, offset, limit: 25 });
@@ -230,7 +238,7 @@ export default function MyShopPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, getAuthHeaders]);
 
   // ─── On mount: check connection + load data ─────────
   useEffect(() => {
@@ -305,10 +313,10 @@ export default function MyShopPage() {
     setIsImporting(true);
     const justImportedIds = new Set(selectedIds);
     try {
+      const headers = await getAuthHeaders();
       const { data } = await axios.post('/api/etsy/import-listings', {
-        user_id: user.id,
         etsy_listing_ids: Array.from(selectedIds),
-      });
+      }, { headers });
       setImportResult(data);
       setSelectedIds(new Set());
 
@@ -321,7 +329,7 @@ export default function MyShopPage() {
       if (toPrep.length > 0) {
         await Promise.all(
           toPrep.map((row) =>
-            axios.post('/api/etsy/prepare-listing', { user_id: user.id, etsy_listing_id: row.id })
+            axios.post('/api/etsy/prepare-listing', { etsy_listing_id: row.id }, { headers })
               .catch((e) => console.error(`[import] prepare failed for ${row.id}:`, e))
           )
         );
@@ -351,10 +359,10 @@ export default function MyShopPage() {
 
     setIsScoring(true);
     try {
+      const headers = await getAuthHeaders();
       const { data } = await axios.post('/api/etsy/score-listings', {
-        user_id: user.id,
         etsy_listing_ids: etsyListingUuids,
-      });
+      }, { headers });
       toast.success(`${data.scored} listing${data.scored !== 1 ? 's' : ''} scored (${data.tokens_deducted} tokens used)`);
       setSelectedIds(new Set());
       await fetchImported();
@@ -425,10 +433,10 @@ export default function MyShopPage() {
 
     setPreparingListingId(etsyListingRowId);
     try {
+      const headers = await getAuthHeaders();
       const { data } = await axios.post('/api/etsy/prepare-listing', {
-        user_id: user.id,
         etsy_listing_id: etsyRow.id,
-      });
+      }, { headers });
       navigate('/studio', { state: { listingId: data.listing_id } });
     } catch (error) {
       toast.error('Failed to prepare listing: ' + (error.response?.data?.error || error.message));
@@ -638,7 +646,7 @@ export default function MyShopPage() {
 
       {/* Export to Etsy Modal */}
       {showExportModal && exportModalData.length > 0 && (
-        <ExportToEtsyModal
+      <ExportToEtsyModal
           isOpen={showExportModal}
           onClose={() => setShowExportModal(false)}
           onSuccess={() => {
@@ -647,7 +655,6 @@ export default function MyShopPage() {
             fetchImported();
           }}
           listings={exportModalData}
-          user={user}
         />
       )}
     </Layout>

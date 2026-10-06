@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { scoreEtsyListing } from '../../lib/etsy/score-etsy-listing.js';
 import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   initSentry();
@@ -12,10 +13,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { user_id, etsy_listing_ids } = req.body;
+    const { etsy_listing_ids } = req.body;
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    const user_id = user.id;
 
-    if (!user_id || !Array.isArray(etsy_listing_ids) || etsy_listing_ids.length === 0) {
-      return res.status(400).json({ error: 'Missing required fields: user_id, etsy_listing_ids (non-empty array)' });
+    if (!Array.isArray(etsy_listing_ids) || etsy_listing_ids.length === 0) {
+      return res.status(400).json({ error: 'Missing required field: etsy_listing_ids (non-empty array)' });
     }
 
     if (etsy_listing_ids.length > 5) {
@@ -92,6 +95,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tokens_deducted: tokensDeducted,
     });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [score-listings] Error:', message);
