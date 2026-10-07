@@ -2091,6 +2091,21 @@ app.post('/api/etsy/oauth/exchange', (req, res) => etsyOauthExchange(req, res));
 app.post('/api/etsy/oauth/disconnect', (req, res) => etsyOauthDisconnect(req, res));
 
 // ─── API ROUTE: POST /api/help/chat ───────────────────────
+app.use('/api/help', async (req, res, next) => {
+  if (req.method !== 'POST' || !['/chat', '/feedback'].includes(req.path)) return next();
+  try {
+    const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
+    req.body.user_id = user.id;
+    if (req.path === '/chat' && req.body.conversationId) {
+      const { data } = await supabaseAdmin.from('help_conversations').select('id').eq('id', req.body.conversationId).eq('user_id', user.id).maybeSingle();
+      if (!data) return res.status(404).json({ error: 'Conversation not found' });
+    }
+    next();
+  } catch (error) {
+    if (error instanceof AuthError) return res.status(error.status).json({ error: error.message });
+    next(error);
+  }
+});
 app.post('/api/help/chat', async (req, res) => {
   const { user_id, message, conversationId, pageContext, history } = req.body ?? {};
 

@@ -152,9 +152,8 @@ export function HelpChatProvider({ children }) {
       try {
         const res = await fetch('/api/help/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}` },
           body: JSON.stringify({
-            user_id: user.id,
             message: text,
             conversationId,
             pageContext:
@@ -323,9 +322,8 @@ export function HelpChatProvider({ children }) {
       try {
         const res = await fetch('/api/help/feedback', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}` },
           body: JSON.stringify({
-            user_id: user.id,
             messageId: messageServerId,
             feedback: value,
             note: note ?? null,

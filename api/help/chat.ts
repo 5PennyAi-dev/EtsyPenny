@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 import { checkRateLimit } from '../../lib/help/rate-limit.js';
 import { streamHelpReply, ChatInputError } from '../../lib/help/chat-service.js';
+import { supabaseAdmin } from '../../lib/supabase/server.js';
+import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   initSentry();
@@ -10,11 +12,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { user_id, message, conversationId, pageContext, history } = req.body ?? {};
+  const { message, conversationId, pageContext, history } = req.body ?? {};
 
-  if (!user_id || typeof user_id !== 'string') {
-    return res.status(400).json({ error: 'Missing required field: user_id' });
-  }
+  let user;
+  try { user = await verifyRequestUser(req.headers.authorization, supabaseAdmin); }
+  catch (error) { if (error instanceof AuthError) return res.status(error.status).json({ error: error.message }); throw error; }
+  const user_id = user.id;
   if (!message || typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ error: 'Missing required field: message' });
   }
@@ -26,6 +29,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (history != null && !Array.isArray(history)) {
     return res.status(400).json({ error: 'history must be an array' });
+  }
+  if (conversationId) {
+    const { data: conversation } = await supabaseAdmin.from('help_conversations').select('id').eq('id', conversationId).eq('user_id', user_id).maybeSingle();
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
   }
 
   // ── Rate limit ──────────────────────────────────────────

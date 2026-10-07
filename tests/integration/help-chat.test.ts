@@ -47,8 +47,16 @@ vi.mock('../../lib/help/rate-limit.ts', () => ({
 }));
 
 import { app } from '../../server.mjs';
-import request from 'supertest';
-import { USER_ID } from './_mock-setup.js';
+import supertest from 'supertest';
+
+const AUTHENTICATED_USER_ID = 'u1u2u3u4-u5u6-7890-abcd-000000000001';
+const request = supertest(app);
+const authenticatedRequest = () => {
+  const agent = supertest(app);
+  const post = agent.post.bind(agent);
+  agent.post = ((path: string) => post(path).set('Authorization', 'Bearer test-token')) as typeof agent.post;
+  return agent;
+};
 
 // Parse an SSE response body into chunk objects.
 function parseSSE(body: string): unknown[] {
@@ -79,34 +87,35 @@ describe('POST /api/help/chat', () => {
   });
 
   it('returns 400 when message is empty', async () => {
-    const res = await request(app)
+    const res = await authenticatedRequest()
       .post('/api/help/chat')
-      .send({ user_id: USER_ID, message: '', history: [] });
+      .send({ message: '', history: [] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/message/);
   });
 
-  it('returns 400 when user_id is missing', async () => {
-    const res = await request(app)
+  it('derives the user from the JWT instead of requiring a client user_id', async () => {
+    const res = await authenticatedRequest()
       .post('/api/help/chat')
-      .send({ message: 'hello', history: [] });
+      .send({ message: '', history: [] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/user_id/);
+    expect(res.body.error).toMatch(/message/);
   });
 
   it('returns 429 when rate-limited', async () => {
     const resetAt = new Date(Date.now() + 60 * 60 * 1000);
     rateLimitMock.mockResolvedValue({ allowed: false, used: 20, limit: 20, resetAt });
 
-    const res = await request(app)
+    const res = await authenticatedRequest()
       .post('/api/help/chat')
-      .send({ user_id: USER_ID, message: 'hello', history: [] });
+      .send({ message: 'hello', history: [] });
 
     expect(res.status).toBe(429);
     expect(res.body.error).toBe('rate_limited');
     expect(res.body.used).toBe(20);
     expect(res.body.limit).toBe(20);
     expect(typeof res.body.resetAt).toBe('string');
+    expect(rateLimitMock).toHaveBeenCalledWith(AUTHENTICATED_USER_ID);
   });
 
   it('streams conversation + delta + done on happy path', async () => {
@@ -119,9 +128,9 @@ describe('POST /api/help/chat', () => {
       yield { type: 'done', tokensInput: 42, tokensOutput: 7 };
     });
 
-    const res = await request(app)
+    const res = await authenticatedRequest()
       .post('/api/help/chat')
-      .send({ user_id: USER_ID, message: 'How do I generate SEO?', history: [] });
+      .send({ user_id: 'third-party-user', message: 'How do I generate SEO?', history: [] });
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/text\/event-stream/);
@@ -149,6 +158,31 @@ describe('POST /api/help/chat', () => {
     expect(typeof opts.systemPrompt).toBe('string');
     expect(opts.systemPrompt).toMatch(/PennySEO/);
   });
+
+  it('refuses a request without a JWT', async () => {
+    const res = await request
+      .post('/api/help/chat')
+      .send({ message: 'hello', history: [] });
+    expect(res.status).toBe(401);
+  });
+
+  it('refuses an invalid JWT', async () => {
+    mockSupabaseClient.auth.getUser.mockResolvedValueOnce({ data: { user: null }, error: new Error('invalid token') });
+    const res = await request
+      .post('/api/help/chat')
+      .set('Authorization', 'Bearer invalid-token')
+      .send({ message: 'hello', history: [] });
+    expect(res.status).toBe(401);
+  });
+
+  it('refuses a conversation owned by another user before starting the stream', async () => {
+    mockSupabaseResponse('help_conversations', []);
+    const res = await authenticatedRequest()
+      .post('/api/help/chat')
+      .send({ user_id: 'third-party-user', message: 'hello', conversationId: 'foreign-conversation', history: [] });
+    expect(res.status).toBe(404);
+    expect(streamAIMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/help/feedback', () => {
@@ -158,17 +192,48 @@ describe('POST /api/help/feedback', () => {
   });
 
   it('returns 400 on invalid feedback value', async () => {
-    const res = await request(app)
+    const res = await authenticatedRequest()
       .post('/api/help/feedback')
-      .send({ user_id: USER_ID, messageId: 'msg-1', feedback: 5 });
+      .send({ messageId: 'msg-1', feedback: 5 });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/-1 or 1/);
   });
 
   it('returns 400 on missing messageId', async () => {
-    const res = await request(app)
+    const res = await authenticatedRequest()
       .post('/api/help/feedback')
-      .send({ user_id: USER_ID, feedback: 1 });
+      .send({ feedback: 1 });
     expect(res.status).toBe(400);
+  });
+
+  it('refuses feedback without a valid JWT', async () => {
+    const missing = await request
+      .post('/api/help/feedback')
+      .send({ messageId: 'msg-1', feedback: 1 });
+    expect(missing.status).toBe(401);
+
+    mockSupabaseClient.auth.getUser.mockResolvedValueOnce({ data: { user: null }, error: new Error('invalid token') });
+    const invalid = await request
+      .post('/api/help/feedback')
+      .set('Authorization', 'Bearer invalid-token')
+      .send({ messageId: 'msg-1', feedback: 1 });
+    expect(invalid.status).toBe(401);
+  });
+
+  it('refuses feedback for a message owned by another user', async () => {
+    mockSupabaseResponse('help_messages', []);
+    const res = await authenticatedRequest()
+      .post('/api/help/feedback')
+      .send({ user_id: 'third-party-user', messageId: 'foreign-message', feedback: 1 });
+    expect(res.status).toBe(404);
+  });
+
+  it('accepts feedback for the authenticated owner', async () => {
+    mockSupabaseResponse('help_messages', [{ id: 'msg-1' }]);
+    const res = await authenticatedRequest()
+      .post('/api/help/feedback')
+      .send({ user_id: 'third-party-user', messageId: 'msg-1', feedback: 1 });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true });
   });
 });
