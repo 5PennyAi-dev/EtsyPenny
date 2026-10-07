@@ -14,7 +14,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

@@ -58,11 +58,12 @@ npm test             # Vitest
 npm run test:watch
 npm run test:coverage
 npm run lint         # ESLint JS/JSX
+npm run typecheck    # TypeScript backend (api/, lib/, types/)
 npm run build        # régénère le corpus puis Vite
 npm run preview
 ```
 
-Exécuter les tests ciblés puis la suite adaptée et le build pour un changement d’API ou d’UI. Ne pas annoncer une validation non exécutée. `npm run lint` est disponible mais reste un point à fiabiliser; aucun script `typecheck` n’est défini actuellement. Ne pas installer de dépendance ou lancer de migration, reset, seed, audit écrivant ou action distante sans autorisation.
+Exécuter les tests ciblés puis la suite adaptée et le build pour un changement d’API ou d’UI. Ne pas annoncer une validation non exécutée. Le lint est configuré mais ses écarts historiques doivent être traités progressivement; le typecheck couvre les sources TypeScript backend. Ne pas installer de dépendance ou lancer de migration, reset, seed, audit écrivant ou action distante sans autorisation.
 
 ## État ouvert et Git
 

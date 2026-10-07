@@ -139,6 +139,9 @@ export async function scoreEtsyListing(
         .eq('id', etsyListing.id);
     }
 
+    if (!listingId) throw new Error('Listing ID was not resolved');
+    const resolvedListingId = listingId;
+
     // ── 3. Image analysis (Vision + Taxonomy) ─────────────
 
     const visualPrompt = PROMPT_VISUAL_ANALYST
@@ -174,7 +177,7 @@ export async function scoreEtsyListing(
     console.info(`[score-etsy] Taxonomy: ${taxonomyMapping.theme} > ${taxonomyMapping.niche}`);
 
     // Save via edge function
-    const finalAnalysis = mergeAnalysisResults(listingId, visualAnalysis, taxonomyMapping);
+    const finalAnalysis = mergeAnalysisResults(resolvedListingId, visualAnalysis, taxonomyMapping);
     const { url: supabaseUrl } = getSupabaseServerConfig();
 
     const saveAnalysisRes = await fetch(`${supabaseUrl}/functions/v1/save-image-analysis`, {
@@ -247,12 +250,12 @@ export async function scoreEtsyListing(
 
     // ── 8. Persist results ────────────────────────────────
 
-    await persistSeo(listingId, finalKeywords, strength, params);
+    await persistSeo(resolvedListingId, finalKeywords, strength, params);
 
     // Finalize the pool synchronously (replaces the old fire-and-forget reset-pool
     // trigger from the save-seo edge function, which left ~50-100 keywords with
     // is_current_pool=true until the async call eventually landed).
-    await runResetPool(listingId, params);
+    await runResetPool(resolvedListingId, params);
 
     // Keep status as NEW — scoring is evaluation only, not full SEO generation
     await supabaseAdmin.from('listings').update({

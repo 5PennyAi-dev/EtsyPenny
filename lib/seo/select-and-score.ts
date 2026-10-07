@@ -3,7 +3,7 @@
  * Composite scoring + strength calculation for selected keywords.
  */
 
-interface Keyword {
+export interface Keyword {
   keyword?: string;
   tag?: string;
   search_volume?: number | null;
@@ -12,7 +12,6 @@ interface Keyword {
   niche_score?: number | null;
   transactional_score?: number | null;
   is_selection_ia?: boolean;
-  [key: string]: unknown;
 }
 
 interface Params {
@@ -43,7 +42,7 @@ interface Strength {
   };
 }
 
-export function selectAndScore(keywords: Keyword[], params: Params): { keywords: Keyword[]; strength: Strength | null } {
+export function selectAndScore<T extends Keyword>(keywords: T[], params: Params): { keywords: T[]; strength: Strength | null } {
   const volW = (params.Volume ?? 5) / 5;
   const compW = (params.Competition ?? 5) / 5;
   const transW = (params.Transaction ?? 5) / 5;

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import Layout from '../components/Layout';
-import { Save, Store } from 'lucide-react';
+import { RefreshCw, Save, Store } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Internal Auto-Resize Textarea Component

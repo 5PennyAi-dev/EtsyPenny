@@ -23,7 +23,7 @@ const Accordion = ({
         if (!isControlled && defaultOpen && !internalIsOpen) {
             setInternalIsOpen(true);
         }
-    }, [defaultOpen]);
+    }, [defaultOpen, internalIsOpen, isControlled]);
 
     const handleToggle = () => {
         if (isControlled && onToggle) {

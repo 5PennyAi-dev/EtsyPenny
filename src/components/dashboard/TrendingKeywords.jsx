@@ -14,6 +14,8 @@ function formatCompetition(comp) {
 }
 
 export default function TrendingKeywords({ keywords = [] }) {
+  const navigate = useNavigate();
+
   if (keywords.length === 0) {
     return (
       <div className="bg-white border border-slate-200 rounded-xl p-6 text-center">
@@ -25,7 +27,6 @@ export default function TrendingKeywords({ keywords = [] }) {
     );
   }
 
-  const navigate = useNavigate();
   const display = keywords.slice(0, 5);
 
   return (

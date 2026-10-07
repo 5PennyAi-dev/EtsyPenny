@@ -28,7 +28,7 @@ function newId() {
 export async function consumeSseStream(reader, onChunk, { signal } = {}) {
   const decoder = new TextDecoder();
   let buffer = '';
-  while (true) {
+  for (;;) {
     if (signal?.aborted) return;
     const { done, value } = await reader.read();
     if (done) break;

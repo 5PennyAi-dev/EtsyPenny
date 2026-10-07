@@ -45,12 +45,14 @@ Résultat attendu : instructions cohérentes pour Codex et documentation conform
 
 - [ ] Installer les dépendances avec `npm ci` et exécuter les tests existants.
 - [ ] Corriger les problèmes de configuration des tests.
-- [ ] Configurer ou vérifier ESLint et une commande de vérification des types adaptée au projet.
-- [ ] Vérifier le build.
+- [x] Configurer ESLint et une commande de vérification des types adaptée au backend TypeScript.
+- [x] Vérifier le build.
 - [ ] Remplacer les dépendances `latest` par des versions maîtrisées et déclarer les dépendances directes manquantes.
 - [ ] Envisager GitHub Actions pour automatiser les validations.
 
 Commandes cibles, à confirmer ou créer selon le dépôt : `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`.
+
+État au 7 octobre 2026 : `npm run typecheck`, la suite de tests (188 tests) et le build de production réussissent. ESLint est configuré; il reste en échec avec 100 erreurs et 36 avertissements historiques à traiter progressivement, sans désactiver les règles.
 
 Résultat attendu : état de référence vérifié et régressions détectables.
 
