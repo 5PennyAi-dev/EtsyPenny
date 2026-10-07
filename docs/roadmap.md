@@ -16,16 +16,19 @@ Ce document conserve les décisions prises dans la conversation. Les constats te
 
 ## Phase 1 — Sécurité critique
 
-- [ ] Identifier les secrets exposés et leurs références sans afficher leurs valeurs.
-- [ ] Effectuer la rotation de la clé Supabase `service_role` signalée comme exposée.
-- [ ] Mettre à jour les variables nécessaires dans Vercel et en développement local.
-- [ ] Retirer les secrets des fichiers suivis et ajuster `.gitignore`.
-- [ ] Préparer puis exécuter un nettoyage coordonné de l’historique Git; la rotation reste indispensable.
+- [x] Identifier les secrets exposés et leurs références sans afficher leurs valeurs.
+- [x] Effectuer la migration des clés Supabase et la rotation de la clé `service_role` signalée comme exposée.
+- [x] Mettre à jour les variables nécessaires dans Vercel et en développement local.
+- [x] Retirer les secrets des fichiers suivis et ajuster `.gitignore`.
+- [x] Préparer un nettoyage coordonné de l’historique Git, avec clone séparé et sauvegarde préalable.
+- [ ] Exécuter le nettoyage de l’historique Git : reporté; ne pas pousser l’historique réécrit sans coordination des autres copies du dépôt.
 - [ ] Sécuriser progressivement les API : validation du JWT Supabase et identité dérivée du token.
 - [ ] Vérifier la propriété des ressources, les intégrations Stripe/Etsy et la prise en compte de `is_blocked`.
 - [ ] Vérifier les permissions et RLS nécessaires à ces corrections dès cette phase.
 
-Résultat attendu : secrets révoqués et accès backend contrôlés. Les actions externes et la réécriture de l’historique font l’objet d’un plan explicite avant exécution.
+État au 7 octobre 2026 : les clés Supabase sont migrées; l’ancienne clé `service_role` exposée est désactivée et son refus HTTP 401 a été confirmé. Les nouvelles clés et les trois fonctions Edge sont en place; le fonctionnement de PennySEO a été vérifié. Les routes Stripe, Etsy et SEO sont sécurisées par JWT et contrôles de propriété, puis déployées. Les routes Help (`chat` et `feedback`) sont sécurisées et validées localement; leur déploiement reste à confirmer. Le nettoyage de l’historique est préparé, mais reporté.
+
+Résultat attendu : secrets révoqués et accès backend contrôlés. La phase reste ouverte : l’audit et la sécurisation des autres API, les contrôles de propriété restants, les vérifications RLS/permissions et la prise en compte de `is_blocked` restent à traiter.
 
 ## Phase 2 — Préparer PennySEO pour Codex
 
@@ -143,9 +146,9 @@ Résultat attendu : développement orienté vers les besoins utilisateurs sur la
 
 ## Prochaine action
 
-Demander à Codex une analyse ciblée du secret Supabase et un plan d’intervention : fichiers concernés, autres secrets éventuels, rotation, impact sur Vercel/local et procédure de nettoyage Git. Ne pas modifier les fichiers ni réécrire l’historique dans cette première analyse.
+Poursuivre la phase 1 avec l’audit et la sécurisation des API : validation des JWT Supabase, identité dérivée du token, contrôle de propriété des ressources, prise en compte de `is_blocked`, ainsi que revue des RLS et permissions. Le nettoyage de l’historique Git reste reporté jusqu’à une coordination explicite.
 
-Ensuite : sécurité critique → instructions Codex → validations → audit IA → architecture OpenAI → migration et refonte → évaluations → reproductibilité Supabase → nettoyage → évolutions.
+Ensuite : instructions Codex → validations → audit IA → architecture OpenAI → migration et refonte → évaluations → reproductibilité Supabase → nettoyage → évolutions.
 
 ## Utilisation dans le projet
 
