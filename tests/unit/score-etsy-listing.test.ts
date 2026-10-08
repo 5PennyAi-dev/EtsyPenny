@@ -121,7 +121,14 @@ beforeEach(() => {
 
   // runAI returns vision then taxonomy. JSON-parseable.
   vi.mocked(runAI)
-    .mockResolvedValueOnce({ text: JSON.stringify({ visual_analysis: { aesthetic_style: 'x' } }) } as any)
+    .mockResolvedValueOnce({ text: JSON.stringify({ visual_analysis: {
+      aesthetic_style: 'x',
+      typography_details: 'No visible text',
+      graphic_elements: 'simple graphic',
+      color_palette: 'blue — calm',
+      target_audience: 'Home Decor Lover',
+      overall_vibe: 'A calm decorative product for modern homes',
+    } }) } as any)
     .mockResolvedValueOnce({ text: JSON.stringify({ theme: 'T', niche: 'N' }) } as any);
 
   vi.mocked(downloadAndUploadEtsyImage).mockResolvedValue('https://storage/new-image.jpg');

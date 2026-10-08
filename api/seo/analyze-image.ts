@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { runAI } from '../../lib/ai/provider-router.js';
 import { extractJson } from '../../lib/ai/extract-json.js';
+import { parseVisualAnalysisResponse } from '../../lib/ai/vision-analysis.js';
 import {
   PROMPT_VISUAL_ANALYST,
   formatTaxonomyLists,
@@ -48,8 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .replace('{{description}}', client_description);
 
     const { text: visualRaw } = await runAI('vision_analysis', visualPrompt, { imageUrl: mockup_url });
-    const visualData = JSON.parse(extractJson(visualRaw));
-    const visualAnalysis = visualData.visual_analysis;
+    const visualAnalysis = parseVisualAnalysisResponse(extractJson(visualRaw));
     // TEMPORARY — remove after validating new prompt outputs
     console.info('[analyze-image] Visual analysis result:', JSON.stringify(visualAnalysis, null, 2));
 

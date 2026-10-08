@@ -1,3 +1,8 @@
+export interface StructuredOutputDefinition {
+  name: string;
+  schema: Record<string, unknown>;
+}
+
 export interface AICallParams {
   model: string;
   prompt: string;
@@ -7,6 +12,7 @@ export interface AICallParams {
   imageMimeType?: string;
   imageUrl?: string;
   systemPrompt?: string;
+  structuredOutput?: StructuredOutputDefinition;
 }
 
 export interface AIResponse {

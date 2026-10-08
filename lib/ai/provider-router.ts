@@ -3,6 +3,7 @@ import { callGemini, callGeminiStream } from './adapters/gemini-adapter.js';
 import { callAnthropic } from './adapters/anthropic-adapter.js';
 import { callOpenAI } from './adapters/openai-adapter.js';
 import type { AICallParams, AIResponse, AIMessage, StreamChunk } from './types.js';
+import { VISUAL_ANALYSIS_STRUCTURED_OUTPUT } from './vision-analysis.js';
 
 // ── Retry with exponential backoff ──────────────────────────────────
 
@@ -92,7 +93,8 @@ function callWithAdapter(
   config: any,
   modelId: string,
   prompt: string,
-  options?: RunAIOptions
+  options?: RunAIOptions,
+  structuredOutput?: AICallParams['structuredOutput'],
 ): Promise<AIResponse> {
   const params: AICallParams = {
     model: modelId,
@@ -103,6 +105,7 @@ function callWithAdapter(
     imageMimeType: options?.imageMimeType,
     imageUrl: options?.imageUrl,
     systemPrompt: options?.systemPrompt,
+    structuredOutput,
   };
   return adapter(params);
 }
@@ -130,6 +133,9 @@ export async function runAI(
   }
 
   const primaryModel: string = config.model_id;
+  const structuredOutput = taskKey === 'vision_analysis'
+    ? VISUAL_ANALYSIS_STRUCTURED_OUTPUT
+    : undefined;
   const fallbacks = config.provider === 'gemini'
     ? (GEMINI_FALLBACK_CHAINS[primaryModel] ?? [])
     : [];
@@ -140,7 +146,7 @@ export async function runAI(
   for (const modelId of modelChain) {
     try {
       const result = await withRetry(
-        () => callWithAdapter(adapter, config, modelId, prompt, options),
+        () => callWithAdapter(adapter, config, modelId, prompt, options, structuredOutput),
         3,
         `${taskKey}/${modelId}`
       );

@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 // ─── SHARED LIB IMPORTS (same modules used by Vercel api/) ──
 import { extractJson } from './lib/ai/extract-json.ts';
 import { runAI } from './lib/ai/provider-router.ts';
+import { parseVisualAnalysisResponse } from './lib/ai/vision-analysis.ts';
 import {
   PROMPT_VISUAL_ANALYST,
   formatTaxonomyLists,
@@ -130,8 +131,7 @@ app.post('/api/seo/analyze-image', async (req, res) => {
     console.log("Visual Prompt:", visualPrompt);
 
     const { text: visualRaw } = await runAI('vision_analysis', visualPrompt, { imageUrl: mockup_url });
-    const visualData = JSON.parse(extractJson(visualRaw));
-    const visualAnalysis = visualData.visual_analysis;
+    const visualAnalysis = parseVisualAnalysisResponse(extractJson(visualRaw));
     console.log('   ✅ Visual analysis done');
     // TEMPORARY — remove after validating new prompt outputs
     console.log('[analyze-image] Visual analysis result:', JSON.stringify(visualAnalysis, null, 2));

@@ -11,6 +11,7 @@ import { downloadAndUploadEtsyImage } from './prepare-etsy-image.js';
 import { matchProductType } from './match-product-type.js';
 import { runAI } from '../ai/provider-router.js';
 import { extractJson } from '../ai/extract-json.js';
+import { parseVisualAnalysisResponse } from '../ai/vision-analysis.js';
 import {
   PROMPT_VISUAL_ANALYST,
   formatTaxonomyLists,
@@ -149,8 +150,7 @@ export async function scoreEtsyListing(
       .replace('{{description}}', etsyListing.original_description || '');
 
     const { text: visualRaw } = await runAI('vision_analysis', visualPrompt, { imageUrl: storageUrl });
-    const visualData = JSON.parse(extractJson(visualRaw));
-    const visualAnalysis = visualData.visual_analysis;
+    const visualAnalysis = parseVisualAnalysisResponse(extractJson(visualRaw));
     console.info('[score-etsy] Vision analysis complete');
 
     // Taxonomy mapping
