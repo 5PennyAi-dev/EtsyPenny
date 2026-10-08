@@ -87,6 +87,8 @@ Traiter une fonctionnalité à la fois, en associant migration du fournisseur, a
 - [ ] Préciser ce qui ne doit pas être inféré et gérer les ambiguïtés.
 - [ ] Définir un schéma de sortie structuré et les informations utiles au SEO Etsy.
 
+État au 7 octobre 2026 : l’analyse d’image avec OpenAI a été exécutée avec succès en production, via la configuration **Visual analysis** de l’administration. Cet essai confirme l’accès à `OPENAI_API_KEY` dans Vercel, le chemin image par URL, la sortie JSON Schema et la persistance du flux existant. Le prompt actif a ensuite été révisé pour séparer produit/design/mise en scène, traiter les notes vendeur comme contexte, expliciter les ambiguïtés et préserver une transcription complète du texte lisible. Ces changements sont effectués, sans modifier les six champs ni la configuration. Leur qualité comparative reste à évaluer sur le jeu de cas représentatifs de la phase 7 ; les quatre travaux ci-dessus restent ouverts.
+
 ### 6B — Génération de mots-clés
 
 - [ ] Confier au modèle la compréhension du produit et la génération sémantique de variantes pertinentes.

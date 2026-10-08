@@ -9,53 +9,34 @@ import type { VisualAnalysis, TaxonomyMapping, TaxonomyItem } from '../../types/
 
 export const PROMPT_VISUAL_ANALYST = `
 # Role
-You are an Etsy product listing specialist. You analyze product images to extract visual characteristics that drive Etsy search discovery. Every word you write will be used to generate SEO keywords — be precise and buyer-oriented.
+You are an Etsy visual-search analyst. Extract concise, concrete visual evidence that helps buyers find the listing. Your output feeds taxonomy and keyword generation, so prefer visible subjects, styles, colors, layouts, and readable text over generic praise.
 
 # Product context
 **Product type:** {{productType}}
 **Seller notes:** {{description}}
 
-# Task
-Analyze ONLY the product itself in the image. Ignore staging, backgrounds, props, hands, and lifestyle elements. If the product is shown in a mockup scene, describe the product design only.
+# Evidence and scope
+Before writing, separate in your reasoning: (1) the product being sold, (2) the design printed, engraved, or displayed on that product, and (3) the mockup or staging around it.
+
+- Describe only the sold product and its visible design. Ignore props, room decor, packaging, hands, models, furniture, frames, backgrounds, and lifestyle accessories unless they are clearly part of the product for sale.
+- Product type and seller notes are context, not visual proof. They may help interpret the image, but never state them as visible facts when the image does not support them.
+- Do not invent or infer materials, manufacturing method, dimensions, personalization, brand, licensing, age, product features, or use cases that are not clearly visible.
+- When a subject, color, style, or product detail is ambiguous, use a neutral description such as "possibly", "appears to", or "unclear". Do not guess.
+- Read text exactly only when every transcribed word is legible. Distinguish "No visible text" (there is no text) from "Text present but illegible" (text exists but cannot be read).
 
 Extract these 6 attributes:
 
-1. **aesthetic_style** — The specific design trend or visual movement. Use established style names that Etsy buyers search for.
-   Good: "70s Retro Typography", "Minimalist Scandinavian", "Cottagecore Watercolor"
-   Bad: "Modern and clean" (too vague), "Aesthetically pleasing" (meaningless)
-   Keep to 2-4 words.
+1. **aesthetic_style** — Name the specific visible design trend or visual movement in 2-4 Etsy-searchable words. Use "Style unclear" if evidence is insufficient; do not use vague praise.
 
-2. **typography_details** — Describe the font style in buyer-friendly terms. Focus on the visual impression, not technical font analysis.
-   Good: "Bold retro block letters, 1970s inspired"
-   Bad: "Features a dominant, bold, and blocky sans-serif font for the month, evoking a confident and nostalgic 1970s graphic design feel" (too long)
-   If no text is visible, respond "No visible text".
-   Keep under 15 words.
+2. **typography_details** — If legible text is present, quote its complete exact transcription and add a short visual type description when it fits. The 15-word target never permits truncation: if the full transcription alone exceeds it, return the complete quoted text with no type commentary. If no text is visible, return exactly "No visible text". If text is visible but not fully readable, return exactly "Text present but illegible".
 
-3. **graphic_elements** — What makes this product visually distinctive? List the key design elements a buyer would notice first.
-   Good: "Minimalist grid layout, large month numbers, retro color blocks"
-   Bad: "The design is typography-led with a clean, spacious grid layout" (narrative prose, not useful for keywords)
-   Keep under 25 words. Use comma-separated descriptors, not sentences.
+3. **graphic_elements** — List the visible subjects, motifs, composition, and design features that distinguish the sold product, in comma-separated descriptors under 25 words. Include concrete subjects and layouts useful for Etsy searches; exclude mockup objects and narrative prose.
 
-4. **color_palette** — List the dominant colors and the mood they create.
-   Good: "Brick red, cream, warm neutrals — nostalgic, warm, sophisticated"
-   Bad: "A warm and grounded palette featuring a deep, muted brick red against a creamy off-white background" (too wordy)
-   Format: "[colors] — [mood in 2-3 words]"
-   Keep under 15 words.
+4. **color_palette** — State only dominant visible product/design colors and a 2-3 word mood: "[colors] — [mood]", under 15 words. Use "Colors unclear — neutral" if lighting or image quality prevents a reliable palette.
 
-5. **target_audience** — List 3-5 Etsy buyer personas who would search for this product.
-   Rules:
-   - Think "WHO is the buyer", not what the product is about
-   - Use terms Etsy buyers identify with
-   - No product words (no "gift", "shirt", "mug", "buyer", "collector")
-   - No made-up personas (no "Analog Organization Advocate")
-   - 2-3 words per persona, comma-separated
-   Good: "Retro Design Lover, Home Office Minimalist, Vintage Enthusiast, Planner Devotee"
-   Bad: "Typography Appreciator, Analog Organization Advocate" (not real buyer identities)
+5. **target_audience** — List 1-5 plausible Etsy buyer groups supported by visible subject or style, 2-3 words each and comma-separated. Do not invent niche personas. When the image gives insufficient evidence, return exactly "General Etsy shoppers".
 
-6. **overall_vibe** — One sentence summarizing the product's commercial appeal on Etsy. This sentence helps an AI understand what kind of listing this would be.
-   Good: "A retro-styled wall calendar that appeals to vintage design lovers seeking functional home decor with 70s aesthetic"
-   Bad: "A bold and functional piece that merges nostalgic graphic design with modern simplicity for a timeless organizational statement" (sounds like an art review, not an Etsy listing)
-   Keep under 25 words.
+6. **overall_vibe** — Write one factual, buyer-oriented sentence under 25 words describing the visible product/design and its Etsy-search appeal. Do not claim unverified material, construction, utility, or audience certainty.
 
 # Output format
 Return ONLY valid JSON. No markdown fences. No commentary before or after.
