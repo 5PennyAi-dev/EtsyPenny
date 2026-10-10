@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 import { extractJson } from './lib/ai/extract-json.ts';
 import { runAI } from './lib/ai/provider-router.ts';
 import { parseVisualAnalysisResponse } from './lib/ai/vision-analysis.ts';
+import { parseTaxonomyMappingResponse } from './lib/ai/taxonomy-mapping.ts';
 import {
   PROMPT_VISUAL_ANALYST,
   formatTaxonomyLists,
@@ -164,7 +165,11 @@ app.post('/api/seo/analyze-image', async (req, res) => {
     console.log("Taxonomy Prompt:", taxonomyPrompt);
 
     const { text: taxonomyRaw } = await runAI('taxonomy_mapping', taxonomyPrompt);
-    const taxonomyMapping = JSON.parse(extractJson(taxonomyRaw));
+    const taxonomyMapping = parseTaxonomyMappingResponse(
+      extractJson(taxonomyRaw),
+      themesResult.data,
+      nichesResult.data,
+    );
     console.log("Taxonomy Mapping Output:", taxonomyMapping);
     console.log(`   ✅ Theme: ${taxonomyMapping.theme}, Niche: ${taxonomyMapping.niche}`);
 

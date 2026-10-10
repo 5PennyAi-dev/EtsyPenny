@@ -4,6 +4,7 @@ import { callAnthropic } from './adapters/anthropic-adapter.js';
 import { callOpenAI } from './adapters/openai-adapter.js';
 import type { AICallParams, AIResponse, AIMessage, StreamChunk } from './types.js';
 import { VISUAL_ANALYSIS_STRUCTURED_OUTPUT } from './vision-analysis.js';
+import { TAXONOMY_MAPPING_STRUCTURED_OUTPUT } from './taxonomy-mapping.js';
 
 // ── Retry with exponential backoff ──────────────────────────────────
 
@@ -135,7 +136,9 @@ export async function runAI(
   const primaryModel: string = config.model_id;
   const structuredOutput = taskKey === 'vision_analysis'
     ? VISUAL_ANALYSIS_STRUCTURED_OUTPUT
-    : undefined;
+    : taskKey === 'taxonomy_mapping'
+      ? TAXONOMY_MAPPING_STRUCTURED_OUTPUT
+      : undefined;
   const fallbacks = config.provider === 'gemini'
     ? (GEMINI_FALLBACK_CHAINS[primaryModel] ?? [])
     : [];

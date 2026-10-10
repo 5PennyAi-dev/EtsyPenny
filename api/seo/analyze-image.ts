@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { runAI } from '../../lib/ai/provider-router.js';
 import { extractJson } from '../../lib/ai/extract-json.js';
 import { parseVisualAnalysisResponse } from '../../lib/ai/vision-analysis.js';
+import { parseTaxonomyMappingResponse } from '../../lib/ai/taxonomy-mapping.js';
 import {
   PROMPT_VISUAL_ANALYST,
   formatTaxonomyLists,
@@ -82,7 +83,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const { text: taxonomyRaw } = await runAI('taxonomy_mapping', taxonomyPrompt);
-    const taxonomyMapping = JSON.parse(extractJson(taxonomyRaw));
+    const taxonomyMapping = parseTaxonomyMappingResponse(
+      extractJson(taxonomyRaw),
+      themesResult.data,
+      nichesResult.data,
+    );
     console.info(`[analyze-image] theme=${taxonomyMapping.theme} niche=${taxonomyMapping.niche}`);
 
     // Step 5: Merge & Save via Edge Function

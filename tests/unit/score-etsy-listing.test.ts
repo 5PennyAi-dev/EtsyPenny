@@ -129,7 +129,7 @@ beforeEach(() => {
       target_audience: 'Home Decor Lover',
       overall_vibe: 'A calm decorative product for modern homes',
     } }) } as any)
-    .mockResolvedValueOnce({ text: JSON.stringify({ theme: 'T', niche: 'N' }) } as any);
+    .mockResolvedValueOnce({ text: JSON.stringify({ theme: 'T', niche: 'N', sub_niche: 'Buyer Phrase' }) } as any);
 
   vi.mocked(downloadAndUploadEtsyImage).mockResolvedValue('https://storage/new-image.jpg');
 
@@ -175,8 +175,8 @@ describe('scoreEtsyListing — idempotency', () => {
         error: null,
       },
       // Taxonomy lookups.
-      'v_combined_themes:select': { data: [], error: null },
-      'v_combined_niches:select': { data: [], error: null },
+      'v_combined_themes:select': { data: [{ id: 'theme', name: 'T', description: null, origin: 'pennyseo' }], error: null },
+      'v_combined_niches:select': { data: [{ id: 'niche', name: 'N', description: null, origin: 'pennyseo' }], error: null },
     });
     setSupabase(client);
 
@@ -190,6 +190,27 @@ describe('scoreEtsyListing — idempotency', () => {
     expect(insertCalls).toHaveLength(0);
   });
 
+  it('does not persist image analysis when taxonomy validation fails', async () => {
+    const { client } = makeSupabaseSpy({
+      'etsy_listings:select': { data: { id: 'etsy-row-1', listing_id: 'existing-listing-1' }, error: null },
+      'listings:select': { data: { id: 'existing-listing-1', image_url: 'https://storage/existing.jpg' }, error: null },
+      'v_combined_themes:select': { data: [{ id: 'theme', name: 'T', description: null, origin: 'pennyseo' }], error: null },
+      'v_combined_niches:select': { data: [{ id: 'niche', name: 'N', description: null, origin: 'pennyseo' }], error: null },
+    });
+    setSupabase(client);
+    vi.mocked(runAI).mockReset()
+      .mockResolvedValueOnce({ text: JSON.stringify({ visual_analysis: {
+        aesthetic_style: 'x', typography_details: 'No visible text', graphic_elements: 'simple graphic',
+        color_palette: 'blue — calm', target_audience: 'Home Decor Lover', overall_vibe: 'A calm decorative product for modern homes',
+      } }) } as any)
+      .mockResolvedValueOnce({ text: JSON.stringify({ theme: 'Unknown', niche: 'N', sub_niche: 'Buyer Phrase' }) } as any);
+
+    const result = await scoreEtsyListing(baseInput());
+
+    expect(result.error).toMatch(/unknown theme/i);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it('INSERT path: when listing_id is null, inserts a new row AND links etsy_listings.listing_id', async () => {
     const { client, calls } = makeSupabaseSpy({
       'etsy_listings:select': {
@@ -197,8 +218,8 @@ describe('scoreEtsyListing — idempotency', () => {
         error: null,
       },
       'listings:insert': { data: { id: 'new-listing-1' }, error: null },
-      'v_combined_themes:select': { data: [], error: null },
-      'v_combined_niches:select': { data: [], error: null },
+      'v_combined_themes:select': { data: [{ id: 'theme', name: 'T', description: null, origin: 'pennyseo' }], error: null },
+      'v_combined_niches:select': { data: [{ id: 'niche', name: 'N', description: null, origin: 'pennyseo' }], error: null },
     });
     setSupabase(client);
 
@@ -235,8 +256,8 @@ describe('scoreEtsyListing — idempotency', () => {
       // No listings row found for the ghost id.
       'listings:select': { data: null, error: null },
       'listings:insert': { data: { id: 'new-listing-2' }, error: null },
-      'v_combined_themes:select': { data: [], error: null },
-      'v_combined_niches:select': { data: [], error: null },
+      'v_combined_themes:select': { data: [{ id: 'theme', name: 'T', description: null, origin: 'pennyseo' }], error: null },
+      'v_combined_niches:select': { data: [{ id: 'niche', name: 'N', description: null, origin: 'pennyseo' }], error: null },
     });
     setSupabase(client);
 
@@ -264,8 +285,8 @@ describe('scoreEtsyListing — idempotency', () => {
         data: { id: 'existing-listing-1', image_url: 'https://storage/existing.jpg' },
         error: null,
       },
-      'v_combined_themes:select': { data: [], error: null },
-      'v_combined_niches:select': { data: [], error: null },
+      'v_combined_themes:select': { data: [{ id: 'theme', name: 'T', description: null, origin: 'pennyseo' }], error: null },
+      'v_combined_niches:select': { data: [{ id: 'niche', name: 'N', description: null, origin: 'pennyseo' }], error: null },
     });
     setSupabase(client);
 

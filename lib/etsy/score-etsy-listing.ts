@@ -12,6 +12,7 @@ import { matchProductType } from './match-product-type.js';
 import { runAI } from '../ai/provider-router.js';
 import { extractJson } from '../ai/extract-json.js';
 import { parseVisualAnalysisResponse } from '../ai/vision-analysis.js';
+import { parseTaxonomyMappingResponse } from '../ai/taxonomy-mapping.js';
 import {
   PROMPT_VISUAL_ANALYST,
   formatTaxonomyLists,
@@ -173,7 +174,11 @@ export async function scoreEtsyListing(
     });
 
     const { text: taxonomyRaw } = await runAI('taxonomy_mapping', taxonomyPrompt);
-    const taxonomyMapping = JSON.parse(extractJson(taxonomyRaw));
+    const taxonomyMapping = parseTaxonomyMappingResponse(
+      extractJson(taxonomyRaw),
+      themesResult.data,
+      nichesResult.data,
+    );
     console.info(`[score-etsy] Taxonomy: ${taxonomyMapping.theme} > ${taxonomyMapping.niche}`);
 
     // Save via edge function
@@ -218,7 +223,9 @@ export async function scoreEtsyListing(
     // ── 6. Score tags via AI ──────────────────────────────
 
     const ctx = {
-      product_type: taxonomyMapping.product_type || '',
+      // TaxonomyMapping has never supplied a product_type; preserve the
+      // existing empty context value without widening the taxonomy contract.
+      product_type: '',
       theme: taxonomyMapping.theme || '',
       niche: taxonomyMapping.niche || '',
       sub_niche: taxonomyMapping.sub_niche || '',

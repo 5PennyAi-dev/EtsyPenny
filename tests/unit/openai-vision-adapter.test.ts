@@ -10,6 +10,7 @@ vi.mock('openai', () => ({
 
 import { callOpenAI } from '../../lib/ai/adapters/openai-adapter.js';
 import { VISUAL_ANALYSIS_STRUCTURED_OUTPUT } from '../../lib/ai/vision-analysis.js';
+import { TAXONOMY_MAPPING_STRUCTURED_OUTPUT } from '../../lib/ai/taxonomy-mapping.js';
 
 const originalFetch = globalThis.fetch;
 
@@ -76,5 +77,41 @@ describe('callOpenAI visual analysis', () => {
   it('rejects parameters outside the documented GPT-4o range before requesting a completion', async () => {
     await expect(callOpenAI({ ...baseParams(), temperature: 2.1 })).rejects.toThrow('temperature must be between 0 and 2');
     expect(createCompletion).not.toHaveBeenCalled();
+  });
+
+  it('requests taxonomy Structured Outputs without an image', async () => {
+    createCompletion.mockResolvedValue({
+      choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ theme: 'Theme', niche: 'Niche', sub_niche: 'Phrase' }), refusal: null } }],
+      usage: {},
+    });
+
+    await callOpenAI({
+      model: 'gpt-4o-mini',
+      prompt: 'Classify this listing.',
+      temperature: 0.3,
+      maxTokens: 1024,
+      structuredOutput: TAXONOMY_MAPPING_STRUCTURED_OUTPUT,
+    });
+
+    const request = createCompletion.mock.calls[0][0];
+    expect(request.response_format.json_schema).toMatchObject({ name: 'taxonomy_mapping', strict: true });
+    const userMessage = request.messages.find((message: { role: string }) => message.role === 'user');
+    expect(userMessage.content).toEqual([{ type: 'text', text: 'Classify this listing.' }]);
+  });
+
+  it.each([
+    [{ finish_reason: 'stop', message: { content: null, refusal: 'I cannot classify this listing.' } }, /refused/i],
+    [{ finish_reason: 'length', message: { content: '{', refusal: null } }, /incomplete/i],
+    [{ finish_reason: 'stop', message: { content: '   ', refusal: null } }, /empty/i],
+  ])('rejects a taxonomy refusal, incomplete, or empty response', async (choice, error) => {
+    createCompletion.mockResolvedValue({ choices: [choice], usage: {} });
+
+    await expect(callOpenAI({
+      model: 'gpt-4o-mini',
+      prompt: 'Classify this listing.',
+      temperature: 0.3,
+      maxTokens: 1024,
+      structuredOutput: TAXONOMY_MAPPING_STRUCTURED_OUTPUT,
+    })).rejects.toThrow(error);
   });
 });
