@@ -95,7 +95,7 @@ Traiter une fonctionnalité à la fois, en associant migration du fournisseur, a
 
 ### 6B — Génération de mots-clés
 
-État au 11 octobre 2026 — les six prompts spécialisés introduits après `09e7103` ont produit une régression qualitative observée. Le template dynamique, les cinq segments, leur ordre, leurs volumes et leurs règles historiques ont été restaurés textuellement depuis `09e7103`, tout en conservant le routeur IA, le parsing, la validation, la déduplication canonique, la facturation et les routes actuelles. Cette restauration locale doit être comparée sur le jeu de cas de la phase 7 avant toute généralisation.
+État au 11 octobre 2026 — la restauration à cinq segments depuis `09e7103` a été remplacée localement par la référence `fbb2a69`. Le générateur retrouve textuellement ses six segments spécialisés (Core Product, Style & Aesthetic, Buyer & Occasion, Niche & Adjacent, Long-Tail & Specific et Broad Discovery), leurs volumes, le contexte incluant couleurs et éléments graphiques, et leurs règles partagées. Le routeur IA, le parsing, la validation, la déduplication canonique, la facturation et les routes actuelles sont conservés. La qualité sémantique doit être comparée sur le jeu de cas de la phase 7 avant toute généralisation.
 
 - [ ] Confier au modèle la compréhension du produit et la génération sémantique de variantes pertinentes.
 - [ ] Utiliser DataForSEO pour les données de marché, avec leur provenance et leurs limites.

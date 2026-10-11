@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,67 +22,60 @@ const context = {
   visual_graphics: 'cassette tape',
 };
 
+const FBB2A69_MODULE_SHA256 = 'cdc9dde0ed56f63a055798137aa3123d8d1d6d35dde5e15ec2b950af139a830a';
+
 const historicalSegments = [
-  { name: 'Broad & High Volume', description: 'High-level niche terms and general gift categories. Focus on high search volume.' },
-  { name: 'Balanced & Descriptive', description: 'Mid-range keywords combining the niche with specific themes and graphics from the visual analysis.' },
-  { name: 'Audience & Gift Scenarios', description: "Target specific buyers (e.g., 'Gift for Coworker') and occasions (Birthday, Christmas, etc.)." },
-  { name: 'Sniper & Long-Tail', description: 'Ultra-specific, low-competition terms and cultural sub-niches related to the design.' },
-  { name: 'Aesthetic & Vibe', description: "Focus on the look, mood, and specific art style (e.g., 'Kawaii Aesthetic', 'Cyberpunk Vibe')." },
-];
+  { name: 'Core Product', volume: 40, sha256: 'b7d373ef4fd7ebea4805220a8dd79774d6addf7aa0c254c893a11559339d14ed' },
+  { name: 'Style & Aesthetic', volume: 30, sha256: 'b04264edc6350dcd331c3783687731cdfff6d14f47047515fdc8b943b53cff4e' },
+  { name: 'Buyer & Occasion', volume: 30, sha256: '0e76ef18233f9fe712bbef65369e1ad2b7e843ee787c3280a42a27eb60fc3939' },
+  { name: 'Niche & Adjacent', volume: 30, sha256: 'e7b7502dc70fab7405e9475dfa6162b05ad123ac57e736275a5a091cbb9546bc' },
+  { name: 'Long-Tail & Specific', volume: 30, sha256: '5be02fd0773b0770ae8a5eb3392234b8b6b5ab83ac83e08dcdcbfbcbe933b1ac' },
+  { name: 'Broad Discovery', volume: 20, sha256: '70d69ccc6fe684010d04c65f02d34f231b03d3ffbcf1d5d9c9359202efd232ec' },
+] as const;
 
-function buildHistoricalPrompt(segment: typeof historicalSegments[number]): string {
-  return `# Role\nYou are an expert Etsy SEO Specialist.\n\n# Task\nGenerate 50 high-intent keywords for: ${segment.name}\n${segment.name}: ${segment.description}\n\n# Context\n- Product Type: ${context.product_type}\n- Theme: ${context.theme}\n- Niche: ${context.niche}\n- Sub-niche: ${context.sub_niche}\n- Description: ${context.client_description}\n\n# Visual & Marketing Data\n- Aesthetic/Style: ${context.visual_aesthetic}\n- Target Audience: ${context.visual_target_audience}\n- Overall Vibe: ${context.visual_overall_vibe}\n\n# Rules\n- Max 20 characters per keyword (CRITICAL for Etsy tags).\n- Max 3 words per phrase.\n- No duplicates, no trademarks, lowercase only.\n- Include product type in keywords at least 75% of the time.\n- Format: JSON object {"keywords": ["keyword1", "keyword2", ...]}`;
-}
+const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 
-const sha256 = (value: string) => createHash('sha256').update(value, 'utf8').digest('hex');
-
-function extractPromptLiteral(source: string): string {
-  const match = source.match(/const prompt = `([^`]+)`;/);
-  if (!match) throw new Error('Historical keyword prompt literal not found');
-  return match[1];
-}
-
-describe('historical keyword prompt restoration', () => {
+describe('fbb2a69 keyword generator restoration', () => {
   beforeEach(() => {
     vi.mocked(runAI).mockReset().mockResolvedValue({
-      text: JSON.stringify({ keywords: ['Retro Mug', 'retro mug', 'keyword longer than twenty'] }),
+      text: JSON.stringify({
+        keywords: ['Custom Ceramic Mug', 'ceramic custom mug', 'keyword longer than twenty'],
+      }),
       usage: { input_tokens: 0, output_tokens: 0 },
       model: 'test',
       provider: 'test',
     });
   });
 
-  it('uses the five historical segments in their historical order', async () => {
-    const keywords = await generateKeywordPool(context);
-
-    expect(vi.mocked(runAI)).toHaveBeenCalledTimes(5);
-    expect(vi.mocked(runAI).mock.calls.map(([task, prompt]) => ({ task, prompt }))).toEqual(
-      historicalSegments.map(segment => ({ task: 'keyword_generation', prompt: buildHistoricalPrompt(segment) }))
-    );
-    expect(keywords).toEqual(['retro mug']);
+  it('keeps the complete module byte-identical to the documented fbb2a69 reference', () => {
+    const source = readFileSync('lib/seo/generate-keyword-pool.ts');
+    expect(sha256(source)).toBe(FBB2A69_MODULE_SHA256);
   });
 
-  it('keeps each effective prompt byte-identical to the historical template', async () => {
+  it('uses the six specialized segments in their historical order and volumes', async () => {
+    const keywords = await generateKeywordPool(context);
+
+    expect(vi.mocked(runAI)).toHaveBeenCalledTimes(6);
+    expect(vi.mocked(runAI).mock.calls.map(([task]) => task)).toEqual(
+      historicalSegments.map(() => 'keyword_generation')
+    );
+
+    vi.mocked(runAI).mock.calls.forEach(([, prompt], index) => {
+      const segment = historicalSegments[index];
+      expect(prompt).toContain(`# Your segment: ${segment.name} Keywords`);
+      expect(prompt).toContain(`Generate ${segment.volume} keywords.`);
+    });
+
+    expect(keywords).toEqual(['custom ceramic mug']);
+  });
+
+  it('keeps each effective prompt at its fbb2a69 reference hash and injects visual data', async () => {
     await generateKeywordPool(context);
 
     vi.mocked(runAI).mock.calls.forEach(([, prompt], index) => {
-      const historicalPrompt = buildHistoricalPrompt(historicalSegments[index]);
-      expect(sha256(prompt as string)).toBe(sha256(historicalPrompt));
-      expect(prompt).toBe(historicalPrompt);
+      expect(sha256(prompt as string)).toBe(historicalSegments[index].sha256);
+      expect(prompt).toContain('- Color palette: orange, brown');
+      expect(prompt).toContain('- Graphic elements: cassette tape');
     });
-  });
-
-  it('keeps the source template literal identical to commit 09e7103', () => {
-    const historicalSource = execFileSync(
-      'git',
-      ['show', '09e7103:lib/seo/generate-keyword-pool.ts'],
-      { encoding: 'utf8' }
-    );
-    const currentSource = readFileSync('lib/seo/generate-keyword-pool.ts', 'utf8');
-
-    const historicalTemplate = extractPromptLiteral(historicalSource);
-    const restoredTemplate = extractPromptLiteral(currentSource);
-    expect(sha256(restoredTemplate)).toBe(sha256(historicalTemplate));
-    expect(restoredTemplate).toBe(historicalTemplate);
   });
 });
