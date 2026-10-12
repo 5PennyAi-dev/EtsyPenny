@@ -20,6 +20,7 @@ import QuotaExceededModal from '../components/billing/QuotaExceededModal';
 import ExportToEtsyModal from '../components/shop/ExportToEtsyModal';
 import OnboardingGuide from '../components/onboarding/OnboardingGuide';
 import { toast } from 'sonner';
+import { getSeoGenerationErrorMessage, SEO_GENERATION_FALLBACK_MESSAGE } from '../lib/seo-generation-error';
 
 const IMAGE_ANALYSIS_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 const IMAGE_ANALYSIS_CANCEL_VISIBLE_MS = 30 * 1000; // Show cancel link after 30s
@@ -971,7 +972,6 @@ const ProductStudio = () => {
         // already reflects the final is_current_pool flags by the time we get here.
         toast.success("SEO Analysis completed! Loading results...");
         await handleLoadListing(activeListingId);
-        setIsSeoLoading(false);
         refreshProfile(); // Update sidebar token badge
 
     } catch (err) {
@@ -981,13 +981,14 @@ const ProductStudio = () => {
             setInsufficientTokensModal({ isOpen: true, balance: d.balance, required: d.required, action: d.required === 4 ? 'rerun_keywords' : 'generate_keywords' });
         } else if (err.response) {
             console.error("Webhook Error Response:", err.response.data);
-            toast.error(`Analysis failed: Server returned ${err.response.status}. Check console for details.`);
+            toast.error(getSeoGenerationErrorMessage(err));
         } else if (err.request) {
             console.error("Webhook No Response:", err.request);
-            toast.error("Analysis failed: No response from analysis server. Check your connection.");
+            toast.error(SEO_GENERATION_FALLBACK_MESSAGE);
         } else {
-             toast.error("An error occurred: " + err.message);
+             toast.error(SEO_GENERATION_FALLBACK_MESSAGE);
         }
+    } finally {
         setIsLoading(false);
         setIsSeoLoading(false);
     }
