@@ -16,6 +16,8 @@ vi.mock('../../lib/seo/enrich-keywords.ts', () => ({
 }));
 vi.mock('../../lib/seo/score-keywords.ts', () => ({
   scoreKeywords: vi.fn(async (stats: any[]) => stats.map(s => ({ ...s, niche_score: 7, transactional_score: 7, is_selection_ia: false, is_user_added: false, is_pinned: false }))),
+  isKeywordScoringError: (error: unknown) => (error as { code?: string })?.code === 'KEYWORD_SCORING_INCOMPLETE',
+  KEYWORD_GENERATION_SCORING_FAILURE_MESSAGE: "L'évaluation des mots-clés n'a pas pu être complétée. Aucun crédit n'a été débité. Veuillez réessayer plus tard.",
 }));
 vi.mock('../../lib/tokens/token-middleware.ts', () => ({
   checkQuota: vi.fn(async () => ({ allowed: true })),

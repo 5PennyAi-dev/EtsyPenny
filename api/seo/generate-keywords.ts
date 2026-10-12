@@ -2,7 +2,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { generateKeywordPool } from '../../lib/seo/generate-keyword-pool.js';
 import { enrichKeywords } from '../../lib/seo/enrich-keywords.js';
-import { scoreKeywords } from '../../lib/seo/score-keywords.js';
+import {
+  scoreKeywords,
+  isKeywordScoringError,
+  KEYWORD_GENERATION_SCORING_FAILURE_MESSAGE,
+} from '../../lib/seo/score-keywords.js';
 import { selectAndScore } from '../../lib/seo/select-and-score.js';
 import { persistSeo } from '../../lib/seo/persist-seo.js';
 import { runResetPool } from '../../lib/seo/run-reset-pool.js';
@@ -143,6 +147,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error: unknown) {
     if (error instanceof AuthError) return res.status(error.status).json({ error: error.message });
+    if (isKeywordScoringError(error)) {
+      console.error('❌ [generate-keywords] Incomplete AI keyword scoring');
+      try {
+        const { listing_id } = req.body || {};
+        if (listing_id) await supabaseAdmin.from('listings').update({ is_generating_seo: false }).eq('id', listing_id);
+      } catch (_) { /* best effort */ }
+      return res.status(502).json({ error: KEYWORD_GENERATION_SCORING_FAILURE_MESSAGE });
+    }
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [generate-keywords] Error:', message);

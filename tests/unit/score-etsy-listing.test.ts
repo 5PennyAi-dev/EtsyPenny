@@ -65,6 +65,8 @@ vi.mock('../../lib/seo/run-reset-pool.js', () => ({
 
 import { downloadAndUploadEtsyImage } from '../../lib/etsy/prepare-etsy-image.js';
 import { runAI } from '../../lib/ai/provider-router.js';
+import { scoreKeywords } from '../../lib/seo/score-keywords.js';
+import { persistSeo } from '../../lib/seo/persist-seo.js';
 import { scoreEtsyListing } from '../../lib/etsy/score-etsy-listing.js';
 
 // ─── Supabase test double ─────────────────────────────────────────────────
@@ -293,5 +295,25 @@ describe('scoreEtsyListing — idempotency', () => {
     await scoreEtsyListing(baseInput());
 
     expect(downloadAndUploadEtsyImage).not.toHaveBeenCalled();
+  });
+
+  it('does not persist SEO results when keyword scoring fails', async () => {
+    const { client, calls } = makeSupabaseSpy({
+      'etsy_listings:select': { data: { id: 'etsy-row-1', listing_id: 'existing-listing-1' }, error: null },
+      'listings:select': { data: { id: 'existing-listing-1', image_url: 'https://storage/existing.jpg' }, error: null },
+      'v_combined_themes:select': { data: [{ id: 'theme', name: 'T', description: null, origin: 'pennyseo' }], error: null },
+      'v_combined_niches:select': { data: [{ id: 'niche', name: 'N', description: null, origin: 'pennyseo' }], error: null },
+    });
+    setSupabase(client);
+    vi.mocked(scoreKeywords).mockRejectedValueOnce(Object.assign(new Error('safe scoring failure'), {
+      code: 'KEYWORD_SCORING_INCOMPLETE',
+    }));
+
+    const result = await scoreEtsyListing(baseInput());
+
+    expect(result.score).toBeNull();
+    expect(result.error).toBe('safe scoring failure');
+    expect(persistSeo).not.toHaveBeenCalled();
+    expect(calls.some(call => call.table === 'etsy_listings' && call.op === 'update' && (call.payload as any)?.scoring_status === 'error')).toBe(true);
   });
 });

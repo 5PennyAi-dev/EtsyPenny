@@ -30,11 +30,39 @@ interface EnrichedKeyword {
 }
 
 interface ScoredKeyword extends EnrichedKeyword {
-  niche_score: number | null;
-  transactional_score: number | null;
+  niche_score: number;
+  transactional_score: number;
   is_selection_ia: boolean;
   is_user_added: boolean;
   is_pinned: boolean;
+}
+
+const VALID_SCORES = new Set([10, 7, 4, 1]);
+
+/** Safe, user-facing message. Provider diagnostics stay in server logs. */
+export const KEYWORD_SCORING_FAILURE_MESSAGE =
+  "L'évaluation des mots-clés n'a pas pu être complétée. Veuillez réessayer plus tard.";
+export const KEYWORD_GENERATION_SCORING_FAILURE_MESSAGE =
+  "L'évaluation des mots-clés n'a pas pu être complétée. Aucun crédit n'a été débité. Veuillez réessayer plus tard.";
+
+/**
+ * Signals that an AI scoring response could not produce a complete, valid
+ * evaluation. Callers use this to avoid persisting or charging a failed run.
+ */
+export class KeywordScoringError extends Error {
+  readonly code = 'KEYWORD_SCORING_INCOMPLETE';
+
+  constructor(
+    readonly taskKey: 'niche_scoring' | 'transactional_scoring',
+    readonly batchIndex: number,
+  ) {
+    super(KEYWORD_SCORING_FAILURE_MESSAGE);
+    this.name = 'KeywordScoringError';
+  }
+}
+
+export function isKeywordScoringError(error: unknown): error is KeywordScoringError {
+  return error instanceof KeywordScoringError;
 }
 
 // ─── NICHE SCORING HELPERS ───────────────────────────────
@@ -338,48 +366,71 @@ export async function scoreKeywords(stats: EnrichedKeyword[], ctx: ScoringContex
 
   const MAX_RETRIES = 3;
 
-  const cleanJsonResponse = (text: string): string => {
-    let cleaned = text
-      .replace(/```json\s*/gi, '')
-      .replace(/```\s*/gi, '')
-      .trim();
-    // Strip trailing commas before } or ]
-    cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
-    // If the response got truncated mid-JSON, try to salvage it
-    if (!cleaned.endsWith('}')) {
-      // Try to find the last complete keyword entry and close the JSON
-      const lastComplete = cleaned.lastIndexOf('}');
-      if (lastComplete > 0) {
-        cleaned = cleaned.substring(0, lastComplete + 1) + ']}';
-      }
+  type ScoringTask = 'niche_scoring' | 'transactional_scoring';
+  type ScoringResult = { keyword?: unknown; niche_score?: unknown; transactional_score?: unknown };
+
+  const normalizeKeyword = (keyword: string) => keyword.trim().toLowerCase();
+
+  const validateBatchResponse = (
+    response: unknown,
+    expectedKeywords: string[],
+    taskKey: ScoringTask,
+  ): ScoringResult[] => {
+    if (!response || typeof response !== 'object' || Array.isArray(response)) {
+      throw new Error('Scoring response must be an object');
     }
-    return cleaned;
+
+    const results = (response as { keywords?: unknown }).keywords;
+    if (!Array.isArray(results)) {
+      throw new Error('Scoring response must contain a keywords array');
+    }
+
+    const scoreField = taskKey === 'niche_scoring' ? 'niche_score' : 'transactional_score';
+    const expected = new Set(expectedKeywords.map(normalizeKeyword));
+    const received = new Set<string>();
+
+    for (const result of results) {
+      if (!result || typeof result !== 'object' || Array.isArray(result)) {
+        throw new Error('Scoring response contains an invalid keyword entry');
+      }
+      const keyword = (result as ScoringResult).keyword;
+      const score = (result as ScoringResult)[scoreField];
+      if (typeof keyword !== 'string' || !keyword.trim()) {
+        throw new Error('Scoring response contains a keyword without a name');
+      }
+      const normalizedKeyword = normalizeKeyword(keyword);
+      if (!expected.has(normalizedKeyword) || received.has(normalizedKeyword)) {
+        throw new Error('Scoring response contains an unexpected or duplicate keyword');
+      }
+      if (typeof score !== 'number' || !Number.isInteger(score) || !VALID_SCORES.has(score)) {
+        throw new Error(`Scoring response contains an invalid ${scoreField}`);
+      }
+      received.add(normalizedKeyword);
+    }
+
+    if (received.size !== expected.size) {
+      throw new Error('Scoring response omitted one or more keywords');
+    }
+
+    return results as ScoringResult[];
   };
 
-  const scoreField = (taskKey: string) =>
-    taskKey === 'niche_scoring' ? 'niche_score' : 'transactional_score';
-
-  const runScoring = async (taskKey: string, systemPrompt: string, batchList: string[][]) => {
+  const runScoring = async (taskKey: ScoringTask, systemPrompt: string, batchList: string[][]) => {
     const batchResults = await Promise.all(
       batchList.map(async (batch, batchIdx) => {
-        let lastError: unknown;
         for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
           try {
             const { text } = await runAI(taskKey, `# Keywords to Analyze:\n${JSON.stringify(batch)}`, {
               systemPrompt,
             });
-            const cleaned = cleanJsonResponse(text);
-            const parsed = JSON.parse(cleaned);
-            return (parsed.keywords ?? []) as Array<{ keyword?: string; niche_score?: number; transactional_score?: number }>;
+            const parsed = JSON.parse(text);
+            return validateBatchResponse(parsed, batch, taskKey);
           } catch (err) {
-            lastError = err;
             console.warn(`[scoring] ${taskKey} batch ${batchIdx + 1} parse failed (attempt ${attempt}/${MAX_RETRIES}): ${(err as Error).message}`);
           }
         }
-        // Graceful fallback: return default score 4 for all keywords in this batch
-        const field = scoreField(taskKey);
-        console.error(`[scoring] ${taskKey} batch ${batchIdx + 1} failed after ${MAX_RETRIES} attempts — assigning default score 4 to ${batch.length} keywords`);
-        return batch.map(kw => ({ keyword: kw, [field]: 4 })) as Array<{ keyword?: string; niche_score?: number; transactional_score?: number }>;
+        console.error(`[scoring] ${taskKey} batch ${batchIdx + 1} failed after ${MAX_RETRIES} attempts`);
+        throw new KeywordScoringError(taskKey, batchIdx + 1);
       })
     );
     return batchResults.flat();
@@ -392,27 +443,14 @@ export async function scoreKeywords(stats: EnrichedKeyword[], ctx: ScoringContex
   ]);
   console.info(`[scoring] Scored ${kws.length} keywords in ${((Date.now() - scoringStart) / 1000).toFixed(1)}s`);
 
-  const VALID = new Set([10, 7, 4, 1]);
-  const nicheMap = new Map(nicheResults.map(r => [r.keyword?.toLowerCase(), VALID.has(r.niche_score!) ? r.niche_score! : 1]));
-  const transMap = new Map(transResults.map(r => [r.keyword?.toLowerCase(), VALID.has(r.transactional_score!) ? r.transactional_score! : 1]));
-
-  // Check for keywords dropped by AI in parallel batches
-  const missingNiche = kws.filter(kw => !nicheMap.has(kw));
-  const missingTrans = kws.filter(kw => !transMap.has(kw));
-  if (missingNiche.length > 0) {
-    console.warn(`[scoring] ${missingNiche.length} keywords missing from niche scoring — filling with default score 4`);
-    missingNiche.forEach(kw => nicheMap.set(kw, 4));
-  }
-  if (missingTrans.length > 0) {
-    console.warn(`[scoring] ${missingTrans.length} keywords missing from transactional scoring — filling with default score 4`);
-    missingTrans.forEach(kw => transMap.set(kw, 4));
-  }
+  const nicheMap = new Map(nicheResults.map(r => [normalizeKeyword(r.keyword as string), r.niche_score as number]));
+  const transMap = new Map(transResults.map(r => [normalizeKeyword(r.keyword as string), r.transactional_score as number]));
 
   return stats.map(s => ({
     keyword: s.keyword, search_volume: s.search_volume, competition: s.competition, cpc: s.cpc,
     volume_history: s.volume_history,
-    niche_score: nicheMap.get(s.keyword) ?? null,
-    transactional_score: transMap.get(s.keyword) ?? null,
+    niche_score: nicheMap.get(normalizeKeyword(s.keyword))!,
+    transactional_score: transMap.get(normalizeKeyword(s.keyword))!,
     is_selection_ia: false, is_user_added: false, is_pinned: false, fromCache: s.fromCache,
   }));
 }

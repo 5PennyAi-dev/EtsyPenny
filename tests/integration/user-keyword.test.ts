@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { mockSupabaseClient, mockSupabaseResponse, resetSupabaseMocks } from '../mocks/supabase.js';
 
 // ── Hoisted mock variables (available before vi.mock factories run) ──
-const { enrichKeywordsMock, scoreKeywordsMock, checkQuotaMock, incrementQuotaMock } = vi.hoisted(() => ({
+const { enrichKeywordsMock, scoreKeywordsMock, checkQuotaMock, incrementQuotaMock, generateKeywordPoolMock } = vi.hoisted(() => ({
   enrichKeywordsMock: vi.fn(async (kws: string[]) => kws.map(k => ({
     keyword: k, search_volume: 5000, competition: 0.45, cpc: 0.85,
     volume_history: [5000, 4800, 4600, 4400, 4200, 4000, 3800, 3600, 3400, 3200, 3000, 2800],
@@ -13,6 +13,7 @@ const { enrichKeywordsMock, scoreKeywordsMock, checkQuotaMock, incrementQuotaMoc
   }))),
   checkQuotaMock: vi.fn(async () => ({ allowed: true })),
   incrementQuotaMock: vi.fn(async () => {}),
+  generateKeywordPoolMock: vi.fn(async () => []),
 }));
 
 // ── Module mocks (hoisted by Vitest) ─────────────────────
@@ -20,7 +21,11 @@ vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn(() => mockSupabase
 vi.mock('../../lib/seo/persist-strength.ts', () => ({ persistStrength: vi.fn(async () => {}) }));
 vi.mock('../../lib/seo/persist-seo.ts', () => ({ persistSeo: vi.fn(async () => ({})) }));
 vi.mock('../../lib/seo/enrich-keywords.ts', () => ({ enrichKeywords: enrichKeywordsMock }));
-vi.mock('../../lib/seo/score-keywords.ts', () => ({ scoreKeywords: scoreKeywordsMock }));
+vi.mock('../../lib/seo/score-keywords.ts', () => ({
+  scoreKeywords: scoreKeywordsMock,
+  isKeywordScoringError: (error: unknown) => (error as { code?: string })?.code === 'KEYWORD_SCORING_INCOMPLETE',
+  KEYWORD_GENERATION_SCORING_FAILURE_MESSAGE: "L'évaluation des mots-clés n'a pas pu être complétée. Aucun crédit n'a été débité. Veuillez réessayer plus tard.",
+}));
 vi.mock('../../lib/tokens/token-middleware.ts', () => ({
   checkQuota: checkQuotaMock,
   incrementQuota: incrementQuotaMock,
@@ -38,7 +43,7 @@ vi.mock('../../lib/etsy/etsy-client.ts', () => ({ fetchShopListings: vi.fn(async
 vi.mock('../../lib/etsy/score-etsy-listing.ts', () => ({ scoreEtsyListing: vi.fn(async () => ({})) }));
 vi.mock('../../lib/etsy/prepare-etsy-image.ts', () => ({ downloadAndUploadEtsyImage: vi.fn(async () => '') }));
 vi.mock('../../lib/etsy/match-product-type.ts', () => ({ matchProductType: vi.fn(async () => null) }));
-vi.mock('../../lib/seo/generate-keyword-pool.ts', () => ({ generateKeywordPool: vi.fn(async () => []) }));
+vi.mock('../../lib/seo/generate-keyword-pool.ts', () => ({ generateKeywordPool: generateKeywordPoolMock }));
 vi.mock('../../lib/ai/extract-json.ts', () => ({ extractJson: vi.fn((text: string) => text) }));
 vi.mock('../../lib/logic/analyse-image-logic.ts', () => ({ PROMPT_VISUAL_ANALYST: '', formatTaxonomyLists: vi.fn(() => ''), buildVisualAnalysisContext: vi.fn(() => ''), buildTaxonomyPrompt: vi.fn(() => ''), mergeAnalysisResults: vi.fn(() => ({})) }));
 
@@ -149,5 +154,40 @@ describe('POST /api/seo/user-keyword', () => {
       keyword: 'handmade pottery mug',
     });
     expect(typeof res.body.listing_strength).toBe('number');
+  });
+
+  it('does not persist or consume quota when shared AI scoring fails', async () => {
+    setupDefaultMocks();
+    scoreKeywordsMock.mockRejectedValueOnce(Object.assign(new Error('safe scoring failure'), {
+      code: 'KEYWORD_SCORING_INCOMPLETE',
+    }));
+
+    const res = await request(app).post('/api/seo/user-keyword').send({
+      listing_id: LISTING_ID,
+      user_id: USER_ID,
+      keyword: 'handmade pottery mug',
+    });
+
+    expect(res.status).toBe(500);
+    expect(incrementQuotaMock).not.toHaveBeenCalled();
+    expect(mockSupabaseClient.from.mock.calls.map(([table]) => table)).not.toContain('listing_seo_stats');
+  });
+
+  it('returns the same controlled scoring failure from the Express generation route', async () => {
+    setupDefaultMocks();
+    generateKeywordPoolMock.mockResolvedValueOnce(['handmade pottery mug']);
+    scoreKeywordsMock.mockRejectedValueOnce(Object.assign(new Error('safe scoring failure'), {
+      code: 'KEYWORD_SCORING_INCOMPLETE',
+    }));
+
+    const res = await request(app).post('/api/seo/generate-keywords').send({
+      listing_id: LISTING_ID,
+      user_id: USER_ID,
+    });
+
+    expect(res.status).toBe(502);
+    expect(res.body).toEqual({
+      error: "L'évaluation des mots-clés n'a pas pu être complétée. Aucun crédit n'a été débité. Veuillez réessayer plus tard.",
+    });
   });
 });

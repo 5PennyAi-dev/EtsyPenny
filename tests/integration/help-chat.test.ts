@@ -18,7 +18,11 @@ vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn(() => mockSupabase
 vi.mock('../../lib/seo/persist-strength.ts', () => ({ persistStrength: vi.fn(async () => {}) }));
 vi.mock('../../lib/seo/persist-seo.ts', () => ({ persistSeo: vi.fn(async () => ({})) }));
 vi.mock('../../lib/seo/enrich-keywords.ts', () => ({ enrichKeywords: vi.fn(async () => []) }));
-vi.mock('../../lib/seo/score-keywords.ts', () => ({ scoreKeywords: vi.fn(async () => []) }));
+vi.mock('../../lib/seo/score-keywords.ts', () => ({
+  scoreKeywords: vi.fn(async () => []),
+  isKeywordScoringError: (error: unknown) => (error as { code?: string })?.code === 'KEYWORD_SCORING_INCOMPLETE',
+  KEYWORD_GENERATION_SCORING_FAILURE_MESSAGE: "L'évaluation des mots-clés n'a pas pu être complétée. Aucun crédit n'a été débité. Veuillez réessayer plus tard.",
+}));
 vi.mock('../../lib/seo/generate-keyword-pool.ts', () => ({ generateKeywordPool: vi.fn(async () => []) }));
 vi.mock('../../lib/tokens/token-middleware.ts', () => ({
   checkQuota: vi.fn(async () => ({ allowed: true })),

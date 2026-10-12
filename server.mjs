@@ -20,7 +20,11 @@ import {
 } from './lib/logic/analyse-image-logic.ts';
 import { generateKeywordPool } from './lib/seo/generate-keyword-pool.ts';
 import { enrichKeywords } from './lib/seo/enrich-keywords.ts';
-import { scoreKeywords } from './lib/seo/score-keywords.ts';
+import {
+  scoreKeywords,
+  isKeywordScoringError,
+  KEYWORD_GENERATION_SCORING_FAILURE_MESSAGE,
+} from './lib/seo/score-keywords.ts';
 import { selectAndScore } from './lib/seo/select-and-score.ts';
 import { persistSeo } from './lib/seo/persist-seo.ts';
 import { persistStrength } from './lib/seo/persist-strength.ts';
@@ -347,6 +351,14 @@ app.post('/api/seo/generate-keywords', async (req, res) => {
     });
 
   } catch (error) {
+    if (isKeywordScoringError(error)) {
+      console.error('❌ [generate-keywords] Incomplete AI keyword scoring');
+      try {
+        const { listing_id } = req.body || {};
+        if (listing_id) await supabaseAdmin.from('listings').update({ is_generating_seo: false }).eq('id', listing_id);
+      } catch (_) {}
+      return res.status(502).json({ error: KEYWORD_GENERATION_SCORING_FAILURE_MESSAGE });
+    }
     console.error('❌ [generate-keywords] Error:', error.message || error);
     // Try to reset is_generating_seo on failure
     try {

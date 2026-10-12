@@ -97,6 +97,8 @@ Traiter une fonctionnalité à la fois, en associant migration du fournisseur, a
 
 État au 11 octobre 2026 — la restauration à cinq segments depuis `09e7103` a été remplacée localement par la référence `fbb2a69`. Le générateur retrouve textuellement ses six segments spécialisés (Core Product, Style & Aesthetic, Buyer & Occasion, Niche & Adjacent, Long-Tail & Specific et Broad Discovery), leurs volumes, le contexte incluant couleurs et éléments graphiques, et leurs règles partagées. Le routeur IA, le parsing, la validation, la déduplication canonique, la facturation et les routes actuelles sont conservés. La qualité sémantique doit être comparée sur le jeu de cas de la phase 7 avant toute généralisation.
 
+État au 11 octobre 2026 — fiabilité des scorings : `niche_scoring` et `transactional_scoring` ne remplacent plus une erreur technique par `4` ou `1`. Après leurs retries existants, une réponse JSON invalide, incomplète, contenant un mot inattendu ou un score hors de `{1,4,7,10}` échoue explicitement. Les flux Vercel et Express de génération arrêtent avant la persistance, la finalisation et le débit de crédits ; les ajouts de mots-clés et le scoring Etsy arrêtent aussi avant toute écriture SEO correspondante. Les tests simulés couvrent scores valides, échecs fournisseur/batch, réponses incomplètes et invalides, ainsi que l'absence de persistance et de débit sur la génération. Aucun résultat partiel ou score `null` n'est introduit.
+
 - [ ] Confier au modèle la compréhension du produit et la génération sémantique de variantes pertinentes.
 - [ ] Utiliser DataForSEO pour les données de marché, avec leur provenance et leurs limites.
 - [ ] Calculer le scoring/ranking dans PennySEO lorsque les règles sont déterministes.
