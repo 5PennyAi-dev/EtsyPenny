@@ -74,3 +74,40 @@ describe('runAI taxonomy_mapping with OpenAI', () => {
     }));
   });
 });
+
+describe('runAI draft_generation with OpenAI', () => {
+  it('uses the selected model and draft schema without falling back to Gemini', async () => {
+    selectConfig.mockResolvedValue({
+      data: [{
+        task_key: 'draft_generation',
+        provider: 'openai',
+        model_id: 'gpt-4o-mini',
+        temperature: 0.9,
+        max_tokens: 2048,
+      }],
+      error: null,
+    });
+    callOpenAI.mockRejectedValue(Object.assign(new Error('OpenAI unavailable'), { status: 503 }));
+
+    await expect(runAI('draft_generation', 'prompt')).rejects.toThrow('OpenAI unavailable');
+
+    expect(callOpenAI).toHaveBeenCalledTimes(3);
+    expect(callGemini).not.toHaveBeenCalled();
+    expect(callOpenAI).toHaveBeenLastCalledWith(expect.objectContaining({
+      model: 'gpt-4o-mini',
+      temperature: 0.9,
+      maxTokens: 2048,
+      structuredOutput: expect.objectContaining({ name: 'draft_generation' }),
+    }));
+  });
+
+  it('does not hide a missing draft configuration behind the global Gemini default', async () => {
+    selectConfig.mockResolvedValue({ data: [], error: null });
+
+    await expect(runAI('draft_generation', 'prompt'))
+      .rejects.toThrow('Missing AI configuration for task "draft_generation"');
+
+    expect(callOpenAI).not.toHaveBeenCalled();
+    expect(callGemini).not.toHaveBeenCalled();
+  });
+});

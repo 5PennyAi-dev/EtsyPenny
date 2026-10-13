@@ -5,6 +5,7 @@ import { callOpenAI } from './adapters/openai-adapter.js';
 import type { AICallParams, AIResponse, AIMessage, StreamChunk } from './types.js';
 import { VISUAL_ANALYSIS_STRUCTURED_OUTPUT } from './vision-analysis.js';
 import { TAXONOMY_MAPPING_STRUCTURED_OUTPUT } from './taxonomy-mapping.js';
+import { DRAFT_GENERATION_STRUCTURED_OUTPUT } from './draft-generation.js';
 
 // ── Retry with exponential backoff ──────────────────────────────────
 
@@ -58,13 +59,15 @@ async function getTaskConfig(taskKey: string) {
     configCacheTime = Date.now();
   }
 
-  return configCache[taskKey] || {
+  return configCache[taskKey];
+}
+
+const DEFAULT_TASK_CONFIG = {
     provider: 'gemini',
     model_id: 'gemini-2.5-flash',
     temperature: 1.0,
     max_tokens: 8192,
-  };
-}
+};
 
 // ── Adapters & fallback chains ──────────────────────────────────────
 
@@ -126,7 +129,11 @@ export async function runAI(
   prompt: string,
   options?: RunAIOptions
 ): Promise<AIResponse> {
-  const config = await getTaskConfig(taskKey);
+  const configuredTask = await getTaskConfig(taskKey);
+  if (!configuredTask && taskKey === 'draft_generation') {
+    throw new Error('[provider-router] Missing AI configuration for task "draft_generation"');
+  }
+  const config = configuredTask || DEFAULT_TASK_CONFIG;
   const adapter = adapters[config.provider];
 
   if (!adapter) {
@@ -138,6 +145,8 @@ export async function runAI(
     ? VISUAL_ANALYSIS_STRUCTURED_OUTPUT
     : taskKey === 'taxonomy_mapping'
       ? TAXONOMY_MAPPING_STRUCTURED_OUTPUT
+      : taskKey === 'draft_generation'
+        ? DRAFT_GENERATION_STRUCTURED_OUTPUT
       : undefined;
   const fallbacks = config.provider === 'gemini'
     ? (GEMINI_FALLBACK_CHAINS[primaryModel] ?? [])

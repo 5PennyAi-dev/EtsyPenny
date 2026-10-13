@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // ─── SHARED LIB IMPORTS (same modules used by Vercel api/) ──
 import { extractJson } from './lib/ai/extract-json.ts';
+import { DraftGenerationValidationError, parseDraftGenerationResponse } from './lib/ai/draft-generation.ts';
 import { runAI } from './lib/ai/provider-router.ts';
 import { parseVisualAnalysisResponse } from './lib/ai/vision-analysis.ts';
 import { parseTaxonomyMappingResponse } from './lib/ai/taxonomy-mapping.ts';
@@ -32,7 +33,7 @@ import { applySEOFilter } from './lib/seo/filter-logic.ts';
 import { extractProductTypeWords } from './lib/seo/concept-diversity.ts';
 import { runResetPool } from './lib/seo/run-reset-pool.ts';
 import { getSupabaseEdgeHeaders, getSupabaseServerConfig } from './lib/supabase/config.ts';
-import { checkTokenBalance, deductTokens, checkQuota, incrementQuota } from './lib/tokens/token-middleware.ts';
+import { checkTokenBalance, deductTokens, TokenDeductionError, checkQuota, incrementQuota } from './lib/tokens/token-middleware.ts';
 import { getStripe, PRICE_TO_PLAN, PRICE_TO_PACK, PLAN_TOKENS } from './lib/stripe/client.ts';
 import { sendEmail } from './lib/email/send-email.ts';
 import { welcomeEmail } from './lib/email/templates/welcome.ts';
@@ -465,6 +466,13 @@ app.post('/api/seo/recalculate-scores', async (req, res) => {
 
 // ─── API ROUTE: POST /api/seo/generate-draft ──────────
 const STATUS_COMPLETE = '28a11ca0-bcfc-42e0-971d-efc320f78424';
+class DraftPersistenceError extends Error {}
+function draftErrorResponse(error) {
+  if (error instanceof DraftGenerationValidationError) return { status: 502, message: 'The AI response could not be used. No credit was deducted.', type: 'invalid_response' };
+  if (error instanceof DraftPersistenceError) return { status: 500, message: 'The draft could not be saved. No credit was deducted.', type: 'persistence' };
+  if (error instanceof TokenDeductionError) return { status: 500, message: 'The draft was saved, but billing could not be confirmed. Please contact support before retrying.', type: 'billing_uncertain' };
+  return { status: 502, message: 'Draft generation is temporarily unavailable. No credit was deducted.', type: 'provider_or_configuration' };
+}
 
 app.post('/api/seo/generate-draft', async (req, res) => {
   try {
@@ -555,7 +563,8 @@ app.post('/api/seo/generate-draft', async (req, res) => {
       }
     }
 
-    console.log(`\n✍️  [generate-draft] Starting for listing ${listing_id} (${keywords.length} keywords)`);
+    const startedAt = Date.now();
+    console.info(`[generate-draft] task=draft_generation listing=${listing_id} keywords=${keywords.length}`);
 
     // Step A: Build clean SEO brief from keywords (no emoji, capped at 13)
     const statusClean = (item) => {
@@ -653,45 +662,38 @@ Respond with ONLY this JSON, no other text:
   "description": "your description here with markdown bullets"
 }`;
 
-    // Log the interpolated prompt for debugging
-    console.log('\n========== GENERATE-DRAFT PROMPT ==========\n');
-    console.log(prompt);
-    console.log('\n========== END PROMPT ==========\n');
-
     // Step C: Call AI
-    const { text: rawResponse } = await runAI('draft_generation', prompt);
+    const aiResponse = await runAI('draft_generation', prompt);
 
     // Step D: Parse response
-    const parsed = JSON.parse(extractJson(rawResponse));
-    const { title, description } = parsed;
-
-    if (!title) {
-      throw new Error('Gemini returned no title');
-    }
+    const { title, description } = parseDraftGenerationResponse(extractJson(aiResponse.text));
 
     // Step E: Persist to DB
-    const { error: updateError } = await supabaseAdmin
+    const { data: updatedListing, error: updateError } = await supabaseAdmin
       .from('listings')
       .update({
         generated_title: title,
         generated_description: description,
         status_id: STATUS_COMPLETE
       })
-      .eq('id', listing_id);
+      .eq('id', listing_id)
+      .eq('user_id', user_id)
+      .select('id')
+      .maybeSingle();
 
-    if (updateError) {
-      console.error('   ⚠️ DB update failed:', updateError.message);
-    }
+    if (updateError || !updatedListing) throw new DraftPersistenceError('Listing update failed');
 
     // Deduct token after successful processing
     await deductTokens(user_id, 'generate_draft', tokenCheck.required, listing_id);
 
-    console.log(`   ✅ Draft generated for ${listing_id} — title: "${title.substring(0, 50)}..."`);
+    const descriptionWordCount = description.trim().split(/\s+/).length;
+    console.info(`[generate-draft] complete task=draft_generation provider=${aiResponse.provider} model=${aiResponse.model} listing=${listing_id} title_length=${title.length} description_words=${descriptionWordCount} duration_ms=${Date.now() - startedAt}`);
     return res.json({ success: true, title, description });
 
   } catch (error) {
-    console.error('❌ [generate-draft] Error:', error.message || error);
-    return res.status(500).json({ error: 'Failed to generate draft.', details: error.message || 'Unknown error' });
+    const response = draftErrorResponse(error);
+    console.error(`[generate-draft] failed task=draft_generation type=${response.type}`);
+    return res.status(response.status).json({ error: response.message });
   }
 });
 

@@ -39,7 +39,7 @@ function validateStructuredOutputParameters(params: AICallParams) {
 
   if (!OPENAI_STRUCTURED_OUTPUT_MODELS.has(params.model)) {
     throw new Error(
-      `OpenAI model "${params.model}" is not verified for visual-analysis Structured Outputs`,
+      `OpenAI model "${params.model}" is not verified for Structured Outputs`,
     );
   }
   if (!Number.isFinite(params.temperature) || params.temperature < 0 || params.temperature > 2) {
@@ -102,13 +102,13 @@ export async function callOpenAI(params: AICallParams): Promise<AIResponse> {
     throw new Error('OpenAI returned no completion choice');
   }
   if (choice.message.refusal) {
-    throw new Error(`OpenAI refused visual analysis: ${choice.message.refusal}`);
+    throw new Error(`OpenAI refused completion: ${choice.message.refusal}`);
   }
   if (choice.finish_reason !== 'stop') {
-    throw new Error(`OpenAI visual analysis was incomplete (finish_reason: ${choice.finish_reason ?? 'unknown'})`);
+    throw new Error(`OpenAI completion was incomplete (finish_reason: ${choice.finish_reason ?? 'unknown'})`);
   }
   if (!choice.message.content?.trim()) {
-    throw new Error('OpenAI returned an empty visual analysis response');
+    throw new Error('OpenAI returned an empty completion response');
   }
 
   return {

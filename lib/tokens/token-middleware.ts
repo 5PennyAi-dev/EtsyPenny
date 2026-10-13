@@ -10,6 +10,13 @@ export const TOKEN_COSTS = {
 
 export type TokenAction = keyof typeof TOKEN_COSTS;
 
+export class TokenDeductionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TokenDeductionError';
+  }
+}
+
 /**
  * Check if user has enough tokens for an action.
  * Returns { allowed: true } or { allowed: false, reason, balance, required }
@@ -55,13 +62,13 @@ export async function deductTokens(
   cost: number,
   listingId?: string
 ) {
-  const { data: profile } = await supabaseAdmin
+  const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
     .select('tokens_monthly_balance, tokens_bonus_balance')
     .eq('id', userId)
     .single();
 
-  if (!profile) throw new Error('Profile not found');
+  if (profileError || !profile) throw new TokenDeductionError('Failed to load token balance');
 
   let monthlyBalance = profile.tokens_monthly_balance ?? 0;
   let bonusBalance = profile.tokens_bonus_balance ?? 0;
@@ -80,16 +87,22 @@ export async function deductTokens(
   const balanceAfter = monthlyBalance + bonusBalance;
 
   // Update profile balances
-  await supabaseAdmin
+  const { data: updatedProfile, error: updateError } = await supabaseAdmin
     .from('profiles')
     .update({
       tokens_monthly_balance: monthlyBalance,
       tokens_bonus_balance: bonusBalance,
     })
-    .eq('id', userId);
+    .eq('id', userId)
+    .select('id')
+    .maybeSingle();
+
+  if (updateError || !updatedProfile) {
+    throw new TokenDeductionError('Failed to update token balance');
+  }
 
   // Log transaction
-  await supabaseAdmin.from('token_transactions').insert({
+  const { error: transactionError } = await supabaseAdmin.from('token_transactions').insert({
     user_id: userId,
     type: 'deduction',
     amount: -cost,
@@ -98,6 +111,10 @@ export async function deductTokens(
     balance_after: balanceAfter,
     description: `${action} (cost: ${cost} tokens)`,
   });
+
+  if (transactionError) {
+    throw new TokenDeductionError('Failed to record token transaction');
+  }
 
   // If generate_keywords or rerun, increment seo_generation_count
   if ((action === 'generate_keywords' || action === 'rerun_keywords') && listingId) {

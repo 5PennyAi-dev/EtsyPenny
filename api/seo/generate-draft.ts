@@ -2,11 +2,27 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { runAI } from '../../lib/ai/provider-router.js';
 import { extractJson } from '../../lib/ai/extract-json.js';
-import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
+import { DraftGenerationValidationError, parseDraftGenerationResponse } from '../../lib/ai/draft-generation.js';
+import { checkTokenBalance, deductTokens, TokenDeductionError } from '../../lib/tokens/token-middleware.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
 const STATUS_COMPLETE = '28a11ca0-bcfc-42e0-971d-efc320f78424';
+
+class DraftPersistenceError extends Error {}
+
+function draftErrorResponse(error: unknown) {
+  if (error instanceof DraftGenerationValidationError) {
+    return { status: 502, message: 'The AI response could not be used. No credit was deducted.', type: 'invalid_response' };
+  }
+  if (error instanceof DraftPersistenceError) {
+    return { status: 500, message: 'The draft could not be saved. No credit was deducted.', type: 'persistence' };
+  }
+  if (error instanceof TokenDeductionError) {
+    return { status: 500, message: 'The draft was saved, but billing could not be confirmed. Please contact support before retrying.', type: 'billing_uncertain' };
+  }
+  return { status: 502, message: 'Draft generation is temporarily unavailable. No credit was deducted.', type: 'provider_or_configuration' };
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   initSentry();
@@ -104,7 +120,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(402).json({ error: tokenCheck.reason, balance: tokenCheck.balance, required: tokenCheck.required });
     }
 
-    console.info(`[generate-draft] listing=${listing_id} keywords=${keywords.length}`);
+    const startedAt = Date.now();
+    console.info(`[generate-draft] task=draft_generation listing=${listing_id} keywords=${keywords.length}`);
 
     // Step A: Build clean SEO brief from keywords (no emoji, capped at 13)
     const statusClean = (item: { status?: { promising?: boolean; trending?: boolean; evergreen?: boolean } }) => {
@@ -200,47 +217,39 @@ Respond with ONLY this JSON, no other text:
   "description": "your description here with markdown bullets"
 }`;
 
-    // Log the interpolated prompt for debugging
-    console.log('\n========== GENERATE-DRAFT PROMPT ==========\n');
-    console.log(prompt);
-    console.log('\n========== END PROMPT ==========\n');
-
-    // Step C: Call Gemini
-    const { text: rawResponse } = await runAI('draft_generation', prompt);
+    // Step C: Call the configured provider.
+    const aiResponse = await runAI('draft_generation', prompt);
 
     // Step D: Parse response
-    const parsed = JSON.parse(extractJson(rawResponse));
-    const { title, description } = parsed;
-
-    if (!title) {
-      throw new Error('Gemini returned no title');
-    }
+    const { title, description } = parseDraftGenerationResponse(extractJson(aiResponse.text));
 
     // Step E: Persist to DB
-    const { error: updateError } = await supabaseAdmin
+    const { data: updatedListing, error: updateError } = await supabaseAdmin
       .from('listings')
       .update({
         generated_title: title,
         generated_description: description,
         status_id: STATUS_COMPLETE,
       })
-      .eq('id', listing_id);
+      .eq('id', listing_id)
+      .eq('user_id', user_id)
+      .select('id')
+      .maybeSingle();
 
-    if (updateError) {
-      console.error('[generate-draft] DB update failed:', updateError.message);
-    }
+    if (updateError || !updatedListing) throw new DraftPersistenceError('Listing update failed');
 
     // Deduct token after successful processing
     await deductTokens(user_id, 'generate_draft', tokenCheck.required, listing_id);
 
-    console.info(`[generate-draft] complete listing=${listing_id}`);
+    const descriptionWordCount = description.trim().split(/\s+/).length;
+    console.info(`[generate-draft] complete task=draft_generation provider=${aiResponse.provider} model=${aiResponse.model} listing=${listing_id} title_length=${title.length} description_words=${descriptionWordCount} duration_ms=${Date.now() - startedAt}`);
     return res.json({ success: true, title, description });
 
   } catch (error: unknown) {
     if (error instanceof AuthError) return res.status(error.status).json({ error: error.message });
     Sentry.captureException(error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('❌ [generate-draft] Error:', message);
-    return res.status(500).json({ error: 'Failed to generate draft.', details: message });
+    const response = draftErrorResponse(error);
+    console.error(`[generate-draft] failed task=draft_generation type=${response.type}`);
+    return res.status(response.status).json({ error: response.message });
   }
 }
