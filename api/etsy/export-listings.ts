@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { updateEtsyListing } from '../../lib/etsy/etsy-client.js';
 import { getActiveConnection, EtsyConnectionError } from '../../lib/etsy/get-connection.js';
+import { getOwnedLinkedEtsyListingForExport } from '../../lib/etsy/validate-export-listing.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
@@ -72,16 +73,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // ── 2b. Validate ownership ──────────────────────
-        const { data: etsyListing, error: elErr } = await supabaseAdmin
-          .from('etsy_listings')
-          .select('id, etsy_listing_id, listing_id, original_title, original_description, original_tags')
-          .eq('etsy_listing_id', etsy_listing_id)
-          .eq('user_id', user_id)
-          .single();
-
-        if (elErr || !etsyListing) {
-          throw new Error('Etsy listing not found or not owned by this user');
-        }
+        const etsyListing = await getOwnedLinkedEtsyListingForExport({
+          db: supabaseAdmin,
+          userId: user_id,
+          etsyListingId: etsy_listing_id,
+          listingId: listing_id,
+          connectionId: etsyConnection.id,
+        });
 
         // ── 2c. Fetch PennySEO listing data ─────────────
         const { data: pennyListing, error: plErr } = await supabaseAdmin

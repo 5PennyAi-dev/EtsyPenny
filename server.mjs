@@ -41,6 +41,7 @@ import { subscriptionEmail } from './lib/email/templates/subscription-confirmati
 import { tokenPackEmail } from './lib/email/templates/token-pack-confirmation.ts';
 import { fetchShopListings, fetchListingsByIds, updateEtsyListing, getSellerTaxonomyNodes } from './lib/etsy/etsy-client.ts';
 import { getActiveConnection, EtsyConnectionError } from './lib/etsy/get-connection.ts';
+import { getOwnedLinkedEtsyListingForExport } from './lib/etsy/validate-export-listing.ts';
 import { scoreEtsyListing } from './lib/etsy/score-etsy-listing.ts';
 import { downloadAndUploadEtsyImage } from './lib/etsy/prepare-etsy-image.ts';
 import { matchProductType } from './lib/etsy/match-product-type.ts';
@@ -1955,17 +1956,14 @@ app.post('/api/etsy/export-listings', async (req, res) => {
           throw new Error(`Invalid field: "${invalidField}". Allowed: tags, title, description`);
         }
 
-        // Validate ownership
-        const { data: etsyListing, error: elErr } = await supabaseAdmin
-          .from('etsy_listings')
-          .select('id, etsy_listing_id, listing_id, original_title, original_description, original_tags')
-          .eq('etsy_listing_id', etsy_listing_id)
-          .eq('user_id', user_id)
-          .single();
-
-        if (elErr || !etsyListing) {
-          throw new Error('Etsy listing not found or not owned by this user');
-        }
+        // Validate ownership, listing association, and active shop connection.
+        const etsyListing = await getOwnedLinkedEtsyListingForExport({
+          db: supabaseAdmin,
+          userId: user_id,
+          etsyListingId: etsy_listing_id,
+          listingId: listing_id,
+          connectionId: etsyConnection.id,
+        });
 
         // Fetch PennySEO listing data
         const { data: pennyListing, error: plErr } = await supabaseAdmin
