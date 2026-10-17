@@ -163,6 +163,23 @@ describe('POST /api/help/chat', () => {
     expect(opts.systemPrompt).toMatch(/PennySEO/);
   });
 
+  it('does not persist an assistant message when streaming fails after a delta', async () => {
+    setupConvoMocks();
+    streamAIMock.mockImplementation(async function* () {
+      yield { type: 'delta', text: 'Partial reply' };
+      throw new Error('provider connection dropped');
+    });
+
+    const res = await authenticatedRequest()
+      .post('/api/help/chat')
+      .send({ message: 'How do I generate SEO?', history: [] });
+
+    const chunks = parseSSE(res.text) as Array<{ type: string }>;
+    expect(chunks.map((chunk) => chunk.type)).toEqual(['conversation', 'delta', 'error']);
+    expect(chunks.some((chunk) => chunk.type === 'done')).toBe(false);
+    expect(mockSupabaseClient.from.mock.calls.filter(([table]) => table === 'help_messages')).toHaveLength(1);
+  });
+
   it('refuses a request without a JWT', async () => {
     const res = await request
       .post('/api/help/chat')

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
-import type { AICallParams, AIResponse } from '../types.js';
+import type { ChatCompletionCreateParamsStreaming } from 'openai/resources/chat/completions';
+import type { AICallParams, AIResponse, AIStreamParams, StreamChunk } from '../types.js';
 
 const OPENAI_STRUCTURED_OUTPUT_MODELS = new Set([
   'gpt-4o',
@@ -42,6 +43,15 @@ function validateStructuredOutputParameters(params: AICallParams) {
       `OpenAI model "${params.model}" is not verified for Structured Outputs`,
     );
   }
+  if (!Number.isFinite(params.temperature) || params.temperature < 0 || params.temperature > 2) {
+    throw new Error('OpenAI temperature must be between 0 and 2');
+  }
+  if (!Number.isInteger(params.maxTokens) || params.maxTokens < 1 || params.maxTokens > MAX_OUTPUT_TOKENS) {
+    throw new Error(`OpenAI max_tokens must be an integer between 1 and ${MAX_OUTPUT_TOKENS}`);
+  }
+}
+
+function validateStreamingParameters(params: AIStreamParams) {
   if (!Number.isFinite(params.temperature) || params.temperature < 0 || params.temperature > 2) {
     throw new Error('OpenAI temperature must be between 0 and 2');
   }
@@ -120,4 +130,85 @@ export async function callOpenAI(params: AICallParams): Promise<AIResponse> {
     model: params.model,
     provider: 'openai',
   };
+}
+
+/**
+ * Streaming Chat Completions adapter for text-only conversations.
+ *
+ * The internal stream contract stays provider-neutral so callers can keep
+ * forwarding its chunks through their existing SSE transport.
+ */
+export async function* callOpenAIStream(params: AIStreamParams): AsyncGenerator<StreamChunk> {
+  validateStreamingParameters(params);
+  const openai = getClient();
+
+  const messages: any[] = [];
+  if (params.systemPrompt) {
+    messages.push({ role: 'system', content: params.systemPrompt });
+  }
+  messages.push(...params.messages.map((message) => ({
+    role: message.role,
+    content: message.content,
+  })));
+
+  let stream;
+  try {
+    const request: ChatCompletionCreateParamsStreaming = {
+      model: params.model,
+      messages,
+      temperature: params.temperature,
+      max_completion_tokens: params.maxTokens,
+      stream: true,
+      stream_options: { include_usage: true },
+    } as any;
+    stream = await openai.chat.completions.create(request, { signal: params.signal });
+  } catch (err) {
+    if (params.signal?.aborted) return;
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`OpenAI chat completion stream failed: ${detail}`);
+  }
+
+  let text = '';
+  let finishReason: string | null = null;
+  let tokensInput: number | undefined;
+  let tokensOutput: number | undefined;
+
+  try {
+    for await (const chunk of stream) {
+      if (params.signal?.aborted) return;
+
+      if (chunk.usage) {
+        tokensInput = chunk.usage.prompt_tokens ?? undefined;
+        tokensOutput = chunk.usage.completion_tokens ?? undefined;
+      }
+
+      for (const choice of chunk.choices) {
+        if (choice.delta.refusal) {
+          throw new Error(`OpenAI refused completion: ${choice.delta.refusal}`);
+        }
+        if (choice.finish_reason) {
+          finishReason = choice.finish_reason;
+        }
+        const delta = choice.delta.content;
+        if (delta) {
+          text += delta;
+          yield { type: 'delta', text: delta };
+        }
+      }
+    }
+  } catch (err) {
+    if (params.signal?.aborted) return;
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`OpenAI stream iteration failed: ${detail}`);
+  }
+
+  if (params.signal?.aborted) return;
+  if (finishReason !== 'stop') {
+    throw new Error(`OpenAI completion was incomplete (finish_reason: ${finishReason ?? 'unknown'})`);
+  }
+  if (!text.trim()) {
+    throw new Error('OpenAI returned an empty completion response');
+  }
+
+  yield { type: 'done', tokensInput, tokensOutput };
 }

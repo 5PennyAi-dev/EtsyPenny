@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../supabase/server.js';
 import { callGemini, callGeminiStream } from './adapters/gemini-adapter.js';
 import { callAnthropic } from './adapters/anthropic-adapter.js';
-import { callOpenAI } from './adapters/openai-adapter.js';
+import { callOpenAI, callOpenAIStream } from './adapters/openai-adapter.js';
 import type { AICallParams, AIResponse, AIMessage, StreamChunk } from './types.js';
 import { VISUAL_ANALYSIS_STRUCTURED_OUTPUT } from './vision-analysis.js';
 import { TAXONOMY_MAPPING_STRUCTURED_OUTPUT } from './taxonomy-mapping.js';
@@ -186,8 +186,8 @@ export async function runAI(
 }
 
 /**
- * Streaming sibling of runAI. Currently Gemini-only (no fallback chain —
- * switching models mid-stream isn't possible). On connect failure the
+ * Streaming sibling of runAI. Streaming has no fallback chain because
+ * switching models mid-stream isn't possible. On connect failure the
  * consumer should retry the whole call.
  *
  * @param taskKey - Matches a row in system_ai_config (e.g. 'help_chat')
@@ -205,21 +205,31 @@ export async function* streamAI(
   }
 ): AsyncGenerator<StreamChunk> {
   const config = await getTaskConfig(taskKey);
-
-  if (config.provider !== 'gemini') {
-    throw new Error(
-      `[streamAI] Streaming only supported for gemini provider; task "${taskKey}" is configured for "${config.provider}"`
-    );
+  if (!config) {
+    throw new Error(`[streamAI] Missing AI configuration for task "${taskKey}"`);
   }
 
-  yield* callGeminiStream({
+  const params = {
     model: config.model_id,
     messages,
     temperature: options?.temperatureOverride ?? config.temperature,
     maxTokens: options?.maxTokensOverride ?? config.max_tokens,
     systemPrompt: options?.systemPrompt,
     signal: options?.signal,
-  });
+  };
+
+  if (config.provider === 'gemini') {
+    yield* callGeminiStream(params);
+    return;
+  }
+  if (config.provider === 'openai') {
+    yield* callOpenAIStream(params);
+    return;
+  }
+
+  throw new Error(
+    `[streamAI] Streaming is not supported for provider "${config.provider}" on task "${taskKey}"`
+  );
 }
 
 /**
