@@ -206,7 +206,7 @@ Lorsqu'une décision est validée, renseigner : **date, choix, justification, im
 
 **Critère de sortie :** absence d'exposition des tokens par les voies testées, lien métier contrôlé et export qui refuse les conflits connus sans écrasement silencieux. Les aspects évolués de comparaison UX restent pour la phase 4.
 
-### Phase 0C — Protection des publications Etsy (migration appliquée, code prêt à déployer)
+### Phase 0C — Protection des publications Etsy (déployée, validation fonctionnelle à faire)
 
 **Décision validée :** avant chaque publication, le serveur relit Etsy et compare seulement `title`, `description` et `tags` avec la dernière baseline Etsy explicitement acceptée. Les brouillons et optimisations PennySEO restent inchangés quand un conflit est détecté.
 
@@ -217,7 +217,8 @@ Lorsqu'une décision est validée, renseigner : **date, choix, justification, im
 - [x] Préserver le traitement indépendant des autres listings d'un lot lorsque l'un est bloqué.
 - [x] Couvrir la comparaison et les parcours serveur simulés sans appel Etsy réel.
 - [x] Appliquer manuellement en production, le 18 octobre 2026, `20261017120000_etsy_export_conflicts.sql`.
-- [ ] Déployer le code 0C et actualiser ce statut après confirmation Vercel, puis vérifier le parcours avec une boutique de test sans publication réelle. **Ne pas utiliser `supabase db push` : les historiques local et distant restent désynchronisés.**
+- [x] Déployer le code 0C en Production et confirmer Vercel `Ready` le 18 octobre 2026 (commit `221cdd26198d8c5d1f4765acf82655ad14891c23`).
+- [ ] Vérifier le parcours avec une boutique de test sans publication réelle. **Ne pas utiliser `supabase db push` : les historiques local et distant restent désynchronisés.**
 
 **Critère de sortie :** après déploiement, une modification externe Etsy ne peut pas être remplacée silencieusement; les utilisateurs peuvent confirmer le remplacement d'un champ historique ou choisir une publication partielle.
 
@@ -347,11 +348,12 @@ _Ajouter ici chaque arbitrage formel, et mettre à jour la section 6._
 | 2026-10-17 | Phase 0B | Validation d'association Etsy/PennySEO ajoutée aux exports Vercel et Express | Déployée et validée en production | `lib/etsy/validate-export-listing.ts` ; commit `f45b6db777153e9ee8456522410b9b4426b98c68` |
 | 2026-10-17 | Phase 0B | Historique des migrations Supabase inspecté | Désynchronisé : interdiction de `supabase db push` jusqu'à réconciliation | `supabase migration list --linked` |
 | 2026-10-18 | Phase 0C | Migration de baselines, journaux et protections client appliquée manuellement dans Supabase Production | Migration validée; code prêt à déployer, confirmation Vercel en attente | `20261017120000_etsy_export_conflicts.sql` |
+| 2026-10-18 | Phase 0C | Code de protection des publications déployé en Production | Vercel `Ready`; validation fonctionnelle sans publication Etsy encore à faire | commit `221cdd26198d8c5d1f4765acf82655ad14891c23` |
 | 2026-10-17 | Suivi | Création et actualisation de cette feuille de route | Prête à être ajoutée au dépôt | `ROADMAP_ETSY_MYSHOP.md` |
 
 ## 12. Prochaine action immédiate
 
-**Déployer les correctifs Phase 0C, confirmer le déploiement Vercel, puis vérifier le parcours avec une boutique de test sans publication réelle.** Réconcilier séparément les historiques de migrations Supabase avant tout usage futur de `supabase db push`.
+**Vérifier le parcours Phase 0C avec une boutique de test sans publication réelle.** Réconcilier séparément les historiques de migrations Supabase avant tout usage futur de `supabase db push`.
 
 ## 13. Reprise du chantier dans une nouvelle conversation
 
