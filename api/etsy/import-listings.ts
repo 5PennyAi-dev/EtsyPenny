@@ -138,6 +138,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (insertError) throw insertError;
 
+    // A new import is the only safe moment to establish its first trusted Etsy
+    // baseline: the values above were just read from Etsy in this request.
+    if (inserted?.length) {
+      const now = new Date().toISOString();
+      const { error: baselineError } = await supabaseAdmin
+        .from('etsy_listing_export_baselines')
+        .upsert(inserted.map((listing) => ({
+          etsy_listing_row_id: listing.id,
+          user_id,
+          connection_id: etsyConnection.id,
+          etsy_listing_id: listing.etsy_listing_id,
+          baseline_snapshot: {
+            title: listing.original_title,
+            description: listing.original_description,
+            tags: listing.original_tags ?? [],
+          },
+          trusted_fields: ['title', 'description', 'tags'],
+          source: 'import',
+          verified_at: now,
+          updated_at: now,
+        })), { onConflict: 'etsy_listing_row_id' });
+      if (baselineError) throw baselineError;
+    }
+
     const imported = inserted?.length ?? 0;
     console.info(`[import-listings] ✅ imported=${imported} skipped=${skipped}`);
 

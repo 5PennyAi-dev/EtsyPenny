@@ -39,9 +39,9 @@ import { sendEmail } from './lib/email/send-email.ts';
 import { welcomeEmail } from './lib/email/templates/welcome.ts';
 import { subscriptionEmail } from './lib/email/templates/subscription-confirmation.ts';
 import { tokenPackEmail } from './lib/email/templates/token-pack-confirmation.ts';
-import { fetchShopListings, fetchListingsByIds, updateEtsyListing, getSellerTaxonomyNodes } from './lib/etsy/etsy-client.ts';
+import { fetchShopListings, fetchListingsByIds, getSellerTaxonomyNodes } from './lib/etsy/etsy-client.ts';
 import { getActiveConnection, EtsyConnectionError } from './lib/etsy/get-connection.ts';
-import { getOwnedLinkedEtsyListingForExport } from './lib/etsy/validate-export-listing.ts';
+import { processEtsyExportItem, toErrorMessage } from './lib/etsy/process-etsy-export.ts';
 import { scoreEtsyListing } from './lib/etsy/score-etsy-listing.ts';
 import { downloadAndUploadEtsyImage } from './lib/etsy/prepare-etsy-image.ts';
 import { matchProductType } from './lib/etsy/match-product-type.ts';
@@ -1703,6 +1703,29 @@ app.post('/api/etsy/import-listings', async (req, res) => {
 
     if (insertError) throw insertError;
 
+    // The Etsy response read during this import is the first trusted baseline.
+    if (inserted?.length) {
+      const now = new Date().toISOString();
+      const { error: baselineError } = await supabaseAdmin
+        .from('etsy_listing_export_baselines')
+        .upsert(inserted.map((listing) => ({
+          etsy_listing_row_id: listing.id,
+          user_id,
+          connection_id: etsyConnection.id,
+          etsy_listing_id: listing.etsy_listing_id,
+          baseline_snapshot: {
+            title: listing.original_title,
+            description: listing.original_description,
+            tags: listing.original_tags ?? [],
+          },
+          trusted_fields: ['title', 'description', 'tags'],
+          source: 'import',
+          verified_at: now,
+          updated_at: now,
+        })), { onConflict: 'etsy_listing_row_id' });
+      if (baselineError) throw baselineError;
+    }
+
     const imported = inserted?.length ?? 0;
     console.info(`   ✅ [import-listings] imported=${imported} skipped=${skipped}`);
 
@@ -1908,7 +1931,7 @@ app.post('/api/etsy/prepare-listing', async (req, res) => {
 // ─── ETSY EXPORT ─────────────────────────────────────────
 app.post('/api/etsy/export-listings', async (req, res) => {
   try {
-    const { listings } = req.body;
+    const { listings, mode = 'preflight', allow_partial = false, confirmed = false } = req.body;
     const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
     const user_id = user.id;
 
@@ -1918,8 +1941,9 @@ app.post('/api/etsy/export-listings', async (req, res) => {
     if (listings.length > 5) {
       return res.status(400).json({ error: 'Maximum 5 listings per export request' });
     }
-
-    console.info(`\n📤 [export-listings] user=${user_id} requested=${listings.length}`);
+    if (mode !== 'preflight' && mode !== 'execute') {
+      return res.status(400).json({ error: 'Invalid export mode' });
+    }
 
     let etsyConnection;
     try {
@@ -1941,152 +1965,25 @@ app.post('/api/etsy/export-listings', async (req, res) => {
     }
 
     const results = [];
-
     for (const item of listings) {
-      const { etsy_listing_id, listing_id, fields } = item;
-
       try {
-        if (!etsy_listing_id || !listing_id || !Array.isArray(fields) || fields.length === 0) {
-          throw new Error('Invalid listing entry: requires etsy_listing_id, listing_id, and non-empty fields array');
-        }
-
-        const validFields = ['tags', 'title', 'description'];
-        const invalidField = fields.find((f) => !validFields.includes(f));
-        if (invalidField) {
-          throw new Error(`Invalid field: "${invalidField}". Allowed: tags, title, description`);
-        }
-
-        // Validate ownership, listing association, and active shop connection.
-        const etsyListing = await getOwnedLinkedEtsyListingForExport({
+        results.push(await processEtsyExportItem({
           db: supabaseAdmin,
+          connection: etsyConnection,
           userId: user_id,
-          etsyListingId: etsy_listing_id,
-          listingId: listing_id,
-          connectionId: etsyConnection.id,
-        });
-
-        // Fetch PennySEO listing data
-        const { data: pennyListing, error: plErr } = await supabaseAdmin
-          .from('listings')
-          .select('generated_title, generated_description')
-          .eq('id', listing_id)
-          .eq('user_id', user_id)
-          .single();
-
-        if (plErr || !pennyListing) {
-          throw new Error('PennySEO listing not found');
-        }
-
-        // Build export payload per requested fields
-        const exportPayload = {};
-        const snapshotBefore = {};
-        const snapshotAfter = {};
-
-        if (fields.includes('title')) {
-          if (!pennyListing.generated_title) {
-            throw new Error('No generated title — run Magic Draft first');
-          }
-          exportPayload.title = pennyListing.generated_title.slice(0, 140);
-          snapshotBefore.title = etsyListing.original_title;
-          snapshotAfter.title = exportPayload.title;
-        }
-
-        if (fields.includes('description')) {
-          if (!pennyListing.generated_description) {
-            throw new Error('No generated description — run Magic Draft first');
-          }
-          exportPayload.description = pennyListing.generated_description;
-          snapshotBefore.description = etsyListing.original_description;
-          snapshotAfter.description = exportPayload.description;
-        }
-
-        if (fields.includes('tags')) {
-          const { data: tagRows, error: tagErr } = await supabaseAdmin
-            .from('listing_seo_stats')
-            .select('tag')
-            .eq('listing_id', listing_id)
-            .eq('is_current_eval', true)
-            .order('opportunity_score', { ascending: false })
-            .limit(13);
-
-          if (tagErr) throw tagErr;
-
-          const tags = (tagRows || [])
-            .map((r) => r.tag.trim())
-            .filter((t) => t.length > 0 && t.length <= 20)
-            .slice(0, 13);
-
-          if (tags.length === 0) {
-            throw new Error('No selected tags found — select tags in SEO Studio first');
-          }
-
-          exportPayload.tags = tags;
-          snapshotBefore.tags = etsyListing.original_tags || [];
-          snapshotAfter.tags = tags;
-        }
-
-        // Call Etsy API
-        const etsyResult = await updateEtsyListing(etsyConnection, etsy_listing_id, exportPayload);
-
-        if (!etsyResult.success) {
-          throw new Error(etsyResult.error || 'Etsy API call failed');
-        }
-
-        // Log success
-        await supabaseAdmin.from('etsy_export_logs').insert({
-          user_id,
-          etsy_listing_id,
-          listing_id,
-          fields_exported: fields,
-          snapshot_before: snapshotBefore,
-          snapshot_after: snapshotAfter,
-          status: 'success',
-        });
-
-        // Update etsy_listings status
-        await supabaseAdmin
-          .from('etsy_listings')
-          .update({
-            export_status: 'exported',
-            last_exported_at: new Date().toISOString(),
-          })
-          .eq('id', etsyListing.id);
-
-        results.push({ etsy_listing_id, status: 'success', fields_exported: fields });
-
+          item,
+          mode,
+          allowPartial: Boolean(allow_partial),
+          confirmed: Boolean(confirmed),
+        }));
       } catch (itemError) {
-        const message = itemError instanceof Error ? itemError.message : 'Unknown error';
-        console.error(`   ❌ [export-listings] Failed for ${etsy_listing_id}:`, message);
-
-        try {
-          await supabaseAdmin.from('etsy_export_logs').insert({
-            user_id,
-            etsy_listing_id: etsy_listing_id || 0,
-            listing_id: listing_id || null,
-            fields_exported: fields || [],
-            snapshot_before: {},
-            snapshot_after: {},
-            status: 'error',
-            error_message: message,
-          });
-        } catch (_) { /* don't mask the real error */ }
-
-        if (etsy_listing_id) {
-          try {
-            await supabaseAdmin
-              .from('etsy_listings')
-              .update({ export_status: 'error' })
-              .eq('etsy_listing_id', etsy_listing_id)
-              .eq('user_id', user_id);
-          } catch (_) { /* don't mask the real error */ }
-        }
-
-        results.push({ etsy_listing_id, status: 'error', fields_exported: fields || [], error: message });
+        const message = toErrorMessage(itemError);
+        console.error(`[export-listings] Failed for ${item?.etsy_listing_id}:`, message);
+        results.push({ etsy_listing_id: item?.etsy_listing_id, status: 'error', fields: {}, fields_to_publish: [], error: message });
       }
     }
 
-    const successCount = results.filter((r) => r.status === 'success').length;
-    console.info(`   ✅ [export-listings] exported=${successCount} failed=${results.length - successCount}\n`);
+    const successCount = results.filter((result) => ['success', 'partial'].includes(result.status)).length;
 
     return res.json({
       results,

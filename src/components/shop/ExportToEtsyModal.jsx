@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle, Check, ChevronDown, ChevronUp, ExternalLink, Loader2 } from 'lucide-react';
@@ -198,9 +198,19 @@ const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [] }) => {
   );
 
   const [isExporting, setIsExporting] = useState(false);
+  const [review, setReview] = useState(null);
+  const [confirmedFields, setConfirmedFields] = useState({});
+  const [allowPartial, setAllowPartial] = useState(false);
 
   // Single mode: expanded state for each field card
   const [expandedField, setExpandedField] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) return;
+    setReview(null);
+    setConfirmedFields({});
+    setAllowPartial(false);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -250,6 +260,8 @@ const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [] }) => {
 
   const pushButtonText = isExporting
     ? 'Pushing...'
+    : review
+      ? 'Confirm and publish'
     : isSingle
       ? totalFieldCount === 0
         ? 'Select at least 1 field'
@@ -270,14 +282,21 @@ const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [] }) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Your session has expired. Please sign in again.');
+      const selectedListings = listings.map((listing, i) => ({
+        etsy_listing_id: listing.etsy_listing_id,
+        listing_id: listing.listing_id,
+        fields: Object.entries(localFields[i])
+          .filter(([k, v]) => v && fieldAvailable(listing, k))
+          .map(([k]) => k),
+      })).filter(item => item.fields.length > 0);
       const payload = {
-        listings: listings.map((listing, i) => ({
-          etsy_listing_id: listing.etsy_listing_id,
-          listing_id: listing.listing_id,
-          fields: Object.entries(localFields[i])
-            .filter(([k, v]) => v && fieldAvailable(listing, k))
-            .map(([k]) => k),
-        })).filter(item => item.fields.length > 0),
+        listings: selectedListings.map((item) => ({
+          ...item,
+          confirmed_fields: item.fields.filter((field) => confirmedFields[`${item.etsy_listing_id}:${field}`]),
+        })),
+        mode: review ? 'execute' : 'preflight',
+        confirmed: Boolean(review),
+        allow_partial: Boolean(review && allowPartial),
       };
 
       if (payload.listings.length === 0) {
@@ -290,8 +309,18 @@ const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [] }) => {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
-      if (data.summary.errors === 0) {
+      if (!review) {
+        setReview(data.results || []);
+        const ready = (data.results || []).filter(result => result.status === 'ready').length;
+        const conflicts = (data.results || []).filter(result => result.status === 'conflict').length;
+        if (conflicts > 0) {
+          toast.warning(`${conflicts} listing${conflicts > 1 ? 's require' : ' requires'} review before publishing.`);
+        } else {
+          toast.success(`${ready} listing${ready > 1 ? 's are' : ' is'} ready. Confirm to publish.`);
+        }
+      } else if (data.summary.errors === 0) {
         toast.success(`Successfully pushed to Etsy`);
+        setReview(null);
         onSuccess?.();
       } else if (data.summary.success > 0) {
         toast.warning(`Pushed ${data.summary.success}/${data.summary.total} listings. ${data.summary.errors} failed — check and retry.`);
@@ -307,6 +336,56 @@ const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [] }) => {
       setIsExporting(false);
     }
   };
+
+  const toggleConfirmedField = (etsyListingId, field) => {
+    const key = `${etsyListingId}:${field}`;
+    setConfirmedFields(previous => ({ ...previous, [key]: !previous[key] }));
+  };
+
+  const renderReview = () => (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+        Etsy was read again just now. Fields changed outside PennySEO need an explicit confirmation. You may publish only the eligible fields by enabling partial publication below.
+      </div>
+      {review.map((result) => {
+        const listing = listings.find(item => item.etsy_listing_id === result.etsy_listing_id);
+        const fields = result.fields || {};
+        return (
+          <div key={result.etsy_listing_id} className="rounded-lg border border-slate-200 p-3 space-y-2">
+            <p className="text-sm font-medium text-slate-800 truncate">
+              {listing?.display_title || listing?.optimized_title || `Etsy #${result.etsy_listing_id}`}
+            </p>
+            {Object.entries(fields).map(([field, detail]) => {
+              const needsConfirmation = ['conflict', 'baseline_unknown'].includes(detail.status);
+              const key = `${result.etsy_listing_id}:${field}`;
+              return (
+                <div key={field} className="rounded border border-slate-100 bg-slate-50 p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold capitalize text-slate-700">{field}</span>
+                    <span className={`text-[10px] font-medium ${needsConfirmation ? 'text-amber-700' : 'text-emerald-700'}`}>
+                      {detail.status === 'baseline_unknown' ? 'History needs confirmation' : detail.status}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-600 break-words"><span className="font-medium">Current Etsy:</span> {Array.isArray(detail.remote) ? detail.remote.join(', ') : detail.remote || '—'}</p>
+                  <p className="mt-1 text-[11px] text-slate-600 break-words"><span className="font-medium">PennySEO proposal:</span> {Array.isArray(detail.proposed) ? detail.proposed.join(', ') : detail.proposed || '—'}</p>
+                  {needsConfirmation && (
+                    <label className="mt-2 flex cursor-pointer items-start gap-2 text-[11px] text-slate-700">
+                      <input type="checkbox" checked={Boolean(confirmedFields[key])} onChange={() => toggleConfirmedField(result.etsy_listing_id, field)} className="mt-0.5" />
+                      <span>I confirm publishing the PennySEO {field} over the current Etsy value.</span>
+                    </label>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+      <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-3 text-xs text-slate-700">
+        <input type="checkbox" checked={allowPartial} onChange={(event) => setAllowPartial(event.target.checked)} className="mt-0.5" />
+        <span>Publish only fields without conflicts or explicitly confirmed above. Other listings may proceed independently.</span>
+      </label>
+    </div>
+  );
 
   // ── Single Mode Content ──────────────────────────────
 
@@ -517,16 +596,16 @@ const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [] }) => {
               );
             })()}
 
-            {isSingle ? renderSingleMode() : renderBatchMode()}
+            {review ? renderReview() : (isSingle ? renderSingleMode() : renderBatchMode())}
 
             {/* Warning banner */}
-            <div className="flex gap-3 p-3 mt-4 bg-amber-50 border border-amber-200 rounded-lg">
+            {!review && <div className="flex gap-3 p-3 mt-4 bg-amber-50 border border-amber-200 rounded-lg">
               <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-amber-700 leading-relaxed">
                 This will overwrite the selected fields on your live Etsy listing{listings.length > 1 ? 's' : ''}.
                 Original values are saved for reference.
               </p>
-            </div>
+            </div>}
           </div>
 
           {/* Action bar */}

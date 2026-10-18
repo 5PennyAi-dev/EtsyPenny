@@ -199,13 +199,27 @@ Lorsqu'une décision est validée, renseigner : **date, choix, justification, im
 - [x] Appliquer manuellement en production, le 17 octobre 2026, `20261017_secure_etsy_shop_connection_permissions.sql` : les tokens ne sont plus lisibles ni modifiables côté client et la lecture des métadonnées reste autorisée.
 - [x] Vérifier les privilèges SQL de production : le rôle `authenticated` pouvait lire/modifier les tokens et supprimer la connexion ; correction appliquée et pages My Shop / Settings validées en production.
 - [x] Implémenter localement la validation serveur du lien exact entre le listing Etsy, le listing PennySEO et la connexion Etsy active, en plus du JWT et de la propriété.
-- [ ] Déployer puis valider en production la protection d'association Etsy/PennySEO, identique pour Vercel et Express local.
-- [ ] Ajouter une protection minimale contre un export basé sur des données Etsy périmées : lecture récente, comparaison ciblée et refus contrôlé si conflit ; détails selon le plan approuvé.
+- [x] Déployer puis valider en production la protection d'association Etsy/PennySEO, identique pour Vercel et Express local.
 - [x] Couvrir la parité Vercel/Express et les cas d'échec par une validation partagée.
 - [x] Exécuter les tests ciblés sans afficher de secrets ; les permissions effectives sont validées en production.
 - [x] Constater la désynchronisation des historiques de migrations locales et distantes ; ne jamais exécuter `supabase db push` avant leur réconciliation explicite.
 
 **Critère de sortie :** absence d'exposition des tokens par les voies testées, lien métier contrôlé et export qui refuse les conflits connus sans écrasement silencieux. Les aspects évolués de comparaison UX restent pour la phase 4.
+
+### Phase 0C — Protection des publications Etsy (migration appliquée, code prêt à déployer)
+
+**Décision validée :** avant chaque publication, le serveur relit Etsy et compare seulement `title`, `description` et `tags` avec la dernière baseline Etsy explicitement acceptée. Les brouillons et optimisations PennySEO restent inchangés quand un conflit est détecté.
+
+- [x] Ajouter une migration locale créant les baselines serveur-only et les données d'audit d'export. Les imports futurs créent une baseline uniquement à partir de la réponse Etsy qui vient d'être lue.
+- [x] Traiter les listings historiques sans baseline comme inconnus : aucune baseline n'est inférée depuis les données locales. Toute différence demande une confirmation explicite.
+- [x] Relire Etsy lors de la prélecture, puis une seconde fois après le PATCH. Une confirmation est enregistrée dans le journal côté serveur et ne contourne ni JWT, ni propriété, ni connexion active.
+- [x] Ajouter dans la modale d'export une comparaison `Etsy actuel` / `proposition PennySEO`, confirmation par champ et publication partielle explicite.
+- [x] Préserver le traitement indépendant des autres listings d'un lot lorsque l'un est bloqué.
+- [x] Couvrir la comparaison et les parcours serveur simulés sans appel Etsy réel.
+- [x] Appliquer manuellement en production, le 18 octobre 2026, `20261017120000_etsy_export_conflicts.sql`.
+- [ ] Déployer le code 0C et actualiser ce statut après confirmation Vercel, puis vérifier le parcours avec une boutique de test sans publication réelle. **Ne pas utiliser `supabase db push` : les historiques local et distant restent désynchronisés.**
+
+**Critère de sortie :** après déploiement, une modification externe Etsy ne peut pas être remplacée silencieusement; les utilisateurs peuvent confirmer le remplacement d'un champ historique ou choisir une publication partielle.
 
 ### Phase 1 — MVP de fiabilité du catalogue et de la reprise
 
@@ -330,13 +344,14 @@ _Ajouter ici chaque arbitrage formel, et mettre à jour la section 6._
 | 2026-10-17 | Audit initial | Rapport Codex en lecture seule sur Etsy/My Shop | Reçu | Fichier transmis : `Texte collé(5).txt` (175 lignes) |
 | 2026-10-17 | Phase 0A | Prompt d'audit ciblé de sécurité préparé (tokens, lien export, conflits) | **Préparé mais non encore exécuté** | Prompt préparé dans la conversation PennySEO |
 | 2026-10-17 | Phase 0B | Permissions Supabase Etsy corrigées manuellement en production | Validé : métadonnées lisibles, tokens non lisibles/non modifiables et suppression client refusée ; My Shop et Settings fonctionnels | `20261017_secure_etsy_shop_connection_permissions.sql` |
-| 2026-10-17 | Phase 0B | Validation d'association Etsy/PennySEO ajoutée aux exports Vercel et Express | Implémentée localement ; déploiement et validation de production en attente | `lib/etsy/validate-export-listing.ts` |
+| 2026-10-17 | Phase 0B | Validation d'association Etsy/PennySEO ajoutée aux exports Vercel et Express | Déployée et validée en production | `lib/etsy/validate-export-listing.ts` ; commit `f45b6db777153e9ee8456522410b9b4426b98c68` |
 | 2026-10-17 | Phase 0B | Historique des migrations Supabase inspecté | Désynchronisé : interdiction de `supabase db push` jusqu'à réconciliation | `supabase migration list --linked` |
+| 2026-10-18 | Phase 0C | Migration de baselines, journaux et protections client appliquée manuellement dans Supabase Production | Migration validée; code prêt à déployer, confirmation Vercel en attente | `20261017120000_etsy_export_conflicts.sql` |
 | 2026-10-17 | Suivi | Création et actualisation de cette feuille de route | Prête à être ajoutée au dépôt | `ROADMAP_ETSY_MYSHOP.md` |
 
 ## 12. Prochaine action immédiate
 
-**Déployer puis vérifier la validation des associations Etsy/PennySEO** dans les flux d'export, sans publier de listing réel sur Etsy. Réconcilier séparément les historiques de migrations Supabase avant tout usage futur de `supabase db push`. Ne pas commencer le chantier de synchronisation et de résolution des conflits externes sans validation explicite.
+**Déployer les correctifs Phase 0C, confirmer le déploiement Vercel, puis vérifier le parcours avec une boutique de test sans publication réelle.** Réconcilier séparément les historiques de migrations Supabase avant tout usage futur de `supabase db push`.
 
 ## 13. Reprise du chantier dans une nouvelle conversation
 
