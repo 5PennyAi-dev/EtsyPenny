@@ -2,9 +2,9 @@
 
 > **Document de suivi et de transfert de contexte**
 > **Date de création :** 17 octobre 2026
-> **Dernière mise à jour :** 17 octobre 2026
-> **Statut global :** cadrage terminé, audit initial reçu; vérification ciblée de sécurité à lancer
-> **Phase active :** 0B — Permissions Supabase validées en production ; validation des associations à déployer
+> **Dernière mise à jour :** 19 octobre 2026
+> **Statut global :** phases 0B et 0C déployées ; migration d'identité canonique Phase 1 appliquée manuellement, code prêt pour déploiement
+> **Phase active :** 1 — fiabilité de l'identité Etsy/PennySEO ; déploiement applicatif à confirmer
 > **Dépôt :** https://github.com/5PennyAi-dev/EtsyPenny
 > **Destination recommandée dans le dépôt :** `docs/ROADMAP_ETSY_MYSHOP.md`
 > **Document directeur complémentaire :** `docs/ROADMAP.md` (vérifier la casse et l'existence dans le dépôt avant de créer un lien).
@@ -224,6 +224,14 @@ Lorsqu'une décision est validée, renseigner : **date, choix, justification, im
 
 ### Phase 1 — MVP de fiabilité du catalogue et de la reprise
 
+- [x] Implémenter localement une création atomique du listing PennySEO canonique pour chaque ligne `etsy_listings`, partagée par la préparation et le scoring Vercel/Express.
+- [x] Préserver les associations historiques existantes : un lien invalide échoue sans être réattribué et doit suivre une réparation ciblée validée.
+- [x] Empêcher localement deux demandes de scoring du même produit de démarrer deux traitements ou débits de crédits : la transition `pending → scoring` est revendiquée atomiquement avant tout appel externe.
+- [x] Ajouter les tests unitaires simulés de création canonique, préparation/scoring concurrents et revendication de scoring ; aucune API Etsy ou IA réelle n'a été appelée.
+- [x] Appliquer manuellement `20261018120000_etsy_canonical_listing.sql` en production le 19 octobre 2026 après vérification : aucun mapping `etsy_listings.listing_id` dupliqué et statut initial `New` confirmé.
+- [x] Conserver les doublons historiques sans réparation ni fusion automatique ; toute réparation restera ciblée, revue et explicitement validée.
+- [ ] Déployer le correctif applicatif Phase 1 et confirmer le statut Production Vercel. **Ne pas exécuter `supabase db push` : les historiques restent désynchronisés.**
+- [ ] Vérifier en production, après déploiement, l'import suivi d'une préparation et d'un scoring concurrents sur une boutique de test, sans publication Etsy.
 - [ ] Corriger le chargement cumulatif : ajouter la page suivante sans remplacer les éléments chargés, éviter doublons et désynchronisation des compteurs.
 - [ ] Traiter proprement les états chargement/succès/échec, y compris reconnexion et retry.
 - [ ] Éviter tout message « Sync successful » après échec réel; aligner le libellé de l'action sur son effet actuel.
@@ -349,11 +357,13 @@ _Ajouter ici chaque arbitrage formel, et mettre à jour la section 6._
 | 2026-10-17 | Phase 0B | Historique des migrations Supabase inspecté | Désynchronisé : interdiction de `supabase db push` jusqu'à réconciliation | `supabase migration list --linked` |
 | 2026-10-18 | Phase 0C | Migration de baselines, journaux et protections client appliquée manuellement dans Supabase Production | Migration validée; code prêt à déployer, confirmation Vercel en attente | `20261017120000_etsy_export_conflicts.sql` |
 | 2026-10-18 | Phase 0C | Code de protection des publications déployé en Production | Vercel `Ready`; validation fonctionnelle sans publication Etsy encore à faire | commit `221cdd26198d8c5d1f4765acf82655ad14891c23` |
+| 2026-10-19 | Phase 1 | Migration d'identité canonique appliquée manuellement en Production | Validée : aucun mapping dupliqué, statut `New` confirmé ; historiques Supabase toujours désynchronisés, `supabase db push` interdit | `20261018120000_etsy_canonical_listing.sql` |
+| 2026-10-19 | Phase 1 | Correctif applicatif de prévention des doublons | Validé localement, prêt pour déploiement ; doublons historiques non modifiés | Commit à créer |
 | 2026-10-17 | Suivi | Création et actualisation de cette feuille de route | Prête à être ajoutée au dépôt | `ROADMAP_ETSY_MYSHOP.md` |
 
 ## 12. Prochaine action immédiate
 
-**Vérifier le parcours Phase 0C avec une boutique de test sans publication réelle.** Réconcilier séparément les historiques de migrations Supabase avant tout usage futur de `supabase db push`.
+**Déployer le correctif applicatif Phase 1, confirmer Vercel Production, puis vérifier le parcours import → préparation/scoring sur une boutique de test sans publication Etsy.** Réconcilier séparément les historiques de migrations Supabase avant tout usage futur de `supabase db push`.
 
 ## 13. Reprise du chantier dans une nouvelle conversation
 

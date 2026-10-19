@@ -25,6 +25,10 @@ vi.mock('../../lib/etsy/match-product-type.js', () => ({
   matchProductType: vi.fn().mockResolvedValue('pt-1'),
 }));
 
+vi.mock('../../lib/etsy/get-or-create-canonical-listing.js', () => ({
+  getOrCreateCanonicalEtsyListing: vi.fn(),
+}));
+
 vi.mock('../../lib/ai/provider-router.js', () => ({
   runAI: vi.fn(),
 }));
@@ -64,6 +68,7 @@ vi.mock('../../lib/seo/run-reset-pool.js', () => ({
 }));
 
 import { downloadAndUploadEtsyImage } from '../../lib/etsy/prepare-etsy-image.js';
+import { getOrCreateCanonicalEtsyListing } from '../../lib/etsy/get-or-create-canonical-listing.js';
 import { runAI } from '../../lib/ai/provider-router.js';
 import { scoreKeywords } from '../../lib/seo/score-keywords.js';
 import { persistSeo } from '../../lib/seo/persist-seo.js';
@@ -134,6 +139,11 @@ beforeEach(() => {
     .mockResolvedValueOnce({ text: JSON.stringify({ theme: 'T', niche: 'N', sub_niche: 'Buyer Phrase' }) } as any);
 
   vi.mocked(downloadAndUploadEtsyImage).mockResolvedValue('https://storage/new-image.jpg');
+  vi.mocked(getOrCreateCanonicalEtsyListing).mockResolvedValue({
+    listingId: 'new-listing-1',
+    imageUrl: 'https://storage/new-image.jpg',
+    created: true,
+  });
 
   process.env.VITE_SUPABASE_URL = 'https://test.supabase.co';
   process.env.SUPABASE_SECRET_KEY = 'test-supabase-secret-key';
@@ -213,13 +223,12 @@ describe('scoreEtsyListing — idempotency', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('INSERT path: when listing_id is null, inserts a new row AND links etsy_listings.listing_id', async () => {
+  it('uses the atomic canonical-listing function when listing_id is null', async () => {
     const { client, calls } = makeSupabaseSpy({
       'etsy_listings:select': {
         data: { id: 'etsy-row-1', listing_id: null },
         error: null,
       },
-      'listings:insert': { data: { id: 'new-listing-1' }, error: null },
       'v_combined_themes:select': { data: [{ id: 'theme', name: 'T', description: null, origin: 'pennyseo' }], error: null },
       'v_combined_niches:select': { data: [{ id: 'niche', name: 'N', description: null, origin: 'pennyseo' }], error: null },
     });
@@ -230,26 +239,17 @@ describe('scoreEtsyListing — idempotency', () => {
     expect(result.listingId).toBe('new-listing-1');
     expect(downloadAndUploadEtsyImage).toHaveBeenCalledTimes(1);
 
-    const listingsInserts = calls.filter((c) => c.table === 'listings' && c.op === 'insert');
-    expect(listingsInserts).toHaveLength(1);
-    expect(listingsInserts[0].payload).toMatchObject({
-      source: 'etsy',
-      user_description: null,
-      is_image_analysed: false,
+    expect(getOrCreateCanonicalEtsyListing).toHaveBeenCalledWith({
+      etsyListingRowId: 'etsy-row-1',
+      userId: 'user-1',
+      title: 'Cute Mug',
+      imageUrl: 'https://storage/new-image.jpg',
+      productTypeId: 'pt-1',
     });
-
-    // After insert, etsy_listings should be updated with the new listing_id.
-    const linkUpdate = calls.find(
-      (c) =>
-        c.table === 'etsy_listings' &&
-        c.op === 'update' &&
-        (c.payload as any)?.listing_id === 'new-listing-1' &&
-        (c.payload as any)?.scoring_status === undefined, // only the link update, not the final scoring update
-    );
-    expect(linkUpdate).toBeTruthy();
+    expect(calls.some((c) => c.table === 'listings' && c.op === 'insert')).toBe(false);
   });
 
-  it('Stale FK fallback: listing_id set but listings row missing → falls through to INSERT path', async () => {
+  it('does not silently replace a stale Etsy/PennySEO association', async () => {
     const { client, calls } = makeSupabaseSpy({
       'etsy_listings:select': {
         data: { id: 'etsy-row-1', listing_id: 'ghost-listing' },
@@ -257,22 +257,24 @@ describe('scoreEtsyListing — idempotency', () => {
       },
       // No listings row found for the ghost id.
       'listings:select': { data: null, error: null },
-      'listings:insert': { data: { id: 'new-listing-2' }, error: null },
       'v_combined_themes:select': { data: [{ id: 'theme', name: 'T', description: null, origin: 'pennyseo' }], error: null },
       'v_combined_niches:select': { data: [{ id: 'niche', name: 'N', description: null, origin: 'pennyseo' }], error: null },
     });
     setSupabase(client);
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(getOrCreateCanonicalEtsyListing).mockRejectedValueOnce(
+      new Error('Existing Etsy/PennySEO listing association ghost-listing requires targeted repair'),
+    );
 
     const result = await scoreEtsyListing(baseInput());
 
-    expect(result.listingId).toBe('new-listing-2');
+    expect(result.listingId).toBeNull();
+    expect(result.error).toContain('requires targeted repair');
     expect(downloadAndUploadEtsyImage).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Stale FK'));
 
-    const listingsInserts = calls.filter((c) => c.table === 'listings' && c.op === 'insert');
-    expect(listingsInserts).toHaveLength(1);
+    expect(getOrCreateCanonicalEtsyListing).toHaveBeenCalledTimes(1);
 
     warnSpy.mockRestore();
   });
@@ -295,6 +297,24 @@ describe('scoreEtsyListing — idempotency', () => {
     await scoreEtsyListing(baseInput());
 
     expect(downloadAndUploadEtsyImage).not.toHaveBeenCalled();
+    expect(getOrCreateCanonicalEtsyListing).not.toHaveBeenCalled();
+  });
+
+  it('uses the same canonical identity when preparation and scoring race', async () => {
+    const { client } = makeSupabaseSpy({
+      'etsy_listings:select': { data: { id: 'etsy-row-1', listing_id: null }, error: null },
+      'v_combined_themes:select': { data: [{ id: 'theme', name: 'T', description: null, origin: 'pennyseo' }], error: null },
+      'v_combined_niches:select': { data: [{ id: 'niche', name: 'N', description: null, origin: 'pennyseo' }], error: null },
+    });
+    setSupabase(client);
+    vi.mocked(getOrCreateCanonicalEtsyListing).mockResolvedValue({
+      listingId: 'canonical-listing', imageUrl: 'https://storage/canonical.jpg', created: false,
+    });
+
+    const result = await scoreEtsyListing(baseInput());
+
+    expect(result.listingId).toBe('canonical-listing');
+    expect(getOrCreateCanonicalEtsyListing).toHaveBeenCalledTimes(1);
   });
 
   it('does not persist SEO results when keyword scoring fails', async () => {

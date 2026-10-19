@@ -43,8 +43,10 @@ import { fetchShopListings, fetchListingsByIds, getSellerTaxonomyNodes } from '.
 import { getActiveConnection, EtsyConnectionError } from './lib/etsy/get-connection.ts';
 import { processEtsyExportItem, toErrorMessage } from './lib/etsy/process-etsy-export.ts';
 import { scoreEtsyListing } from './lib/etsy/score-etsy-listing.ts';
+import { claimPendingEtsyListingsForScoring } from './lib/etsy/claim-scoring.ts';
 import { downloadAndUploadEtsyImage } from './lib/etsy/prepare-etsy-image.ts';
 import { matchProductType } from './lib/etsy/match-product-type.ts';
+import { getOrCreateCanonicalEtsyListing } from './lib/etsy/get-or-create-canonical-listing.ts';
 import etsyOauthAuthorize from './api/etsy/oauth/authorize.ts';
 import etsyOauthExchange from './api/etsy/oauth/exchange.ts';
 import etsyOauthDisconnect from './api/etsy/oauth/disconnect.ts';
@@ -1757,24 +1759,38 @@ app.post('/api/etsy/score-listings', async (req, res) => {
     if (etsy_listing_ids.length > 5) {
       return res.status(400).json({ error: 'Maximum 5 listings per scoring request' });
     }
+    if (new Set(etsy_listing_ids).size !== etsy_listing_ids.length) {
+      return res.status(400).json({ error: 'Duplicate Etsy listing IDs are not allowed' });
+    }
 
     console.info(`\n🔍 [score-listings] user=${user_id} requested=${etsy_listing_ids.length}`);
 
-    // 1. Fetch and validate
+    // 1. Fetch and validate ownership
     const { data: listings, error: fetchErr } = await supabaseAdmin
       .from('etsy_listings')
       .select('*')
       .in('id', etsy_listing_ids)
-      .eq('user_id', user_id)
-      .eq('scoring_status', 'pending');
+      .eq('user_id', user_id);
 
     if (fetchErr) throw fetchErr;
-    if (!listings || listings.length === 0) {
-      return res.status(400).json({ error: 'No valid pending listings found for scoring' });
+    if (!listings || listings.length !== etsy_listing_ids.length) {
+      return res.status(404).json({ error: 'One or more Etsy listings were not found' });
+    }
+
+    const pendingListings = listings.filter((listing) => listing.scoring_status === 'pending');
+    if (pendingListings.length === 0) {
+      const inProgress = listings.filter((listing) => listing.scoring_status === 'scoring');
+      if (inProgress.length > 0) {
+        return res.status(409).json({
+          error: 'One or more listings are already being scored',
+          in_progress: inProgress.map((listing) => listing.id),
+        });
+      }
+      return res.status(400).json({ error: 'No pending listings found for scoring' });
     }
 
     // 2. Token check
-    const totalCost = listings.length * 3;
+    const totalCost = pendingListings.length * 3;
     const tokenCheck = await checkTokenBalance(user_id, 'etsy_score');
     if (!tokenCheck.allowed || tokenCheck.balance < totalCost) {
       return res.status(402).json({
@@ -1784,11 +1800,23 @@ app.post('/api/etsy/score-listings', async (req, res) => {
       });
     }
 
-    // 3. Set scoring status
-    await supabaseAdmin
-      .from('etsy_listings')
-      .update({ scoring_status: 'scoring' })
-      .in('id', listings.map((l) => l.id));
+    // 3. Atomically claim still-pending rows before any paid work.
+    const claimedListings = await claimPendingEtsyListingsForScoring(
+      user_id,
+      pendingListings.map((listing) => listing.id),
+    );
+
+    if (claimedListings.length === 0) {
+      return res.status(409).json({
+        error: 'One or more listings are already being scored',
+        in_progress: pendingListings.map((listing) => listing.id),
+      });
+    }
+
+    const claimedIds = new Set(claimedListings.map((listing) => listing.id));
+    const skipped = listings
+      .filter((listing) => !claimedIds.has(listing.id))
+      .map((listing) => ({ id: listing.id, scoring_status: listing.scoring_status }));
 
     // 4. Fetch user settings
     const { data: settings } = await supabaseAdmin
@@ -1801,8 +1829,8 @@ app.post('/api/etsy/score-listings', async (req, res) => {
     const results = [];
     let successCount = 0;
 
-    for (const listing of listings) {
-      console.info(`   📊 Scoring ${successCount + 1}/${listings.length}...`);
+    for (const listing of claimedListings) {
+      console.info(`   📊 Scoring ${successCount + 1}/${claimedListings.length}...`);
       const result = await scoreEtsyListing({
         etsyListing: listing,
         userId: user_id,
@@ -1819,11 +1847,12 @@ app.post('/api/etsy/score-listings', async (req, res) => {
       tokensDeducted += 3;
     }
 
-    console.info(`   ✅ [score-listings] scored=${successCount} failed=${listings.length - successCount} tokens=${tokensDeducted}\n`);
+    console.info(`   ✅ [score-listings] scored=${successCount} failed=${claimedListings.length - successCount} skipped=${skipped.length} tokens=${tokensDeducted}\n`);
 
     return res.json({
       scored: successCount,
-      failed: listings.length - successCount,
+      failed: claimedListings.length - successCount,
+      skipped,
       results,
       tokens_deducted: tokensDeducted,
     });
@@ -1866,6 +1895,7 @@ app.post('/api/etsy/prepare-listing', async (req, res) => {
         .from('listings')
         .select('id, image_url')
         .eq('id', etsyListing.listing_id)
+        .eq('user_id', user_id)
         .single();
 
       if (existing) {
@@ -1875,7 +1905,6 @@ app.post('/api/etsy/prepare-listing', async (req, res) => {
     }
 
     // 3. Download + upload image
-    const STATUS_NEW = 'ac083a90-43fa-4ff5-a62d-5cd6bb5edbcc';
     let imageUrl = '';
     if (etsyListing.original_image_url) {
       imageUrl = await downloadAndUploadEtsyImage(etsyListing.original_image_url, user_id);
@@ -1890,35 +1919,19 @@ app.post('/api/etsy/prepare-listing', async (req, res) => {
       console.warn('[prepare-listing] Product type matching failed:', err.message);
     }
 
-    // 5. Create listings row
-    const { data: listing, error: insertErr } = await supabaseAdmin
-      .from('listings')
-      .insert({
-        user_id,
-        title: etsyListing.original_title,
-        user_description: null,
-        image_url: imageUrl,
-        status_id: STATUS_NEW,
-        is_image_analysed: false,
-        source: 'etsy',
-        ...(productTypeId ? { product_type_id: productTypeId } : {}),
-      })
-      .select('id, image_url')
-      .single();
+    // 5. Atomically resolve the canonical PennySEO listing. External work above
+    // is deliberately outside the short database row lock.
+    const listing = await getOrCreateCanonicalEtsyListing({
+      etsyListingRowId: etsyListing.id,
+      userId: user_id,
+      title: etsyListing.original_title,
+      imageUrl,
+      productTypeId,
+    });
 
-    if (insertErr || !listing) {
-      throw new Error(`Failed to create listing: ${insertErr?.message}`);
-    }
+    console.info(`   ✅ [prepare-listing] ${listing.created ? 'Created' : 'Reused'} canonical listing_id=${listing.listingId}\n`);
 
-    // 5. Link back to etsy_listings
-    await supabaseAdmin
-      .from('etsy_listings')
-      .update({ listing_id: listing.id })
-      .eq('id', etsy_listing_id);
-
-    console.info(`   ✅ [prepare-listing] Done: listing_id=${listing.id}\n`);
-
-    return res.json({ listing_id: listing.id, image_url: listing.image_url });
+    return res.json({ listing_id: listing.listingId, image_url: listing.imageUrl });
   } catch (error) {
     if (error instanceof AuthError) {
       return res.status(error.status).json({ error: error.message });

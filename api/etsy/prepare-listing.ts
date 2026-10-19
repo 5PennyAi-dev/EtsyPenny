@@ -2,10 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { downloadAndUploadEtsyImage } from '../../lib/etsy/prepare-etsy-image.js';
 import { matchProductType } from '../../lib/etsy/match-product-type.js';
+import { getOrCreateCanonicalEtsyListing } from '../../lib/etsy/get-or-create-canonical-listing.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
-
-const STATUS_NEW = 'ac083a90-43fa-4ff5-a62d-5cd6bb5edbcc';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   initSentry();
@@ -43,6 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .from('listings')
         .select('id, image_url')
         .eq('id', etsyListing.listing_id)
+        .eq('user_id', user_id)
         .single();
 
       if (existing) {
@@ -66,35 +66,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.warn('[prepare-listing] Product type matching failed, continuing:', (err as Error).message);
     }
 
-    // ── 5. Create listings row ──────────────────────────
-    const { data: listing, error: insertErr } = await supabaseAdmin
-      .from('listings')
-      .insert({
-        user_id,
-        title: etsyListing.original_title,
-        user_description: null,
-        image_url: imageUrl,
-        status_id: STATUS_NEW,
-        is_image_analysed: false,
-        source: 'etsy',
-        ...(productTypeId ? { product_type_id: productTypeId } : {}),
-      })
-      .select('id, image_url')
-      .single();
+    // ── 5. Resolve the canonical PennySEO listing atomically ─
+    // External image/type work stays outside the short SQL row lock. A racing
+    // scorer/preparer can therefore reuse the winner instead of creating a
+    // second listings row.
+    const listing = await getOrCreateCanonicalEtsyListing({
+      etsyListingRowId: etsyListing.id,
+      userId: user_id,
+      title: etsyListing.original_title,
+      imageUrl,
+      productTypeId,
+    });
 
-    if (insertErr || !listing) {
-      throw new Error(`Failed to create listing: ${insertErr?.message}`);
-    }
+    console.info(`[prepare-listing] ${listing.created ? 'Created' : 'Reused'} canonical listing_id=${listing.listingId}`);
 
-    // ── 5. Link back to etsy_listings ───────────────────
-    await supabaseAdmin
-      .from('etsy_listings')
-      .update({ listing_id: listing.id })
-      .eq('id', etsy_listing_id);
-
-    console.info(`[prepare-listing] Done: listing_id=${listing.id}`);
-
-    return res.json({ listing_id: listing.id, image_url: listing.image_url });
+    return res.json({ listing_id: listing.listingId, image_url: listing.imageUrl });
   } catch (error: unknown) {
     if (error instanceof AuthError) {
       return res.status(error.status).json({ error: error.message });

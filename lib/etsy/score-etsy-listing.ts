@@ -9,6 +9,7 @@
 import { supabaseAdmin } from '../supabase/server.js';
 import { downloadAndUploadEtsyImage } from './prepare-etsy-image.js';
 import { matchProductType } from './match-product-type.js';
+import { getOrCreateCanonicalEtsyListing } from './get-or-create-canonical-listing.js';
 import { runAI } from '../ai/provider-router.js';
 import { extractJson } from '../ai/extract-json.js';
 import { parseVisualAnalysisResponse } from '../ai/vision-analysis.js';
@@ -26,8 +27,6 @@ import { selectAndScore } from '../seo/select-and-score.js';
 import { persistSeo } from '../seo/persist-seo.js';
 import { runResetPool } from '../seo/run-reset-pool.js';
 import { getSupabaseEdgeHeaders, getSupabaseServerConfig } from '../supabase/config.js';
-
-const STATUS_NEW = 'ac083a90-43fa-4ff5-a62d-5cd6bb5edbcc';
 
 // ─── Types ────────────────────────────────────────────
 
@@ -67,7 +66,7 @@ export async function scoreEtsyListing(
   try {
     console.info(`[score-etsy] Starting: "${etsyListing.original_title?.slice(0, 60)}..." (${tagCount} tags)`);
 
-    // ── 1. Idempotency check: reuse existing listings row if prepare-listing already ran ──
+    // ── 1. Reuse or atomically establish the canonical listings row ──
 
     const { data: etsyRow, error: etsyFetchErr } = await supabaseAdmin
       .from('etsy_listings')
@@ -89,6 +88,7 @@ export async function scoreEtsyListing(
         .from('listings')
         .select('id, image_url')
         .eq('id', etsyRow.listing_id)
+        .eq('user_id', userId)
         .single();
 
       if (existingListing) {
@@ -97,14 +97,15 @@ export async function scoreEtsyListing(
         reusedExistingRow = true;
         console.info(`[score-etsy] Reusing existing listing ${listingId} (no image re-download)`);
       } else {
-        // Stale FK — listings row was deleted. Fall through to INSERT path.
-        console.warn(`[score-etsy] Stale FK: etsy_listings.listing_id=${etsyRow.listing_id} not found, will create new listing`);
+        // Stale association: the atomic function fails closed instead of
+        // silently repointing historical Etsy/PennySEO data.
+        console.warn(`[score-etsy] Stale FK: etsy_listings.listing_id=${etsyRow.listing_id} requires targeted repair`);
       }
     }
 
     if (!reusedExistingRow) {
-      // INSERT PATH — direct score, no prior prepare (or stale FK fallback).
-
+      // Do external work outside the database lock. The SQL function below
+      // locks only while it resolves/creates the one canonical mapping.
       if (etsyListing.original_image_url) {
         storageUrl = await downloadAndUploadEtsyImage(etsyListing.original_image_url, userId);
         console.info('[score-etsy] Image uploaded to storage');
@@ -115,30 +116,17 @@ export async function scoreEtsyListing(
         productTypeId = await matchProductType(etsyListing.etsy_category, userId);
       } catch (_) { /* non-critical */ }
 
-      const { data: listing, error: insertErr } = await supabaseAdmin
-        .from('listings')
-        .insert({
-          user_id: userId,
-          title: etsyListing.original_title,
-          user_description: null,
-          image_url: storageUrl,
-          status_id: STATUS_NEW,
-          is_image_analysed: false,
-          source: 'etsy',
-          ...(productTypeId ? { product_type_id: productTypeId } : {}),
-        })
-        .select('id')
-        .single();
-
-      if (insertErr || !listing) throw new Error(`Failed to create listing: ${insertErr?.message}`);
-      listingId = listing.id;
-      console.info(`[score-etsy] Created listing ${listingId}`);
-
-      // Link back to etsy_listings — CRITICAL for MyShop visibility.
-      await supabaseAdmin
-        .from('etsy_listings')
-        .update({ listing_id: listingId })
-        .eq('id', etsyListing.id);
+      const canonical = await getOrCreateCanonicalEtsyListing({
+        etsyListingRowId: etsyListing.id,
+        userId,
+        title: etsyListing.original_title,
+        imageUrl: storageUrl,
+        productTypeId,
+      });
+      listingId = canonical.listingId;
+      storageUrl = canonical.imageUrl || storageUrl;
+      reusedExistingRow = !canonical.created;
+      console.info(`[score-etsy] ${canonical.created ? 'Created' : 'Reused'} canonical listing ${listingId}`);
     }
 
     if (!listingId) throw new Error('Listing ID was not resolved');
