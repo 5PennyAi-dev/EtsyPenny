@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, Loader2, ExternalLink, Search } from 'lucide-react';
+import { RefreshCw, Loader2, ExternalLink, Search, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ import ImportActionBar from '@/components/shop/ImportActionBar';
 import ExportToEtsyModal from '@/components/shop/ExportToEtsyModal';
 import ConnectEtsyEmptyState from '@/components/shop/ConnectEtsyEmptyState';
 import HelpLink from '@/components/ui/HelpLink';
+import { getMyShopListingStatus, isScoreableEtsyListing, mergeEtsyListings } from '@/lib/my-shop-utils';
 
 function EmptyResults({ statusFilter, searchQuery, onClearStatus, onClearAll }) {
   const hasStatus = statusFilter !== 'all';
@@ -52,7 +53,7 @@ export default function MyShopPage() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
 
-  const [connectionStatus, setConnectionStatus] = useState('loading'); // 'loading' | 'connected' | 'no-connection' | 'refresh-failed'
+  const [connectionStatus, setConnectionStatus] = useState('loading'); // 'loading' | 'connected' | 'no-connection' | 'refresh-failed' | 'error'
   const [shopMeta, setShopMeta] = useState({ shop_name: null, shop_url: null });
   const [etsyListings, setEtsyListings] = useState([]);
   const [importedListings, setImportedListings] = useState([]);
@@ -61,6 +62,7 @@ export default function MyShopPage() {
   const [importResult, setImportResult] = useState(null);
   const [pagination, setPagination] = useState({ count: 0, offset: 0, limit: 25 });
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isScoring, setIsScoring] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -74,6 +76,8 @@ export default function MyShopPage() {
   }, [searchQuery]);
   const [exportModalData, setExportModalData] = useState([]);
   const [preparingListingId, setPreparingListingId] = useState(null);
+  const [catalogError, setCatalogError] = useState(null);
+  const [preparationErrors, setPreparationErrors] = useState({});
 
   const getAuthHeaders = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -107,6 +111,9 @@ export default function MyShopPage() {
       : [...selectedIds].every((id) => isPublishable(importedListings.find((l) => l.etsy_listing_id === id)))
         ? 'export'
         : 'score';
+  const isRetryingScore = selectionMode === 'score' && [...selectedIds].every((id) => (
+    importedListings.find((listing) => listing.etsy_listing_id === id)?.scoring_status === 'error'
+  ));
 
   // Amorce card + stats bar counts
   const importedCount = importedListings.length;
@@ -138,15 +145,9 @@ export default function MyShopPage() {
   const handleOpenDocs = (path) => navigate(path);
 
   // ─── Status filter logic ────────────────────────────
-  const getListingStatus = (etsyListingId) => {
-    const imp = importedListings.find((l) => l.etsy_listing_id === etsyListingId);
-    if (!imp) return 'not_imported';
-    if (imp.scoring_status !== 'scored') return 'imported';
-    if (imp.export_status === 'exported') return 'exported';
-    const pennySeo = imp.listings?.listings_global_eval?.[0]?.listing_strength ?? null;
-    if (pennySeo != null && pennySeo !== imp.original_score) return 'optimized';
-    return 'scored';
-  };
+  const getListingStatus = (etsyListingId) => getMyShopListingStatus(
+    importedListings.find((listing) => listing.etsy_listing_id === etsyListingId),
+  );
 
   const filterCounts = {
     all: etsyListings.length,
@@ -154,6 +155,7 @@ export default function MyShopPage() {
     scored: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'scored').length,
     optimized: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'optimized').length,
     exported: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'exported').length,
+    error: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'error').length,
   };
 
   const filteredListings = useMemo(() => {
@@ -170,12 +172,13 @@ export default function MyShopPage() {
     { key: 'scored', label: 'Scored', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', activeBg: 'bg-amber-500' },
     { key: 'optimized', label: 'Optimized', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', activeBg: 'bg-emerald-600' },
     { key: 'exported', label: 'Published', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', activeBg: 'bg-blue-500' },
+    { key: 'error', label: 'Errors', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', activeBg: 'bg-rose-600' },
   ];
 
   // ─── Fetch imported listings from DB ────────────────
   const fetchImported = useCallback(async () => {
     if (!user) return [];
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('etsy_listings')
       .select(`
         *,
@@ -188,17 +191,19 @@ export default function MyShopPage() {
       `)
       .eq('user_id', user.id)
       .order('imported_at', { ascending: false });
+    if (error) throw error;
 
     const rows = data || [];
     const linkedIds = rows.map((r) => r.listing_id).filter(Boolean);
 
     const countsByListingId = {};
     if (linkedIds.length > 0) {
-      const { data: evalRows } = await supabase
+      const { data: evalRows, error: evalError } = await supabase
         .from('listing_seo_stats')
         .select('listing_id')
         .in('listing_id', linkedIds)
         .eq('is_current_eval', true);
+      if (evalError) throw evalError;
       for (const r of evalRows || []) {
         countsByListingId[r.listing_id] = (countsByListingId[r.listing_id] || 0) + 1;
       }
@@ -213,18 +218,30 @@ export default function MyShopPage() {
   }, [user]);
 
   // ─── Fetch Etsy API listings ────────────────────────
-  const fetchEtsyListings = useCallback(async (offset = 0) => {
-    if (!user) return;
-    setIsLoading(true);
+  const fetchEtsyListings = useCallback(async ({ offset = 0, append = false, initial = false } = {}) => {
+    if (!user) return false;
+    if (append) setIsLoadingMore(true);
+    else setIsLoading(true);
+    setCatalogError(null);
     try {
       const headers = await getAuthHeaders();
       const { data } = await axios.get('/api/etsy/shop-listings', {
         params: { limit: 25, offset },
         headers,
       });
-      setEtsyListings(data.results || []);
-      setPagination({ count: data.count, offset, limit: 25 });
+      const results = data.results || [];
+      if (append) {
+        setEtsyListings((current) => mergeEtsyListings(current, results));
+      } else {
+        const nextListings = mergeEtsyListings([], results);
+        setEtsyListings(nextListings);
+        setSelectedIds((current) => new Set([...current].filter((id) => (
+          nextListings.some((listing) => listing.etsy_listing_id === id)
+        ))));
+      }
+      setPagination({ count: data.count || 0, offset, limit: 25 });
       setConnectionStatus('connected');
+      return true;
     } catch (err) {
       console.error('[MyShopPage] Failed to fetch Etsy listings:', err);
       const code = err.response?.data?.code;
@@ -233,10 +250,15 @@ export default function MyShopPage() {
       } else if (err.response?.status === 401 && code === 'ETSY_REFRESH_FAILED') {
         setConnectionStatus('refresh-failed');
       } else {
-        toast.error('Failed to fetch Etsy listings');
+        const message = err.response?.data?.error || 'Failed to fetch Etsy listings. Please try again.';
+        setCatalogError(message);
+        if (initial) setConnectionStatus('error');
+        toast.error(message);
       }
+      return false;
     } finally {
-      setIsLoading(false);
+      if (append) setIsLoadingMore(false);
+      else setIsLoading(false);
     }
   }, [user, getAuthHeaders]);
 
@@ -245,7 +267,7 @@ export default function MyShopPage() {
     if (!user) return;
 
     async function init() {
-      const { data: connection } = await supabase
+      const { data: connection, error: connectionError } = await supabase
         .from('etsy_shop_connections')
         .select('id, shop_name, shop_url')
         .eq('user_id', user.id)
@@ -254,13 +276,29 @@ export default function MyShopPage() {
         .limit(1)
         .maybeSingle();
 
+      if (connectionError) {
+        setCatalogError('Failed to load your Etsy connection. Please try again.');
+        setConnectionStatus('error');
+        return;
+      }
+
       if (connection) {
         setShopMeta({ shop_name: connection.shop_name, shop_url: connection.shop_url });
       } else {
         setShopMeta({ shop_name: null, shop_url: null });
       }
 
-      await Promise.all([fetchImported(), fetchEtsyListings(0)]);
+      try {
+        const [, etsyLoaded] = await Promise.all([
+          fetchImported(),
+          fetchEtsyListings({ offset: 0, initial: true }),
+        ]);
+        if (!etsyLoaded) return;
+      } catch (error) {
+        console.error('[MyShopPage] Failed to load shop data:', error);
+        setCatalogError('Failed to load your shop data. Please try again.');
+        setConnectionStatus('error');
+      }
     }
 
     init();
@@ -270,11 +308,13 @@ export default function MyShopPage() {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      await fetchEtsyListings(pagination.offset);
+      const etsyLoaded = await fetchEtsyListings({ offset: 0 });
       await fetchImported();
-      toast.success('Shop data refreshed');
-    } catch {
-      toast.error('Failed to refresh');
+      if (etsyLoaded) toast.success('Shop data refreshed');
+    } catch (error) {
+      console.error('[MyShopPage] Failed to refresh shop data:', error);
+      setCatalogError('Failed to refresh shop data. Please try again.');
+      toast.error('Failed to refresh shop data');
     } finally {
       setIsSyncing(false);
     }
@@ -283,10 +323,19 @@ export default function MyShopPage() {
   // ─── Toggle selection (exclusive mode: import / score / export) ──
   const handleToggleSelect = (etsyListingId) => {
     const clickedIsImported = importedIds.has(etsyListingId);
+    const importedListing = importedListings.find((listing) => listing.etsy_listing_id === etsyListingId);
     const clickedMode = !clickedIsImported ? 'import' : (() => {
-      const imp = importedListings.find(l => l.etsy_listing_id === etsyListingId);
-      return isPublishable(imp) ? 'export' : 'score';
+      if (isPublishable(importedListing)) return 'export';
+      if (isScoreableEtsyListing(importedListing)) return 'score';
+      return null;
     })();
+
+    if (!clickedMode) {
+      toast.info(importedListing?.scoring_status === 'scoring'
+        ? 'This listing is already being scored.'
+        : 'This listing is not ready for another action yet.');
+      return;
+    }
 
     const modeLabels = { import: 'import mode', score: 'scoring mode', export: 'export mode' };
 
@@ -327,16 +376,22 @@ export default function MyShopPage() {
         (l) => justImportedIds.has(l.etsy_listing_id) && !l.listing_id
       );
       if (toPrep.length > 0) {
-        await Promise.all(
-          toPrep.map((row) =>
-            axios.post('/api/etsy/prepare-listing', { etsy_listing_id: row.id }, { headers })
-              .catch((e) => console.error(`[import] prepare failed for ${row.id}:`, e))
-          )
+        const preparationResults = await Promise.allSettled(
+          toPrep.map((row) => axios.post('/api/etsy/prepare-listing', { etsy_listing_id: row.id }, { headers }))
         );
+        const failedPreparations = preparationResults.flatMap((result, index) => {
+          if (result.status === 'fulfilled') return [];
+          const message = result.reason?.response?.data?.error || 'Preparation failed. You can retry from this listing.';
+          return [[toPrep[index].etsy_listing_id, message]];
+        });
+        if (failedPreparations.length > 0) {
+          setPreparationErrors((current) => ({ ...current, ...Object.fromEntries(failedPreparations) }));
+          toast.error(`${failedPreparations.length} imported listing${failedPreparations.length !== 1 ? 's' : ''} still need preparation.`);
+        }
         await fetchImported();
       }
 
-      toast.success(`${data.imported} listing${data.imported !== 1 ? 's' : ''} imported successfully`);
+      toast.success(`${data.imported} listing${data.imported !== 1 ? 's' : ''} imported`);
     } catch (err) {
       if (err.response?.status === 402) {
         toast.error(err.response.data.error);
@@ -363,7 +418,11 @@ export default function MyShopPage() {
       const { data } = await axios.post('/api/etsy/score-listings', {
         etsy_listing_ids: etsyListingUuids,
       }, { headers });
-      toast.success(`${data.scored} listing${data.scored !== 1 ? 's' : ''} scored (${data.tokens_deducted} tokens used)`);
+      if (data.scored > 0) {
+        toast.success(`${data.scored} listing${data.scored !== 1 ? 's' : ''} scored (${data.tokens_deducted} tokens used)`);
+      } else {
+        toast.error(data.failed > 0 ? 'Scoring failed. You can retry the listing.' : 'No listing was scored.');
+      }
       setSelectedIds(new Set());
       await fetchImported();
     } catch (err) {
@@ -437,9 +496,15 @@ export default function MyShopPage() {
       const { data } = await axios.post('/api/etsy/prepare-listing', {
         etsy_listing_id: etsyRow.id,
       }, { headers });
+      setPreparationErrors((current) => {
+        const { [etsyListingRowId]: _resolved, ...remaining } = current;
+        return remaining;
+      });
       navigate('/studio', { state: { listingId: data.listing_id } });
     } catch (error) {
-      toast.error('Failed to prepare listing: ' + (error.response?.data?.error || error.message));
+      const message = error.response?.data?.error || error.message || 'Preparation failed. Please try again.';
+      setPreparationErrors((current) => ({ ...current, [etsyListingRowId]: message }));
+      toast.error('Failed to prepare listing: ' + message);
     } finally {
       setPreparingListingId(null);
     }
@@ -447,10 +512,25 @@ export default function MyShopPage() {
 
   // ─── Load more ──────────────────────────────────────
   const handleLoadMore = () => {
-    fetchEtsyListings(pagination.offset + pagination.limit);
+    fetchEtsyListings({ offset: etsyListings.length, append: true });
   };
 
-  const hasMore = pagination.offset + pagination.limit < pagination.count;
+  const handleRetryLoad = async () => {
+    setConnectionStatus('loading');
+    try {
+      const [, etsyLoaded] = await Promise.all([
+        fetchImported(),
+        fetchEtsyListings({ offset: 0, initial: true }),
+      ]);
+      if (!etsyLoaded) return;
+    } catch (error) {
+      console.error('[MyShopPage] Failed to retry loading shop data:', error);
+      setCatalogError('Failed to load your shop data. Please try again.');
+      setConnectionStatus('error');
+    }
+  };
+
+  const hasMore = etsyListings.length < pagination.count;
   const hasSelection = selectedIds.size > 0;
 
   // ─── Empty / reconnect states ───────────────────────
@@ -472,6 +552,24 @@ export default function MyShopPage() {
       <Layout>
         <div className="min-h-screen bg-slate-50 px-6 lg:px-8 py-6 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (connectionStatus === 'error') {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-slate-50 px-6 lg:px-8 py-6 flex items-center justify-center">
+          <div role="alert" className="max-w-md rounded-xl border border-rose-200 bg-white p-6 text-center shadow-sm">
+            <AlertCircle className="mx-auto mb-3 h-8 w-8 text-rose-600" />
+            <h1 className="text-lg font-semibold text-slate-800">Unable to load your Etsy shop</h1>
+            <p className="mt-2 text-sm text-slate-600">{catalogError || 'Please check your connection and try again.'}</p>
+            <button onClick={handleRetryLoad} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+              <RefreshCw className="h-4 w-4" />
+              Try again
+            </button>
+          </div>
         </div>
       </Layout>
     );
@@ -517,6 +615,13 @@ export default function MyShopPage() {
           </button>
         </div>
 
+        {catalogError && (
+          <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            <span>{catalogError}</span>
+            <button onClick={handleSync} disabled={isSyncing} className="shrink-0 font-medium text-rose-700 underline disabled:opacity-50">Try again</button>
+          </div>
+        )}
+
         {/* Amorce card — contextual next-action hint */}
         <AmorceCard
           importedCount={importedCount}
@@ -539,7 +644,7 @@ export default function MyShopPage() {
             <h2 className="text-lg font-medium text-slate-700">
               Your Etsy listings
               {pagination.count > 0 && (
-                <span className="ml-2 text-sm font-normal text-slate-400">({pagination.count})</span>
+                <span className="ml-2 text-sm font-normal text-slate-400">({etsyListings.length} of {pagination.count})</span>
               )}
             </h2>
             {hasSelection && (
@@ -587,7 +692,7 @@ export default function MyShopPage() {
         </div>
 
         {/* Listing grid */}
-        {isLoading ? (
+        {isLoading && etsyListings.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
           </div>
@@ -608,6 +713,7 @@ export default function MyShopPage() {
               onToggleSelect={handleToggleSelect}
               onOpenInStudio={handleOpenInStudio}
               preparingListingId={preparingListingId}
+              preparationErrors={preparationErrors}
             />
           )
         )}
@@ -617,9 +723,11 @@ export default function MyShopPage() {
           <div className="text-center pt-2 pb-8">
             <button
               onClick={handleLoadMore}
-              className="px-5 py-2 rounded-lg text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+              disabled={isLoadingMore}
+              className="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors disabled:opacity-60"
             >
-              Load more listings
+              {isLoadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isLoadingMore ? 'Loading listings...' : 'Load more listings'}
             </button>
           </div>
         )}
@@ -638,6 +746,7 @@ export default function MyShopPage() {
           limitRemaining={importLimit}
           isScoring={isScoring}
           onScore={handleScore}
+          isRetryingScore={isRetryingScore}
           tokenBalance={tokenBalance}
           onExport={handleBatchExport}
           exportCount={selectedIds.size}

@@ -43,7 +43,7 @@ import { fetchShopListings, fetchListingsByIds, getSellerTaxonomyNodes } from '.
 import { getActiveConnection, EtsyConnectionError } from './lib/etsy/get-connection.ts';
 import { processEtsyExportItem, toErrorMessage } from './lib/etsy/process-etsy-export.ts';
 import { scoreEtsyListing } from './lib/etsy/score-etsy-listing.ts';
-import { claimPendingEtsyListingsForScoring } from './lib/etsy/claim-scoring.ts';
+import { claimScoreableEtsyListingsForScoring } from './lib/etsy/claim-scoring.ts';
 import { downloadAndUploadEtsyImage } from './lib/etsy/prepare-etsy-image.ts';
 import { matchProductType } from './lib/etsy/match-product-type.ts';
 import { getOrCreateCanonicalEtsyListing } from './lib/etsy/get-or-create-canonical-listing.ts';
@@ -1777,8 +1777,10 @@ app.post('/api/etsy/score-listings', async (req, res) => {
       return res.status(404).json({ error: 'One or more Etsy listings were not found' });
     }
 
-    const pendingListings = listings.filter((listing) => listing.scoring_status === 'pending');
-    if (pendingListings.length === 0) {
+    const scoreableListings = listings.filter((listing) => (
+      listing.scoring_status === 'pending' || listing.scoring_status === 'error'
+    ));
+    if (scoreableListings.length === 0) {
       const inProgress = listings.filter((listing) => listing.scoring_status === 'scoring');
       if (inProgress.length > 0) {
         return res.status(409).json({
@@ -1786,11 +1788,11 @@ app.post('/api/etsy/score-listings', async (req, res) => {
           in_progress: inProgress.map((listing) => listing.id),
         });
       }
-      return res.status(400).json({ error: 'No pending listings found for scoring' });
+      return res.status(400).json({ error: 'No pending or failed listings found for scoring' });
     }
 
     // 2. Token check
-    const totalCost = pendingListings.length * 3;
+    const totalCost = scoreableListings.length * 3;
     const tokenCheck = await checkTokenBalance(user_id, 'etsy_score');
     if (!tokenCheck.allowed || tokenCheck.balance < totalCost) {
       return res.status(402).json({
@@ -1800,16 +1802,16 @@ app.post('/api/etsy/score-listings', async (req, res) => {
       });
     }
 
-    // 3. Atomically claim still-pending rows before any paid work.
-    const claimedListings = await claimPendingEtsyListingsForScoring(
+    // 3. Atomically claim still-scoreable rows before any paid work.
+    const claimedListings = await claimScoreableEtsyListingsForScoring(
       user_id,
-      pendingListings.map((listing) => listing.id),
+      scoreableListings.map((listing) => listing.id),
     );
 
     if (claimedListings.length === 0) {
       return res.status(409).json({
         error: 'One or more listings are already being scored',
-        in_progress: pendingListings.map((listing) => listing.id),
+        in_progress: scoreableListings.map((listing) => listing.id),
       });
     }
 

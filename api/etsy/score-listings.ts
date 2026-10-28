@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { scoreEtsyListing } from '../../lib/etsy/score-etsy-listing.js';
-import { claimPendingEtsyListingsForScoring } from '../../lib/etsy/claim-scoring.js';
+import { claimScoreableEtsyListingsForScoring } from '../../lib/etsy/claim-scoring.js';
 import { checkTokenBalance, deductTokens } from '../../lib/tokens/token-middleware.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
@@ -44,8 +44,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'One or more Etsy listings were not found' });
     }
 
-    const pendingListings = listings.filter((listing: any) => listing.scoring_status === 'pending');
-    if (pendingListings.length === 0) {
+    const scoreableListings = listings.filter((listing: any) => (
+      listing.scoring_status === 'pending' || listing.scoring_status === 'error'
+    ));
+    if (scoreableListings.length === 0) {
       const inProgress = listings.filter((listing: any) => listing.scoring_status === 'scoring');
       if (inProgress.length > 0) {
         return res.status(409).json({
@@ -53,11 +55,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           in_progress: inProgress.map((listing: any) => listing.id),
         });
       }
-      return res.status(400).json({ error: 'No pending listings found for scoring' });
+      return res.status(400).json({ error: 'No pending or failed listings found for scoring' });
     }
 
     // ── 2. Token check ────────────────────────────────
-    const totalCost = pendingListings.length * 3;
+    const totalCost = scoreableListings.length * 3;
     const tokenCheck = await checkTokenBalance(user_id, 'etsy_score');
     if (!tokenCheck.allowed || tokenCheck.balance < totalCost) {
       return res.status(402).json({
@@ -67,18 +69,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // ── 3. Atomically claim still-pending rows ─────────
+    // ── 3. Atomically claim still-scoreable rows ───────
     // Do this immediately before external work. A concurrent request receives
     // no claimed rows and therefore cannot call paid providers or deduct tokens.
-    const claimedListings = await claimPendingEtsyListingsForScoring(
+    const claimedListings = await claimScoreableEtsyListingsForScoring(
       user_id,
-      pendingListings.map((listing: any) => listing.id),
+      scoreableListings.map((listing: any) => listing.id),
     );
 
     if (claimedListings.length === 0) {
       return res.status(409).json({
         error: 'One or more listings are already being scored',
-        in_progress: pendingListings.map((listing: any) => listing.id),
+        in_progress: scoreableListings.map((listing: any) => listing.id),
       });
     }
 

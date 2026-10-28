@@ -57,7 +57,7 @@ function StatusPill({ status }) {
   );
 }
 
-function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringStatus, originalScore, pennySeoScore, exportStatus, listingId, onOpenInStudio, isPreparing }) {
+function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringStatus, originalScore, pennySeoScore, exportStatus, listingId, onOpenInStudio, isPreparing, preparationError }) {
   const tagCount = listing.tag_count ?? 0;
   const isScored = scoringStatus === 'scored' && originalScore != null;
   const isSelectable = true;
@@ -149,13 +149,14 @@ function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringS
         </div>
 
         {/* Open in Studio — for imported but not yet scored/prepared listings */}
+        {preparationError && <p role="alert" className="text-xs text-rose-700">{preparationError}</p>}
         {isImported && scoringStatus === 'pending' && !listingId && onOpenInStudio && (
           <button
             onClick={(e) => { e.stopPropagation(); onOpenInStudio(listing.etsy_listing_id); }}
             disabled={isPreparing}
             className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors disabled:text-indigo-400"
           >
-            {isPreparing ? 'Preparing...' : 'Open in Studio →'}
+            {isPreparing ? 'Preparing...' : preparationError ? 'Retry preparation →' : 'Open in Studio →'}
           </button>
         )}
       </div>
@@ -163,7 +164,7 @@ function ListingCard({ listing, isImported, isSelected, onToggleSelect, scoringS
   );
 }
 
-export default function EtsyListingGrid({ listings = [], importedIds, importedListings = [], selectedIds, onToggleSelect, onOpenInStudio, preparingListingId }) {
+export default function EtsyListingGrid({ listings = [], importedIds, importedListings = [], selectedIds, onToggleSelect, onOpenInStudio, preparingListingId, preparationErrors = {} }) {
   if (listings.length === 0) {
     return (
       <div className="text-center py-12 text-slate-400">
@@ -197,6 +198,7 @@ export default function EtsyListingGrid({ listings = [], importedIds, importedLi
             listingId={imported?.listing_id}
             onOpenInStudio={onOpenInStudio}
             isPreparing={preparingListingId === listing.etsy_listing_id}
+            preparationError={preparationErrors[listing.etsy_listing_id]}
           />
         );
       })}

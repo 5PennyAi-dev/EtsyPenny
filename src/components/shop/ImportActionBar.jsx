@@ -11,6 +11,7 @@ export default function ImportActionBar({
   tokenBalance = 0,
   onExport,
   exportCount = 0,
+  isRetryingScore = false,
 }) {
   const exceedsImportLimit = selectedCount > limitRemaining;
   const scoreCost = selectedCount * 3;
@@ -78,10 +79,10 @@ export default function ImportActionBar({
               {isScoring ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Scoring...
+                  {isRetryingScore ? 'Retrying...' : 'Scoring...'}
                 </>
               ) : (
-                `Score ${selectedCount} (${scoreCost} tokens)`
+                `${isRetryingScore ? 'Retry score' : 'Score'} ${selectedCount} (${scoreCost} tokens)`
               )}
             </button>
           </>

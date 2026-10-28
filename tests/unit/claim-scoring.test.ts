@@ -12,9 +12,9 @@ vi.mock('../../lib/supabase/server.js', () => ({
   }),
 }));
 
-import { claimPendingEtsyListingsForScoring } from '../../lib/etsy/claim-scoring.js';
+import { claimScoreableEtsyListingsForScoring } from '../../lib/etsy/claim-scoring.js';
 
-describe('claimPendingEtsyListingsForScoring', () => {
+describe('claimScoreableEtsyListingsForScoring', () => {
   const operations: Array<{ name: string; value?: unknown }> = [];
 
   beforeEach(() => {
@@ -31,17 +31,17 @@ describe('claimPendingEtsyListingsForScoring', () => {
     };
   });
 
-  it('claims only rows that are still pending in the UPDATE predicate', async () => {
-    await expect(claimPendingEtsyListingsForScoring('owner', ['etsy-row']))
+  it('claims only rows that are still pending or retryable after an error in the UPDATE predicate', async () => {
+    await expect(claimScoreableEtsyListingsForScoring('owner', ['etsy-row']))
       .resolves.toEqual([{ id: 'etsy-row', scoring_status: 'scoring' }]);
 
     expect(operations).toContainEqual({ name: 'update', value: { scoring_status: 'scoring' } });
     expect(operations).toContainEqual({ name: 'eq:user_id', value: 'owner' });
-    expect(operations).toContainEqual({ name: 'eq:scoring_status', value: 'pending' });
+    expect(operations).toContainEqual({ name: 'in:scoring_status', value: ['pending', 'error'] });
   });
 
   it('does not query when there is nothing to claim', async () => {
-    await expect(claimPendingEtsyListingsForScoring('owner', [])).resolves.toEqual([]);
+    await expect(claimScoreableEtsyListingsForScoring('owner', [])).resolves.toEqual([]);
     expect(operations).toEqual([]);
   });
 });
