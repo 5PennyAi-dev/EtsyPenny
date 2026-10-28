@@ -2,9 +2,9 @@
 
 > **Document de suivi et de transfert de contexte**
 > **Date de création :** 17 octobre 2026
-> **Dernière mise à jour :** 19 octobre 2026
-> **Statut global :** phases 0B, 0C et correctif applicatif Phase 1 déployés ; correctifs locaux de fiabilité My Shop (Phase 1B) à valider et déployer
-> **Phase active :** 1B — fiabilité de My Shop ; validation fonctionnelle sur boutique de test à confirmer
+> **Dernière mise à jour :** 28 octobre 2026
+> **Statut global :** phases 0B, 0C, Phase 1 et Phase 1B déployées ; validations fonctionnelles sur boutique de test à confirmer
+> **Phase active :** 1B — validation fonctionnelle de fiabilité My Shop sur boutique de test
 > **Dépôt :** https://github.com/5PennyAi-dev/EtsyPenny
 > **Destination recommandée dans le dépôt :** `docs/ROADMAP_ETSY_MYSHOP.md`
 > **Document directeur complémentaire :** `docs/ROADMAP.md` (vérifier la casse et l'existence dans le dépôt avant de créer un lien).
@@ -251,7 +251,7 @@ Lorsqu'une décision est validée, renseigner : **date, choix, justification, im
 - [x] Après import, conserver les produits lorsque la préparation Studio échoue, afficher l'erreur sur la carte et proposer « Retry preparation » sans réimport.
 - [x] Ne pas réparer ou fusionner les doublons historiques de SEO History : décision conservée ; aucun changement de données n'est inclus dans cette phase.
 - [ ] Exécuter la validation fonctionnelle sur une boutique de test (pagination 26+, erreur/retry, reprise préparation, notation échouée), sans publication Etsy réelle.
-- [ ] Valider puis déployer le code local. **Ne pas exécuter `supabase db push` : les historiques local et distant restent désynchronisés.**
+- [x] Déployer le code en Production : Vercel `Ready` le 28 octobre 2026 pour le commit applicatif `b70cb55c2efb8d228b3079a48b0107ad3ad40cf5`. **Ne pas exécuter `supabase db push` : les historiques local et distant restent désynchronisés.**
 
 ### Phase 2 — UX et nouveau workflow My Shop
 
@@ -371,6 +371,7 @@ _Ajouter ici chaque arbitrage formel, et mettre à jour la section 6._
 | 2026-10-19 | Phase 1 | Migration d'identité canonique appliquée manuellement en Production | Validée : aucun mapping dupliqué, statut `New` confirmé ; historiques Supabase toujours désynchronisés, `supabase db push` interdit | `20261018120000_etsy_canonical_listing.sql` |
 | 2026-10-19 | Phase 1 | Correctif applicatif de prévention des doublons déployé | Vercel Production `Ready`; doublons historiques non modifiés automatiquement | commit `f45a6f0344c33e3505c4ab32f2a81533302bbdbc` |
 | 2026-10-19 | Phase 1B | Correctifs locaux de fiabilité My Shop : pagination cumulative, états d'erreur/retry, reprise de scoring et préparation après import | Suite locale, typecheck, build et contrôle de diff validés ; aucun commit, push, déploiement, appel Etsy réel ou migration distante | Arbre de travail local, en attente de validation |
+| 2026-10-28 | Phase 1B | Correctifs de fiabilité My Shop déployés en Production | `npm test` : 308 tests réussis ; typecheck, build et `git diff --check` réussis ; Vercel Production `Ready` | commit applicatif `b70cb55c2efb8d228b3079a48b0107ad3ad40cf5` |
 | 2026-10-17 | Suivi | Création et actualisation de cette feuille de route | Prête à être ajoutée au dépôt | `ROADMAP_ETSY_MYSHOP.md` |
 
 ## 12. Prochaine action immédiate
