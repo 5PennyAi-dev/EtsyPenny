@@ -255,6 +255,8 @@ Lorsqu'une décision est validée, renseigner : **date, choix, justification, im
 
 ### Phase 2 — UX et nouveau workflow My Shop
 
+- [x] Produire et valider la conception fonctionnelle (2A) et UX desktop/mobile (2B) du nouveau My Shop.
+- [x] Implémenter localement le lot 2C-1 : sélecteur centralisé des états UX, liste compacte responsive, six onglets exclusifs, recherche/filtres/tri locaux et compteurs sur les produits chargés. En attente de validation complète avant commit ou déploiement.
 - [ ] Valider les décisions ouvertes de la section 6 et les principaux scénarios d'utilisation.
 - [ ] Définir et documenter le modèle d'états à trois axes : Etsy / progression SEO / cohérence.
 - [ ] Produire maquettes desktop/mobile et libellés des actions explicites par produit.
@@ -372,6 +374,7 @@ _Ajouter ici chaque arbitrage formel, et mettre à jour la section 6._
 | 2026-10-19 | Phase 1 | Correctif applicatif de prévention des doublons déployé | Vercel Production `Ready`; doublons historiques non modifiés automatiquement | commit `f45a6f0344c33e3505c4ab32f2a81533302bbdbc` |
 | 2026-10-19 | Phase 1B | Correctifs locaux de fiabilité My Shop : pagination cumulative, états d'erreur/retry, reprise de scoring et préparation après import | Suite locale, typecheck, build et contrôle de diff validés ; aucun commit, push, déploiement, appel Etsy réel ou migration distante | Arbre de travail local, en attente de validation |
 | 2026-10-28 | Phase 1B | Correctifs de fiabilité My Shop déployés en Production | `npm test` : 308 tests réussis ; typecheck, build et `git diff --check` réussis ; Vercel Production `Ready` | commit applicatif `b70cb55c2efb8d228b3079a48b0107ad3ad40cf5` |
+| 2026-10-31 | Phase 2C-1 | Nouvelle liste compacte locale, classement UX exclusif et filtres locaux sur les produits chargés | Implémenté localement ; validation complète, commit et déploiement en attente | `src/lib/my-shop-utils.js`, `src/components/shop/EtsyListingGrid.jsx`, `src/pages/MyShopPage.jsx` |
 | 2026-10-17 | Suivi | Création et actualisation de cette feuille de route | Prête à être ajoutée au dépôt | `ROADMAP_ETSY_MYSHOP.md` |
 
 ## 12. Prochaine action immédiate

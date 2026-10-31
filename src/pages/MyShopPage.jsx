@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, Loader2, ExternalLink, Search, AlertCircle } from 'lucide-react';
+import { RefreshCw, Loader2, ExternalLink, Search, AlertCircle, SlidersHorizontal, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -13,10 +13,10 @@ import ImportActionBar from '@/components/shop/ImportActionBar';
 import ExportToEtsyModal from '@/components/shop/ExportToEtsyModal';
 import ConnectEtsyEmptyState from '@/components/shop/ConnectEtsyEmptyState';
 import HelpLink from '@/components/ui/HelpLink';
-import { getMyShopListingStatus, isScoreableEtsyListing, mergeEtsyListings } from '@/lib/my-shop-utils';
+import { MY_SHOP_TABS, filterAndSortMyShopListings, isScoreableEtsyListing, mergeEtsyListings } from '@/lib/my-shop-utils';
 
-function EmptyResults({ statusFilter, searchQuery, onClearStatus, onClearAll }) {
-  const hasStatus = statusFilter !== 'all';
+function EmptyResults({ activeTab, searchQuery, hasExtraFilters, onClearStatus, onClearAll }) {
+  const hasStatus = activeTab !== 'all' || hasExtraFilters;
   const hasSearch = !!searchQuery.trim();
 
   if (hasStatus && hasSearch) {
@@ -39,7 +39,7 @@ function EmptyResults({ statusFilter, searchQuery, onClearStatus, onClearAll }) 
   if (hasStatus) {
     return (
       <div className="py-8 text-center text-sm text-slate-500">
-        No listings in this filter.{' '}
+        No listings in this view.{' '}
         <button onClick={onClearStatus} className="text-indigo-600 hover:text-indigo-700 font-medium">
           Show all
         </button>
@@ -65,7 +65,10 @@ export default function MyShopPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isScoring, setIsScoring] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('to_optimize');
+  const [progressFilter, setProgressFilter] = useState('all');
+  const [publicationFilter, setPublicationFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState('activity');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
@@ -144,36 +147,26 @@ export default function MyShopPage() {
 
   const handleOpenDocs = (path) => navigate(path);
 
-  // ─── Status filter logic ────────────────────────────
-  const getListingStatus = (etsyListingId) => getMyShopListingStatus(
-    importedListings.find((listing) => listing.etsy_listing_id === etsyListingId),
-  );
-
-  const filterCounts = {
-    all: etsyListings.length,
-    imported: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'imported').length,
-    scored: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'scored').length,
-    optimized: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'optimized').length,
-    exported: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'exported').length,
-    error: etsyListings.filter((l) => getListingStatus(l.etsy_listing_id) === 'error').length,
-  };
-
-  const filteredListings = useMemo(() => {
-    const lower = debouncedSearch.toLowerCase().trim();
-    return etsyListings
-      .filter((l) => statusFilter === 'all' || getListingStatus(l.etsy_listing_id) === statusFilter)
-      .filter((l) => !lower || (l.title || '').toLowerCase().includes(lower));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etsyListings, statusFilter, debouncedSearch, importedListings]);
-
-  const filters = [
-    { key: 'all', label: 'All', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', activeBg: 'bg-indigo-600' },
-    { key: 'imported', label: 'Imported', bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-300', activeBg: 'bg-slate-500' },
-    { key: 'scored', label: 'Scored', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', activeBg: 'bg-amber-500' },
-    { key: 'optimized', label: 'Optimized', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', activeBg: 'bg-emerald-600' },
-    { key: 'exported', label: 'Published', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', activeBg: 'bg-blue-500' },
-    { key: 'error', label: 'Errors', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', activeBg: 'bg-rose-600' },
+  // ─── UX tabs, local filters and ordering ─────────────
+  const allRows = useMemo(() => filterAndSortMyShopListings({
+    etsyListings, importedListings, tab: 'all', preparationErrors, preparingListingId,
+  }), [etsyListings, importedListings, preparationErrors, preparingListingId]);
+  const tabCounts = useMemo(() => Object.fromEntries(MY_SHOP_TABS.map((tab) => [
+    tab,
+    tab === 'all' ? etsyListings.length : allRows.filter((row) => row.ux.category === tab).length,
+  ])), [allRows, etsyListings.length]);
+  const filteredRows = useMemo(() => filterAndSortMyShopListings({
+    etsyListings, importedListings, tab: activeTab, search: debouncedSearch,
+    progress: progressFilter, publication: publicationFilter, sort: sortOrder,
+    preparationErrors, preparingListingId,
+  }), [etsyListings, importedListings, activeTab, debouncedSearch, progressFilter, publicationFilter, sortOrder, preparationErrors, preparingListingId]);
+  const tabs = [
+    { key: 'to_optimize', label: 'To Optimize' }, { key: 'in_progress', label: 'In Progress' },
+    { key: 'ready_to_publish', label: 'Ready to Publish' }, { key: 'needs_attention', label: 'Needs Attention' },
+    { key: 'published', label: 'Published' }, { key: 'all', label: 'All Listings' },
   ];
+  const hasExtraFilters = progressFilter !== 'all' || publicationFilter !== 'all' || sortOrder !== 'activity';
+  const clearFilters = () => { setProgressFilter('all'); setPublicationFilter('all'); setSortOrder('activity'); setSearchQuery(''); };
 
   // ─── Fetch imported listings from DB ────────────────
   const fetchImported = useCallback(async () => {
@@ -611,7 +604,7 @@ export default function MyShopPage() {
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} strokeWidth={2} />
-            Sync
+            Refresh catalog
           </button>
         </div>
 
@@ -638,13 +631,13 @@ export default function MyShopPage() {
           publishedCount={publishedCount}
         />
 
-        {/* Section label + filter pills */}
+        {/* Workflow tabs, local filters and search */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium text-slate-700">
               Your Etsy listings
               {pagination.count > 0 && (
-                <span className="ml-2 text-sm font-normal text-slate-400">({etsyListings.length} of {pagination.count})</span>
+                <span className="ml-2 text-sm font-normal text-slate-400">({etsyListings.length} loaded of {pagination.count})</span>
               )}
             </h2>
             {hasSelection && (
@@ -657,38 +650,39 @@ export default function MyShopPage() {
             )}
           </div>
 
-          {/* Filter row: pills + search (hidden when shop is empty) */}
           {etsyListings.length > 0 && (
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {filters
-                  .filter((f) => f.key === 'all' || filterCounts[f.key] > 0)
-                  .map((f) => (
-                    <button
-                      key={f.key}
-                      onClick={() => setStatusFilter((prev) => (prev === f.key ? 'all' : f.key))}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                        statusFilter === f.key
-                          ? `${f.activeBg} text-white border-transparent`
-                          : `${f.bg} ${f.text} ${f.border}`
-                      }`}
-                    >
-                      {f.label} · {filterCounts[f.key]}
-                    </button>
-                  ))}
-              </div>
-              <div className="relative shrink-0 min-w-[180px]">
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {tabs.map((tab) => (
+                <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === tab.key ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-700'}`}>
+                  {tab.label} · {tabCounts[tab.key]}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {etsyListings.length > 0 && (
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+              <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" strokeWidth={2} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search titles…"
-                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder={`Search ${etsyListings.length} loaded titles…`}
+                  aria-label="Search loaded listing titles"
+                  className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <SlidersHorizontal size={15} className="text-slate-400" />
+                <select value={progressFilter} onChange={(event) => setProgressFilter(event.target.value)} aria-label="Filter SEO progress" className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="all">SEO progress</option><option value="not_started">Not started</option><option value="preparation_required">Preparation required</option><option value="ready_to_score">Ready to score</option><option value="scoring">Scoring</option><option value="studio">Continue in Studio</option><option value="proposal">Proposal ready</option><option value="error">Needs retry</option></select>
+                <select value={publicationFilter} onChange={(event) => setPublicationFilter(event.target.value)} aria-label="Filter publication status" className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="all">Publication</option><option value="not_ready">Not ready</option><option value="ready">Ready to review</option><option value="attention">Needs attention</option><option value="published">Published</option></select>
+                <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} aria-label="Sort listings" className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="activity">Latest activity</option><option value="title">Title</option><option value="score">SEO score</option></select>
+                {(hasExtraFilters || searchQuery) && <button onClick={clearFilters} className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"><X size={14} /> Clear</button>}
               </div>
             </div>
           )}
+          {etsyListings.length > 0 && <p className="text-xs text-slate-500">Search, filters, and tab counts apply to the {etsyListings.length} listings loaded in this browser.</p>}
         </div>
 
         {/* Listing grid */}
@@ -697,23 +691,20 @@ export default function MyShopPage() {
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
           </div>
         ) : (
-          filteredListings.length === 0 && etsyListings.length > 0 ? (
+          filteredRows.length === 0 && etsyListings.length > 0 ? (
             <EmptyResults
-              statusFilter={statusFilter}
+              activeTab={activeTab}
               searchQuery={debouncedSearch}
-              onClearStatus={() => setStatusFilter('all')}
-              onClearAll={() => { setStatusFilter('all'); setSearchQuery(''); }}
+              hasExtraFilters={hasExtraFilters}
+              onClearStatus={() => { setActiveTab('all'); clearFilters(); }}
+              onClearAll={() => { setActiveTab('all'); clearFilters(); }}
             />
           ) : (
             <EtsyListingGrid
-              listings={filteredListings}
-              importedIds={importedIds}
-              importedListings={importedListings}
+              rows={filteredRows}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
               onOpenInStudio={handleOpenInStudio}
-              preparingListingId={preparingListingId}
-              preparationErrors={preparationErrors}
             />
           )
         )}
