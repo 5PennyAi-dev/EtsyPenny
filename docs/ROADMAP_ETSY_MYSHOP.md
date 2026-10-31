@@ -374,12 +374,12 @@ _Ajouter ici chaque arbitrage formel, et mettre à jour la section 6._
 | 2026-10-19 | Phase 1 | Correctif applicatif de prévention des doublons déployé | Vercel Production `Ready`; doublons historiques non modifiés automatiquement | commit `f45a6f0344c33e3505c4ab32f2a81533302bbdbc` |
 | 2026-10-19 | Phase 1B | Correctifs locaux de fiabilité My Shop : pagination cumulative, états d'erreur/retry, reprise de scoring et préparation après import | Suite locale, typecheck, build et contrôle de diff validés ; aucun commit, push, déploiement, appel Etsy réel ou migration distante | Arbre de travail local, en attente de validation |
 | 2026-10-28 | Phase 1B | Correctifs de fiabilité My Shop déployés en Production | `npm test` : 308 tests réussis ; typecheck, build et `git diff --check` réussis ; Vercel Production `Ready` | commit applicatif `b70cb55c2efb8d228b3079a48b0107ad3ad40cf5` |
-| 2026-10-31 | Phase 2C-1 | Nouvelle liste compacte locale, classement UX exclusif et filtres locaux sur les produits chargés | Implémenté localement ; validation complète, commit et déploiement en attente | `src/lib/my-shop-utils.js`, `src/components/shop/EtsyListingGrid.jsx`, `src/pages/MyShopPage.jsx` |
+| 2026-10-31 | Phase 2C-1 | Nouvelle liste compacte, classement UX exclusif et filtres locaux sur les produits chargés | Déployé en Production ; `npm test` (311), typecheck, build et `git diff --check` réussis. Validation visuelle authentifiée restant à effectuer (desktop 1440 px, mobile 390 px ; All Listings, Ready to Publish, Needs Attention). | commit `13f71992584865bee40d38b5caeb722ee407e98f` ; Vercel Production `Ready` |
 | 2026-10-17 | Suivi | Création et actualisation de cette feuille de route | Prête à être ajoutée au dépôt | `ROADMAP_ETSY_MYSHOP.md` |
 
 ## 12. Prochaine action immédiate
 
-**Valider les correctifs Phase 1B sur une boutique de test sans publication Etsy : pagination 26+, chargement/retry, reprise de préparation et retry de scoring.** Réconcilier séparément les historiques de migrations Supabase avant tout usage futur de `supabase db push`.
+**Valider visuellement Phase 2C-1 sur une boutique authentifiée, sans publication Etsy : desktop 1440 px et mobile 390 px, onglets All Listings / Ready to Publish / Needs Attention, actions, sélection multiple et clavier.** Réconcilier séparément les historiques de migrations Supabase avant tout usage futur de `supabase db push`.
 
 ## 13. Reprise du chantier dans une nouvelle conversation
 
