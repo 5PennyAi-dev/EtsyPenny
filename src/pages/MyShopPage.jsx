@@ -13,7 +13,7 @@ import ImportActionBar from '@/components/shop/ImportActionBar';
 import ExportToEtsyModal from '@/components/shop/ExportToEtsyModal';
 import ConnectEtsyEmptyState from '@/components/shop/ConnectEtsyEmptyState';
 import HelpLink from '@/components/ui/HelpLink';
-import { MY_SHOP_TABS, filterAndSortMyShopListings, isScoreableEtsyListing, mergeEtsyListings } from '@/lib/my-shop-utils';
+import { MY_SHOP_TABS, filterAndSortMyShopListings, getMyShopBulkActionPlan, isMyShopBulkSelectable, mergeEtsyListings } from '@/lib/my-shop-utils';
 
 function EmptyResults({ activeTab, searchQuery, hasExtraFilters, onClearStatus, onClearAll }) {
   const hasStatus = activeTab !== 'all' || hasExtraFilters;
@@ -72,6 +72,7 @@ export default function MyShopPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [exportModalMode, setExportModalMode] = useState('review');
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 200);
@@ -98,27 +99,9 @@ export default function MyShopPage() {
 
   // Derived state
   const importLimit = importResult?.limit_remaining ?? Math.max(0, planImportLimit - importedListings.length);
-  const importedIds = new Set(importedListings.map((l) => l.etsy_listing_id));
   const tokenBalance = (profile?.tokens_monthly_balance ?? 0) + (profile?.tokens_bonus_balance ?? 0);
 
-  // A listing is publishable when it has 13+ selected keywords (is_current_eval=true).
-  // Independent of the visual status pill — a "Scored" listing can be publishable too.
-  const isPublishable = (imp) =>
-    !!imp && !!imp.listing_id && imp.scoring_status === 'scored' && (imp.selected_keyword_count ?? 0) >= 13;
-
-  // Derive exclusive selection mode: 'import' | 'score' | 'export' | null
-  const selectionMode = selectedIds.size === 0
-    ? null
-    : [...selectedIds].some((id) => !importedIds.has(id))
-      ? 'import'
-      : [...selectedIds].every((id) => isPublishable(importedListings.find((l) => l.etsy_listing_id === id)))
-        ? 'export'
-        : 'score';
-  const isRetryingScore = selectionMode === 'score' && [...selectedIds].every((id) => (
-    importedListings.find((listing) => listing.etsy_listing_id === id)?.scoring_status === 'error'
-  ));
-
-  // Amorce card + stats bar counts
+  // Workspace totals come from imported records; catalog counts below are explicitly local.
   const importedCount = importedListings.length;
   const optimizedCount = importedListings.filter(
     (l) => {
@@ -160,6 +143,8 @@ export default function MyShopPage() {
     progress: progressFilter, publication: publicationFilter, sort: sortOrder,
     preparationErrors, preparingListingId,
   }), [etsyListings, importedListings, activeTab, debouncedSearch, progressFilter, publicationFilter, sortOrder, preparationErrors, preparingListingId]);
+  const selectedRows = useMemo(() => allRows.filter((row) => selectedIds.has(row.etsyListing.etsy_listing_id)), [allRows, selectedIds]);
+  const bulkActionPlan = useMemo(() => getMyShopBulkActionPlan(selectedRows), [selectedRows]);
   const tabs = [
     { key: 'to_optimize', label: 'To Optimize' }, { key: 'in_progress', label: 'In Progress' },
     { key: 'ready_to_publish', label: 'Ready to Publish' }, { key: 'needs_attention', label: 'Needs Attention' },
@@ -313,33 +298,14 @@ export default function MyShopPage() {
     }
   };
 
-  // ─── Toggle selection (exclusive mode: import / score / export) ──
+  // ─── Toggle selection (state-neutral; action bar groups compatible rows) ──
   const handleToggleSelect = (etsyListingId) => {
-    const clickedIsImported = importedIds.has(etsyListingId);
-    const importedListing = importedListings.find((listing) => listing.etsy_listing_id === etsyListingId);
-    const clickedMode = !clickedIsImported ? 'import' : (() => {
-      if (isPublishable(importedListing)) return 'export';
-      if (isScoreableEtsyListing(importedListing)) return 'score';
-      return null;
-    })();
-
-    if (!clickedMode) {
-      toast.info(importedListing?.scoring_status === 'scoring'
-        ? 'This listing is already being scored.'
-        : 'This listing is not ready for another action yet.');
+    const row = allRows.find((candidate) => candidate.etsyListing.etsy_listing_id === etsyListingId);
+    if (!row || !isMyShopBulkSelectable(row)) {
+      toast.info('This listing needs an individual action first.');
       return;
     }
-
-    const modeLabels = { import: 'import mode', score: 'scoring mode', export: 'export mode' };
-
     setSelectedIds((prev) => {
-      // If switching modes, clear previous selections and start fresh
-      if (selectionMode && selectionMode !== clickedMode) {
-        toast.info(`Switched to ${modeLabels[clickedMode]}`, { duration: 2000 });
-        return new Set([etsyListingId]);
-      }
-
-      // Normal toggle within same mode
       const next = new Set(prev);
       if (next.has(etsyListingId)) {
         next.delete(etsyListingId);
@@ -351,16 +317,17 @@ export default function MyShopPage() {
   };
 
   // ─── Import handler ─────────────────────────────────
-  const handleImport = async () => {
+  const handleImport = async (etsyIds = Array.from(selectedIds), { openStudioAfterPreparation = false } = {}) => {
+    if (etsyIds.length === 0) return;
     setIsImporting(true);
-    const justImportedIds = new Set(selectedIds);
+    const justImportedIds = new Set(etsyIds);
     try {
       const headers = await getAuthHeaders();
       const { data } = await axios.post('/api/etsy/import-listings', {
-        etsy_listing_ids: Array.from(selectedIds),
+        etsy_listing_ids: etsyIds,
       }, { headers });
       setImportResult(data);
-      setSelectedIds(new Set());
+      setSelectedIds((current) => new Set([...current].filter((id) => !justImportedIds.has(id))));
 
       // Fetch imported rows, then auto-prepare newly imported listings
       // so they appear immediately in /listings at "New" status (free operation).
@@ -368,7 +335,26 @@ export default function MyShopPage() {
       const toPrep = freshImported.filter(
         (l) => justImportedIds.has(l.etsy_listing_id) && !l.listing_id
       );
-      if (toPrep.length > 0) {
+      if (openStudioAfterPreparation && etsyIds.length === 1) {
+        const etsyId = etsyIds[0];
+        const row = freshImported.find((listing) => listing.etsy_listing_id === etsyId);
+        if (!row) throw new Error('The imported listing could not be found. Refresh the catalog and try again.');
+        setPreparingListingId(etsyId);
+        try {
+          const { data: prepared } = await axios.post('/api/etsy/prepare-listing', { etsy_listing_id: row.id }, { headers });
+          setPreparationErrors((current) => {
+            const { [etsyId]: _resolved, ...remaining } = current;
+            return remaining;
+          });
+          navigate('/studio', { state: { listingId: prepared.listing_id } });
+        } catch (error) {
+          const message = error.response?.data?.error || error.message || 'Preparation failed. Please try again.';
+          setPreparationErrors((current) => ({ ...current, [etsyId]: message }));
+          toast.error('Imported, but preparation failed. Retry from this listing.');
+        } finally {
+          setPreparingListingId(null);
+        }
+      } else if (toPrep.length > 0) {
         const preparationResults = await Promise.allSettled(
           toPrep.map((row) => axios.post('/api/etsy/prepare-listing', { etsy_listing_id: row.id }, { headers }))
         );
@@ -384,7 +370,7 @@ export default function MyShopPage() {
         await fetchImported();
       }
 
-      toast.success(`${data.imported} listing${data.imported !== 1 ? 's' : ''} imported`);
+      if (!openStudioAfterPreparation) toast.success(`${data.imported} listing${data.imported !== 1 ? 's' : ''} imported`);
     } catch (err) {
       if (err.response?.status === 402) {
         toast.error(err.response.data.error);
@@ -397,13 +383,15 @@ export default function MyShopPage() {
   };
 
   // ─── Score handler ──────────────────────────────────
-  const handleScore = async () => {
-    const etsyListingUuids = [...selectedIds]
+  const handleScore = async (etsyIds = bulkActionPlan.scoreIds) => {
+    const etsyListingUuids = etsyIds
       .map((etsyId) => importedListings.find((l) => l.etsy_listing_id === etsyId))
       .filter((imp) => imp && (imp.scoring_status === 'pending' || imp.scoring_status === 'error'))
       .map((imp) => imp.id);
 
     if (etsyListingUuids.length === 0) return;
+    const scoreCost = etsyListingUuids.length * 3;
+    if (!window.confirm(`Score SEO for ${etsyListingUuids.length} listing${etsyListingUuids.length !== 1 ? 's' : ''}? This uses ${scoreCost} credit${scoreCost !== 1 ? 's' : ''}.`)) return;
 
     setIsScoring(true);
     try {
@@ -416,7 +404,7 @@ export default function MyShopPage() {
       } else {
         toast.error(data.failed > 0 ? 'Scoring failed. You can retry the listing.' : 'No listing was scored.');
       }
-      setSelectedIds(new Set());
+      setSelectedIds((current) => new Set([...current].filter((id) => !etsyIds.includes(id))));
       await fetchImported();
     } catch (err) {
       if (err.response?.status === 402) {
@@ -430,13 +418,17 @@ export default function MyShopPage() {
   };
 
   // ─── Batch export handler ───────────────────────────
-  const handleBatchExport = async () => {
+  const handleBatchExport = async (etsyIds = bulkActionPlan.reviewIds, mode = 'review') => {
     const selectedEtsyListings = importedListings.filter(el =>
-      selectedIds.has(el.etsy_listing_id) && el.scoring_status === 'scored' && el.listing_id
+      etsyIds.includes(el.etsy_listing_id) && el.scoring_status === 'scored' && el.listing_id
     );
 
     if (selectedEtsyListings.length === 0) {
-      toast.error('No exportable listings selected');
+      toast.error('No listings are ready for review');
+      return;
+    }
+    if (selectedEtsyListings.length > 5) {
+      toast.error('Review up to 5 listings at a time.');
       return;
     }
 
@@ -471,6 +463,7 @@ export default function MyShopPage() {
       }
 
       setExportModalData(modalListings);
+      setExportModalMode(mode);
       setShowExportModal(true);
     } catch (err) {
       toast.error('Failed to load listing data for export');
@@ -500,6 +493,37 @@ export default function MyShopPage() {
       toast.error('Failed to prepare listing: ' + message);
     } finally {
       setPreparingListingId(null);
+    }
+  };
+
+  // ─── Direct row actions ──────────────────────────────
+  const handleListingAction = async (row, action) => {
+    const etsyId = row.etsyListing.etsy_listing_id;
+    if (action === 'working') return;
+    if (action === 'optimize') {
+      if (importLimit < 1) {
+        toast.error('Your import limit has been reached.');
+        return;
+      }
+      await handleImport([etsyId], { openStudioAfterPreparation: true });
+      return;
+    }
+    if (['prepare', 'retry_preparation', 'continue', 'view'].includes(action)) {
+      await handleOpenInStudio(etsyId);
+      return;
+    }
+    if (['score', 'retry_score'].includes(action)) {
+      await handleScore([etsyId]);
+      return;
+    }
+    if (action === 'review') {
+      // The modal starts with Etsy preflight. It never publishes until its own explicit confirmation.
+      await handleBatchExport([etsyId]);
+      return;
+    }
+    if (action === 'verify') {
+      // An unverified publication starts with a fresh Etsy read, not a new publication.
+      await handleBatchExport([etsyId], 'verify');
     }
   };
 
@@ -626,9 +650,11 @@ export default function MyShopPage() {
 
         {/* Stats bar */}
         <ShopStatsBar
-          importedCount={importedCount}
-          optimizedCount={optimizedCount}
-          publishedCount={publishedCount}
+          catalogTotal={pagination.count}
+          catalogLoaded={etsyListings.length}
+          workspaceImported={importedCount}
+          workspacePublished={publishedCount}
+          loadedReadyToPublish={tabCounts.ready_to_publish}
         />
 
         {/* Workflow tabs, local filters and search */}
@@ -704,7 +730,7 @@ export default function MyShopPage() {
               rows={filteredRows}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
-              onOpenInStudio={handleOpenInStudio}
+              onAction={handleListingAction}
             />
           )
         )}
@@ -731,16 +757,14 @@ export default function MyShopPage() {
       {hasSelection && (
         <ImportActionBar
           selectedCount={selectedIds.size}
-          selectionMode={selectionMode}
+          plan={bulkActionPlan}
           isImporting={isImporting}
           onImport={handleImport}
           limitRemaining={importLimit}
           isScoring={isScoring}
           onScore={handleScore}
-          isRetryingScore={isRetryingScore}
           tokenBalance={tokenBalance}
-          onExport={handleBatchExport}
-          exportCount={selectedIds.size}
+          onReview={handleBatchExport}
         />
       )}
 
@@ -755,6 +779,7 @@ export default function MyShopPage() {
             fetchImported();
           }}
           listings={exportModalData}
+          preflightLabel={exportModalMode === 'verify' ? 'Verify with Etsy first' : undefined}
         />
       )}
     </Layout>

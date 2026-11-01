@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterAndSortMyShopListings, getMyShopListingStatus, getMyShopUxState, isScoreableEtsyListing, mergeEtsyListings } from '../../src/lib/my-shop-utils.js';
+import { filterAndSortMyShopListings, getMyShopBulkActionPlan, getMyShopListingStatus, getMyShopUxState, isMyShopBulkSelectable, isScoreableEtsyListing, mergeEtsyListings } from '../../src/lib/my-shop-utils.js';
 
 describe('My Shop listing helpers', () => {
   it('appends a later Etsy page without duplicates and refreshes overlapping listings', () => {
@@ -28,14 +28,20 @@ describe('My Shop listing helpers', () => {
 
   it('uses a deterministic priority for attention, progress, proposals, and published listings', () => {
     expect(getMyShopUxState()).toMatchObject({ category: 'to_optimize', action: 'optimize' });
+    expect(getMyShopUxState({ scoring_status: 'pending' })).toMatchObject({ action: 'prepare' });
+    expect(getMyShopUxState({ listing_id: 'listing-1', scoring_status: 'pending' })).toMatchObject({ action: 'score' });
     expect(getMyShopUxState({ scoring_status: 'scoring' })).toMatchObject({ category: 'in_progress', action: 'working' });
+    expect(getMyShopUxState({ scoring_status: 'pending' }, { preparationError: true })).toMatchObject({ action: 'retry_preparation' });
     expect(getMyShopUxState({ scoring_status: 'error' })).toMatchObject({ category: 'needs_attention', action: 'retry_score' });
+    expect(getMyShopUxState({ listing_id: 'listing-1', scoring_status: 'scored' })).toMatchObject({ action: 'continue' });
     expect(getMyShopUxState({ scoring_status: 'scored', selected_keyword_count: 13 })).toMatchObject({ category: 'ready_to_publish', action: 'review' });
     expect(getMyShopUxState({ scoring_status: 'scored', listings: { generated_title: 'A finished Etsy title' } })).toMatchObject({
       category: 'ready_to_publish', progress: 'SEO proposal ready',
     });
     expect(getMyShopUxState({ scoring_status: 'scored', export_status: 'partial', selected_keyword_count: 13 })).toMatchObject({ category: 'needs_attention', publication: 'Publication partial' });
+    expect(getMyShopUxState({ scoring_status: 'scored', export_status: 'published_unverified', selected_keyword_count: 13 })).toMatchObject({ category: 'needs_attention', action: 'verify' });
     expect(getMyShopUxState({ scoring_status: 'scored', export_status: 'exported', selected_keyword_count: 13 })).toMatchObject({ category: 'published', publication: 'Published (verified)' });
+    expect(getMyShopUxState({ listing_id: 'listing-1', scoring_status: 'scored', export_status: 'exported' })).toMatchObject({ action: 'view' });
   });
 
   it('does not turn an unknown baseline into a confirmed conflict', () => {
@@ -60,5 +66,22 @@ describe('My Shop listing helpers', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].etsyListing.etsy_listing_id).toBe(2);
     expect(rows[0].ux.category).toBe('needs_attention');
+  });
+
+  it('keeps a mixed selection neutral and plans only compatible bulk actions', () => {
+    const rows = [
+      { etsyListing: { etsy_listing_id: 'new' }, imported: undefined },
+      { etsyListing: { etsy_listing_id: 'score' }, imported: { id: 'score-row', etsy_listing_id: 'score', scoring_status: 'pending' } },
+      { etsyListing: { etsy_listing_id: 'review' }, imported: { id: 'review-row', etsy_listing_id: 'review', listing_id: 'listing-1', scoring_status: 'scored', selected_keyword_count: 13 } },
+      { etsyListing: { etsy_listing_id: 'working' }, imported: { id: 'working-row', etsy_listing_id: 'working', scoring_status: 'scoring' } },
+    ];
+
+    expect(getMyShopBulkActionPlan(rows)).toEqual({
+      importIds: ['new'], scoreIds: ['score'], reviewIds: ['review'], skippedIds: ['working'],
+    });
+    expect(isMyShopBulkSelectable(rows[0])).toBe(true);
+    expect(isMyShopBulkSelectable(rows[1])).toBe(true);
+    expect(isMyShopBulkSelectable(rows[2])).toBe(true);
+    expect(isMyShopBulkSelectable(rows[3])).toBe(false);
   });
 });

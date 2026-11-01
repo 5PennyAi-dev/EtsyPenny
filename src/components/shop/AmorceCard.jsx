@@ -36,7 +36,7 @@ export default function AmorceCard({
     onClick = () => onOpenStudioWithFirstImported();
   } else {
     title = 'Push your first optimization to Etsy';
-    subtext = `You have ${optimizedCount} optimized listings. Select them below to publish to Etsy in one click.`;
+    subtext = `You have ${optimizedCount} optimized listings. Review the proposals below before publishing to Etsy.`;
     ctaLabel = 'See how';
     onClick = () => onOpenDocs('/docs/etsy-import#publishing');
   }

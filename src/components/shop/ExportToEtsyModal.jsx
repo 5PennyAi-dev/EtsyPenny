@@ -182,7 +182,7 @@ const fieldAvailable = (listing, field) => {
   return false;
 };
 
-const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [] }) => {
+const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [], preflightLabel }) => {
   const isSingle = listings.length === 1;
 
   // Global defaults (batch mode)
@@ -265,10 +265,10 @@ const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [] }) => {
     : isSingle
       ? totalFieldCount === 0
         ? 'Select at least 1 field'
-        : `Push ${totalFieldCount} field${totalFieldCount > 1 ? 's' : ''} to Etsy`
+          : preflightLabel || `Push ${totalFieldCount} field${totalFieldCount > 1 ? 's' : ''} to Etsy`
       : totalFieldCount === 0
         ? 'Select at least 1 field'
-        : 'Push to Etsy';
+        : preflightLabel || 'Push to Etsy';
 
   const summaryText = isSingle
     ? `Push ${totalFieldCount} field${totalFieldCount > 1 ? 's' : ''}`

@@ -34,7 +34,7 @@ export function getMyShopUxState(listing, { isPreparing = false, preparationErro
   const exportStatus = listing.export_status || 'pending';
   if (['error', 'partial', 'conflict', 'published_unverified'].includes(exportStatus)) {
     const labels = { error: 'Publication failed', partial: 'Publication partial', conflict: 'Review required', published_unverified: 'Publication needs verification' };
-    return { category: 'needs_attention', progress: 'SEO proposal available', progressKey: 'proposal', publication: labels[exportStatus], publicationKey: 'attention', action: 'review', secondaryActions: ['open_studio', 'view_etsy'] };
+    return { category: 'needs_attention', progress: 'SEO proposal available', progressKey: 'proposal', publication: labels[exportStatus], publicationKey: 'attention', action: exportStatus === 'published_unverified' ? 'verify' : 'review', secondaryActions: ['open_studio', 'view_etsy'] };
   }
   if (preparationError) {
     return { category: 'needs_attention', progress: 'Preparation needs retry', progressKey: 'error', publication: 'Not ready', publicationKey: 'not_ready', action: 'retry_preparation', secondaryActions: ['view_etsy'] };
@@ -62,6 +62,39 @@ export function getMyShopUxState(listing, { isPreparing = false, preparationErro
     return { category: 'to_optimize', progress: 'Preparation required', progressKey: 'preparation_required', publication: 'Not ready', publicationKey: 'not_ready', action: 'prepare', secondaryActions: ['view_etsy'] };
   }
   return { category: 'to_optimize', progress: 'Ready to score', progressKey: 'ready_to_score', publication: 'Not ready', publicationKey: 'not_ready', action: 'score', secondaryActions: ['open_studio', 'view_etsy'] };
+}
+
+export function isReviewableListing(listing) {
+  return Boolean(listing?.listing_id && listing.scoring_status === 'scored' && hasPublishableProposal(listing));
+}
+
+/**
+ * A selection is intentionally state-neutral. Each batch button only receives
+ * the rows whose persisted preconditions match its operation.
+ */
+export function getMyShopBulkActionPlan(rows = []) {
+  const plan = { importIds: [], scoreIds: [], reviewIds: [], skippedIds: [] };
+
+  rows.forEach(({ etsyListing, imported }) => {
+    const etsyId = etsyListing?.etsy_listing_id;
+    if (etsyId == null) return;
+    if (!imported) {
+      plan.importIds.push(etsyId);
+    } else if (isScoreableEtsyListing(imported)) {
+      plan.scoreIds.push(etsyId);
+    } else if (isReviewableListing(imported)) {
+      plan.reviewIds.push(etsyId);
+    } else {
+      plan.skippedIds.push(etsyId);
+    }
+  });
+
+  return plan;
+}
+
+export function isMyShopBulkSelectable(row) {
+  const plan = getMyShopBulkActionPlan([row]);
+  return plan.importIds.length + plan.scoreIds.length + plan.reviewIds.length === 1;
 }
 
 export function filterAndSortMyShopListings({
