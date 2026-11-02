@@ -29,6 +29,7 @@ import {
 import { selectAndScore } from './lib/seo/select-and-score.ts';
 import { persistSeo } from './lib/seo/persist-seo.ts';
 import { persistStrength } from './lib/seo/persist-strength.ts';
+import { withProposalFields } from './lib/etsy/proposals.ts';
 import { applySEOFilter } from './lib/seo/filter-logic.ts';
 import { extractProductTypeWords } from './lib/seo/concept-diversity.ts';
 import { runResetPool } from './lib/seo/run-reset-pool.ts';
@@ -456,7 +457,8 @@ app.post('/api/seo/recalculate-scores', async (req, res) => {
 
     // 4. Persist to DB
     const selectedTags = selected_keywords.map(k => k.keyword);
-    await persistStrength(listing_id, strength, selectedTags, finalParams);
+    // Mirror Vercel: an explicit Studio recalculation saves the tag proposal.
+    await persistStrength(listing_id, strength, selectedTags, finalParams, { markProposalTags: true });
 
     console.log(`   ✅ Recalculate complete for ${listing_id} — LSI: ${strength.listing_strength}`);
     return res.json({ success: true, strength });
@@ -672,11 +674,19 @@ Respond with ONLY this JSON, no other text:
     const { title, description } = parseDraftGenerationResponse(extractJson(aiResponse.text));
 
     // Step E: Persist to DB
+    const { data: proposalListing, error: proposalListingError } = await supabaseAdmin
+      .from('listings')
+      .select('etsy_proposal_fields')
+      .eq('id', listing_id)
+      .eq('user_id', user_id)
+      .single();
+    if (proposalListingError || !proposalListing) throw new DraftPersistenceError('Listing not found');
     const { data: updatedListing, error: updateError } = await supabaseAdmin
       .from('listings')
       .update({
         generated_title: title,
         generated_description: description,
+        etsy_proposal_fields: withProposalFields(proposalListing.etsy_proposal_fields, ['title', 'description']),
         status_id: STATUS_COMPLETE
       })
       .eq('id', listing_id)

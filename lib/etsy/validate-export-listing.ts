@@ -16,6 +16,9 @@ export interface ExportEtsyListing {
   original_title: string | null;
   original_description: string | null;
   original_tags: string[] | null;
+  export_status: string | null;
+  last_exported_at: string | null;
+  scoring_status: string | null;
 }
 
 export class EtsyExportValidationError extends Error {
@@ -39,7 +42,7 @@ export async function getOwnedLinkedEtsyListingForExport({
 }: ValidateExportListingArgs): Promise<ExportEtsyListing> {
   const { data, error } = await db
     .from('etsy_listings')
-    .select('id, connection_id, listing_id, etsy_listing_id, original_title, original_description, original_tags')
+    .select('id, connection_id, listing_id, etsy_listing_id, original_title, original_description, original_tags, export_status, last_exported_at, scoring_status')
     .eq('etsy_listing_id', etsyListingId)
     .eq('user_id', userId)
     .single();

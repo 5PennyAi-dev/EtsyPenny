@@ -1053,11 +1053,23 @@ const ProductStudio = () => {
     }
 
     try {
+        const { data: currentListing, error: currentListingError } = await supabase
+            .from('listings')
+            .select('etsy_proposal_fields')
+            .eq('id', listingId)
+            .single();
+        if (currentListingError) throw currentListingError;
+        const now = new Date().toISOString();
+        const proposalFields = { ...(currentListing?.etsy_proposal_fields || {}) };
+        for (const field of ['title', 'description']) {
+            proposalFields[field] = { version: crypto.randomUUID(), updated_at: now };
+        }
         const { error } = await supabase
             .from('listings')
             .update({
                 generated_title: title,
-                generated_description: description
+                generated_description: description,
+                etsy_proposal_fields: proposalFields,
             })
             .eq('id', listingId);
 

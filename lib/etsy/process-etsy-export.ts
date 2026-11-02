@@ -7,6 +7,8 @@ import {
   type EtsyExportSnapshot,
 } from './export-conflicts.js';
 import { getExportBaseline, updateExportBaseline } from './export-baselines.js';
+import type { ExportBaseline } from './export-baselines.js';
+import { readFieldProposalState, snapshotsMatch, type FieldProposalState } from './proposals.js';
 
 export interface ExportRequestItem {
   etsy_listing_id: number;
@@ -21,22 +23,30 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown error';
 }
 
-async function getProposal(db: any, userId: string, listingId: string, fields: EtsyExportField[]): Promise<EtsyExportSnapshot> {
+interface SavedProposal {
+  snapshot: EtsyExportSnapshot;
+  versions: FieldProposalState;
+}
+
+async function getProposal(db: any, userId: string, listingId: string, fields: EtsyExportField[], etsyListing: any, baseline: ExportBaseline): Promise<SavedProposal> {
   const { data: pennyListing, error: listingError } = await db
     .from('listings')
-    .select('generated_title, generated_description')
+    .select('generated_title, generated_description, etsy_proposal_fields')
     .eq('id', listingId)
     .eq('user_id', userId)
     .single();
   if (listingError || !pennyListing) throw new Error('PennySEO listing not found');
+  if (etsyListing.scoring_status !== 'scored') throw new Error('SEO scoring must be completed before publishing to Etsy');
+  const versions = readFieldProposalState(pennyListing.etsy_proposal_fields);
+  if (fields.some((field) => !versions[field])) throw new Error('No current saved SEO proposal for every selected field — save changes in Studio first');
 
   const proposal: EtsyExportSnapshot = {};
   if (fields.includes('title')) {
-    if (!pennyListing.generated_title) throw new Error('No generated title — run Magic Draft first');
+    if (!pennyListing.generated_title) throw new Error('No saved title proposal found — save a title change in Studio first');
     proposal.title = pennyListing.generated_title.slice(0, 140);
   }
   if (fields.includes('description')) {
-    if (!pennyListing.generated_description) throw new Error('No generated description — run Magic Draft first');
+    if (!pennyListing.generated_description) throw new Error('No saved description proposal found — save a description change in Studio first');
     proposal.description = pennyListing.generated_description;
   }
   if (fields.includes('tags')) {
@@ -44,7 +54,7 @@ async function getProposal(db: any, userId: string, listingId: string, fields: E
       .from('listing_seo_stats')
       .select('tag')
       .eq('listing_id', listingId)
-      .eq('is_current_eval', true)
+      .eq('is_proposal_selected', true)
       .order('opportunity_score', { ascending: false })
       .limit(13);
     if (tagError) throw tagError;
@@ -52,10 +62,37 @@ async function getProposal(db: any, userId: string, listingId: string, fields: E
       .map((row: { tag: string }) => row.tag.trim())
       .filter((tag: string) => tag.length > 0 && tag.length <= 20)
       .slice(0, 13);
-    if (tags.length === 0) throw new Error('No selected tags found — select tags in SEO Studio first');
+    if (tags.length === 0) throw new Error('No saved tag proposal found — save tags in SEO Studio first');
     proposal.tags = tags;
   }
-  return proposal;
+  for (const field of fields) {
+    if (baseline.trusted_fields.includes(field) && snapshotsMatch(field, proposal, baseline.baseline_snapshot)) {
+      throw new Error(`No changed ${field} proposal — it matches the last verified Etsy value`);
+    }
+  }
+  return { snapshot: proposal, versions };
+}
+
+async function clearVerifiedProposalFields(db: any, userId: string, listingId: string, versions: FieldProposalState, fields: EtsyExportField[]): Promise<void> {
+  if (fields.length === 0) return;
+  const { data: listing, error } = await db.from('listings')
+    .select('etsy_proposal_fields').eq('id', listingId).eq('user_id', userId).single();
+  if (error || !listing) throw error || new Error('PennySEO listing not found');
+  const current = readFieldProposalState(listing.etsy_proposal_fields);
+  let changed = false;
+  for (const field of fields) {
+    if (current[field]?.version === versions[field]?.version) {
+      delete current[field];
+      changed = true;
+    }
+  }
+  if (changed) {
+    const { error: updateError } = await db.from('listings')
+      .update({ etsy_proposal_fields: current })
+      .eq('id', listingId)
+      .eq('user_id', userId);
+    if (updateError) throw updateError;
+  }
 }
 
 async function logAttempt(db: any, args: {
@@ -112,9 +149,9 @@ export async function processEtsyExportItem(args: {
     listingId: item.listing_id,
     connectionId: connection.id,
   });
-  const [proposal, baseline, remoteRows] = await Promise.all([
-    getProposal(db, userId, item.listing_id, item.fields),
-    getExportBaseline(db, { etsyListingRowId: etsyListing.id, userId, connectionId: connection.id }),
+  const baseline = await getExportBaseline(db, { etsyListingRowId: etsyListing.id, userId, connectionId: connection.id });
+  const [proposal, remoteRows] = await Promise.all([
+    getProposal(db, userId, item.listing_id, item.fields, etsyListing, baseline),
     fetchListingsByIds(connection, [item.etsy_listing_id]),
   ]);
   const remoteListing = remoteRows.find((listing) => listing.listing_id === item.etsy_listing_id);
@@ -125,14 +162,14 @@ export async function processEtsyExportItem(args: {
     baseline: baseline.baseline_snapshot,
     trustedFields: baseline.trusted_fields,
     remote,
-    proposed: proposal,
+    proposed: proposal.snapshot,
   });
 
   const blockedFields = item.fields.filter((field) => ['conflict', 'baseline_unknown'].includes(fieldResults[field].status));
   if (args.mode === 'preflight') {
     if (blockedFields.length > 0) {
       await logAttempt(db, {
-        userId, item, status: 'conflict', baseline: baseline.baseline_snapshot, remote, proposal, fieldResults,
+        userId, item, status: 'conflict', baseline: baseline.baseline_snapshot, remote, proposal: proposal.snapshot, fieldResults,
         errorMessage: 'Etsy changes require explicit confirmation before publication',
       });
     }
@@ -149,7 +186,7 @@ export async function processEtsyExportItem(args: {
   const unconfirmedBlocked = blockedFields.filter((field) => !confirmedFields.has(field));
   if (unconfirmedBlocked.length > 0 && !args.allowPartial) {
     await logAttempt(db, {
-      userId, item, status: 'conflict', baseline: baseline.baseline_snapshot, remote, proposal, fieldResults,
+      userId, item, status: 'conflict', baseline: baseline.baseline_snapshot, remote, proposal: proposal.snapshot, fieldResults,
       errorMessage: 'Conflicting Etsy fields were not explicitly confirmed',
       confirmedFields: Array.from(confirmedFields),
     });
@@ -163,7 +200,7 @@ export async function processEtsyExportItem(args: {
   if (fieldsToPatch.length === 0) {
     if (unconfirmedBlocked.length === 0) {
       await logAttempt(db, {
-        userId, item, status: 'success', baseline: baseline.baseline_snapshot, remote, proposal, fieldResults,
+        userId, item, status: 'success', baseline: baseline.baseline_snapshot, remote, proposal: proposal.snapshot, fieldResults,
         fieldsExported: [], confirmedFields: Array.from(confirmedFields),
       });
       const unchangedFields = item.fields.filter((field) => fieldResults[field].status === 'unchanged');
@@ -172,11 +209,12 @@ export async function processEtsyExportItem(args: {
           etsyListingRowId: etsyListing.id, userId, connectionId: connection.id, etsyListingId: item.etsy_listing_id,
           existing: baseline, acceptedSnapshot: remote, acceptedFields: unchangedFields, source: 'post_export',
         });
+        await clearVerifiedProposalFields(db, userId, item.listing_id, proposal.versions, unchangedFields);
       }
       return { etsy_listing_id: item.etsy_listing_id, status: 'success', fields: fieldResults, fields_to_publish: [] };
     }
     await logAttempt(db, {
-      userId, item, status: 'conflict', baseline: baseline.baseline_snapshot, remote, proposal, fieldResults,
+      userId, item, status: 'conflict', baseline: baseline.baseline_snapshot, remote, proposal: proposal.snapshot, fieldResults,
       errorMessage: 'No selected field was eligible for publication',
       confirmedFields: Array.from(confirmedFields),
     });
@@ -185,16 +223,16 @@ export async function processEtsyExportItem(args: {
 
   const patchPayload: EtsyExportSnapshot = {};
   for (const field of fieldsToPatch) {
-    if (field === 'tags') patchPayload.tags = proposal.tags;
-    else if (field === 'title') patchPayload.title = proposal.title;
-    else patchPayload.description = proposal.description;
+    if (field === 'tags') patchPayload.tags = proposal.snapshot.tags;
+    else if (field === 'title') patchPayload.title = proposal.snapshot.title;
+    else patchPayload.description = proposal.snapshot.description;
   }
   let patchResult;
   try {
     patchResult = await updateEtsyListing(connection, item.etsy_listing_id, patchPayload);
   } catch (error) {
     await logAttempt(db, {
-      userId, item, status: 'error', baseline: baseline.baseline_snapshot, remote, proposal, fieldResults,
+      userId, item, status: 'error', baseline: baseline.baseline_snapshot, remote, proposal: proposal.snapshot, fieldResults,
       fieldsExported: [], confirmedFields: Array.from(confirmedFields), errorMessage: toErrorMessage(error),
     });
     throw error;
@@ -202,7 +240,7 @@ export async function processEtsyExportItem(args: {
   if (!patchResult.success) {
     const error = new Error(patchResult.error ?? 'Etsy API call failed');
     await logAttempt(db, {
-      userId, item, status: 'error', baseline: baseline.baseline_snapshot, remote, proposal, fieldResults,
+      userId, item, status: 'error', baseline: baseline.baseline_snapshot, remote, proposal: proposal.snapshot, fieldResults,
       fieldsExported: [], confirmedFields: Array.from(confirmedFields), errorMessage: error.message,
     });
     throw error;
@@ -218,14 +256,14 @@ export async function processEtsyExportItem(args: {
   }
 
   const verifiedFields = verifiedRemote
-    ? fieldsToPatch.filter((field) => JSON.stringify(verifiedRemote?.[field]) === JSON.stringify(proposal[field]))
+    ? fieldsToPatch.filter((field) => snapshotsMatch(field, verifiedRemote ?? {}, proposal.snapshot))
     : [];
   const finalStatus = verifiedFields.length === fieldsToPatch.length
     ? (unconfirmedBlocked.length > 0 ? 'partial' : 'success')
     : 'published_unverified';
   await logAttempt(db, {
     userId, item, status: finalStatus, baseline: baseline.baseline_snapshot, remote: verifiedRemote ?? remote,
-    proposal, fieldResults, fieldsExported: fieldsToPatch, confirmedFields: Array.from(confirmedFields),
+    proposal: proposal.snapshot, fieldResults, fieldsExported: fieldsToPatch, confirmedFields: Array.from(confirmedFields),
     errorMessage: finalStatus === 'published_unverified' ? 'Etsy PATCH succeeded but the post-publication read could not verify every field' : undefined,
   });
 
@@ -235,6 +273,7 @@ export async function processEtsyExportItem(args: {
       existing: baseline, acceptedSnapshot: verifiedRemote, acceptedFields: verifiedFields,
       source: blockedFields.some((field) => confirmedFields.has(field)) ? 'user_confirmed' : 'post_export',
     });
+    await clearVerifiedProposalFields(db, userId, item.listing_id, proposal.versions, verifiedFields);
   }
   await db.from('etsy_listings').update({
     export_status: finalStatus === 'success' ? 'exported' : finalStatus,

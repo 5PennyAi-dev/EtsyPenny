@@ -18,11 +18,9 @@ export function isScoreableEtsyListing(listing) {
 
 function hasPublishableProposal(listing) {
   const pennyListing = listing?.listings;
-  return Boolean(
-    pennyListing?.generated_title
-    || pennyListing?.generated_description
-    || (listing?.selected_keyword_count ?? 0) >= 13,
-  );
+  const fields = pennyListing?.etsy_proposal_fields;
+  if (!fields || typeof fields !== 'object') return false;
+  return Boolean(fields.title || fields.description || fields.tags);
 }
 
 /** Maps persisted state, plus explicit session-only preparation state, to one work tab. */
@@ -48,11 +46,13 @@ export function getMyShopUxState(listing, { isPreparing = false, preparationErro
   if (listing.scoring_status === 'scoring') {
     return { category: 'in_progress', progress: 'Scoring in progress', progressKey: 'scoring', publication: 'Not ready', publicationKey: 'not_ready', action: 'working', secondaryActions: ['open_studio', 'view_etsy'] };
   }
-  // A past export is not evidence that a possible current draft is also published.
-  if (exportStatus === 'exported') {
+  const hasCurrentProposal = hasPublishableProposal(listing);
+  // A verified historical export stays published until an explicitly saved,
+  // newer proposal exists. Scoring recommendations alone never change it.
+  if (exportStatus === 'exported' && !hasCurrentProposal) {
     return { category: 'published', progress: 'Last optimization published', progressKey: 'published', publication: 'Published (verified)', publicationKey: 'published', action: 'view', secondaryActions: ['open_studio', 'view_etsy'] };
   }
-  if (listing.scoring_status === 'scored' && hasPublishableProposal(listing)) {
+  if (listing.scoring_status === 'scored' && hasCurrentProposal) {
     return { category: 'ready_to_publish', progress: 'SEO proposal ready', progressKey: 'proposal', publication: 'Ready to review', publicationKey: 'ready', action: 'review', secondaryActions: ['open_studio', 'view_etsy'] };
   }
   if (listing.scoring_status === 'scored') {

@@ -34,8 +34,8 @@ describe('My Shop listing helpers', () => {
     expect(getMyShopUxState({ scoring_status: 'pending' }, { preparationError: true })).toMatchObject({ action: 'retry_preparation' });
     expect(getMyShopUxState({ scoring_status: 'error' })).toMatchObject({ category: 'needs_attention', action: 'retry_score' });
     expect(getMyShopUxState({ listing_id: 'listing-1', scoring_status: 'scored' })).toMatchObject({ action: 'continue' });
-    expect(getMyShopUxState({ scoring_status: 'scored', selected_keyword_count: 13 })).toMatchObject({ category: 'ready_to_publish', action: 'review' });
-    expect(getMyShopUxState({ scoring_status: 'scored', listings: { generated_title: 'A finished Etsy title' } })).toMatchObject({
+    expect(getMyShopUxState({ scoring_status: 'scored', selected_keyword_count: 13 })).toMatchObject({ category: 'in_progress', action: 'continue' });
+    expect(getMyShopUxState({ scoring_status: 'scored', original_title: 'Old', listings: { generated_title: 'A finished Etsy title', etsy_proposal_fields: { title: { version: 'title-v1', updated_at: '2026-11-01T00:00:00.000Z' } } } })).toMatchObject({
       category: 'ready_to_publish', progress: 'SEO proposal ready',
     });
     expect(getMyShopUxState({ scoring_status: 'scored', export_status: 'partial', selected_keyword_count: 13 })).toMatchObject({ category: 'needs_attention', publication: 'Publication partial' });
@@ -44,10 +44,20 @@ describe('My Shop listing helpers', () => {
     expect(getMyShopUxState({ listing_id: 'listing-1', scoring_status: 'scored', export_status: 'exported' })).toMatchObject({ action: 'view' });
   });
 
-  it('does not turn an unknown baseline into a confirmed conflict', () => {
-    expect(getMyShopUxState({ scoring_status: 'scored', selected_keyword_count: 13 })).toMatchObject({
-      category: 'ready_to_publish', publication: 'Ready to review',
-    });
+  it('separates scoring recommendations from explicit current proposals', () => {
+    for (const selected_keyword_count of [0, 5, 13]) {
+      expect(getMyShopUxState({ scoring_status: 'scored', selected_keyword_count })).toMatchObject({
+        category: 'in_progress', action: 'continue',
+      });
+    }
+    expect(getMyShopUxState({ scoring_status: 'scored', proposal_tag_count: 5, listings: { etsy_proposal_fields: { tags: { version: 'tags-v1', updated_at: '2026-11-01T00:00:00.000Z' } } } })).toMatchObject({ category: 'ready_to_publish' });
+    expect(getMyShopUxState({ scoring_status: 'scored', original_description: 'Old', listings: { generated_description: 'New', etsy_proposal_fields: { description: { version: 'description-v1', updated_at: '2026-11-01T00:00:00.000Z' } } } })).toMatchObject({ category: 'ready_to_publish' });
+    expect(getMyShopUxState({ scoring_status: 'scored', proposal_tag_count: 13 })).toMatchObject({ category: 'in_progress' });
+  });
+
+  it('keeps a historical publication published until a newer explicit proposal exists', () => {
+    expect(getMyShopUxState({ scoring_status: 'scored', export_status: 'exported', proposal_tag_count: 5 })).toMatchObject({ category: 'published' });
+    expect(getMyShopUxState({ scoring_status: 'scored', export_status: 'exported', proposal_tag_count: 5, listings: { etsy_proposal_fields: { tags: { version: 'tags-v2', updated_at: '2026-11-02T00:00:00.000Z' } } } })).toMatchObject({ category: 'ready_to_publish' });
   });
 
   it('filters loaded listings, counts one exclusive category, and sorts locally', () => {
@@ -72,7 +82,7 @@ describe('My Shop listing helpers', () => {
     const rows = [
       { etsyListing: { etsy_listing_id: 'new' }, imported: undefined },
       { etsyListing: { etsy_listing_id: 'score' }, imported: { id: 'score-row', etsy_listing_id: 'score', scoring_status: 'pending' } },
-      { etsyListing: { etsy_listing_id: 'review' }, imported: { id: 'review-row', etsy_listing_id: 'review', listing_id: 'listing-1', scoring_status: 'scored', selected_keyword_count: 13 } },
+      { etsyListing: { etsy_listing_id: 'review' }, imported: { id: 'review-row', etsy_listing_id: 'review', listing_id: 'listing-1', scoring_status: 'scored', proposal_tag_count: 5, listings: { etsy_proposal_fields: { tags: { version: 'tags-v1', updated_at: '2026-11-01T00:00:00.000Z' } } } } },
       { etsyListing: { etsy_listing_id: 'working' }, imported: { id: 'working-row', etsy_listing_id: 'working', scoring_status: 'scoring' } },
     ];
 

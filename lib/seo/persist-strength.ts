@@ -4,6 +4,7 @@
  */
 
 import { supabaseAdmin } from '../supabase/server.js';
+import { withProposalFields } from '../etsy/proposals.js';
 
 interface Strength {
   listing_strength: number;
@@ -28,24 +29,46 @@ interface Params {
   CPC: number;
 }
 
+interface PersistStrengthOptions {
+  markProposalTags?: boolean;
+}
+
 export async function persistStrength(
   listing_id: string,
   strength: Strength,
   selectedTags: string[],
-  params: Params
+  params: Params,
+  { markProposalTags = false }: PersistStrengthOptions = {}
 ): Promise<void> {
   // 1. Update is_current_eval flags on listing_seo_stats
   await supabaseAdmin
     .from('listing_seo_stats')
-    .update({ is_current_eval: false })
+    .update(markProposalTags
+      ? { is_current_eval: false, is_proposal_selected: false }
+      : { is_current_eval: false })
     .eq('listing_id', listing_id);
 
   if (selectedTags.length > 0) {
     await supabaseAdmin
       .from('listing_seo_stats')
-      .update({ is_current_eval: true })
+      .update(markProposalTags
+        ? { is_current_eval: true, is_proposal_selected: true }
+        : { is_current_eval: true })
       .eq('listing_id', listing_id)
       .in('tag', selectedTags);
+  }
+
+  if (markProposalTags) {
+    const { data: listing, error: listingError } = await supabaseAdmin
+      .from('listings')
+      .select('etsy_proposal_fields')
+      .eq('id', listing_id)
+      .single();
+    if (listingError || !listing) throw listingError || new Error('Listing not found');
+    await supabaseAdmin
+      .from('listings')
+      .update({ etsy_proposal_fields: withProposalFields(listing.etsy_proposal_fields, ['tags']) })
+      .eq('id', listing_id);
   }
 
   // 2. Upsert listings_global_eval (single source of truth for scores)

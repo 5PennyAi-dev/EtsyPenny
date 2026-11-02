@@ -164,6 +164,7 @@ export default function MyShopPage() {
           id,
           generated_title,
           generated_description,
+          etsy_proposal_fields,
           listings_global_eval ( listing_strength )
         )
       `)
@@ -175,21 +176,26 @@ export default function MyShopPage() {
     const linkedIds = rows.map((r) => r.listing_id).filter(Boolean);
 
     const countsByListingId = {};
+    const proposalCountsByListingId = {};
     if (linkedIds.length > 0) {
-      const { data: evalRows, error: evalError } = await supabase
-        .from('listing_seo_stats')
-        .select('listing_id')
-        .in('listing_id', linkedIds)
-        .eq('is_current_eval', true);
+      const [{ data: evalRows, error: evalError }, { data: proposalRows, error: proposalError }] = await Promise.all([
+        supabase.from('listing_seo_stats').select('listing_id').in('listing_id', linkedIds).eq('is_current_eval', true),
+        supabase.from('listing_seo_stats').select('listing_id').in('listing_id', linkedIds).eq('is_proposal_selected', true),
+      ]);
       if (evalError) throw evalError;
+      if (proposalError) throw proposalError;
       for (const r of evalRows || []) {
         countsByListingId[r.listing_id] = (countsByListingId[r.listing_id] || 0) + 1;
+      }
+      for (const r of proposalRows || []) {
+        proposalCountsByListingId[r.listing_id] = (proposalCountsByListingId[r.listing_id] || 0) + 1;
       }
     }
 
     const enriched = rows.map((r) => ({
       ...r,
       selected_keyword_count: r.listing_id ? (countsByListingId[r.listing_id] || 0) : 0,
+      proposal_tag_count: r.listing_id ? (proposalCountsByListingId[r.listing_id] || 0) : 0,
     }));
     setImportedListings(enriched);
     return enriched;
@@ -436,8 +442,8 @@ export default function MyShopPage() {
 
     try {
       const [{ data: listingsData }, { data: keywordsData }] = await Promise.all([
-        supabase.from('listings').select('id, generated_title, generated_description, image_url').in('id', listingIds),
-        supabase.from('listing_seo_stats').select('listing_id, tag').in('listing_id', listingIds).eq('is_current_eval', true),
+        supabase.from('listings').select('id, generated_title, generated_description, image_url, etsy_proposal_fields').in('id', listingIds),
+        supabase.from('listing_seo_stats').select('listing_id, tag').in('listing_id', listingIds).eq('is_proposal_selected', true),
       ]);
 
       const modalListings = selectedEtsyListings.map(el => {
@@ -452,10 +458,11 @@ export default function MyShopPage() {
           optimized_title: listing?.generated_title,
           optimized_description: listing?.generated_description,
           optimized_tags: tags,
+          proposal_fields: listing?.etsy_proposal_fields || {},
           image_url: el.thumbnail_url || listing?.image_url,
           display_title: listing?.generated_title || el.original_title,
         };
-      }).filter(item => item.optimized_tags.length > 0 || item.optimized_title);
+      }).filter(item => item.optimized_tags.length > 0 || item.optimized_title || item.optimized_description);
 
       if (modalListings.length === 0) {
         toast.error('Selected listings have no optimized SEO data. Open them in Studio first.');

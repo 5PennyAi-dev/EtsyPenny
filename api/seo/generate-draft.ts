@@ -6,6 +6,7 @@ import { DraftGenerationValidationError, parseDraftGenerationResponse } from '..
 import { checkTokenBalance, deductTokens, TokenDeductionError } from '../../lib/tokens/token-middleware.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
+import { withProposalFields } from '../../lib/etsy/proposals.js';
 
 const STATUS_COMPLETE = '28a11ca0-bcfc-42e0-971d-efc320f78424';
 
@@ -36,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const user_id = user.id;
 
     if (!listing_id) return res.status(400).json({ error: 'Missing listing_id' });
-    const { data: ownedListing } = await supabaseAdmin.from('listings').select('id').eq('id', listing_id).eq('user_id', user_id).maybeSingle();
+    const { data: ownedListing } = await supabaseAdmin.from('listings').select('id, etsy_proposal_fields').eq('id', listing_id).eq('user_id', user_id).maybeSingle();
     if (!ownedListing) return res.status(404).json({ error: 'Listing not found' });
 
     // If keywords not provided (e.g. bulk action), fetch from DB
@@ -229,6 +230,7 @@ Respond with ONLY this JSON, no other text:
       .update({
         generated_title: title,
         generated_description: description,
+        etsy_proposal_fields: withProposalFields(ownedListing.etsy_proposal_fields, ['title', 'description']),
         status_id: STATUS_COMPLETE,
       })
       .eq('id', listing_id)

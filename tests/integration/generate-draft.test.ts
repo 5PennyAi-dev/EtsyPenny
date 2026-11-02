@@ -87,7 +87,8 @@ describe('POST /api/seo/generate-draft (Express)', () => {
     const ownedListing: any = {
       select: vi.fn(() => ownedListing),
       eq: vi.fn(() => ownedListing),
-      maybeSingle: vi.fn(async () => ({ data: { id: LISTING_ID }, error: null })),
+      maybeSingle: vi.fn(async () => ({ data: { id: LISTING_ID, etsy_proposal_fields: {} }, error: null })),
+      single: vi.fn(async () => ({ data: { id: LISTING_ID, etsy_proposal_fields: {} }, error: null })),
     };
     const noRowUpdate: any = {
       update: vi.fn(() => noRowUpdate),
@@ -98,7 +99,9 @@ describe('POST /api/seo/generate-draft (Express)', () => {
     let listingCalls = 0;
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table !== 'listings') throw new Error(`Unexpected table ${table}`);
-      return listingCalls++ === 0 ? ownedListing : noRowUpdate;
+      // Express verifies ownership before the handler reads proposal versions,
+      // then the final update deliberately reports no affected row.
+      return listingCalls++ < 2 ? ownedListing : noRowUpdate;
     });
 
     const res = await request.post('/api/seo/generate-draft').set('Authorization', 'Bearer test-token').send(payload());

@@ -173,6 +173,9 @@ serve(async (req) => {
             .delete()
             .eq('listing_id', listing_id)
             .eq('is_competition', false)
+            // An explicit Studio tag proposal is durable across fresh scoring.
+            // New recommendations may refresh its metrics, but must not remove it.
+            .eq('is_proposal_selected', false)
             .or('is_user_added.is.null,is_user_added.eq.false');
 
         if (delError) {

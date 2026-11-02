@@ -1083,7 +1083,7 @@ const SidebarSkeleton = ({ phase }) => (
                             title={selectedTags.length > 13 ? "You can select a maximum of 13 keywords to recalculate" : selectedTags.length === 0 ? "You must select at least 1 keyword to recalculate" : "Recalculate Global Scores"}
                          >
                             {isRecalculating ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
-                            Recalculate Scores
+                            Save tag proposal & recalculate
                          </button>
 
                          <button 

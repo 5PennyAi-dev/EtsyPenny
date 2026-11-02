@@ -176,9 +176,14 @@ const FIELD_DISABLED_REASONS = {
 };
 
 const fieldAvailable = (listing, field) => {
-  if (field === 'tags') return (listing?.optimized_tags?.length ?? 0) >= 13;
-  if (field === 'title') return !!(listing?.optimized_title && listing.optimized_title.trim());
-  if (field === 'description') return !!(listing?.optimized_description && listing.optimized_description.trim());
+  if (listing?.proposal_fields && !listing.proposal_fields[field]) return false;
+  if (field === 'tags') {
+    const tags = listing?.optimized_tags || [];
+    const original = listing?.tags || [];
+    return tags.length > 0 && tags.length <= 13 && JSON.stringify(tags.map((tag) => tag.trim().toLowerCase())) !== JSON.stringify(original.map((tag) => tag.trim().toLowerCase()));
+  }
+  if (field === 'title') return !!(listing?.optimized_title?.trim() && listing.optimized_title.trim() !== (listing?.title || '').trim());
+  if (field === 'description') return !!(listing?.optimized_description?.trim() && listing.optimized_description.trim() !== (listing?.description || '').trim());
   return false;
 };
 
@@ -193,7 +198,9 @@ const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [], prefligh
     listings.map((l) => ({
       tags: fieldAvailable(l, 'tags'),
       title: fieldAvailable(l, 'title'),
-      description: false,
+      // A description-only proposal must be reviewable without selecting a
+      // non-existent title or tag field first.
+      description: !fieldAvailable(l, 'tags') && !fieldAvailable(l, 'title') && fieldAvailable(l, 'description'),
     }))
   );
 

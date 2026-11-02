@@ -61,7 +61,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 4. Persist to DB
     const selectedTags = selected_keywords.map((k: { keyword?: string }) => k.keyword);
-    await persistStrength(listing_id, strength, selectedTags, finalParams);
+    // Recalculation is the explicit Studio action that saves a tag proposal.
+    // Automatic scoring uses persistSeo/runResetPool and never sets this flag.
+    await persistStrength(listing_id, strength, selectedTags, finalParams, { markProposalTags: true });
 
     console.info(`[recalculate-scores] complete listing=${listing_id} LSI=${strength.listing_strength}`);
     return res.json({ success: true, strength });
