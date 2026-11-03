@@ -3,6 +3,13 @@ import { supabaseAdmin } from '../../lib/supabase/server.js';
 import { downloadAndUploadEtsyImage } from '../../lib/etsy/prepare-etsy-image.js';
 import { matchProductType } from '../../lib/etsy/match-product-type.js';
 import { getOrCreateCanonicalEtsyListing } from '../../lib/etsy/get-or-create-canonical-listing.js';
+import {
+  claimEtsyListingForPreparation,
+  completeEtsyListingPreparation,
+  failEtsyListingPreparation,
+  PreparationClaimLostError,
+  preparationUserMessage,
+} from '../../lib/etsy/preparation-state.js';
 import { initSentry, Sentry } from '../../lib/sentry.js';
 import { verifyRequestUser, AuthError } from '../../lib/auth/verify-request-user.js';
 
@@ -13,6 +20,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  let claimed: { attemptId: string } | null = null;
+  let claimedRowId: string | null = null;
+  let claimedUserId: string | null = null;
   try {
     const { etsy_listing_id } = req.body;
     const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
@@ -27,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── 1. Fetch and validate ownership ─────────────────
     const { data: etsyListing, error: fetchErr } = await supabaseAdmin
       .from('etsy_listings')
-      .select('id, etsy_listing_id, listing_id, original_title, original_description, original_image_url, user_id, etsy_category')
+      .select('id, etsy_listing_id, listing_id, original_title, original_description, original_image_url, user_id, etsy_category, preparation_status')
       .eq('id', etsy_listing_id)
       .eq('user_id', user_id)
       .single();
@@ -45,10 +55,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('user_id', user_id)
         .single();
 
-      if (existing) {
+      if (existing && etsyListing.preparation_status === 'prepared') {
         console.info(`[prepare-listing] Already prepared: listing_id=${existing.id}`);
         return res.json({ listing_id: existing.id, image_url: existing.image_url });
       }
+    }
+
+    claimed = await claimEtsyListingForPreparation(user_id, etsyListing.id);
+    claimedRowId = etsyListing.id;
+    claimedUserId = user_id;
+    if (!claimed) {
+      return res.status(409).json({
+        error: 'Preparation is already in progress for this listing',
+        code: 'PREPARATION_IN_PROGRESS',
+      });
     }
 
     // ── 3. Download + upload image ──────────────────────
@@ -78,6 +98,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       productTypeId,
     });
 
+    await completeEtsyListingPreparation(user_id, etsyListing.id, claimed.attemptId);
+
     console.info(`[prepare-listing] ${listing.created ? 'Created' : 'Reused'} canonical listing_id=${listing.listingId}`);
 
     return res.json({ listing_id: listing.listingId, image_url: listing.imageUrl });
@@ -85,9 +107,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error instanceof AuthError) {
       return res.status(error.status).json({ error: error.message });
     }
+    if (error instanceof PreparationClaimLostError) {
+      return res.status(409).json({
+        error: 'Preparation was superseded by a newer attempt. Refresh My Shop to see the latest status.',
+        code: error.code,
+      });
+    }
+    if (claimed && claimedRowId && claimedUserId) {
+      try {
+        await failEtsyListingPreparation(claimedUserId, claimedRowId, claimed.attemptId, preparationUserMessage());
+      } catch (finalizeError) {
+        if (finalizeError instanceof PreparationClaimLostError) {
+          return res.status(409).json({
+            error: 'Preparation was superseded by a newer attempt. Refresh My Shop to see the latest status.',
+            code: finalizeError.code,
+          });
+        }
+        Sentry.captureException(finalizeError);
+      }
+    }
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ [prepare-listing] Error:', message);
-    return res.status(500).json({ error: 'Failed to prepare listing', details: message });
+    return res.status(500).json({ error: preparationUserMessage() });
   }
 }

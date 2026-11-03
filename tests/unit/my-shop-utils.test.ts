@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { filterAndSortMyShopListings, getMyShopBulkActionPlan, getMyShopListingStatus, getMyShopUxState, isMyShopBulkSelectable, isScoreableEtsyListing, mergeEtsyListings } from '../../src/lib/my-shop-utils.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { filterAndSortMyShopListings, getMyShopBulkActionPlan, getMyShopListingStatus, getMyShopUxState, getNextPreparationClaimExpiry, isMyShopBulkSelectable, isScoreableEtsyListing, mergeEtsyListings } from '../../src/lib/my-shop-utils.js';
+
+afterEach(() => vi.useRealTimers());
 
 describe('My Shop listing helpers', () => {
   it('appends a later Etsy page without duplicates and refreshes overlapping listings', () => {
@@ -20,10 +22,10 @@ describe('My Shop listing helpers', () => {
   });
 
   it('makes failed scoring retryable and visible in the errors filter', () => {
-    const listing = { scoring_status: 'error' };
+    const listing = { listing_id: 'listing-1', scoring_status: 'error' };
     expect(isScoreableEtsyListing(listing)).toBe(true);
     expect(getMyShopListingStatus(listing)).toBe('error');
-    expect(isScoreableEtsyListing({ scoring_status: 'scoring' })).toBe(false);
+    expect(isScoreableEtsyListing({ listing_id: 'listing-1', scoring_status: 'scoring' })).toBe(false);
   });
 
   it('uses a deterministic priority for attention, progress, proposals, and published listings', () => {
@@ -31,7 +33,8 @@ describe('My Shop listing helpers', () => {
     expect(getMyShopUxState({ scoring_status: 'pending' })).toMatchObject({ action: 'prepare' });
     expect(getMyShopUxState({ listing_id: 'listing-1', scoring_status: 'pending' })).toMatchObject({ action: 'score' });
     expect(getMyShopUxState({ scoring_status: 'scoring' })).toMatchObject({ category: 'in_progress', action: 'working' });
-    expect(getMyShopUxState({ scoring_status: 'pending' }, { preparationError: true })).toMatchObject({ action: 'retry_preparation' });
+    expect(getMyShopUxState({ scoring_status: 'pending', preparation_status: 'error', preparation_error: 'Safe message' })).toMatchObject({ action: 'retry_preparation', error: 'Safe message' });
+    expect(getMyShopUxState({ scoring_status: 'pending', preparation_status: 'preparing' }, { now: Date.parse('2026-11-03T12:00:00.000Z') })).toMatchObject({ category: 'in_progress', action: 'working' });
     expect(getMyShopUxState({ scoring_status: 'error' })).toMatchObject({ category: 'needs_attention', action: 'retry_score' });
     expect(getMyShopUxState({ listing_id: 'listing-1', scoring_status: 'scored' })).toMatchObject({ action: 'continue' });
     expect(getMyShopUxState({ scoring_status: 'scored', selected_keyword_count: 13 })).toMatchObject({ category: 'in_progress', action: 'continue' });
@@ -81,7 +84,7 @@ describe('My Shop listing helpers', () => {
   it('keeps a mixed selection neutral and plans only compatible bulk actions', () => {
     const rows = [
       { etsyListing: { etsy_listing_id: 'new' }, imported: undefined },
-      { etsyListing: { etsy_listing_id: 'score' }, imported: { id: 'score-row', etsy_listing_id: 'score', scoring_status: 'pending' } },
+      { etsyListing: { etsy_listing_id: 'score' }, imported: { id: 'score-row', etsy_listing_id: 'score', listing_id: 'listing-score', scoring_status: 'pending' } },
       { etsyListing: { etsy_listing_id: 'review' }, imported: { id: 'review-row', etsy_listing_id: 'review', listing_id: 'listing-1', scoring_status: 'scored', proposal_tag_count: 5, listings: { etsy_proposal_fields: { tags: { version: 'tags-v1', updated_at: '2026-11-01T00:00:00.000Z' } } } } },
       { etsyListing: { etsy_listing_id: 'working' }, imported: { id: 'working-row', etsy_listing_id: 'working', scoring_status: 'scoring' } },
     ];
@@ -93,5 +96,50 @@ describe('My Shop listing helpers', () => {
     expect(isMyShopBulkSelectable(rows[1])).toBe(true);
     expect(isMyShopBulkSelectable(rows[2])).toBe(true);
     expect(isMyShopBulkSelectable(rows[3])).toBe(false);
+  });
+
+  it('does not offer scoring while preparation is active or still required', () => {
+    expect(isScoreableEtsyListing({ listing_id: 'listing-1', scoring_status: 'pending', preparation_status: 'preparing' })).toBe(false);
+    expect(isScoreableEtsyListing({ scoring_status: 'pending', preparation_status: 'pending' })).toBe(false);
+    expect(isScoreableEtsyListing({ listing_id: 'listing-1', scoring_status: 'pending', preparation_status: 'prepared' })).toBe(true);
+  });
+
+  it('keeps an active claim working, then exposes a retry at its persisted expiry', () => {
+    vi.useFakeTimers();
+    const expiry = Date.parse('2026-11-03T12:10:00.000Z');
+    const activeClaim = {
+      listing_id: 'listing-1', scoring_status: 'pending', preparation_status: 'preparing',
+      preparation_claim_expires_at: '2026-11-03T12:10:00.000Z',
+    };
+    vi.setSystemTime(new Date('2026-11-03T12:09:59.000Z'));
+
+    expect(getNextPreparationClaimExpiry([activeClaim])).toBe(expiry);
+    expect(getMyShopUxState(activeClaim)).toMatchObject({ category: 'in_progress', action: 'working' });
+
+    vi.setSystemTime(new Date('2026-11-03T12:10:00.000Z'));
+    expect(getNextPreparationClaimExpiry([activeClaim])).toBeNull();
+    expect(getMyShopUxState(activeClaim)).toMatchObject({
+      category: 'needs_attention', action: 'retry_preparation',
+      error: 'The previous preparation appears to have stopped. You can retry safely.',
+    });
+  });
+
+  it('keeps missing or invalid claim expiries conservative and preserves exclusive tab counts', () => {
+    const preparingWithoutExpiry = { etsy_listing_id: 'missing', scoring_status: 'pending', preparation_status: 'preparing' };
+    const preparingWithInvalidExpiry = { etsy_listing_id: 'invalid', scoring_status: 'pending', preparation_status: 'preparing', preparation_claim_expires_at: 'not-a-date' };
+    const expired = { etsy_listing_id: 'expired', scoring_status: 'pending', preparation_status: 'preparing', preparation_claim_expires_at: '2026-11-03T12:00:00.000Z' };
+    const now = Date.parse('2026-11-03T12:00:01.000Z');
+
+    expect(getMyShopUxState(preparingWithoutExpiry, { now })).toMatchObject({ category: 'in_progress', action: 'working' });
+    expect(getMyShopUxState(preparingWithInvalidExpiry, { now })).toMatchObject({ category: 'in_progress', action: 'working' });
+    expect(filterAndSortMyShopListings({
+      etsyListings: [
+        { etsy_listing_id: 'missing', title: 'Missing' },
+        { etsy_listing_id: 'invalid', title: 'Invalid' },
+        { etsy_listing_id: 'expired', title: 'Expired' },
+      ],
+      importedListings: [preparingWithoutExpiry, preparingWithInvalidExpiry, expired], now,
+      tab: 'needs_attention',
+    }).map((row) => row.etsyListing.etsy_listing_id)).toEqual(['expired']);
   });
 });

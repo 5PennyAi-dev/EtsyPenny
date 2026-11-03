@@ -48,6 +48,13 @@ import { claimScoreableEtsyListingsForScoring } from './lib/etsy/claim-scoring.t
 import { downloadAndUploadEtsyImage } from './lib/etsy/prepare-etsy-image.ts';
 import { matchProductType } from './lib/etsy/match-product-type.ts';
 import { getOrCreateCanonicalEtsyListing } from './lib/etsy/get-or-create-canonical-listing.ts';
+import {
+  claimEtsyListingForPreparation,
+  completeEtsyListingPreparation,
+  failEtsyListingPreparation,
+  PreparationClaimLostError,
+  preparationUserMessage,
+} from './lib/etsy/preparation-state.ts';
 import etsyOauthAuthorize from './api/etsy/oauth/authorize.ts';
 import etsyOauthExchange from './api/etsy/oauth/exchange.ts';
 import etsyOauthDisconnect from './api/etsy/oauth/disconnect.ts';
@@ -1788,9 +1795,17 @@ app.post('/api/etsy/score-listings', async (req, res) => {
     }
 
     const scoreableListings = listings.filter((listing) => (
-      listing.scoring_status === 'pending' || listing.scoring_status === 'error'
+      (listing.scoring_status === 'pending' || listing.scoring_status === 'error')
+      && listing.preparation_status !== 'preparing'
     ));
     if (scoreableListings.length === 0) {
+      const preparing = listings.filter((listing) => listing.preparation_status === 'preparing');
+      if (preparing.length > 0) {
+        return res.status(409).json({
+          error: 'One or more listings are still being prepared',
+          in_progress: preparing.map((listing) => listing.id),
+        });
+      }
       const inProgress = listings.filter((listing) => listing.scoring_status === 'scoring');
       if (inProgress.length > 0) {
         return res.status(409).json({
@@ -1879,6 +1894,9 @@ app.post('/api/etsy/score-listings', async (req, res) => {
 
 // ─── ETSY PREPARE (direct-to-Studio, free) ───────────────
 app.post('/api/etsy/prepare-listing', async (req, res) => {
+  let claimed = null;
+  let claimedRowId = null;
+  let claimedUserId = null;
   try {
     const { etsy_listing_id } = req.body;
     const user = await verifyRequestUser(req.headers.authorization, supabaseAdmin);
@@ -1893,7 +1911,7 @@ app.post('/api/etsy/prepare-listing', async (req, res) => {
     // 1. Fetch and validate ownership
     const { data: etsyListing, error: fetchErr } = await supabaseAdmin
       .from('etsy_listings')
-      .select('id, etsy_listing_id, listing_id, original_title, original_description, original_image_url, user_id, etsy_category')
+      .select('id, etsy_listing_id, listing_id, original_title, original_description, original_image_url, user_id, etsy_category, preparation_status')
       .eq('id', etsy_listing_id)
       .eq('user_id', user_id)
       .single();
@@ -1910,10 +1928,20 @@ app.post('/api/etsy/prepare-listing', async (req, res) => {
         .eq('user_id', user_id)
         .single();
 
-      if (existing) {
+      if (existing && etsyListing.preparation_status === 'prepared') {
         console.info(`   ✅ [prepare-listing] Already prepared: listing_id=${existing.id}`);
         return res.json({ listing_id: existing.id, image_url: existing.image_url });
       }
+    }
+
+    claimed = await claimEtsyListingForPreparation(user_id, etsyListing.id);
+    claimedRowId = etsyListing.id;
+    claimedUserId = user_id;
+    if (!claimed) {
+      return res.status(409).json({
+        error: 'Preparation is already in progress for this listing',
+        code: 'PREPARATION_IN_PROGRESS',
+      });
     }
 
     // 3. Download + upload image
@@ -1941,6 +1969,8 @@ app.post('/api/etsy/prepare-listing', async (req, res) => {
       productTypeId,
     });
 
+    await completeEtsyListingPreparation(user_id, etsyListing.id, claimed.attemptId);
+
     console.info(`   ✅ [prepare-listing] ${listing.created ? 'Created' : 'Reused'} canonical listing_id=${listing.listingId}\n`);
 
     return res.json({ listing_id: listing.listingId, image_url: listing.imageUrl });
@@ -1948,8 +1978,27 @@ app.post('/api/etsy/prepare-listing', async (req, res) => {
     if (error instanceof AuthError) {
       return res.status(error.status).json({ error: error.message });
     }
+    if (error instanceof PreparationClaimLostError) {
+      return res.status(409).json({
+        error: 'Preparation was superseded by a newer attempt. Refresh My Shop to see the latest status.',
+        code: error.code,
+      });
+    }
+    if (claimed && claimedRowId && claimedUserId) {
+      try {
+        await failEtsyListingPreparation(claimedUserId, claimedRowId, claimed.attemptId, preparationUserMessage());
+      } catch (finalizeError) {
+        if (finalizeError instanceof PreparationClaimLostError) {
+          return res.status(409).json({
+            error: 'Preparation was superseded by a newer attempt. Refresh My Shop to see the latest status.',
+            code: finalizeError.code,
+          });
+        }
+        console.error('❌ [prepare-listing] Failed to persist preparation error:', finalizeError.message);
+      }
+    }
     console.error('❌ [prepare-listing] Error:', error.message);
-    return res.status(500).json({ error: 'Failed to prepare listing', details: error.message });
+    return res.status(500).json({ error: preparationUserMessage() });
   }
 });
 

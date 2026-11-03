@@ -24,7 +24,7 @@ function activityLabel(imported) {
 function actionLabel(action) {
   return {
     optimize: 'Optimize', prepare: 'Optimize', score: 'Score SEO', retry_score: 'Retry',
-    retry_preparation: 'Retry', continue: 'Continue', review: 'Review & publish',
+    retry_preparation: 'Retry preparation', continue: 'Continue', review: 'Review & publish',
     verify: 'Verify publication', view: 'View details', working: 'In progress',
   }[action] || 'View details';
 }
@@ -47,7 +47,7 @@ function ListingRow({ row, isSelected, onToggleSelect, onAction }) {
         className={`flex h-5 w-5 items-center justify-center rounded border ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 bg-white text-transparent hover:border-indigo-400'} disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-transparent`}
       ><Check size={14} strokeWidth={3} /></button>
       {listing.thumbnail_url ? <img src={listing.thumbnail_url} alt="" className="h-11 w-11 rounded-lg bg-slate-100 object-cover" loading="lazy" /> : <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100"><Package size={20} className="text-slate-400" /></div>}
-      <div className="min-w-0"><p className="truncate text-sm font-medium text-slate-800">{listing.title || 'Untitled listing'}</p><p className="mt-0.5 truncate text-xs text-slate-500 lg:hidden">{ux.progress} · {ux.publication}</p></div>
+      <div className="min-w-0"><p className="truncate text-sm font-medium text-slate-800">{listing.title || 'Untitled listing'}</p><p className={`mt-0.5 truncate text-xs ${ux.error ? 'text-rose-700' : 'text-slate-500'}`}>{ux.error || `${ux.progress} · ${ux.publication}`}</p></div>
       <span className="hidden text-xs text-slate-600 lg:block">{ux.progress}</span>
       <span className={`hidden w-fit rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums lg:block ${score == null ? 'border-slate-200 text-slate-400' : scoreClass(score)}`}>{score ?? '—'}</span>
       <span className={`hidden w-fit rounded-full border px-2 py-0.5 text-xs font-medium lg:block ${statusClass(ux.publicationKey)}`}>{ux.publication}</span>

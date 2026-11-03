@@ -13,7 +13,31 @@ export function mergeEtsyListings(existing = [], incoming = []) {
 }
 
 export function isScoreableEtsyListing(listing) {
-  return listing?.scoring_status === 'pending' || listing?.scoring_status === 'error';
+  return Boolean(listing?.listing_id)
+    && listing?.preparation_status !== 'preparing'
+    && (listing?.scoring_status === 'pending' || listing?.scoring_status === 'error');
+}
+
+/** Returns a valid preparation-claim expiry only for an active preparation. */
+export function getPreparationClaimExpiry(listing) {
+  if (listing?.preparation_status !== 'preparing') return null;
+  const expiresAt = Date.parse(listing?.preparation_claim_expires_at || '');
+  return Number.isFinite(expiresAt) ? expiresAt : null;
+}
+
+/** The browser may present a retry after expiry; the server remains authoritative. */
+export function isPreparationClaimExpired(listing, now = Date.now()) {
+  const expiresAt = getPreparationClaimExpiry(listing);
+  return expiresAt !== null && expiresAt <= now;
+}
+
+/** Finds the next valid active claim expiry for one lightweight UI refresh. */
+export function getNextPreparationClaimExpiry(listings = [], now = Date.now()) {
+  return listings.reduce((nextExpiry, listing) => {
+    const expiresAt = getPreparationClaimExpiry(listing);
+    if (expiresAt === null || expiresAt <= now) return nextExpiry;
+    return nextExpiry === null || expiresAt < nextExpiry ? expiresAt : nextExpiry;
+  }, null);
 }
 
 function hasPublishableProposal(listing) {
@@ -23,8 +47,8 @@ function hasPublishableProposal(listing) {
   return Boolean(fields.title || fields.description || fields.tags);
 }
 
-/** Maps persisted state, plus explicit session-only preparation state, to one work tab. */
-export function getMyShopUxState(listing, { isPreparing = false, preparationError = false } = {}) {
+/** Maps persisted workflow state, plus a short-lived local loading indicator, to one work tab. */
+export function getMyShopUxState(listing, { isPreparing = false, now = Date.now() } = {}) {
   if (!listing) {
     return { category: 'to_optimize', progress: 'Not started', progressKey: 'not_started', publication: 'Not imported', publicationKey: 'not_ready', action: 'optimize', secondaryActions: ['view_etsy'] };
   }
@@ -34,10 +58,19 @@ export function getMyShopUxState(listing, { isPreparing = false, preparationErro
     const labels = { error: 'Publication failed', partial: 'Publication partial', conflict: 'Review required', published_unverified: 'Publication needs verification' };
     return { category: 'needs_attention', progress: 'SEO proposal available', progressKey: 'proposal', publication: labels[exportStatus], publicationKey: 'attention', action: exportStatus === 'published_unverified' ? 'verify' : 'review', secondaryActions: ['open_studio', 'view_etsy'] };
   }
-  if (preparationError) {
-    return { category: 'needs_attention', progress: 'Preparation needs retry', progressKey: 'error', publication: 'Not ready', publicationKey: 'not_ready', action: 'retry_preparation', secondaryActions: ['view_etsy'] };
+  if (listing.preparation_status === 'error') {
+    return {
+      category: 'needs_attention', progress: 'Preparation needs retry', progressKey: 'error', publication: 'Not ready', publicationKey: 'not_ready', action: 'retry_preparation', secondaryActions: ['view_etsy'],
+      error: listing.preparation_error || 'We could not prepare this listing. Please try again.',
+    };
   }
-  if (isPreparing) {
+  if (isPreparationClaimExpired(listing, now)) {
+    return {
+      category: 'needs_attention', progress: 'Preparation needs retry', progressKey: 'error', publication: 'Not ready', publicationKey: 'not_ready', action: 'retry_preparation', secondaryActions: ['view_etsy'],
+      error: 'The previous preparation appears to have stopped. You can retry safely.',
+    };
+  }
+  if (isPreparing || listing.preparation_status === 'preparing') {
     return { category: 'in_progress', progress: 'Preparing for Studio', progressKey: 'preparing', publication: 'Not ready', publicationKey: 'not_ready', action: 'working', secondaryActions: ['view_etsy'] };
   }
   if (listing.scoring_status === 'error') {
@@ -98,7 +131,7 @@ export function isMyShopBulkSelectable(row) {
 }
 
 export function filterAndSortMyShopListings({
-  etsyListings = [], importedListings = [], tab = 'all', search = '', progress = 'all', publication = 'all', sort = 'activity', preparationErrors = {}, preparingListingId = null,
+  etsyListings = [], importedListings = [], tab = 'all', search = '', progress = 'all', publication = 'all', sort = 'activity', preparingListingId = null, now = Date.now(),
 }) {
   const importedByEtsyId = new Map(importedListings.map((listing) => [listing.etsy_listing_id, listing]));
   const query = search.trim().toLowerCase();
@@ -106,7 +139,7 @@ export function filterAndSortMyShopListings({
     const imported = importedByEtsyId.get(etsyListing.etsy_listing_id);
     const ux = getMyShopUxState(imported, {
       isPreparing: preparingListingId === etsyListing.etsy_listing_id,
-      preparationError: Boolean(preparationErrors[etsyListing.etsy_listing_id]),
+      now,
     });
     return { etsyListing, imported, ux };
   }).filter((row) => (

@@ -45,9 +45,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const scoreableListings = listings.filter((listing: any) => (
-      listing.scoring_status === 'pending' || listing.scoring_status === 'error'
+      (listing.scoring_status === 'pending' || listing.scoring_status === 'error')
+      && listing.preparation_status !== 'preparing'
     ));
     if (scoreableListings.length === 0) {
+      const preparing = listings.filter((listing: any) => listing.preparation_status === 'preparing');
+      if (preparing.length > 0) {
+        return res.status(409).json({
+          error: 'One or more listings are still being prepared',
+          in_progress: preparing.map((listing: any) => listing.id),
+        });
+      }
       const inProgress = listings.filter((listing: any) => listing.scoring_status === 'scoring');
       if (inProgress.length > 0) {
         return res.status(409).json({

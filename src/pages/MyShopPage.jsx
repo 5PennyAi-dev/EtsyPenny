@@ -13,7 +13,7 @@ import ImportActionBar from '@/components/shop/ImportActionBar';
 import ExportToEtsyModal from '@/components/shop/ExportToEtsyModal';
 import ConnectEtsyEmptyState from '@/components/shop/ConnectEtsyEmptyState';
 import HelpLink from '@/components/ui/HelpLink';
-import { MY_SHOP_TABS, filterAndSortMyShopListings, getMyShopBulkActionPlan, isMyShopBulkSelectable, mergeEtsyListings } from '@/lib/my-shop-utils';
+import { MY_SHOP_TABS, filterAndSortMyShopListings, getMyShopBulkActionPlan, getNextPreparationClaimExpiry, isMyShopBulkSelectable, mergeEtsyListings } from '@/lib/my-shop-utils';
 
 function EmptyResults({ activeTab, searchQuery, hasExtraFilters, onClearStatus, onClearAll }) {
   const hasStatus = activeTab !== 'all' || hasExtraFilters;
@@ -80,8 +80,8 @@ export default function MyShopPage() {
   }, [searchQuery]);
   const [exportModalData, setExportModalData] = useState([]);
   const [preparingListingId, setPreparingListingId] = useState(null);
+  const [preparationClock, setPreparationClock] = useState(() => Date.now());
   const [catalogError, setCatalogError] = useState(null);
-  const [preparationErrors, setPreparationErrors] = useState({});
 
   const getAuthHeaders = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -132,8 +132,8 @@ export default function MyShopPage() {
 
   // ─── UX tabs, local filters and ordering ─────────────
   const allRows = useMemo(() => filterAndSortMyShopListings({
-    etsyListings, importedListings, tab: 'all', preparationErrors, preparingListingId,
-  }), [etsyListings, importedListings, preparationErrors, preparingListingId]);
+    etsyListings, importedListings, tab: 'all', preparingListingId, now: preparationClock,
+  }), [etsyListings, importedListings, preparingListingId, preparationClock]);
   const tabCounts = useMemo(() => Object.fromEntries(MY_SHOP_TABS.map((tab) => [
     tab,
     tab === 'all' ? etsyListings.length : allRows.filter((row) => row.ux.category === tab).length,
@@ -141,8 +141,8 @@ export default function MyShopPage() {
   const filteredRows = useMemo(() => filterAndSortMyShopListings({
     etsyListings, importedListings, tab: activeTab, search: debouncedSearch,
     progress: progressFilter, publication: publicationFilter, sort: sortOrder,
-    preparationErrors, preparingListingId,
-  }), [etsyListings, importedListings, activeTab, debouncedSearch, progressFilter, publicationFilter, sortOrder, preparationErrors, preparingListingId]);
+    preparingListingId, now: preparationClock,
+  }), [etsyListings, importedListings, activeTab, debouncedSearch, progressFilter, publicationFilter, sortOrder, preparingListingId, preparationClock]);
   const selectedRows = useMemo(() => allRows.filter((row) => selectedIds.has(row.etsyListing.etsy_listing_id)), [allRows, selectedIds]);
   const bulkActionPlan = useMemo(() => getMyShopBulkActionPlan(selectedRows), [selectedRows]);
   const tabs = [
@@ -150,6 +150,16 @@ export default function MyShopPage() {
     { key: 'ready_to_publish', label: 'Ready to Publish' }, { key: 'needs_attention', label: 'Needs Attention' },
     { key: 'published', label: 'Published' }, { key: 'all', label: 'All Listings' },
   ];
+
+  // Re-render once at the next persisted claim expiry. This does not poll or
+  // write to Supabase; the preparation endpoint remains the final authority.
+  useEffect(() => {
+    const now = Date.now();
+    const nextExpiry = getNextPreparationClaimExpiry(importedListings, now);
+    if (nextExpiry === null) return undefined;
+    const timeout = window.setTimeout(() => setPreparationClock(Date.now()), Math.max(0, nextExpiry - now) + 1);
+    return () => window.clearTimeout(timeout);
+  }, [importedListings, preparationClock]);
   const hasExtraFilters = progressFilter !== 'all' || publicationFilter !== 'all' || sortOrder !== 'activity';
   const clearFilters = () => { setProgressFilter('all'); setPublicationFilter('all'); setSortOrder('activity'); setSearchQuery(''); };
 
@@ -348,15 +358,13 @@ export default function MyShopPage() {
         setPreparingListingId(etsyId);
         try {
           const { data: prepared } = await axios.post('/api/etsy/prepare-listing', { etsy_listing_id: row.id }, { headers });
-          setPreparationErrors((current) => {
-            const { [etsyId]: _resolved, ...remaining } = current;
-            return remaining;
-          });
           navigate('/studio', { state: { listingId: prepared.listing_id } });
         } catch (error) {
           const message = error.response?.data?.error || error.message || 'Preparation failed. Please try again.';
-          setPreparationErrors((current) => ({ ...current, [etsyId]: message }));
-          toast.error('Imported, but preparation failed. Retry from this listing.');
+          await fetchImported();
+          toast.error(error.response?.data?.code === 'PREPARATION_IN_PROGRESS'
+            ? 'Preparation is already in progress. Refresh My Shop for the latest status.'
+            : `Imported, but preparation failed: ${message}`);
         } finally {
           setPreparingListingId(null);
         }
@@ -370,7 +378,6 @@ export default function MyShopPage() {
           return [[toPrep[index].etsy_listing_id, message]];
         });
         if (failedPreparations.length > 0) {
-          setPreparationErrors((current) => ({ ...current, ...Object.fromEntries(failedPreparations) }));
           toast.error(`${failedPreparations.length} imported listing${failedPreparations.length !== 1 ? 's' : ''} still need preparation.`);
         }
         await fetchImported();
@@ -489,15 +496,14 @@ export default function MyShopPage() {
       const { data } = await axios.post('/api/etsy/prepare-listing', {
         etsy_listing_id: etsyRow.id,
       }, { headers });
-      setPreparationErrors((current) => {
-        const { [etsyListingRowId]: _resolved, ...remaining } = current;
-        return remaining;
-      });
+      await fetchImported();
       navigate('/studio', { state: { listingId: data.listing_id } });
     } catch (error) {
       const message = error.response?.data?.error || error.message || 'Preparation failed. Please try again.';
-      setPreparationErrors((current) => ({ ...current, [etsyListingRowId]: message }));
-      toast.error('Failed to prepare listing: ' + message);
+      await fetchImported();
+      toast.error(error.response?.data?.code === 'PREPARATION_IN_PROGRESS'
+        ? 'Preparation is already in progress. Refresh My Shop for the latest status.'
+        : 'Failed to prepare listing: ' + message);
     } finally {
       setPreparingListingId(null);
     }
