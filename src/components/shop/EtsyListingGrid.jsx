@@ -2,6 +2,10 @@ import { Check, ExternalLink, Loader2, MoreHorizontal, Package } from 'lucide-re
 import { useState } from 'react';
 import { getMyShopLatestActivityTimestamp, isMyShopBulkSelectable } from '@/lib/my-shop-utils';
 
+// Keep the desktop header and rows on the same explicit tracks. In particular,
+// empty header cells cannot size the checkbox, action, or overflow-menu columns.
+const DESKTOP_GRID_COLUMNS = 'lg:grid-cols-[20px_44px_minmax(170px,1.8fr)_minmax(120px,1fr)_64px_minmax(130px,1fr)_72px_minmax(120px,max-content)_32px]';
+
 function scoreClass(score) {
   if (score >= 70) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
   if (score >= 40) return 'bg-amber-50 text-amber-700 border-amber-200';
@@ -37,7 +41,7 @@ function ListingRow({ row, isSelected, onToggleSelect, onAction }) {
   const isSelectable = isMyShopBulkSelectable(row);
 
   return (
-    <div className={`relative grid min-h-[88px] grid-cols-[auto_44px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-slate-100 px-3 py-3 last:border-b-0 lg:min-h-[72px] lg:grid-cols-[auto_44px_minmax(170px,1.8fr)_minmax(120px,1fr)_64px_minmax(130px,1fr)_72px_auto_auto] lg:gap-3 lg:px-4 ${isSelected ? 'bg-indigo-50/60' : 'bg-white'}`}>
+    <div className={`relative grid min-h-[88px] grid-cols-[auto_44px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-slate-100 px-3 py-3 last:border-b-0 lg:min-h-[72px] ${DESKTOP_GRID_COLUMNS} lg:gap-3 lg:px-4 ${isSelected ? 'bg-indigo-50/60' : 'bg-white'}`}>
       <button
         type="button"
         aria-label={`${isSelected ? 'Deselect' : 'Select'} ${listing.title}`}
@@ -67,5 +71,5 @@ function ListingRow({ row, isSelected, onToggleSelect, onAction }) {
 
 export default function EtsyListingGrid({ rows = [], selectedIds, onToggleSelect, onAction }) {
   if (rows.length === 0) return <div className="py-12 text-center text-sm text-slate-500"><Package className="mx-auto mb-3 text-slate-300" size={36} /><p>No listings found</p></div>;
-  return <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="hidden grid-cols-[auto_44px_minmax(170px,1.8fr)_minmax(120px,1fr)_64px_minmax(130px,1fr)_72px_auto_auto] items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-slate-500 lg:grid"><span /><span /><span>Listing</span><span>SEO progress</span><span>Score</span><span>Publication</span><span>Activity</span><span>Action</span><span /></div>{rows.map((row) => <ListingRow key={row.etsyListing.etsy_listing_id} row={row} isSelected={selectedIds.has(row.etsyListing.etsy_listing_id)} onToggleSelect={onToggleSelect} onAction={onAction} />)}</div>;
+  return <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className={`hidden items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-slate-500 lg:grid ${DESKTOP_GRID_COLUMNS}`}><span /><span /><span>Listing</span><span>SEO progress</span><span>Score</span><span>Publication</span><span>Activity</span><span>Action</span><span /></div>{rows.map((row) => <ListingRow key={row.etsyListing.etsy_listing_id} row={row} isSelected={selectedIds.has(row.etsyListing.etsy_listing_id)} onToggleSelect={onToggleSelect} onAction={onAction} />)}</div>;
 }

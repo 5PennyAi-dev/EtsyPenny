@@ -2,9 +2,9 @@
 
 > **Document de suivi et de transfert de contexte**
 > **Date de création :** 17 octobre 2026
-> **Dernière mise à jour :** 3 novembre 2026
+> **Dernière mise à jour :** 4 novembre 2026
 > **Statut global :** phases 0B, 0C, Phase 1 et Phase 1B déployées ; validations fonctionnelles sur boutique de test à confirmer
-> **Phase active :** 2C-3C.2B — validation locale du calcul Activity My Shop
+> **Phase active :** 2C-4 — corrections UX ciblées My Shop
 > **Dépôt :** https://github.com/5PennyAi-dev/EtsyPenny
 > **Destination recommandée dans le dépôt :** `docs/ROADMAP_ETSY_MYSHOP.md`
 > **Document directeur complémentaire :** `docs/ROADMAP.md` (vérifier la casse et l'existence dans le dépôt avant de créer un lien).
@@ -379,11 +379,12 @@ _Ajouter ici chaque arbitrage formel, et mettre à jour la section 6._
 | 2026-11-02 | Phase 2C-3A | Propositions SEO versionnées par champ et préconditions d’export renforcées | Local uniquement : un scoring conserve les tags explicitement proposés ; les propositions `title`, `description` et `tags` ont des versions indépendantes, vidées seulement après vérification Etsy de leur propre version. Le serveur partagé exige `scoring_status = scored`; les tags sont comparés sans dépendre de leur ordre. Migration non appliquée, aucun appel Etsy/OpenAI, commit, push ou déploiement. | `20261101120000_explicit_etsy_tag_proposals.sql` révisée ; validation complète et revue finale restantes |
 | 2026-11-03 | Phase 2C-3C.2A | Persistance locale de la préparation Etsy | Migration manuelle ajoutant état, erreur sûre, dates, claim expirant et identifiant de tentative. Vercel/Express utilisent le même helper ; My Shop relit l’état persistant et conserve l’erreur après rechargement. Un claim expiré est maintenant présenté comme récupérable, avec un unique réveil local à son échéance ; le serveur conserve la décision atomique. Aucun appel Etsy/IA, migration distante, commit, push ou déploiement. | `npm test` : 336 tests réussis ; typecheck, build et `git diff --check` réussis. Contrôle manuel Supabase Production et validation fonctionnelle restent nécessaires. |
 | 2026-11-03 | Phase 2C-3C.2B | Calcul Activity par dernière date réelle | My Shop calcule maintenant le maximum chronologique entre import, préparation, scoring, proposition de titre/description/tags et publication Etsy. Les dates absentes ou invalides sont ignorées ; sans date valide, l’interface affiche `—`. Les données déjà chargées suffisent : aucune requête supplémentaire, migration, appel Etsy/IA, commit, push ou déploiement. | `npm test` : 340 tests réussis ; typecheck, build et `git diff --check` réussis. Validation fonctionnelle sur boutique de test restante. |
+| 2026-11-04 | Phase 2C-4 | Corrections UX ciblées My Shop | La grille desktop partage maintenant des pistes explicites entre l’en-tête et les lignes (case, miniature, titre, progression, score, publication, activité, action, menu), ce qui aligne les colonnes sans positionnement fragile. L’avertissement « not fully optimized » est supprimé pour les publications volontaires limitées aux tags ; les confirmations explicites, l’avertissement d’écrasement et les protections de conflit restent inchangés. Aucun appel Etsy/IA, migration, commit, push ou déploiement. | `npm test` : 340 tests réussis ; typecheck, build et `git diff --check` réussis. Validation fonctionnelle sur boutique de test restante. |
 | 2026-10-17 | Suivi | Création et actualisation de cette feuille de route | Prête à être ajoutée au dépôt | `ROADMAP_ETSY_MYSHOP.md` |
 
 ## 12. Prochaine action immédiate
 
-**Examiner ce correctif local 2C-3C.2B, puis effectuer la validation fonctionnelle sur une boutique de test : une proposition enregistrée après publication doit devenir la dernière Activity au retour de Studio. Ne pas exécuter `supabase db push`.**
+**Examiner le correctif local 2C-4, puis valider sur une boutique de test l’alignement desktop/tablette et une publication volontaire limitée aux tags, sans publication Etsy. Confirmer aussi qu’une proposition enregistrée après publication devient la dernière Activity au retour de Studio. Ne pas exécuter `supabase db push`.**
 
 ## 13. Reprise du chantier dans une nouvelle conversation
 

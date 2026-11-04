@@ -583,26 +583,6 @@ const ExportToEtsyModal = ({ isOpen, onClose, onSuccess, listings = [], prefligh
 
           {/* Content */}
           <div className="px-5 pb-3 max-h-[60vh] overflow-y-auto">
-            {(() => {
-              const notFullyOptimized = listings.filter(
-                (l) => fieldAvailable(l, 'tags') && !fieldAvailable(l, 'title') && !fieldAvailable(l, 'description')
-              );
-              if (notFullyOptimized.length === 0) return null;
-              const isOne = notFullyOptimized.length === 1;
-              return (
-                <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 mb-4">
-                  <p className="text-sm font-medium text-amber-900 mb-1">
-                    {isOne ? 'This listing was not fully optimized' : `${notFullyOptimized.length} listings were not fully optimized`}
-                  </p>
-                  <p className="text-xs text-amber-800 leading-snug">
-                    {isOne
-                      ? `"${notFullyOptimized[0].display_title || notFullyOptimized[0].title || 'Untitled'}" has selected tags but no generated title or description. Are you sure you want to publish?`
-                      : 'These listings have tags ready but no generated title or description. They will be published with their existing Etsy title and description intact.'}
-                  </p>
-                </div>
-              );
-            })()}
-
             {review ? renderReview() : (isSingle ? renderSingleMode() : renderBatchMode())}
 
             {/* Warning banner */}
