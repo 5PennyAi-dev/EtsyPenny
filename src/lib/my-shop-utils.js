@@ -40,6 +40,30 @@ export function getNextPreparationClaimExpiry(listings = [], now = Date.now()) {
   }, null);
 }
 
+/**
+ * Returns the most recent valid persisted activity timestamp for a My Shop
+ * listing. Proposal timestamps live on the linked PennySEO listing while the
+ * import, preparation, scoring, and export timestamps live on etsy_listings.
+ */
+export function getMyShopLatestActivityTimestamp(listing) {
+  const proposalFields = listing?.listings?.etsy_proposal_fields;
+  const candidates = [
+    listing?.imported_at,
+    listing?.prepared_at,
+    listing?.scored_at,
+    proposalFields?.title?.updated_at,
+    proposalFields?.description?.updated_at,
+    proposalFields?.tags?.updated_at,
+    listing?.last_exported_at,
+  ];
+
+  return candidates.reduce((latest, value) => {
+    if (typeof value !== 'string') return latest;
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) && (latest === null || timestamp > latest) ? timestamp : latest;
+  }, null);
+}
+
 function hasPublishableProposal(listing) {
   const pennyListing = listing?.listings;
   const fields = pennyListing?.etsy_proposal_fields;
@@ -156,9 +180,9 @@ export function filterAndSortMyShopListings({
       const bScore = b.imported?.listings?.listings_global_eval?.[0]?.listing_strength ?? b.imported?.original_score ?? -1;
       return bScore - aScore;
     }
-    const aDate = a.imported?.last_exported_at || a.imported?.scored_at || a.imported?.imported_at || '';
-    const bDate = b.imported?.last_exported_at || b.imported?.scored_at || b.imported?.imported_at || '';
-    return String(bDate).localeCompare(String(aDate));
+    const aTimestamp = getMyShopLatestActivityTimestamp(a.imported);
+    const bTimestamp = getMyShopLatestActivityTimestamp(b.imported);
+    return (bTimestamp ?? -Infinity) - (aTimestamp ?? -Infinity);
   });
 }
 

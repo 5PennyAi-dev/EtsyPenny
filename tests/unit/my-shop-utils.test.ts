@@ -1,9 +1,53 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { filterAndSortMyShopListings, getMyShopBulkActionPlan, getMyShopListingStatus, getMyShopUxState, getNextPreparationClaimExpiry, isMyShopBulkSelectable, isScoreableEtsyListing, mergeEtsyListings } from '../../src/lib/my-shop-utils.js';
+import { filterAndSortMyShopListings, getMyShopBulkActionPlan, getMyShopLatestActivityTimestamp, getMyShopListingStatus, getMyShopUxState, getNextPreparationClaimExpiry, isMyShopBulkSelectable, isScoreableEtsyListing, mergeEtsyListings } from '../../src/lib/my-shop-utils.js';
 
 afterEach(() => vi.useRealTimers());
 
 describe('My Shop listing helpers', () => {
+  it('uses the most recent valid timestamp from every persisted activity source', () => {
+    const listing = {
+      imported_at: '2026-11-01T09:00:00.000Z',
+      prepared_at: '2026-11-01T10:00:00.000Z',
+      scored_at: '2026-11-01T11:00:00.000Z',
+      last_exported_at: '2026-11-01T15:00:00.000Z',
+      listings: {
+        etsy_proposal_fields: {
+          title: { updated_at: '2026-11-01T12:00:00.000Z' },
+          description: { updated_at: '2026-11-01T13:00:00.000Z' },
+          tags: { updated_at: '2026-11-01T14:00:00.000Z' },
+        },
+      },
+    };
+
+    expect(getMyShopLatestActivityTimestamp(listing)).toBe(Date.parse('2026-11-01T15:00:00.000Z'));
+    expect(getMyShopLatestActivityTimestamp({ ...listing, last_exported_at: '2026-11-01T08:00:00.000Z' }))
+      .toBe(Date.parse('2026-11-01T14:00:00.000Z'));
+  });
+
+  it('treats an explicit proposal saved after publication as the latest activity', () => {
+    const listing = {
+      last_exported_at: '2026-11-01T10:00:00.000Z',
+      listings: { etsy_proposal_fields: { tags: { updated_at: '2026-11-01T11:00:00.000Z' } } },
+    };
+
+    expect(getMyShopLatestActivityTimestamp(listing)).toBe(Date.parse('2026-11-01T11:00:00.000Z'));
+  });
+
+  it('ignores missing and invalid activity timestamps', () => {
+    expect(getMyShopLatestActivityTimestamp({
+      imported_at: 'not-a-date',
+      scored_at: null,
+      listings: { etsy_proposal_fields: { title: { updated_at: 123 }, tags: { updated_at: '' } } },
+    })).toBeNull();
+  });
+
+  it('supports historical listings that do not have prepared_at', () => {
+    expect(getMyShopLatestActivityTimestamp({
+      imported_at: '2026-11-01T09:00:00.000Z',
+      scored_at: '2026-11-01T10:00:00.000Z',
+    })).toBe(Date.parse('2026-11-01T10:00:00.000Z'));
+  });
+
   it('appends a later Etsy page without duplicates and refreshes overlapping listings', () => {
     const firstPage = [
       { etsy_listing_id: 'one', title: 'Original' },

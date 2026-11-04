@@ -1,6 +1,6 @@
 import { Check, ExternalLink, Loader2, MoreHorizontal, Package } from 'lucide-react';
 import { useState } from 'react';
-import { isMyShopBulkSelectable } from '@/lib/my-shop-utils';
+import { getMyShopLatestActivityTimestamp, isMyShopBulkSelectable } from '@/lib/my-shop-utils';
 
 function scoreClass(score) {
   if (score >= 70) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -16,9 +16,9 @@ function statusClass(key) {
 }
 
 function activityLabel(imported) {
-  const value = imported?.last_exported_at || imported?.scored_at || imported?.imported_at;
-  if (!value || Number.isNaN(new Date(value).getTime())) return '—';
-  return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const timestamp = getMyShopLatestActivityTimestamp(imported);
+  if (timestamp === null) return '—';
+  return new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function actionLabel(action) {
