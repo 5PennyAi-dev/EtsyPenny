@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -6,11 +6,12 @@ import { useBulkProgress } from '@/context/BulkProgressContext';
 import Layout from '@/components/Layout';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { filterSeoListings, getSeoListingPresentation, SEO_STATUS_LABELS } from '@/lib/seo-listings-utils';
 
 const STATUS_CONFIG = {
   new: {
     computed: 'NEW',
-    label: 'New',
+    label: SEO_STATUS_LABELS.NEW,
     description: 'Listings created but not yet analyzed',
     color: '#64748b',
     bg: '#f1f5f9',
@@ -22,7 +23,7 @@ const STATUS_CONFIG = {
   },
   analyzed: {
     computed: 'ANALYZED',
-    label: 'Analyzed',
+    label: SEO_STATUS_LABELS.ANALYZED,
     description: 'Image analyzed — ready for keyword generation',
     color: '#1e40af',
     bg: '#dbeafe',
@@ -34,7 +35,7 @@ const STATUS_CONFIG = {
   },
   'seo-ready': {
     computed: 'SEO_READY',
-    label: 'SEO Ready',
+    label: SEO_STATUS_LABELS.SEO_READY,
     description: 'Keywords generated — ready for review',
     color: '#3730a3',
     bg: '#e0e7ff',
@@ -46,7 +47,7 @@ const STATUS_CONFIG = {
   },
   'draft-ready': {
     computed: 'DRAFT_READY',
-    label: 'Draft Ready',
+    label: SEO_STATUS_LABELS.DRAFT_READY,
     description: 'Keywords selected — ready for draft generation',
     color: '#92400e',
     bg: '#fef3c7',
@@ -58,7 +59,7 @@ const STATUS_CONFIG = {
   },
   complete: {
     computed: 'OPTIMIZED',
-    label: 'Complete',
+    label: SEO_STATUS_LABELS.OPTIMIZED,
     description: 'Title, description and keywords ready',
     color: '#065f46',
     bg: '#d1fae5',
@@ -120,40 +121,66 @@ export default function ListingsByStatusPage() {
   const config = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.new;
 
   const [allListings, setAllListings] = useState([]);
+  const [etsyListingsByListingId, setEtsyListingsByListingId] = useState(new Map());
+  const [etsyMetadataAvailable, setEtsyMetadataAvailable] = useState(true);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [originFilter, setOriginFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const totalTokens = (profile?.tokens_monthly_balance ?? 0) + (profile?.tokens_bonus_balance ?? 0);
-
-  useEffect(() => {
-    if (user) fetchListings();
-  }, [user]);
 
   // Reset selection when status changes
   useEffect(() => {
     setSelected([]);
   }, [currentStatus]);
 
-  async function fetchListings() {
+  const fetchListings = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('v_dashboard_listings')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false });
+    const [listingResult, etsyResult] = await Promise.all([
+      supabase
+        .from('v_dashboard_listings')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false }),
+      supabase
+        .from('etsy_listings')
+        .select('listing_id, preparation_status, preparation_claim_expires_at, scoring_status, export_status, prepared_at, scored_at, last_exported_at')
+        .eq('user_id', user.id),
+    ]);
 
-    if (!error) setAllListings(data || []);
+    if (!listingResult.error) setAllListings(listingResult.data || []);
+    if (etsyResult.error) {
+      setEtsyMetadataAvailable(false);
+      setEtsyListingsByListingId(new Map());
+    } else {
+      setEtsyMetadataAvailable(true);
+      setEtsyListingsByListingId(new Map((etsyResult.data || [])
+        .filter((listing) => listing.listing_id)
+        .map((listing) => [listing.listing_id, listing])));
+    }
     setLoading(false);
-  }
+  }, [user]);
 
-  const filteredListings = allListings.filter(
-    (l) => statusToKey(l.computed_status) === currentStatus
-  );
+  useEffect(() => {
+    if (user) fetchListings();
+  }, [user, fetchListings]);
+
+  const presentationRows = allListings.map((listing) => ({
+    listing,
+    presentation: getSeoListingPresentation(listing, etsyListingsByListingId.get(listing.id), { etsyMetadataAvailable }),
+  }));
+  const filteredRows = filterSeoListings(presentationRows, {
+    origin: originFilter,
+    status: config.computed,
+    search: searchQuery,
+  });
+  const filteredListings = filteredRows.map(({ listing }) => listing);
 
   const statusCounts = {};
   for (const key of STATUS_KEYS) {
-    statusCounts[key] = allListings.filter((l) => statusToKey(l.computed_status) === key).length;
+    statusCounts[key] = filterSeoListings(presentationRows, { origin: originFilter, status: STATUS_CONFIG[key].computed }).length;
   }
 
   const handleBulkAction = async () => {
@@ -253,6 +280,29 @@ export default function ListingsByStatusPage() {
               </button>
             );
           })}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div role="group" aria-label="Filter by listing origin" style={{ display: 'flex', gap: 4 }}>
+            {[['all', 'Tous'], ['etsy', 'Etsy'], ['manual', 'Manuel']].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setOriginFilter(value)}
+                style={{ padding: '6px 10px', border: `1px solid ${originFilter === value ? '#a5b4fc' : '#e2e8f0'}`, borderRadius: 6, background: originFilter === value ? '#eef2ff' : '#fff', color: originFilter === value ? '#4338ca' : '#64748b', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Rechercher un listing"
+            aria-label="Rechercher un listing"
+            style={{ marginLeft: 'auto', minWidth: 200, padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, color: '#334155' }}
+          />
         </div>
 
         {config.bulkLimit > 0 && (
@@ -359,12 +409,12 @@ export default function ListingsByStatusPage() {
             <div style={{ textAlign: 'center', padding: '48px 0', color: '#94a3b8', fontSize: 13 }}>
               Loading listings...
             </div>
-          ) : filteredListings.length === 0 ? (
+          ) : filteredRows.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px 0', color: '#94a3b8', fontSize: 13 }}>
-              No {config.label.toLowerCase()} listings found.
+              Aucun listing ne correspond aux filtres actuels.
             </div>
           ) : (
-            filteredListings.map((listing) => {
+            filteredRows.map(({ listing, presentation }) => {
               const isSelected = selected.includes(listing.id);
               const scoreStyle = getScoreColor(listing.listing_strength);
               const statusKey = statusToKey(listing.computed_status);
@@ -416,7 +466,7 @@ export default function ListingsByStatusPage() {
                     ) : (
                       <div style={{ width: 32, height: 32, borderRadius: 6, background: '#f1f5f9' }} />
                     )}
-                    {listing.source === 'etsy' && (
+                    {presentation.origin === 'etsy' && (
                       <span style={{ position: 'absolute', top: -4, left: -4, background: '#f97316', color: 'white', fontSize: 9, fontWeight: 700, lineHeight: 1, padding: '2px 4px', borderRadius: 4 }}>Etsy</span>
                     )}
                   </div>
@@ -434,6 +484,10 @@ export default function ListingsByStatusPage() {
                       }}
                     >
                       {listing.title || 'Untitled'}
+                    </div>
+                    <div style={{ fontSize: 11, color: presentation.origin === 'unknown' ? '#b45309' : '#64748b', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {presentation.originLabel}
+                      {presentation.etsyNotice && ` · ${presentation.etsyNotice.label}`}
                     </div>
                     {listing.theme && (
                       <div
@@ -503,7 +557,7 @@ export default function ListingsByStatusPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      Open →
+                      Ouvrir
                     </button>
                   </div>
                 </div>
