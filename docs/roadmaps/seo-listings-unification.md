@@ -70,9 +70,9 @@ L’option B est retenue : **statut SEO commun + origine distincte**.
 | 0 — Audit | Comprendre l’architecture et les statuts existants | En cours | Cette roadmap, inventaire des états, matrice proposée, risques | États, sources et limites documentés ; état passé à Terminé le 4 novembre 2026 |
 | 1 — Conception UX | Valider statuts, colonnes, filtres et actions | Terminé | Conception validée, contrat de rendu, libellés définitifs, cas limites | Décisions produit consignées le 4 novembre 2026 |
 | 2 — Plan technique | Définir les modifications minimales | Terminé | Plan de réalisation, dépendances, risques et stratégie de tests (A11) | Aucun changement de schéma/pipeline requis ; périmètre d’implémentation déterminé |
-| 3 — Implémentation | Adapter SEO Listings localement | À faire | Interface et tests ciblés | Origine, statuts et restrictions Etsy fonctionnent dans les parcours retenus |
-| 4 — Validation | Tests fonctionnels et régression | À faire | Résultats de tests, recette manuelle des scénarios | Parcours manuels/Etsy, retry, historique et non-export manuel validés |
-| 5 — Déploiement | Publier et vérifier en Production | À faire | Procédure et vérification Production | Déploiement approuvé, contrôlé et sans régression constatée |
+| 3 — Implémentation | Adapter SEO Listings localement | Terminé | Interface, helpers et tests ciblés | Origine, statuts et restrictions Etsy fonctionnent dans les parcours retenus |
+| 4 — Validation | Tests fonctionnels et régression | Terminé | Tests automatisés et recette Production | Parcours manuels/Etsy, retry, historique, non-export manuel et rendu desktop/mobile validés le 5 novembre 2026 |
+| 5 — Déploiement | Publier et vérifier en Production | Terminé | Déploiements Production successifs contrôlés | Déploiement approuvé, contrôlé et sans régression fonctionnelle constatée |
 
 ## A6. Critères d’acceptation globaux
 
@@ -454,24 +454,24 @@ Statut : correctif local et validations automatisées terminés le 4 novembre 20
 
 ## A14. Publication Production
 
-Statut : publication autorisée après validations automatisées ; la validation UX et fonctionnelle authentifiée reste à effectuer manuellement sur `pennyseo.ai` après le déploiement.
+Statut : publication et validation UX/fonctionnelle authentifiée confirmées en Production le 5 novembre 2026.
 
-La publication n’autorise aucune modification de My Shop, de Supabase, des routes Etsy/IA ni des données utilisateur. La phase 4 ne sera clôturée qu’après la validation Production documentée.
+La publication n’a nécessité aucune modification de My Shop, de Supabase, des routes Etsy/IA ni des données utilisateur hors du périmètre documenté.
 
 ## A15. Correctif linguistique — SEO Listings en anglais
 
-Statut : correctif local en attente de commit et de déploiement. Le périmètre est strictement linguistique : aucune règle métier, valeur technique, requête, filtre ou présentation structurelle n’est modifiée.
+Statut : correctif publié et validé en Production. Le périmètre est strictement linguistique : aucune règle métier, valeur technique, requête, filtre ou présentation structurelle n’est modifiée.
 
 - Statuts : `To Analyze`, `To Generate`, `Keywords Available`, `Ready to Draft` et `Content Generated`.
 - Origines et actions : `All`, `Etsy`, `Manual`, `Verify Origin` et `Open`.
 - Recherche et état vide : `Search listings...` et `No listings match the current filters.`
 - Notices Etsy : `Preparation in progress`, `Preparation needs retry in My Shop`, `Scoring in progress`, `Scoring needs retry in My Shop`, `Publication needs verification` et `Published`.
 
-Les tests unitaires du helper couvrent ces chaînes visibles. La validation Production devra confirmer l’absence de texte français résiduel dans SEO Listings avant la clôture de la phase 4.
+Les tests unitaires du helper couvrent ces chaînes visibles. La validation Production a confirmé l’absence de texte français résiduel dans SEO Listings.
 
 ## A16. Harmonisation UX — Etsy Workflow et SEO Progress
 
-Statut : implémentation locale terminée le 5 novembre 2026 ; la validation UX Production reste ouverte.
+Statut : implémentation, déploiement et validation UX Production terminés le 5 novembre 2026.
 
 ### Changements réalisés
 
@@ -486,8 +486,25 @@ Statut : implémentation locale terminée le 5 novembre 2026 ; la validation UX 
 - `Ready to Publish` provient uniquement de la logique existante de proposition Etsy explicite ; il n’est jamais déduit de `Content Generated` et ne donne aucune autorisation d’export.
 - Aucune migration, route, règle RLS, action My Shop/Etsy ou requête N+1 n’est ajoutée.
 - Validations locales : 22 tests ciblés, 348 tests complets, typecheck, lint ciblé et build réussis. Le corpus d’aide généré par le build a été restauré hors diff.
-- À confirmer en Production sur desktop et mobile : contraste/lisibilité des badges, coexistence des deux informations secondaires, erreurs/préparations Etsy, listings manuels, filtres, recherche, pagination et navigation. La phase 4 reste ouverte jusqu’à cette recette authentifiée.
+- Validation Production confirmée sur desktop et mobile : contraste/lisibilité des badges, coexistence des informations secondaires, erreurs/préparations Etsy, listings manuels, filtres, recherche, pagination et navigation.
 
 ### Correctif de chargement My Shop
 
 Le 5 novembre 2026, la tentative de sélectionner `listings.computed_status` a été retirée : Supabase renvoie `42703` car ce champ appartient à la vue `v_dashboard_listings`, pas à la table liée `listings`. My Shop revient à sa relation existante et charge sans requête SEO secondaire. Le statut Etsy et les informations SEO de SEO Listings restent inchangés.
+
+## A17. Clôture de la refonte SEO Listings
+
+**Date de clôture : 5 novembre 2026.**
+
+La refonte est déployée et validée en Production. Les objectifs UX sont atteints : la liste unifiée distingue clairement Etsy et Manual, conserve les cinq statuts SEO anglais, sépare `SEO Progress` et `Etsy Workflow`, préserve les filtres/recherche/navigation et ne propose aucun export Etsy direct pour un listing manuel. Les rendus desktop et mobile, ainsi que les cas Etsy/manuels, ont été vérifiés sans problème fonctionnel bloquant.
+
+Les dernières validations automatisées sont réussies : 348/348 tests, typecheck, lint ciblé et build Production. Aucune migration Supabase, règle RLS, route Etsy/IA ou règle de publication n’a été modifiée pour cette refonte.
+
+### Améliorations potentielles reportées
+
+- Conserver et traiter séparément les titres provisoires `Pending Analysis...` de certains listings manuels.
+- Le statut SEO secondaire dans My Shop reste facultatif ; il n’est pas nécessaire à l’expérience actuelle.
+- Évaluer une pagination spécifique de SEO Listings seulement pour des catalogues très volumineux.
+- Réexaminer ultérieurement les cases à cocher et les actions groupées de SEO Listings.
+
+Ces points ne bloquent pas la clôture et ne font pas partie du périmètre livré.
