@@ -477,7 +477,7 @@ Statut : implémentation locale terminée le 5 novembre 2026 ; la validation UX 
 
 - My Shop nomme discrètement ses onglets et son filtre principal `Etsy Workflow`. Ses cinq catégories conservent leurs valeurs et libellés : `To Optimize`, `In Progress`, `Ready to Publish`, `Needs Attention` et `Published`.
 - `MY_SHOP_WORKFLOW` centralise ces libellés et leur intention visuelle. Les badges publication emploient désormais orange pour l’attention, vert pour l’action prête et un neutre distinct pour une publication terminée.
-- My Shop affiche `SEO: <statut>` uniquement lorsque `listings.computed_status` existe déjà sur le listing Etsy lié. Ce champ est ajouté à la relation déjà lue ; aucune requête supplémentaire ni déduction depuis le workflow Etsy n’est introduite.
+- My Shop ne rend pas de statut SEO secondaire : `computed_status` est calculé par `v_dashboard_listings` et n’existe pas dans la relation `listings` déjà lue. Ajouter une requête dédiée serait hors du périmètre minimal ; aucune déduction depuis le workflow Etsy n’est introduite.
 - SEO Listings identifie ses onglets comme `SEO Progress`. Pour un listing Etsy lié canoniquement, il rend en information secondaire `Etsy Workflow: <catégorie>` à partir de `getMyShopUxState()` et de la même présentation partagée. Les notices de préparation, scoring et publication restent affichées ; les listings manuels n’ont aucun statut Etsy.
 - Les badges SEO conservent leurs cinq statuts calculés Supabase. Les étapes prêtes pour une action sont vertes, le travail en cours bleu, le départ neutre et le contenu généré teal afin de le distinguer des actions à effectuer.
 
@@ -487,3 +487,7 @@ Statut : implémentation locale terminée le 5 novembre 2026 ; la validation UX 
 - Aucune migration, route, règle RLS, action My Shop/Etsy ou requête N+1 n’est ajoutée.
 - Validations locales : 22 tests ciblés, 348 tests complets, typecheck, lint ciblé et build réussis. Le corpus d’aide généré par le build a été restauré hors diff.
 - À confirmer en Production sur desktop et mobile : contraste/lisibilité des badges, coexistence des deux informations secondaires, erreurs/préparations Etsy, listings manuels, filtres, recherche, pagination et navigation. La phase 4 reste ouverte jusqu’à cette recette authentifiée.
+
+### Correctif de chargement My Shop
+
+Le 5 novembre 2026, la tentative de sélectionner `listings.computed_status` a été retirée : Supabase renvoie `42703` car ce champ appartient à la vue `v_dashboard_listings`, pas à la table liée `listings`. My Shop revient à sa relation existante et charge sans requête SEO secondaire. Le statut Etsy et les informations SEO de SEO Listings restent inchangés.

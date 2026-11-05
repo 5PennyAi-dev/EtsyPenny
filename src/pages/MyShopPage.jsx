@@ -174,7 +174,6 @@ export default function MyShopPage() {
           id,
           generated_title,
           generated_description,
-          computed_status,
           etsy_proposal_fields,
           listings_global_eval ( listing_strength )
         )

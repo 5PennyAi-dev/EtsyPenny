@@ -1,7 +1,6 @@
 import { Check, ExternalLink, Loader2, MoreHorizontal, Package } from 'lucide-react';
 import { useState } from 'react';
 import { getMyShopLatestActivityTimestamp, isMyShopBulkSelectable } from '@/lib/my-shop-utils';
-import { getSeoStatusLabel } from '@/lib/seo-listings-utils';
 
 // Keep the desktop header and rows on the same explicit tracks. In particular,
 // empty header cells cannot size the checkbox, action, or overflow-menu columns.
@@ -42,7 +41,6 @@ function ListingRow({ row, isSelected, onToggleSelect, onAction }) {
   const score = imported?.listings?.listings_global_eval?.[0]?.listing_strength ?? imported?.original_score;
   const isWorking = ux.action === 'working';
   const isSelectable = isMyShopBulkSelectable(row);
-  const seoStatusLabel = getSeoStatusLabel(imported?.listings?.computed_status);
 
   return (
     <div className={`relative grid min-h-[88px] grid-cols-[auto_44px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-slate-100 px-3 py-3 last:border-b-0 lg:min-h-[72px] ${DESKTOP_GRID_COLUMNS} lg:gap-3 lg:px-4 ${isSelected ? 'bg-indigo-50/60' : 'bg-white'}`}>
@@ -55,7 +53,7 @@ function ListingRow({ row, isSelected, onToggleSelect, onAction }) {
         className={`flex h-5 w-5 items-center justify-center rounded border ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 bg-white text-transparent hover:border-indigo-400'} disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-transparent`}
       ><Check size={14} strokeWidth={3} /></button>
       {listing.thumbnail_url ? <img src={listing.thumbnail_url} alt="" className="h-11 w-11 rounded-lg bg-slate-100 object-cover" loading="lazy" /> : <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100"><Package size={20} className="text-slate-400" /></div>}
-      <div className="min-w-0"><p className="truncate text-sm font-medium text-slate-800">{listing.title || 'Untitled listing'}</p><p className={`mt-0.5 truncate text-xs ${ux.error ? 'text-rose-700' : 'text-slate-500'}`}>{ux.error || [ux.progress, ux.publication, seoStatusLabel && `SEO: ${seoStatusLabel}`].filter(Boolean).join(' · ')}</p></div>
+      <div className="min-w-0"><p className="truncate text-sm font-medium text-slate-800">{listing.title || 'Untitled listing'}</p><p className={`mt-0.5 truncate text-xs ${ux.error ? 'text-rose-700' : 'text-slate-500'}`}>{ux.error || `${ux.progress} · ${ux.publication}`}</p></div>
       <span className={`${DESKTOP_CELL_START} text-xs text-slate-600`}>{ux.progress}</span>
       <div className={DESKTOP_CELL_START}><span className={`w-fit rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums ${score == null ? 'border-slate-200 text-slate-400' : scoreClass(score)}`}>{score ?? '—'}</span></div>
       <div className={DESKTOP_CELL_START}><span className={`w-fit rounded-full border px-2 py-0.5 text-xs font-medium ${statusClass(ux.publicationKey)}`}>{ux.publication}</span></div>
