@@ -492,29 +492,31 @@ Statut : implémentation, déploiement et validation UX Production terminés le 
 
 Le 5 novembre 2026, la tentative de sélectionner `listings.computed_status` a été retirée : Supabase renvoie `42703` car ce champ appartient à la vue `v_dashboard_listings`, pas à la table liée `listings`. My Shop revient à sa relation existante et charge sans requête SEO secondaire. Le statut Etsy et les informations SEO de SEO Listings restent inchangés.
 
-## A17. Clôture de la refonte SEO Listings
+## A17. Clôture définitive de la refonte SEO Listings
 
 **Date de clôture : 5 novembre 2026.**
 
 La refonte est déployée et validée en Production. Les objectifs UX sont atteints : la liste unifiée distingue clairement Etsy et Manual, conserve les cinq statuts SEO anglais, sépare `SEO Progress` et `Etsy Workflow`, préserve les filtres/recherche/navigation et ne propose aucun export Etsy direct pour un listing manuel. Les rendus desktop et mobile, ainsi que les cas Etsy/manuels, ont été vérifiés sans problème fonctionnel bloquant.
 
-Les dernières validations automatisées sont réussies : 348/348 tests, typecheck, lint ciblé et build Production. Aucune migration Supabase, règle RLS, route Etsy/IA ou règle de publication n’a été modifiée pour cette refonte.
+Les dernières validations automatisées sont réussies : 350/350 tests, typecheck, lint ciblé et `git diff --check`. Aucune migration Supabase, règle RLS, route Etsy/IA ou règle de publication n’a été modifiée pour cette refonte.
 
-### Améliorations potentielles reportées
+### Future improvements
 
 - Conserver et traiter séparément les titres provisoires `Pending Analysis...` de certains listings manuels.
 - Le statut SEO secondaire dans My Shop reste facultatif ; il n’est pas nécessaire à l’expérience actuelle.
 - Évaluer une pagination spécifique de SEO Listings seulement pour des catalogues très volumineux.
-- Réexaminer ultérieurement les cases à cocher et les actions groupées de SEO Listings.
+- Réévaluer un traitement en lot de listings manuels seulement si un besoin produit confirmé le justifie.
 
 Ces points ne bloquent pas la clôture et ne font pas partie du périmètre livré.
 
 ## A18. Simplification des actions SEO Listings
 
-Statut : implémentation locale en attente de validation finale.
+Statut : implémentation, déploiement et validation Production terminés le 5 novembre 2026.
 
 La décision UX retire de SEO Listings les trois actions groupées historiques (`Analyze Images`, `Generate Keywords` et `Generate Drafts`) ainsi que les cases à cocher, les limites, les coûts affichés, la confirmation et la progression associés. La page demeure une vue de consultation : filtres, recherche, cinq statuts SEO, origine Etsy/Manual, notices Etsy et ouverture individuelle dans le Studio sont conservés.
 
 Les opérations individuelles d’analyse, génération de mots-clés et rédaction restent disponibles dans le Studio sans modification. Les actions groupées de My Shop sont conservées sans modification. Un éventuel traitement en lot de listings manuels pourra être réévalué ultérieurement s’il répond à un besoin produit confirmé.
 
-Cette simplification est volontairement limitée à l’interface SEO Listings : aucune route IA ou Etsy, règle métier, mécanisme de tokens, migration ou flux de publication n’est modifié. La roadmap ne doit pas être considérée comme clôturée de nouveau avant validation de ce dernier changement.
+Cette simplification est volontairement limitée à l’interface SEO Listings : aucune route IA ou Etsy, règle métier, mécanisme de tokens, migration ou flux de publication n’est modifié. Le commit applicatif final est `bc58c62` (`refactor(seo-listings): remove legacy bulk actions`). La validation visuelle Production a confirmé la disparition des cases et actions groupées, le bon fonctionnement des filtres, de la recherche et de `Open`, ainsi que l’affichage harmonisé des listings Etsy et manuels et la conservation des actions groupées de My Shop.
+
+Toutes les phases de la roadmap sont terminées. La refonte SEO Listings est officiellement clôturée.
