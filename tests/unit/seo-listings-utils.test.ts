@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterSeoListings, getSeoListingPresentation, SEO_STATUS_LABELS } from '../../src/lib/seo-listings-utils.js';
+import { filterSeoListings, getSeoListingPresentation, getSeoStatusLabel, SEO_STATUS_LABELS } from '../../src/lib/seo-listings-utils.js';
 
 const etsyListing = (overrides = {}) => ({ listing_id: 'listing-etsy', ...overrides });
 const studioListing = (overrides = {}) => ({ id: 'listing-etsy', source: 'etsy', computed_status: 'NEW', title: 'Etsy mug', ...overrides });
@@ -10,6 +10,8 @@ describe('SEO Listings presentation', () => {
       NEW: 'To Analyze', ANALYZED: 'To Generate', SEO_READY: 'Keywords Available',
       DRAFT_READY: 'Ready to Draft', OPTIMIZED: 'Content Generated',
     });
+    expect(getSeoStatusLabel('DRAFT_READY')).toBe('Ready to Draft');
+    expect(getSeoStatusLabel('unknown')).toBeNull();
   });
 
   it('renders a canonically linked Etsy listing and its persisted notices', () => {
@@ -41,6 +43,14 @@ describe('SEO Listings presentation', () => {
       .toMatchObject({ origin: 'unknown', originLabel: 'Verify Origin' });
     expect(getSeoListingPresentation(studioListing(), null, { etsyMetadataAvailable: false }))
       .toMatchObject({ origin: 'etsy', originLabel: 'Etsy', etsyNotice: null });
+  });
+
+  it('renders an Etsy Workflow only for a canonically linked Etsy listing', () => {
+    const workflow = { label: 'Ready to Publish', tone: 'ready' };
+    expect(getSeoListingPresentation(studioListing(), etsyListing(), { etsyWorkflow: workflow }))
+      .toMatchObject({ isEtsyLinked: true, etsyWorkflow: workflow });
+    expect(getSeoListingPresentation({ id: 'manual', source: 'manual' }, null, { etsyWorkflow: workflow }))
+      .toMatchObject({ isEtsyLinked: false, etsyWorkflow: null });
   });
 
   it('combines origin, status and search filters', () => {

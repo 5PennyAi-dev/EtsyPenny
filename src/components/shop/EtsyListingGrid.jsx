@@ -1,6 +1,7 @@
 import { Check, ExternalLink, Loader2, MoreHorizontal, Package } from 'lucide-react';
 import { useState } from 'react';
 import { getMyShopLatestActivityTimestamp, isMyShopBulkSelectable } from '@/lib/my-shop-utils';
+import { getSeoStatusLabel } from '@/lib/seo-listings-utils';
 
 // Keep the desktop header and rows on the same explicit tracks. In particular,
 // empty header cells cannot size the checkbox, action, or overflow-menu columns.
@@ -15,9 +16,9 @@ function scoreClass(score) {
 }
 
 function statusClass(key) {
-  if (key === 'attention') return 'bg-rose-50 text-rose-700 border-rose-200';
-  if (key === 'published') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  if (key === 'ready') return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+  if (key === 'attention') return 'bg-amber-50 text-amber-700 border-amber-200';
+  if (key === 'published') return 'bg-slate-100 text-slate-700 border-slate-300';
+  if (key === 'ready') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
   return 'bg-slate-50 text-slate-600 border-slate-200';
 }
 
@@ -41,6 +42,7 @@ function ListingRow({ row, isSelected, onToggleSelect, onAction }) {
   const score = imported?.listings?.listings_global_eval?.[0]?.listing_strength ?? imported?.original_score;
   const isWorking = ux.action === 'working';
   const isSelectable = isMyShopBulkSelectable(row);
+  const seoStatusLabel = getSeoStatusLabel(imported?.listings?.computed_status);
 
   return (
     <div className={`relative grid min-h-[88px] grid-cols-[auto_44px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-slate-100 px-3 py-3 last:border-b-0 lg:min-h-[72px] ${DESKTOP_GRID_COLUMNS} lg:gap-3 lg:px-4 ${isSelected ? 'bg-indigo-50/60' : 'bg-white'}`}>
@@ -53,7 +55,7 @@ function ListingRow({ row, isSelected, onToggleSelect, onAction }) {
         className={`flex h-5 w-5 items-center justify-center rounded border ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 bg-white text-transparent hover:border-indigo-400'} disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-transparent`}
       ><Check size={14} strokeWidth={3} /></button>
       {listing.thumbnail_url ? <img src={listing.thumbnail_url} alt="" className="h-11 w-11 rounded-lg bg-slate-100 object-cover" loading="lazy" /> : <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100"><Package size={20} className="text-slate-400" /></div>}
-      <div className="min-w-0"><p className="truncate text-sm font-medium text-slate-800">{listing.title || 'Untitled listing'}</p><p className={`mt-0.5 truncate text-xs ${ux.error ? 'text-rose-700' : 'text-slate-500'}`}>{ux.error || `${ux.progress} · ${ux.publication}`}</p></div>
+      <div className="min-w-0"><p className="truncate text-sm font-medium text-slate-800">{listing.title || 'Untitled listing'}</p><p className={`mt-0.5 truncate text-xs ${ux.error ? 'text-rose-700' : 'text-slate-500'}`}>{ux.error || [ux.progress, ux.publication, seoStatusLabel && `SEO: ${seoStatusLabel}`].filter(Boolean).join(' · ')}</p></div>
       <span className={`${DESKTOP_CELL_START} text-xs text-slate-600`}>{ux.progress}</span>
       <div className={DESKTOP_CELL_START}><span className={`w-fit rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums ${score == null ? 'border-slate-200 text-slate-400' : scoreClass(score)}`}>{score ?? '—'}</span></div>
       <div className={DESKTOP_CELL_START}><span className={`w-fit rounded-full border px-2 py-0.5 text-xs font-medium ${statusClass(ux.publicationKey)}`}>{ux.publication}</span></div>
@@ -73,5 +75,5 @@ function ListingRow({ row, isSelected, onToggleSelect, onAction }) {
 
 export default function EtsyListingGrid({ rows = [], selectedIds, onToggleSelect, onAction }) {
   if (rows.length === 0) return <div className="py-12 text-center text-sm text-slate-500"><Package className="mx-auto mb-3 text-slate-300" size={36} /><p>No listings found</p></div>;
-  return <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className={`hidden items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-slate-500 lg:grid ${DESKTOP_GRID_COLUMNS}`}><span /><span /><span className={DESKTOP_HEADER_CELL_START}>Listing</span><span className={DESKTOP_HEADER_CELL_START}>SEO progress</span><span className={DESKTOP_HEADER_CELL_START}>Score</span><span className={DESKTOP_HEADER_CELL_START}>Publication</span><span className={DESKTOP_HEADER_CELL_START}>Activity</span><span className={DESKTOP_HEADER_CELL_START}>Action</span><span /></div>{rows.map((row) => <ListingRow key={row.etsyListing.etsy_listing_id} row={row} isSelected={selectedIds.has(row.etsyListing.etsy_listing_id)} onToggleSelect={onToggleSelect} onAction={onAction} />)}</div>;
+  return <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className={`hidden items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-slate-500 lg:grid ${DESKTOP_GRID_COLUMNS}`}><span /><span /><span className={DESKTOP_HEADER_CELL_START}>Listing</span><span className={DESKTOP_HEADER_CELL_START}>Etsy Workflow</span><span className={DESKTOP_HEADER_CELL_START}>Score</span><span className={DESKTOP_HEADER_CELL_START}>Publication</span><span className={DESKTOP_HEADER_CELL_START}>Activity</span><span className={DESKTOP_HEADER_CELL_START}>Action</span><span /></div>{rows.map((row) => <ListingRow key={row.etsyListing.etsy_listing_id} row={row} isSelected={selectedIds.has(row.etsyListing.etsy_listing_id)} onToggleSelect={onToggleSelect} onAction={onAction} />)}</div>;
 }

@@ -6,6 +6,10 @@ export const SEO_STATUS_LABELS = {
   OPTIMIZED: 'Content Generated',
 };
 
+export function getSeoStatusLabel(status) {
+  return SEO_STATUS_LABELS[status] || null;
+}
+
 function isPreparationClaimExpired(etsyListing, now) {
   if (etsyListing?.preparation_status !== 'preparing') return false;
   const expiresAt = Date.parse(etsyListing.preparation_claim_expires_at || '');
@@ -19,6 +23,7 @@ function isPreparationClaimExpired(etsyListing, now) {
  */
 export function getSeoListingPresentation(listing, etsyListing, {
   etsyMetadataAvailable = true,
+  etsyWorkflow = null,
   now = Date.now(),
 } = {}) {
   const declaredEtsy = listing?.source === 'etsy';
@@ -29,6 +34,7 @@ export function getSeoListingPresentation(listing, etsyListing, {
       origin: declaredEtsy ? 'etsy' : 'manual',
       originLabel: declaredEtsy ? 'Etsy' : 'Manual',
       isEtsyLinked: false,
+      etsyWorkflow: null,
       etsyNotice: null,
     };
   }
@@ -41,6 +47,7 @@ export function getSeoListingPresentation(listing, etsyListing, {
       origin: 'unknown',
       originLabel: 'Verify Origin',
       isEtsyLinked: false,
+      etsyWorkflow: null,
       etsyNotice: null,
     };
   }
@@ -50,6 +57,7 @@ export function getSeoListingPresentation(listing, etsyListing, {
     origin: isEtsyLinked ? 'etsy' : 'manual',
     originLabel: isEtsyLinked ? 'Etsy' : 'Manual',
     isEtsyLinked,
+    etsyWorkflow: isEtsyLinked ? etsyWorkflow : null,
     etsyNotice: null,
   };
 

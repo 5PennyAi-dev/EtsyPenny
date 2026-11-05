@@ -7,6 +7,7 @@ import Layout from '@/components/Layout';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { filterSeoListings, getSeoListingPresentation, SEO_STATUS_LABELS } from '@/lib/seo-listings-utils';
+import { getMyShopUxState, getMyShopWorkflowPresentation } from '@/lib/my-shop-utils';
 
 const STATUS_CONFIG = {
   new: {
@@ -37,8 +38,8 @@ const STATUS_CONFIG = {
     computed: 'SEO_READY',
     label: SEO_STATUS_LABELS.SEO_READY,
     description: 'Keywords generated — ready for review',
-    color: '#3730a3',
-    bg: '#e0e7ff',
+    color: '#047857',
+    bg: '#d1fae5',
     bulkAction: null,
     actionCost: 0,
     actionKey: null,
@@ -49,8 +50,8 @@ const STATUS_CONFIG = {
     computed: 'DRAFT_READY',
     label: SEO_STATUS_LABELS.DRAFT_READY,
     description: 'Keywords selected — ready for draft generation',
-    color: '#92400e',
-    bg: '#fef3c7',
+    color: '#047857',
+    bg: '#d1fae5',
     bulkAction: 'Generate Drafts',
     actionCost: 1,
     actionKey: 'generate_draft',
@@ -61,8 +62,8 @@ const STATUS_CONFIG = {
     computed: 'OPTIMIZED',
     label: SEO_STATUS_LABELS.OPTIMIZED,
     description: 'Title, description and keywords ready',
-    color: '#065f46',
-    bg: '#d1fae5',
+    color: '#0f766e',
+    bg: '#ccfbf1',
     bulkAction: null,
     actionCost: 0,
     actionKey: null,
@@ -146,7 +147,7 @@ export default function ListingsByStatusPage() {
         .order('updated_at', { ascending: false }),
       supabase
         .from('etsy_listings')
-        .select('listing_id, preparation_status, preparation_claim_expires_at, scoring_status, export_status, prepared_at, scored_at, last_exported_at')
+        .select('listing_id, preparation_status, preparation_claim_expires_at, scoring_status, export_status, prepared_at, scored_at, last_exported_at, listings:listing_id ( etsy_proposal_fields )')
         .eq('user_id', user.id),
     ]);
 
@@ -167,10 +168,16 @@ export default function ListingsByStatusPage() {
     if (user) fetchListings();
   }, [user, fetchListings]);
 
-  const presentationRows = allListings.map((listing) => ({
-    listing,
-    presentation: getSeoListingPresentation(listing, etsyListingsByListingId.get(listing.id), { etsyMetadataAvailable }),
-  }));
+  const presentationRows = allListings.map((listing) => {
+    const etsyListing = etsyListingsByListingId.get(listing.id);
+    const etsyWorkflow = etsyMetadataAvailable && etsyListing
+      ? getMyShopWorkflowPresentation(getMyShopUxState(etsyListing))
+      : null;
+    return {
+      listing,
+      presentation: getSeoListingPresentation(listing, etsyListing, { etsyMetadataAvailable, etsyWorkflow }),
+    };
+  });
   const filteredRows = filterSeoListings(presentationRows, {
     origin: originFilter,
     status: config.computed,
@@ -246,6 +253,7 @@ export default function ListingsByStatusPage() {
           </div>
         </div>
 
+        <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>SEO Progress</p>
         {/* Status tabs */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid #e2e8f0' }}>
           {STATUS_KEYS.map((key) => {
@@ -487,6 +495,7 @@ export default function ListingsByStatusPage() {
                     </div>
                     <div style={{ fontSize: 11, color: presentation.origin === 'unknown' ? '#b45309' : '#64748b', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {presentation.originLabel}
+                      {presentation.etsyWorkflow && ` · Etsy Workflow: ${presentation.etsyWorkflow.label}`}
                       {presentation.etsyNotice && ` · ${presentation.etsyNotice.label}`}
                     </div>
                     {listing.theme && (

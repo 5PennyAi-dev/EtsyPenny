@@ -468,3 +468,22 @@ Statut : correctif local en attente de commit et de déploiement. Le périmètre
 - Notices Etsy : `Preparation in progress`, `Preparation needs retry in My Shop`, `Scoring in progress`, `Scoring needs retry in My Shop`, `Publication needs verification` et `Published`.
 
 Les tests unitaires du helper couvrent ces chaînes visibles. La validation Production devra confirmer l’absence de texte français résiduel dans SEO Listings avant la clôture de la phase 4.
+
+## A16. Harmonisation UX — Etsy Workflow et SEO Progress
+
+Statut : implémentation locale terminée le 5 novembre 2026 ; la validation UX Production reste ouverte.
+
+### Changements réalisés
+
+- My Shop nomme discrètement ses onglets et son filtre principal `Etsy Workflow`. Ses cinq catégories conservent leurs valeurs et libellés : `To Optimize`, `In Progress`, `Ready to Publish`, `Needs Attention` et `Published`.
+- `MY_SHOP_WORKFLOW` centralise ces libellés et leur intention visuelle. Les badges publication emploient désormais orange pour l’attention, vert pour l’action prête et un neutre distinct pour une publication terminée.
+- My Shop affiche `SEO: <statut>` uniquement lorsque `listings.computed_status` existe déjà sur le listing Etsy lié. Ce champ est ajouté à la relation déjà lue ; aucune requête supplémentaire ni déduction depuis le workflow Etsy n’est introduite.
+- SEO Listings identifie ses onglets comme `SEO Progress`. Pour un listing Etsy lié canoniquement, il rend en information secondaire `Etsy Workflow: <catégorie>` à partir de `getMyShopUxState()` et de la même présentation partagée. Les notices de préparation, scoring et publication restent affichées ; les listings manuels n’ont aucun statut Etsy.
+- Les badges SEO conservent leurs cinq statuts calculés Supabase. Les étapes prêtes pour une action sont vertes, le travail en cours bleu, le départ neutre et le contenu généré teal afin de le distinguer des actions à effectuer.
+
+### Limites et validations
+
+- `Ready to Publish` provient uniquement de la logique existante de proposition Etsy explicite ; il n’est jamais déduit de `Content Generated` et ne donne aucune autorisation d’export.
+- Aucune migration, route, règle RLS, action My Shop/Etsy ou requête N+1 n’est ajoutée.
+- Validations locales : 22 tests ciblés, 348 tests complets, typecheck, lint ciblé et build réussis. Le corpus d’aide généré par le build a été restauré hors diff.
+- À confirmer en Production sur desktop et mobile : contraste/lisibilité des badges, coexistence des deux informations secondaires, erreurs/préparations Etsy, listings manuels, filtres, recherche, pagination et navigation. La phase 4 reste ouverte jusqu’à cette recette authentifiée.

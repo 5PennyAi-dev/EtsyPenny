@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { filterAndSortMyShopListings, getMyShopBulkActionPlan, getMyShopLatestActivityTimestamp, getMyShopListingStatus, getMyShopUxState, getNextPreparationClaimExpiry, isMyShopBulkSelectable, isScoreableEtsyListing, mergeEtsyListings } from '../../src/lib/my-shop-utils.js';
+import { MY_SHOP_WORKFLOW, filterAndSortMyShopListings, getMyShopBulkActionPlan, getMyShopLatestActivityTimestamp, getMyShopListingStatus, getMyShopUxState, getMyShopWorkflowPresentation, getNextPreparationClaimExpiry, isMyShopBulkSelectable, isScoreableEtsyListing, mergeEtsyListings } from '../../src/lib/my-shop-utils.js';
 
 afterEach(() => vi.useRealTimers());
 
@@ -70,6 +70,18 @@ describe('My Shop listing helpers', () => {
     expect(isScoreableEtsyListing(listing)).toBe(true);
     expect(getMyShopListingStatus(listing)).toBe('error');
     expect(isScoreableEtsyListing({ listing_id: 'listing-1', scoring_status: 'scoring' })).toBe(false);
+  });
+
+  it('maps each My Shop category to one shared Etsy Workflow label and tone', () => {
+    expect(MY_SHOP_WORKFLOW).toEqual({
+      to_optimize: { label: 'To Optimize', tone: 'neutral' },
+      in_progress: { label: 'In Progress', tone: 'progress' },
+      ready_to_publish: { label: 'Ready to Publish', tone: 'ready' },
+      needs_attention: { label: 'Needs Attention', tone: 'attention' },
+      published: { label: 'Published', tone: 'completed' },
+    });
+    expect(getMyShopWorkflowPresentation({ category: 'ready_to_publish' })).toEqual(MY_SHOP_WORKFLOW.ready_to_publish);
+    expect(getMyShopWorkflowPresentation()).toEqual(MY_SHOP_WORKFLOW.to_optimize);
   });
 
   it('uses a deterministic priority for attention, progress, proposals, and published listings', () => {

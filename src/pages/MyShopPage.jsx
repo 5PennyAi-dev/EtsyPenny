@@ -13,7 +13,7 @@ import ImportActionBar from '@/components/shop/ImportActionBar';
 import ExportToEtsyModal from '@/components/shop/ExportToEtsyModal';
 import ConnectEtsyEmptyState from '@/components/shop/ConnectEtsyEmptyState';
 import HelpLink from '@/components/ui/HelpLink';
-import { MY_SHOP_TABS, filterAndSortMyShopListings, getMyShopBulkActionPlan, getNextPreparationClaimExpiry, isMyShopBulkSelectable, mergeEtsyListings } from '@/lib/my-shop-utils';
+import { MY_SHOP_TABS, MY_SHOP_WORKFLOW, filterAndSortMyShopListings, getMyShopBulkActionPlan, getNextPreparationClaimExpiry, isMyShopBulkSelectable, mergeEtsyListings } from '@/lib/my-shop-utils';
 
 function EmptyResults({ activeTab, searchQuery, hasExtraFilters, onClearStatus, onClearAll }) {
   const hasStatus = activeTab !== 'all' || hasExtraFilters;
@@ -146,9 +146,9 @@ export default function MyShopPage() {
   const selectedRows = useMemo(() => allRows.filter((row) => selectedIds.has(row.etsyListing.etsy_listing_id)), [allRows, selectedIds]);
   const bulkActionPlan = useMemo(() => getMyShopBulkActionPlan(selectedRows), [selectedRows]);
   const tabs = [
-    { key: 'to_optimize', label: 'To Optimize' }, { key: 'in_progress', label: 'In Progress' },
-    { key: 'ready_to_publish', label: 'Ready to Publish' }, { key: 'needs_attention', label: 'Needs Attention' },
-    { key: 'published', label: 'Published' }, { key: 'all', label: 'All Listings' },
+    { key: 'to_optimize', label: MY_SHOP_WORKFLOW.to_optimize.label }, { key: 'in_progress', label: MY_SHOP_WORKFLOW.in_progress.label },
+    { key: 'ready_to_publish', label: MY_SHOP_WORKFLOW.ready_to_publish.label }, { key: 'needs_attention', label: MY_SHOP_WORKFLOW.needs_attention.label },
+    { key: 'published', label: MY_SHOP_WORKFLOW.published.label }, { key: 'all', label: 'All Listings' },
   ];
 
   // Re-render once at the next persisted claim expiry. This does not poll or
@@ -174,6 +174,7 @@ export default function MyShopPage() {
           id,
           generated_title,
           generated_description,
+          computed_status,
           etsy_proposal_fields,
           listings_global_eval ( listing_strength )
         )
@@ -690,12 +691,15 @@ export default function MyShopPage() {
           </div>
 
           {etsyListings.length > 0 && (
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              {tabs.map((tab) => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === tab.key ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-700'}`}>
-                  {tab.label} · {tabCounts[tab.key]}
-                </button>
-              ))}
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Etsy Workflow</p>
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                {tabs.map((tab) => (
+                  <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === tab.key ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-700'}`}>
+                    {tab.label} · {tabCounts[tab.key]}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -714,7 +718,7 @@ export default function MyShopPage() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <SlidersHorizontal size={15} className="text-slate-400" />
-                <select value={progressFilter} onChange={(event) => setProgressFilter(event.target.value)} aria-label="Filter SEO progress" className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="all">SEO progress</option><option value="not_started">Not started</option><option value="preparation_required">Preparation required</option><option value="ready_to_score">Ready to score</option><option value="scoring">Scoring</option><option value="studio">Continue in Studio</option><option value="proposal">Proposal ready</option><option value="error">Needs retry</option></select>
+                <select value={progressFilter} onChange={(event) => setProgressFilter(event.target.value)} aria-label="Filter Etsy workflow" className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="all">Etsy Workflow</option><option value="not_started">Not started</option><option value="preparation_required">Preparation required</option><option value="ready_to_score">Ready to score</option><option value="scoring">Scoring</option><option value="studio">Continue in Studio</option><option value="proposal">Proposal ready</option><option value="error">Needs retry</option></select>
                 <select value={publicationFilter} onChange={(event) => setPublicationFilter(event.target.value)} aria-label="Filter publication status" className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="all">Publication</option><option value="not_ready">Not ready</option><option value="ready">Ready to review</option><option value="attention">Needs attention</option><option value="published">Published</option></select>
                 <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} aria-label="Sort listings" className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="activity">Latest activity</option><option value="title">Title</option><option value="score">SEO score</option></select>
                 {(hasExtraFilters || searchQuery) && <button onClick={clearFilters} className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"><X size={14} /> Clear</button>}

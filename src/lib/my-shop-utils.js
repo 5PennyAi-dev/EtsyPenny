@@ -2,6 +2,18 @@ export const MY_SHOP_TABS = [
   'to_optimize', 'in_progress', 'ready_to_publish', 'needs_attention', 'published', 'all',
 ];
 
+export const MY_SHOP_WORKFLOW = {
+  to_optimize: { label: 'To Optimize', tone: 'neutral' },
+  in_progress: { label: 'In Progress', tone: 'progress' },
+  ready_to_publish: { label: 'Ready to Publish', tone: 'ready' },
+  needs_attention: { label: 'Needs Attention', tone: 'attention' },
+  published: { label: 'Published', tone: 'completed' },
+};
+
+export function getMyShopWorkflowPresentation(ux) {
+  return MY_SHOP_WORKFLOW[ux?.category] || MY_SHOP_WORKFLOW.to_optimize;
+}
+
 export function mergeEtsyListings(existing = [], incoming = []) {
   const incomingById = new Map(incoming.map((listing) => [listing.etsy_listing_id, listing]));
   const existingIds = new Set(existing.map((listing) => listing.etsy_listing_id));
