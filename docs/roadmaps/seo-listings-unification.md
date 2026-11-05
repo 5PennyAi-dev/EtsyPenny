@@ -508,3 +508,13 @@ Les dernières validations automatisées sont réussies : 348/348 tests, typeche
 - Réexaminer ultérieurement les cases à cocher et les actions groupées de SEO Listings.
 
 Ces points ne bloquent pas la clôture et ne font pas partie du périmètre livré.
+
+## A18. Simplification des actions SEO Listings
+
+Statut : implémentation locale en attente de validation finale.
+
+La décision UX retire de SEO Listings les trois actions groupées historiques (`Analyze Images`, `Generate Keywords` et `Generate Drafts`) ainsi que les cases à cocher, les limites, les coûts affichés, la confirmation et la progression associés. La page demeure une vue de consultation : filtres, recherche, cinq statuts SEO, origine Etsy/Manual, notices Etsy et ouverture individuelle dans le Studio sont conservés.
+
+Les opérations individuelles d’analyse, génération de mots-clés et rédaction restent disponibles dans le Studio sans modification. Les actions groupées de My Shop sont conservées sans modification. Un éventuel traitement en lot de listings manuels pourra être réévalué ultérieurement s’il répond à un besoin produit confirmé.
+
+Cette simplification est volontairement limitée à l’interface SEO Listings : aucune route IA ou Etsy, règle métier, mécanisme de tokens, migration ou flux de publication n’est modifié. La roadmap ne doit pas être considérée comme clôturée de nouveau avant validation de ce dernier changement.

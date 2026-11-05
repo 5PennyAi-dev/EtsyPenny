@@ -2,10 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { useBulkProgress } from '@/context/BulkProgressContext';
 import Layout from '@/components/Layout';
-import axios from 'axios';
-import { toast } from 'sonner';
 import { filterSeoListings, getSeoListingPresentation, SEO_STATUS_LABELS } from '@/lib/seo-listings-utils';
 import { getMyShopUxState, getMyShopWorkflowPresentation } from '@/lib/my-shop-utils';
 
@@ -13,62 +10,32 @@ const STATUS_CONFIG = {
   new: {
     computed: 'NEW',
     label: SEO_STATUS_LABELS.NEW,
-    description: 'Listings created but not yet analyzed',
     color: '#64748b',
     bg: '#f1f5f9',
-    bulkAction: 'Analyze Images',
-    actionCost: 1,
-    actionKey: 'analyze_image',
-    bulkLimit: 10,
-    bulkLimitMessage: 'Maximum 10 listings for image analysis at once.',
   },
   analyzed: {
     computed: 'ANALYZED',
     label: SEO_STATUS_LABELS.ANALYZED,
-    description: 'Image analyzed — ready for keyword generation',
     color: '#1e40af',
     bg: '#dbeafe',
-    bulkAction: 'Generate Keywords',
-    actionCost: 8,
-    actionKey: 'generate_keywords',
-    bulkLimit: 5,
-    bulkLimitMessage: 'Maximum 5 listings for keyword generation at once.',
   },
   'seo-ready': {
     computed: 'SEO_READY',
     label: SEO_STATUS_LABELS.SEO_READY,
-    description: 'Keywords generated — ready for review',
     color: '#047857',
     bg: '#d1fae5',
-    bulkAction: null,
-    actionCost: 0,
-    actionKey: null,
-    bulkLimit: 0,
-    bulkLimitMessage: null,
   },
   'draft-ready': {
     computed: 'DRAFT_READY',
     label: SEO_STATUS_LABELS.DRAFT_READY,
-    description: 'Keywords selected — ready for draft generation',
     color: '#047857',
     bg: '#d1fae5',
-    bulkAction: 'Generate Drafts',
-    actionCost: 1,
-    actionKey: 'generate_draft',
-    bulkLimit: 15,
-    bulkLimitMessage: 'Maximum 15 listings for draft generation at once.',
   },
   complete: {
     computed: 'OPTIMIZED',
     label: SEO_STATUS_LABELS.OPTIMIZED,
-    description: 'Title, description and keywords ready',
     color: '#0f766e',
     bg: '#ccfbf1',
-    bulkAction: null,
-    actionCost: 0,
-    actionKey: null,
-    bulkLimit: 0,
-    bulkLimitMessage: null,
   },
 };
 
@@ -107,7 +74,7 @@ function statusToKey(computed) {
 
 const ROW_GRID = {
   display: 'grid',
-  gridTemplateColumns: '24px 36px 2fr 1fr 1fr 1fr 60px',
+  gridTemplateColumns: '36px 2fr 1fr 1fr 1fr 60px',
   alignItems: 'center',
   gap: '0 10px',
 };
@@ -115,8 +82,7 @@ const ROW_GRID = {
 export default function ListingsByStatusPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, profile, refreshProfile } = useAuth();
-  const { bulkProgress, startBulk, incrementBulk, finishBulk } = useBulkProgress();
+  const { user } = useAuth();
 
   const currentStatus = searchParams.get('status') || 'new';
   const config = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.new;
@@ -125,17 +91,8 @@ export default function ListingsByStatusPage() {
   const [etsyListingsByListingId, setEtsyListingsByListingId] = useState(new Map());
   const [etsyMetadataAvailable, setEtsyMetadataAvailable] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState([]);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [originFilter, setOriginFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-
-  const totalTokens = (profile?.tokens_monthly_balance ?? 0) + (profile?.tokens_bonus_balance ?? 0);
-
-  // Reset selection when status changes
-  useEffect(() => {
-    setSelected([]);
-  }, [currentStatus]);
 
   const fetchListings = useCallback(async () => {
     setLoading(true);
@@ -183,60 +140,10 @@ export default function ListingsByStatusPage() {
     status: config.computed,
     search: searchQuery,
   });
-  const filteredListings = filteredRows.map(({ listing }) => listing);
-
   const statusCounts = {};
   for (const key of STATUS_KEYS) {
     statusCounts[key] = filterSeoListings(presentationRows, { origin: originFilter, status: STATUS_CONFIG[key].computed }).length;
   }
-
-  const handleBulkAction = async () => {
-    setShowConfirmModal(false);
-    // Note: bulk processing runs in the browser. Closing the tab or refreshing
-    // the page will interrupt processing. A server-side job queue would be
-    // required to survive tab close — acceptable limitation for v1.
-    startBulk(selected.length, config.bulkAction);
-
-    for (let i = 0; i < selected.length; i++) {
-      const listingId = selected[i];
-      const listing = allListings.find((l) => l.id === listingId);
-      let hasError = false;
-      try {
-        if (config.actionKey === 'analyze_image') {
-          await axios.post('/api/seo/analyze-image', {
-            listing_id: listingId,
-            user_id: user.id,
-            mockup_url: listing?.image_url,
-          });
-        } else if (config.actionKey === 'generate_keywords') {
-          await axios.post('/api/seo/generate-keywords', {
-            listing_id: listingId,
-            user_id: user.id,
-          });
-        } else if (config.actionKey === 'generate_draft') {
-          await axios.post('/api/seo/generate-draft', {
-            listing_id: listingId,
-            user_id: user.id,
-          });
-        }
-      } catch (err) {
-        hasError = true;
-        if (err.response?.status === 402) {
-          toast.error('Insufficient tokens — stopping bulk action.');
-          incrementBulk(true);
-          break;
-        }
-        toast.error(`Failed on listing ${i + 1}: ${err.message}`);
-      }
-      incrementBulk(hasError);
-    }
-
-    finishBulk();
-    setSelected([]);
-    toast.success(`Bulk ${config.bulkAction} complete!`);
-    await refreshProfile();
-    fetchListings();
-  };
 
   return (
     <Layout>
@@ -248,7 +155,7 @@ export default function ListingsByStatusPage() {
               SEO Listings
             </h1>
             <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>
-              {allListings.length} listing{allListings.length !== 1 ? 's' : ''} total · {filteredListings.length} {config.label.toLowerCase()}
+              {allListings.length} listing{allListings.length !== 1 ? 's' : ''} total · {filteredRows.length} {config.label.toLowerCase()}
             </p>
           </div>
         </div>
@@ -313,98 +220,10 @@ export default function ListingsByStatusPage() {
           />
         </div>
 
-        {config.bulkLimit > 0 && (
-          <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 12 }}>
-            You can select up to <strong>{config.bulkLimit}</strong> listings at once for this action.
-          </p>
-        )}
-
-        {/* Progress bar */}
-        {bulkProgress.running && (
-          <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
-            <div style={{ fontSize: 13, color: '#065f46', marginBottom: 6 }}>
-              Processing {bulkProgress.current} of {bulkProgress.total} listings...
-              {bulkProgress.errors > 0 && (
-                <span style={{ color: '#dc2626', marginLeft: 8 }}>
-                  ({bulkProgress.errors} failed)
-                </span>
-              )}
-            </div>
-            <div style={{ height: 4, background: '#dcfce7', borderRadius: 999 }}>
-              <div
-                style={{
-                  height: 4,
-                  background: '#22c55e',
-                  borderRadius: 999,
-                  width: `${(bulkProgress.current / bulkProgress.total) * 100}%`,
-                  transition: 'width 0.3s',
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Bulk action bar */}
-        {selected.length > 0 && config.bulkAction && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '10px 16px',
-              background: '#eef2ff',
-              borderRadius: 8,
-              marginBottom: 16,
-              border: '1px solid #c7d2fe',
-            }}
-          >
-            <span style={{ fontSize: 13, color: '#3730a3', fontWeight: 500 }}>
-              {selected.length} listing{selected.length > 1 ? 's' : ''} selected
-            </span>
-            <span style={{ fontSize: 12, color: '#6366f1' }}>
-              · {selected.length * config.actionCost} tokens required
-            </span>
-            <div style={{ flex: 1 }} />
-            <button
-              onClick={() => setShowConfirmModal(true)}
-              style={{
-                padding: '6px 16px',
-                background: '#4f46e5',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 6,
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              {config.bulkAction} ({selected.length})
-            </button>
-            <button
-              onClick={() => setSelected([])}
-              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 12 }}
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-
         {/* Main card */}
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20 }}>
           {/* Column headers */}
           <div style={{ ...ROW_GRID, paddingBottom: 8, borderBottom: '1px solid #f1f5f9', fontSize: 11, color: '#94a3b8', fontWeight: 500, marginBottom: 4 }}>
-            <div>
-              {config.bulkAction && (
-                <input
-                  type="checkbox"
-                  checked={selected.length === Math.min(filteredListings.length, config.bulkLimit) && filteredListings.length > 0}
-                  onChange={(e) =>
-                    setSelected(e.target.checked ? filteredListings.slice(0, config.bulkLimit).map((l) => l.id) : [])
-                  }
-                  style={{ cursor: 'pointer' }}
-                />
-              )}
-            </div>
             <div>Image</div>
             <div>Product Name</div>
             <div style={{ textAlign: 'center' }}>Score</div>
@@ -423,7 +242,6 @@ export default function ListingsByStatusPage() {
             </div>
           ) : (
             filteredRows.map(({ listing, presentation }) => {
-              const isSelected = selected.includes(listing.id);
               const scoreStyle = getScoreColor(listing.listing_strength);
               const statusKey = statusToKey(listing.computed_status);
               const statusCfg = STATUS_CONFIG[statusKey];
@@ -435,34 +253,11 @@ export default function ListingsByStatusPage() {
                     ...ROW_GRID,
                     padding: '8px 0',
                     borderBottom: '1px solid #f8fafc',
-                    background: isSelected ? '#f5f3ff' : 'transparent',
                     transition: 'background 0.15s',
                     cursor: 'pointer',
                   }}
                   onClick={() => navigate('/studio', { state: { listingId: listing.id } })}
                 >
-                  {/* Checkbox */}
-                  <div onClick={(e) => e.stopPropagation()}>
-                    {config.bulkAction && (
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => {
-                          if (e.target.checked && selected.length >= config.bulkLimit) {
-                            toast.error(config.bulkLimitMessage);
-                            return;
-                          }
-                          setSelected((prev) =>
-                            e.target.checked
-                              ? [...prev, listing.id]
-                              : prev.filter((id) => id !== listing.id)
-                          );
-                        }}
-                        style={{ cursor: 'pointer' }}
-                      />
-                    )}
-                  </div>
-
                   {/* Image */}
                   <div style={{ position: 'relative' }}>
                     {listing.image_url ? (
@@ -574,81 +369,6 @@ export default function ListingsByStatusPage() {
             })
           )}
         </div>
-
-        {/* Confirm modal */}
-        {showConfirmModal && (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 50,
-            }}
-          >
-            <div
-              style={{
-                background: '#fff',
-                borderRadius: 12,
-                padding: 24,
-                width: 360,
-                boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
-              }}
-            >
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: '0 0 8px' }}>
-                Confirm bulk action
-              </h3>
-              <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px' }}>
-                {config.bulkAction} for{' '}
-                <strong>
-                  {selected.length} listing{selected.length > 1 ? 's' : ''}
-                </strong>{' '}
-                will cost <strong>{selected.length * config.actionCost} tokens</strong>. You currently
-                have <strong>{totalTokens} tokens</strong>.
-              </p>
-              {totalTokens < selected.length * config.actionCost && (
-                <p style={{ fontSize: 12, color: '#dc2626', marginBottom: 12 }}>
-                  Insufficient tokens. Please buy more or select fewer listings.
-                </p>
-              )}
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button
-                  onClick={() => setShowConfirmModal(false)}
-                  style={{
-                    padding: '8px 16px',
-                    background: '#f1f5f9',
-                    border: 'none',
-                    borderRadius: 6,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    color: '#64748b',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleBulkAction}
-                  disabled={totalTokens < selected.length * config.actionCost}
-                  style={{
-                    padding: '8px 16px',
-                    background: '#4f46e5',
-                    border: 'none',
-                    borderRadius: 6,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    color: '#fff',
-                    fontWeight: 500,
-                    opacity: totalTokens < selected.length * config.actionCost ? 0.5 : 1,
-                  }}
-                >
-                  Confirm
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </Layout>
   );
