@@ -284,7 +284,7 @@ export default function ListingsByStatusPage() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
           <div role="group" aria-label="Filter by listing origin" style={{ display: 'flex', gap: 4 }}>
-            {[['all', 'Tous'], ['etsy', 'Etsy'], ['manual', 'Manuel']].map(([value, label]) => (
+            {[['all', 'All'], ['etsy', 'Etsy'], ['manual', 'Manual']].map(([value, label]) => (
               <button
                 key={value}
                 type="button"
@@ -299,8 +299,8 @@ export default function ListingsByStatusPage() {
             type="search"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Rechercher un listing"
-            aria-label="Rechercher un listing"
+            placeholder="Search listings..."
+            aria-label="Search listings"
             style={{ marginLeft: 'auto', minWidth: 200, padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, color: '#334155' }}
           />
         </div>
@@ -411,7 +411,7 @@ export default function ListingsByStatusPage() {
             </div>
           ) : filteredRows.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px 0', color: '#94a3b8', fontSize: 13 }}>
-              Aucun listing ne correspond aux filtres actuels.
+              No listings match the current filters.
             </div>
           ) : (
             filteredRows.map(({ listing, presentation }) => {
@@ -557,7 +557,7 @@ export default function ListingsByStatusPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      Ouvrir
+                      Open
                     </button>
                   </div>
                 </div>

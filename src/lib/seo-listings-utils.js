@@ -1,9 +1,9 @@
 export const SEO_STATUS_LABELS = {
-  NEW: 'À analyser',
-  ANALYZED: 'À générer',
-  SEO_READY: 'Mots-clés disponibles',
-  DRAFT_READY: 'Prêt à rédiger',
-  OPTIMIZED: 'Contenu généré',
+  NEW: 'To Analyze',
+  ANALYZED: 'To Generate',
+  SEO_READY: 'Keywords Available',
+  DRAFT_READY: 'Ready to Draft',
+  OPTIMIZED: 'Content Generated',
 };
 
 function isPreparationClaimExpired(etsyListing, now) {
@@ -27,7 +27,7 @@ export function getSeoListingPresentation(listing, etsyListing, {
   if (!etsyMetadataAvailable) {
     return {
       origin: declaredEtsy ? 'etsy' : 'manual',
-      originLabel: declaredEtsy ? 'Etsy' : 'Manuel',
+      originLabel: declaredEtsy ? 'Etsy' : 'Manual',
       isEtsyLinked: false,
       etsyNotice: null,
     };
@@ -39,7 +39,7 @@ export function getSeoListingPresentation(listing, etsyListing, {
   if (originMismatch) {
     return {
       origin: 'unknown',
-      originLabel: 'Origine à vérifier',
+      originLabel: 'Verify Origin',
       isEtsyLinked: false,
       etsyNotice: null,
     };
@@ -48,7 +48,7 @@ export function getSeoListingPresentation(listing, etsyListing, {
   const isEtsyLinked = declaredEtsy && hasEtsyLink;
   const presentation = {
     origin: isEtsyLinked ? 'etsy' : 'manual',
-    originLabel: isEtsyLinked ? 'Etsy' : 'Manuel',
+    originLabel: isEtsyLinked ? 'Etsy' : 'Manual',
     isEtsyLinked,
     etsyNotice: null,
   };
@@ -56,23 +56,23 @@ export function getSeoListingPresentation(listing, etsyListing, {
   if (!isEtsyLinked) return presentation;
 
   if (etsyListing.preparation_status === 'error' || isPreparationClaimExpired(etsyListing, now)) {
-    return { ...presentation, etsyNotice: { tone: 'attention', label: 'Préparation à réessayer dans My Shop' } };
+    return { ...presentation, etsyNotice: { tone: 'attention', label: 'Preparation needs retry in My Shop' } };
   }
   if (etsyListing.preparation_status === 'preparing') {
-    return { ...presentation, etsyNotice: { tone: 'progress', label: 'Préparation en cours' } };
+    return { ...presentation, etsyNotice: { tone: 'progress', label: 'Preparation in progress' } };
   }
   if (etsyListing.scoring_status === 'error') {
-    return { ...presentation, etsyNotice: { tone: 'attention', label: 'Scoring à réessayer dans My Shop' } };
+    return { ...presentation, etsyNotice: { tone: 'attention', label: 'Scoring needs retry in My Shop' } };
   }
   if (etsyListing.scoring_status === 'scoring') {
-    return { ...presentation, etsyNotice: { tone: 'progress', label: 'Scoring en cours' } };
+    return { ...presentation, etsyNotice: { tone: 'progress', label: 'Scoring in progress' } };
   }
 
   if (['error', 'partial', 'conflict', 'published_unverified'].includes(etsyListing.export_status)) {
-    return { ...presentation, etsyNotice: { tone: 'attention', label: 'Publication à vérifier' } };
+    return { ...presentation, etsyNotice: { tone: 'attention', label: 'Publication needs verification' } };
   }
   if (etsyListing.export_status === 'exported') {
-    return { ...presentation, etsyNotice: { tone: 'success', label: 'Publié' } };
+    return { ...presentation, etsyNotice: { tone: 'success', label: 'Published' } };
   }
 
   return presentation;

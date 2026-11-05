@@ -457,3 +457,14 @@ Statut : correctif local et validations automatisées terminés le 4 novembre 20
 Statut : publication autorisée après validations automatisées ; la validation UX et fonctionnelle authentifiée reste à effectuer manuellement sur `pennyseo.ai` après le déploiement.
 
 La publication n’autorise aucune modification de My Shop, de Supabase, des routes Etsy/IA ni des données utilisateur. La phase 4 ne sera clôturée qu’après la validation Production documentée.
+
+## A15. Correctif linguistique — SEO Listings en anglais
+
+Statut : correctif local en attente de commit et de déploiement. Le périmètre est strictement linguistique : aucune règle métier, valeur technique, requête, filtre ou présentation structurelle n’est modifiée.
+
+- Statuts : `To Analyze`, `To Generate`, `Keywords Available`, `Ready to Draft` et `Content Generated`.
+- Origines et actions : `All`, `Etsy`, `Manual`, `Verify Origin` et `Open`.
+- Recherche et état vide : `Search listings...` et `No listings match the current filters.`
+- Notices Etsy : `Preparation in progress`, `Preparation needs retry in My Shop`, `Scoring in progress`, `Scoring needs retry in My Shop`, `Publication needs verification` et `Published`.
+
+Les tests unitaires du helper couvrent ces chaînes visibles. La validation Production devra confirmer l’absence de texte français résiduel dans SEO Listings avant la clôture de la phase 4.
